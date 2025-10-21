@@ -1,0 +1,250 @@
+import React, { useState } from 'react';
+import type { Campaign } from '../types';
+import { Icons, SceneIcon } from './Icons';
+import type { EditorView, GeneratorType } from '../App';
+import { twMerge } from 'tailwind-merge';
+
+type SelectedIds = {
+    adventure: string | null;
+    scene: string | null;
+    npc: string | null;
+    location: string | null;
+    faction: string | null;
+    item: string | null;
+}
+
+interface CampaignSidebarProps {
+    campaign: Campaign;
+    activeView: EditorView;
+    onSelectView: (view: EditorView) => void;
+    selectedIds: SelectedIds;
+    onSelect: (type: 'adventure' | 'scene' | 'npc' | 'location' | 'faction' | 'item', id: string) => void;
+    onShowGenerator: (type: GeneratorType) => void;
+    onReorderScene: (adventureId: string, draggedSceneId: string, targetSceneId: string) => void;
+}
+
+export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
+    campaign,
+    activeView,
+    onSelectView,
+    selectedIds,
+    onSelect,
+    onShowGenerator,
+    onReorderScene
+}) => {
+    const [expandedAdventures, setExpandedAdventures] = useState<Record<string, boolean>>({});
+    const [expandedViews, setExpandedViews] = useState<Partial<Record<EditorView, boolean>>>({
+        npcs: true,
+    });
+
+    const toggleAdventure = (adventureId: string) => {
+        setExpandedAdventures(prev => ({ ...prev, [adventureId]: !prev[adventureId] }));
+    };
+    
+    const toggleView = (view: EditorView) => {
+        setExpandedViews(prev => ({ ...prev, [view]: !prev[view] }));
+    };
+
+    const isViewExpanded = (view: EditorView) => {
+        if (view === 'npcs' && selectedIds.npc) return true;
+        if (view === 'locations' && selectedIds.location) return true;
+        if (view === 'factions' && selectedIds.faction) return true;
+        if (view === 'items' && selectedIds.item) return true;
+        return !!expandedViews[view];
+    };
+    
+    // --- Drag and Drop Handlers ---
+    const handleDragStart = (e: React.DragEvent, adventureId: string, sceneId: string) => {
+        e.dataTransfer.setData('application/json', JSON.stringify({ adventureId, sceneId }));
+        e.dataTransfer.effectAllowed = 'move';
+        (e.target as HTMLElement).classList.add('opacity-50');
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const target = (e.target as HTMLElement).closest('button');
+        if (target) {
+            target.classList.add('border-t-2', 'border-indigo-500', '-mt-0.5');
+        }
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        const target = (e.target as HTMLElement).closest('button');
+        if (target) {
+            target.classList.remove('border-t-2', 'border-indigo-500', '-mt-0.5');
+        }
+    };
+
+    const handleDrop = (e: React.DragEvent, targetAdventureId: string, targetSceneId: string) => {
+        e.preventDefault();
+        handleDragLeave(e);
+        const data = e.dataTransfer.getData('application/json');
+        if (data) {
+            const { adventureId: draggedAdventureId, sceneId: draggedSceneId } = JSON.parse(data);
+            if (draggedAdventureId === targetAdventureId && draggedSceneId !== targetSceneId) {
+                onReorderScene(draggedAdventureId, draggedSceneId, targetSceneId);
+            }
+        }
+    };
+
+    const handleDragEnd = (e: React.DragEvent) => {
+        (e.target as HTMLElement).classList.remove('opacity-50');
+        document.querySelectorAll('.border-indigo-500').forEach(el => el.classList.remove('border-t-2', 'border-indigo-500', '-mt-0.5'));
+    };
+
+
+    const entityGroups: {
+        label: string,
+        icon: keyof typeof Icons,
+        view: 'npcs' | 'locations' | 'factions' | 'items',
+        generatorType: 'npc' | 'location' | 'faction' | 'item',
+        items: { id: string, name: string }[],
+        selectedId: string | null
+    }[] = [
+        { label: "NPCs", icon: 'NPCs', view: 'npcs', generatorType: 'npc', items: campaign.npcs, selectedId: selectedIds.npc },
+        { label: "Locations", icon: 'Locations', view: 'locations', generatorType: 'location', items: campaign.locations, selectedId: selectedIds.location },
+        { label: "Factions", icon: 'Factions', view: 'factions', generatorType: 'faction', items: campaign.factions, selectedId: selectedIds.faction },
+        { label: "Items", icon: 'Items', view: 'items', generatorType: 'item', items: campaign.items, selectedId: selectedIds.item },
+    ];
+
+
+    return (
+        <aside className="w-72 bg-slate-900 flex-shrink-0 flex flex-col border-r border-slate-800">
+            <div className="p-4 border-b border-slate-800">
+                <h2 className="text-lg font-semibold font-serif truncate" title={campaign.title}>{campaign.title}</h2>
+            </div>
+            <nav className="flex-1 p-2 space-y-1 overflow-y-auto custom-scrollbar">
+                <NavHeader label="Campaign" />
+                <NavItem
+                    label="Setting"
+                    icon="Setting"
+                    active={activeView === 'setting'}
+                    onClick={() => onSelectView('setting')}
+                />
+                
+                <NavHeader label="World Entities" />
+                {entityGroups.map(group => {
+                    const Icon = Icons[group.icon];
+                    const isExpanded = isViewExpanded(group.view);
+                    return (
+                        <div key={group.view} className="space-y-1">
+                            <div className="flex items-center justify-between group">
+                                <button
+                                    onClick={() => { onSelectView(group.view); toggleView(group.view); }}
+                                    className={twMerge(
+                                        'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors',
+                                        activeView === group.view ? 'bg-indigo-600/20 text-indigo-300' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                                    )}
+                                >
+                                    <Icon className="w-4 h-4" /> <span>{group.label}</span>
+                                    <Icons.ChevronDown className={`w-3.5 h-3.5 ml-auto transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
+                                </button>
+                                <button onClick={() => { onSelectView(group.view); onShowGenerator(group.generatorType); }} className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100 mr-2">
+                                    <Icons.Plus className="w-4 h-4" />
+                                </button>
+                            </div>
+                            {isExpanded && (
+                                <div className="pl-4 border-l border-slate-700 ml-5 space-y-1">
+                                    {group.items.map(item => (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => onSelect(group.generatorType, item.id)}
+                                            className={twMerge(
+                                                'w-full text-left text-sm truncate pr-2 pl-2 py-1 rounded-md',
+                                                group.selectedId === item.id ? 'bg-slate-700 text-white' : 'hover:bg-slate-800 text-slate-400'
+                                            )}
+                                            title={item.name}
+                                        >
+                                            {item.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+
+
+                <NavHeader label="Storylines" />
+                 <div className="space-y-1">
+                    <div className="flex items-center justify-between px-3 py-2 group">
+                        <button
+                          onClick={() => onSelectView('adventures')}
+                          className={twMerge(
+                            'flex items-center gap-3 text-sm transition-colors w-full',
+                            activeView === 'adventures' ? 'text-indigo-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
+                          )}
+                        >
+                          <Icons.Adventures className="w-4 h-4" />
+                          <span>Adventures</span>
+                        </button>
+                        <button onClick={() => { onSelectView('adventures'); onShowGenerator('adventure') }} className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100">
+                            <Icons.Plus className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <div className="pl-4 border-l border-slate-700 ml-5 space-y-1">
+                        {campaign.adventures.map(adventure => (
+                            <div key={adventure.id}>
+                                <div className="flex items-center justify-between group">
+                                    <button onClick={() => toggleAdventure(adventure.id)} className="p-1 -ml-3 mr-1 text-slate-500 hover:text-slate-300">
+                                        <Icons.ChevronDown className={`w-3.5 h-3.5 transition-transform ${expandedAdventures[adventure.id] ? 'rotate-0' : '-rotate-90'}`} />
+                                    </button>
+                                    <button
+                                        onClick={() => onSelect('adventure', adventure.id)}
+                                        className={twMerge(
+                                            'w-full text-left text-sm truncate pr-2 py-1 rounded-md',
+                                            selectedIds.adventure === adventure.id && !selectedIds.scene ? 'bg-slate-700 text-white' : 'hover:bg-slate-800'
+                                        )}
+                                        title={adventure.title}
+                                    >
+                                        {adventure.title}
+                                    </button>
+                                     <button onClick={() => { onSelect('adventure', adventure.id); onShowGenerator('scene');}} className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100">
+                                        <Icons.Plus className="w-4 h-4" />
+                                    </button>
+                                </div>
+                                {expandedAdventures[adventure.id] && (
+                                    <div className="pl-5 mt-1 pt-1 border-l border-slate-700 ml-2 space-y-0.5">
+                                        {adventure.scenes.map(scene => (
+                                            <button
+                                                key={scene.id}
+                                                draggable="true"
+                                                onDragStart={(e) => handleDragStart(e, adventure.id, scene.id)}
+                                                onDragOver={handleDragOver}
+                                                onDragLeave={handleDragLeave}
+                                                onDrop={(e) => handleDrop(e, adventure.id, scene.id)}
+                                                onDragEnd={handleDragEnd}
+                                                onClick={() => { onSelect('adventure', adventure.id); onSelect('scene', scene.id); }}
+                                                className={twMerge(
+                                                    'w-full text-left text-sm truncate px-2 py-1.5 rounded-md flex items-center transition-all duration-100',
+                                                    selectedIds.scene === scene.id ? 'bg-slate-700 text-white' : 'hover:bg-slate-800 text-slate-400'
+                                                )}
+                                                title={scene.title}
+                                            >
+                                               <SceneIcon type={scene.type} className="flex-shrink-0"/>
+                                               <span>{scene.title}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </nav>
+        </aside>
+    );
+};
+
+
+const NavHeader = ({ label }: { label: string }) => <h3 className="px-3 pt-4 pb-1 text-xs font-bold text-slate-500 uppercase tracking-wider">{label}</h3>;
+
+const NavItem = ({ icon, label, active, onClick }: { icon: keyof typeof Icons, label: string, active: boolean, onClick: () => void }) => {
+  const Icon = Icons[icon];
+  return (
+    <button onClick={onClick} className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${active ? 'bg-indigo-600/20 text-indigo-300' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}>
+      <Icon className="w-4 h-4" /> <span>{label}</span>
+    </button>
+  );
+};
