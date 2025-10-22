@@ -1,4 +1,3 @@
-
 # Technical Design Document: D&D RealmWeaver
 
 ## 1. Introduction

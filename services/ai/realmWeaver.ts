@@ -1,8 +1,5 @@
-
-
-
 import { Type } from "@google/genai";
-import type { NPC, Location, Faction, Item, Scene, SkillCheck, AdventureForBatchAdd } from '../../types';
+import type { NPC, Location, Faction, Item, Scene, SkillCheck, AdventureForBatchAdd, Article } from '../../types';
 import { generateWithSchema } from './core';
 
 // --- Schemas for consistent JSON output ---
@@ -95,32 +92,71 @@ export const adventureWithScenesSchema = {
     required: ['title', 'level', 'hook', 'theme', 'scenes']
 };
 
+export const articleSchema = {
+    type: Type.OBJECT,
+    properties: {
+        title: { type: Type.STRING, description: "A compelling title for the lore, history, or cosmology article." },
+        category: { type: Type.STRING, enum: ['lore', 'history', 'cosmology'], description: "The category of the article." },
+        content: { type: Type.STRING, description: "The detailed content of the article, written in an engaging, encyclopedic style suitable for a TTRPG world guide." },
+    },
+    required: ['title', 'category', 'content'],
+};
+
 // --- Generator Functions ---
 
 export const generateNpc = async (prompt: string, useGroundedSearch: boolean = false, campaignContext?: string): Promise<Omit<NPC, 'id' | 'factionId'>> => {
-  const instructions = `You are a master storyteller and world-builder for Dungeons & Dragons. Based on the following prompt, generate a detailed NPC. The NPC should be memorable, with a rich description that includes unique physical details and attire. Their personality traits should be distinct and actionable, giving a game master clear hooks for roleplaying. Include a single, characteristic example quote. The backstory and motivations should be compelling but concise, providing clear plot hooks.`;
+  const instructions = `You are The Prep Architect, an expert TTRPG assistant. Your task is to generate a detailed, ready-to-run NPC dossier based on the user's prompt, conforming to the specified JSON schema.
+
+- **name:** The NPC's full name, title, or alias.
+- **description:** A brief but evocative physical description. Focus on details that are immediately noticeable.
+- **traits:** Actionable roleplaying notes. How does the GM portray them? What are their mannerisms or speech patterns?
+- **exampleQuote:** A single line of dialogue that perfectly captures their personality.
+- **backstory:** A concise summary of their history and their role in the story.
+- **motivations:** What does this character want, and what are they actively doing to achieve it?
+- **secrets:** A crucial piece of hidden information, a plot twist, or a vulnerability. This is for the GM's eyes only.
+- **stats:** A TTRPG-agnostic suggestion for their capabilities (e.g., "Use 'Guard' stats, but add a poison dagger attack.").`;
   const configOverrides = useGroundedSearch ? { tools: [{googleSearch: {}}] } : {};
   const generatedData = await generateWithSchema(prompt, npcSchema, instructions, configOverrides, 'gemini-2.5-flash', campaignContext);
   return { ...generatedData, knowsPlayerHistory: [] }; // The AI doesn't generate this field, so return an empty array.
 };
 
 export const generateLocation = async (prompt: string, campaignContext?: string): Promise<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>> => {
-  const instructions = `You are a master world-builder, crafting vivid settings for Dungeons & Dragons. Based on the following prompt, generate a detailed location. The description should be rich with sensory details—what does it look, sound, and smell like? Evoke a strong mood or atmosphere. The secrets should be intriguing and provide clear opportunities for player discovery and interaction.`;
+  const instructions = `You are The Prep Architect, an expert TTRPG assistant. Your task is to generate a detailed, ready-to-run location based on the user's prompt, conforming to the specified JSON schema.
+
+- **name:** The name of the location.
+- **description:** A "read-aloud" description focusing on sensory details (sight, sound, smell) to set the scene for players. Keep it evocative but concise.
+- **secrets:** Hidden details, lore, or clues that players can discover through investigation. Frame these as "investigation" opportunities (e.g., "A DC 15 Investigation check on the bookshelf reveals a false book that acts as a lever.").`;
   return generateWithSchema(prompt, locationSchema, instructions, {}, 'gemini-2.5-flash', campaignContext);
 };
 
 export const generateFaction = async (prompt: string, campaignContext?: string): Promise<Omit<Faction, 'id' | 'leaderId' | 'memberIds'>> => {
-  const instructions = `You are a master world-builder, designing political and social structures for Dungeons & Dragons. Based on the following prompt, generate a detailed faction. The description should give a clear sense of their public identity and their internal culture. Their goals should be specific, actionable, and divided into short-term (what are they doing now?) and long-term (what is their ultimate ambition?) objectives.`;
+  const instructions = `You are The Prep Architect, an expert TTRPG assistant. Your task is to generate a detailed faction based on the user's prompt, conforming to the specified JSON schema.
+
+- **name:** The name of the faction or organization.
+- **description:** A summary of the faction's purpose, public image, and typical members.
+- **goals:** The faction's primary objectives. Make these actionable and clear, providing potential plot hooks for the GM.`;
   return generateWithSchema(prompt, factionSchema, instructions, {}, 'gemini-2.5-flash', campaignContext);
 };
 
 export const generateItem = async (prompt: string, campaignContext?: string): Promise<Omit<Item, 'id'>> => {
-  const instructions = `You are a legendary artificer and loremaster for Dungeons & Dragons. Based on the prompt, design a compelling magical item. The description should be evocative, hinting at its origin or purpose. The properties must be clear and align with standard TTRPG mechanics.`;
+  const instructions = `You are The Prep Architect, an expert TTRPG assistant. Your task is to generate a detailed magic item based on the user's prompt, conforming to the specified JSON schema.
+
+- **name:** The name of the item.
+- **description:** An evocative description of the item's appearance and history, suitable for reading to players.
+- **rarity:** The item's rarity level.
+- **properties:** Mechanically precise details of the item's abilities, attunement requirements, and usage rules. Ensure clarity for game mechanics.`;
   return generateWithSchema(prompt, itemSchema, instructions, {}, 'gemini-2.5-flash', campaignContext);
 };
 
 export const generateScene = async (prompt: string, campaignContext?: string): Promise<Omit<Scene, 'id' | 'locationId' | 'npcIds'>> => {
-  const instructions = `You are an expert Dungeon Master, designing engaging scenes for Dungeons & Dragons. Based on the prompt, create a detailed scene. Generate distinct text for 'readAloudText' (for players) and 'gmNotes' (for the GM). The read-aloud text should be evocative and set the scene. The GM notes should cover goals, motivations, and secrets. Also include relevant skill checks and potential rewards.`;
+  const instructions = `You are The Prep Architect, an expert TTRPG assistant. Your task is to generate a complete, ready-to-run scene based on the user's prompt, conforming to the specified JSON schema.
+
+- **title:** A clear, descriptive title for the scene.
+- **type:** The primary type of encounter.
+- **readAloudText:** High-quality, evocative text to be read aloud to players to set the scene.
+- **gmNotes:** A comprehensive overview for the GM. This MUST include the scene's primary goal, setup details, potential complications, and information on any monsters or antagonists present (including their tactics).
+- **skillChecks:** Explicitly defined skill checks with a skill, a DC, and a clear description of what success and failure mean.
+- **rewards:** Any treasure, items, information, or other rewards players might gain.`;
   const generatedData = await generateWithSchema(prompt, sceneSchema, instructions, {}, 'gemini-2.5-flash', campaignContext);
   
   // Add client-side IDs to skill checks
@@ -135,7 +171,13 @@ export const generateScene = async (prompt: string, campaignContext?: string): P
 };
 
 export const generateAdventure = async (prompt: string, campaignContext?: string): Promise<AdventureForBatchAdd> => {
-    const instructions = `You are a master adventure writer for Dungeons & Dragons. Based on the prompt, outline a compelling adventure. This should include a title, a target level, a plot hook, themes, and 2-3 fully detailed scenes that form a coherent storyline. Each scene must have its own title, type, read-aloud text, GM notes, skill checks, and rewards.`;
+    const instructions = `You are The Prep Architect, an expert TTRPG adventure designer. Based on the user's prompt, generate a complete adventure outline with 2-3 fully detailed scenes, conforming to the specified JSON schema.
+
+- **title:** A compelling title for the adventure.
+- **level:** The suggested character level.
+- **hook:** A "read-aloud" plot hook to engage the players immediately.
+- **theme:** Keywords describing the adventure's mood and genre.
+- **scenes:** Generate 2-3 interconnected scenes. Each scene must be fully fleshed out as per the scene generation guidelines: include high-quality read-aloud text, comprehensive GM notes (goals, setup, antagonists), clear skill checks, and defined rewards.`;
     const generatedData = await generateWithSchema(prompt, adventureWithScenesSchema, instructions, {}, 'gemini-2.5-flash', campaignContext);
 
     // Post-process the result to add IDs to skill checks within scenes, but not scene IDs themselves.
@@ -155,4 +197,13 @@ export const generateAdventure = async (prompt: string, campaignContext?: string
     }
 
     return generatedData as AdventureForBatchAdd;
+};
+
+export const generateArticle = async (prompt: string, campaignContext?: string): Promise<Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds'>> => {
+  const instructions = `You are The Prep Architect, an expert TTRPG loremaster. Your task is to generate a detailed lore article based on the user's prompt, conforming to the specified JSON schema.
+
+- **title:** A clear title for the lore entry.
+- **category:** The appropriate category for the article.
+- **content:** Write the article in an engaging, encyclopedic style. This is background information for the GM to understand the world's history, key events, or cosmology. Structure it for clarity and easy reference during a game.`;
+  return generateWithSchema(prompt, articleSchema, instructions, {}, 'gemini-2.5-flash', campaignContext);
 };

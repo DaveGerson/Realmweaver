@@ -11,6 +11,7 @@ type SelectedIds = {
     location: string | null;
     faction: string | null;
     item: string | null;
+    article: string | null;
 }
 
 interface CampaignSidebarProps {
@@ -18,7 +19,7 @@ interface CampaignSidebarProps {
     activeView: EditorView;
     onSelectView: (view: EditorView) => void;
     selectedIds: SelectedIds;
-    onSelect: (type: 'adventure' | 'scene' | 'npc' | 'location' | 'faction' | 'item', id: string) => void;
+    onSelect: (type: 'adventure' | 'scene' | 'npc' | 'location' | 'faction' | 'item' | 'article', id: string) => void;
     onShowGenerator: (type: GeneratorType) => void;
     onReorderScene: (adventureId: string, draggedSceneId: string, targetSceneId: string) => void;
 }
@@ -33,12 +34,17 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
     onReorderScene
 }) => {
     const [expandedAdventures, setExpandedAdventures] = useState<Record<string, boolean>>({});
+    const [expandedArticles, setExpandedArticles] = useState<Record<string, boolean>>({});
     const [expandedViews, setExpandedViews] = useState<Partial<Record<EditorView, boolean>>>({
         npcs: true,
     });
 
     const toggleAdventure = (adventureId: string) => {
         setExpandedAdventures(prev => ({ ...prev, [adventureId]: !prev[adventureId] }));
+    };
+
+    const toggleArticle = (articleId: string) => {
+        setExpandedArticles(prev => ({ ...prev, [articleId]: !prev[articleId] }));
     };
     
     const toggleView = (view: EditorView) => {
@@ -107,7 +113,8 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
         { label: "Factions", icon: 'Factions', view: 'factions', generatorType: 'faction', items: campaign.factions, selectedId: selectedIds.faction },
         { label: "Items", icon: 'Items', view: 'items', generatorType: 'item', items: campaign.items, selectedId: selectedIds.item },
     ];
-
+    
+    const topLevelArticles = campaign.articles.filter(a => !a.parentArticleId);
 
     return (
         <aside className="w-72 bg-slate-900 flex-shrink-0 flex flex-col border-r border-slate-800">
@@ -115,7 +122,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                 <h2 className="text-lg font-semibold font-serif truncate" title={campaign.title}>{campaign.title}</h2>
             </div>
             <nav className="flex-1 p-2 space-y-1 overflow-y-auto custom-scrollbar">
-                <NavHeader label="Campaign" />
+                <NavHeader label="Worldbuilding" />
                 <NavItem
                     label="Setting"
                     icon="Setting"
@@ -123,6 +130,64 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                     onClick={() => onSelectView('setting')}
                 />
                 
+                <div className="space-y-1">
+                    <div className="flex items-center justify-between px-3 py-2 group">
+                        <button
+                            onClick={() => onSelectView('lorebook')}
+                            className={twMerge(
+                                'flex items-center gap-3 text-sm transition-colors w-full',
+                                activeView === 'lorebook' ? 'text-indigo-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
+                            )}
+                        >
+                            <Icons.FileCode className="w-4 h-4" />
+                            <span>Lorebook</span>
+                        </button>
+                        <button onClick={() => { onSelectView('lorebook'); onShowGenerator('article'); }} className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100">
+                            <Icons.Plus className="w-4 h-4" />
+                        </button>
+                    </div>
+                     <div className="pl-4 border-l border-slate-700 ml-5 space-y-1">
+                        {topLevelArticles.map(article => (
+                            <div key={article.id}>
+                                <div className="flex items-center justify-between group">
+                                    <button onClick={() => toggleArticle(article.id)} className="p-1 -ml-3 mr-1 text-slate-500 hover:text-slate-300">
+                                        <Icons.ChevronDown className={`w-3.5 h-3.5 transition-transform ${expandedArticles[article.id] ? 'rotate-0' : '-rotate-90'}`} />
+                                    </button>
+                                    <button
+                                        onClick={() => onSelect('article', article.id)}
+                                        className={twMerge(
+                                            'w-full text-left text-sm truncate pr-2 py-1 rounded-md',
+                                            selectedIds.article === article.id ? 'bg-slate-700 text-white' : 'hover:bg-slate-800 text-slate-400'
+                                        )}
+                                        title={article.title}
+                                    >
+                                        {article.title}
+                                    </button>
+                                </div>
+                                {expandedArticles[article.id] && (
+                                    <div className="pl-5 mt-1 pt-1 border-l border-slate-700 ml-2 space-y-0.5">
+                                        {campaign.articles.filter(a => a.parentArticleId === article.id).map(subArticle => (
+                                            <button
+                                                key={subArticle.id}
+                                                onClick={() => onSelect('article', subArticle.id)}
+                                                className={twMerge(
+                                                    'w-full text-left text-sm truncate px-2 py-1.5 rounded-md flex items-center transition-all duration-100',
+                                                    selectedIds.article === subArticle.id ? 'bg-slate-700 text-white' : 'hover:bg-slate-800 text-slate-400'
+                                                )}
+                                                title={subArticle.title}
+                                            >
+                                               {/* FIX: Property 'FileText' does not exist on type 'Icons'. Changed to 'Scenes' which is an alias for the FileText component. */}
+                                               <Icons.Scenes className="w-4 h-4 mr-2 flex-shrink-0"/>
+                                               <span>{subArticle.title}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
                 <NavHeader label="World Entities" />
                 {entityGroups.map(group => {
                     const Icon = Icons[group.icon];
@@ -165,7 +230,6 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                     );
                 })}
 
-
                 <NavHeader label="Storylines" />
                  <div className="space-y-1">
                     <div className="flex items-center justify-between px-3 py-2 group">
@@ -194,7 +258,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                                         onClick={() => onSelect('adventure', adventure.id)}
                                         className={twMerge(
                                             'w-full text-left text-sm truncate pr-2 py-1 rounded-md',
-                                            selectedIds.adventure === adventure.id && !selectedIds.scene ? 'bg-slate-700 text-white' : 'hover:bg-slate-800'
+                                            selectedIds.adventure === adventure.id && !selectedIds.scene ? 'bg-slate-700 text-white' : 'hover:bg-slate-800 text-slate-400'
                                         )}
                                         title={adventure.title}
                                     >

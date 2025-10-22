@@ -1,4 +1,4 @@
-import type { NPC, Location, Faction, RollableTable, Item, Scene, SceneType, AdventureForBatchAdd } from '../../types';
+import type { NPC, Location, Faction, RollableTable, Item, Scene, SceneType, AdventureForBatchAdd, Article } from '../../types';
 import type { BatchAddData } from '../../types';
 
 // --- Mock Data ---
@@ -69,6 +69,12 @@ const mockAdventureData: AdventureForBatchAdd = {
             npcIds: [],
         }
     ]
+};
+
+const mockArticleData: Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds'> = {
+  title: "The Mock War of the Whispering Peaks",
+  category: "history",
+  content: "A long and bloody conflict fought between the dwarves of Ironhold and the goblins of the Slashed Eye tribe. The war concluded with the dwarves victorious, but at a great cost, leaving many ancient mountain passes haunted by the spirits of the fallen.",
 };
 
 const mockCampaignFillData: BatchAddData = {
@@ -173,6 +179,13 @@ export const generateAdventure = async (prompt: string, campaignContext?: string
   logContext(campaignContext);
   await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
   return Promise.resolve(mockAdventureData);
+};
+
+export const generateArticle = async (prompt: string, campaignContext?: string): Promise<Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds'>> => {
+  console.log(`[MOCK MODE] Called generateArticle with prompt: "${prompt}"`);
+  logContext(campaignContext);
+  await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+  return Promise.resolve(mockArticleData);
 };
 
 export const generateNarration = async (prompt: string, campaignContext?: string, useLiteModel: boolean = false, isMockMode: boolean = true): Promise<string> => {

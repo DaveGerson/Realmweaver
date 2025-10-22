@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Icons } from './Icons';
 
 interface HeaderProps {
@@ -6,9 +6,20 @@ interface HeaderProps {
   onToggleMockMode: () => void;
   onToggleCoach: () => void;
   onToggleWizard: () => void;
+  onSaveCampaign: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ isMockMode, onToggleMockMode, onToggleCoach, onToggleWizard }) => {
+export const Header: React.FC<HeaderProps> = ({ isMockMode, onToggleMockMode, onToggleCoach, onToggleWizard, onSaveCampaign }) => {
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
+
+  const handleSave = () => {
+    onSaveCampaign();
+    setSaveStatus('saved');
+    setTimeout(() => {
+      setSaveStatus('idle');
+    }, 2000);
+  };
+
   return (
     <header className="flex items-center justify-between p-3 border-b border-slate-800 bg-slate-900 flex-shrink-0">
       <div className="flex items-center gap-2">
@@ -16,6 +27,14 @@ export const Header: React.FC<HeaderProps> = ({ isMockMode, onToggleMockMode, on
         <h1 className="text-lg font-bold font-serif text-slate-100">RealmWeaver</h1>
       </div>
       <div className="flex items-center gap-6">
+        <button
+          onClick={handleSave}
+          className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-indigo-500 rounded-md p-1 -m-1"
+          aria-label="Save Campaign"
+        >
+          <Icons.Save className={`w-5 h-5 ${saveStatus === 'saved' ? 'text-green-400' : 'text-indigo-400'}`} />
+          <span>{saveStatus === 'saved' ? 'Saved!' : 'Save Campaign'}</span>
+        </button>
         <button 
           onClick={onToggleWizard} 
           className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-indigo-500 rounded-md p-1 -m-1"

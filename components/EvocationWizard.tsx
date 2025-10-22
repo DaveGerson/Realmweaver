@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import type { Campaign } from '../types';
 import type { BatchAddData } from '../types';
@@ -116,13 +115,31 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                 const itemPromises = detailedPrompts.items.map(p => generateItem(p.prompt, isMockMode, campaignContext));
                 const adventurePromises = detailedPrompts.adventures.map(p => generateAdventure(p.prompt, isMockMode, campaignContext));
 
-                [data.npcs, data.locations, data.factions, data.items, data.adventures] = await Promise.all([
+                // FIX: Refactored promise handling to prevent type inference issues.
+                // The previous implementation with direct destructuring and `as any` casting led to `unknown` types.
+                // This approach ensures results are correctly typed before processing and assigning to state.
+                const [
+                    npcsResult,
+                    locationsResult,
+                    factionsResult,
+                    itemsResult,
+                    adventuresResult
+                ] = await Promise.all([
                     Promise.all(npcPromises),
                     Promise.all(locationPromises),
                     Promise.all(factionPromises),
                     Promise.all(itemPromises),
                     Promise.all(adventurePromises)
                 ]);
+                
+                // The `generateNpc` function adds `knowsPlayerHistory`, which is not part of the BatchAddData type for NPCs.
+                // We must strip it out to prevent type errors.
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                data.npcs = npcsResult.map(({ knowsPlayerHistory, ...restOfNpc }: any) => restOfNpc);
+                data.locations = locationsResult;
+                data.factions = factionsResult;
+                data.items = itemsResult;
+                data.adventures = adventuresResult;
                 
                 setGeneratedData(data);
                 setSelection({

@@ -1,4 +1,4 @@
-import type { NPC, Location, Faction, RollableTable, Item, Scene, Adventure } from '../types';
+import type { NPC, Location, Faction, RollableTable, Item, Scene, Adventure, Article } from '../types';
 import type { BatchAddData, AdventureForBatchAdd } from '../types';
 
 import * as aiRealmWeaver from './ai/realmWeaver';
@@ -46,6 +46,13 @@ export const generateAdventure = (prompt: string, isMockMode: boolean = false, c
         return mockService.generateAdventure(prompt, campaignContext);
     }
     return aiRealmWeaver.generateAdventure(prompt, campaignContext);
+};
+
+export const generateArticle = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds'>> => {
+    if (isMockMode) {
+        return mockService.generateArticle(prompt, campaignContext);
+    }
+    return aiRealmWeaver.generateArticle(prompt, campaignContext);
 };
 
 export const generateNarration = (prompt: string, campaignContext?: string, useLiteModel: boolean = false, isMockMode: boolean = false): Promise<string> => {

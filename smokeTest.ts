@@ -1,4 +1,4 @@
-import type { Campaign, Adventure, NPC, Location, Item, Scene, Faction, BatchAddData, AdventureForBatchAdd } from './types';
+import type { Campaign, Adventure, NPC, Location, Item, Scene, Faction, BatchAddData, AdventureForBatchAdd, Article } from './types';
 import { 
     generateNpc, 
     generateLocation, 
@@ -6,6 +6,7 @@ import {
     generateScene,
     generateFaction,
     generateAdventure,
+    generateArticle,
     generateNarration,
     generateImprovisation,
     generateRollableTable,
@@ -49,6 +50,9 @@ const testServiceFunctions = async (isMockMode: boolean) => {
     const adventure = await generateAdventure('test adventure prompt', isMockMode);
     success &&= testLog(!!(adventure && adventure.title && Array.isArray(adventure.scenes)), 'generateAdventure: Success', 'generateAdventure: Failed', adventure);
     
+    const article = await generateArticle('test article prompt', isMockMode);
+    success &&= testLog(!!(article && article.title && article.content), 'generateArticle: Success', 'generateArticle: Failed', article);
+
     const narration = await generateNarration('test narration prompt', undefined, false, isMockMode);
     success &&= testLog(typeof narration === 'string' && narration.length > 0, 'generateNarration: Success', 'generateNarration: Failed', narration);
 
@@ -80,7 +84,7 @@ const testCampaignHandlers = async (isMockMode: boolean) => {
     try {
         // --- Handlers (mirroring App.tsx logic) ---
         const handleCreateCampaign = (title: string, setting: string) => {
-            campaign = { id: crypto.randomUUID(), title, setting, adventures: [], npcs: [], locations: [], factions: [], items: [] };
+            campaign = { id: crypto.randomUUID(), title, setting, articles: [], adventures: [], npcs: [], locations: [], factions: [], items: [] };
         };
         const handleUpdateCampaign = (updatedData: Partial<Campaign>) => {
             campaign = produce(campaign, draft => { if (draft) Object.assign(draft, updatedData) });
@@ -159,6 +163,47 @@ const testCampaignHandlers = async (isMockMode: boolean) => {
         const handleDeleteItem = (id: string) => {
             campaign = produce(campaign, draft => { if (draft) draft.items = draft.items.filter(i => i.id !== id); });
         };
+        const handleArticleCreated = (newArticleData: Omit<Article, 'id'>) => {
+            const newArticle: Article = { ...newArticleData, id: crypto.randomUUID() };
+            campaign = produce(campaign, draft => { if (draft) draft.articles.push(newArticle); });
+            return newArticle;
+        };
+        const handleUpdateArticle = (id: string, updatedData: Partial<Article>) => {
+            campaign = produce(campaign, draft => {
+                if (!draft) return;
+                const articleIndex = draft.articles.findIndex(a => a.id === id);
+                if (articleIndex === -1) return;
+                const oldArticle = { ...draft.articles[articleIndex] };
+                Object.assign(draft.articles[articleIndex], updatedData);
+                const newArticle = draft.articles[articleIndex];
+                if (oldArticle.parentArticleId !== newArticle.parentArticleId) {
+                    if (oldArticle.parentArticleId) {
+                        const oldParent = draft.articles.find(p => p.id === oldArticle.parentArticleId);
+                        if (oldParent) oldParent.subArticleIds = oldParent.subArticleIds.filter(subId => subId !== id);
+                    }
+                    if (newArticle.parentArticleId) {
+                        const newParent = draft.articles.find(p => p.id === newArticle.parentArticleId);
+                        if (newParent && !newParent.subArticleIds.includes(id)) newParent.subArticleIds.push(id);
+                    }
+                }
+            });
+        };
+        const handleDeleteArticle = (id: string) => {
+            campaign = produce(campaign, draft => {
+                if (!draft) return;
+                const article = draft.articles.find(a => a.id === id);
+                if (!article) return;
+                if (article.parentArticleId) {
+                    const parent = draft.articles.find(p => p.id === article.parentArticleId);
+                    if (parent) parent.subArticleIds = parent.subArticleIds.filter(subId => subId !== id);
+                }
+                article.subArticleIds.forEach(childId => {
+                    const child = draft.articles.find(c => c.id === childId);
+                    if (child) child.parentArticleId = undefined;
+                });
+                draft.articles = draft.articles.filter(a => a.id !== id);
+            });
+        };
         const handleAdventureCreated = (adventureData: Omit<Adventure, 'id' | 'scenes'>) => {
             const newAdventure: Adventure = { ...adventureData, id: crypto.randomUUID(), scenes: [] };
             campaign = produce(campaign, draft => { if (draft) draft.adventures.push(newAdventure); });
@@ -234,11 +279,13 @@ const testCampaignHandlers = async (isMockMode: boolean) => {
         const loc2 = handleLocationCreated({ ...(await generateLocation('loc 2', isMockMode)), parentLocationId: undefined, subLocationIds: [] });
         const faction = handleFactionCreated({ ...(await generateFaction('test faction', isMockMode)), leaderId: undefined, memberIds: [] });
         const item = handleItemCreated({ ...(await generateItem('test item', isMockMode)) });
+        const article1 = handleArticleCreated({ ...(await generateArticle('article 1', isMockMode)), parentArticleId: undefined, subArticleIds: [] });
+        const article2 = handleArticleCreated({ ...(await generateArticle('article 2', isMockMode)), parentArticleId: undefined, subArticleIds: [] });
         const adventure = handleAdventureCreated({ title: 'Test Adventure', hook: 'A test', theme: 'testing', level: 1 });
         const scene1 = handleSceneCreated(adventure.id, { ...(await generateScene('scene 1', isMockMode)), locationId: undefined, npcIds: [] });
         const scene2 = handleSceneCreated(adventure.id, { ...(await generateScene('scene 2', isMockMode)), locationId: undefined, npcIds: [] });
         success &&= testLog(
-            campaign?.npcs.length === 1 && campaign.locations.length === 2 && campaign.factions.length === 1 && campaign.items.length === 1 && campaign.adventures.length === 1 && campaign.adventures[0].scenes.length === 2,
+            campaign?.npcs.length === 1 && campaign.locations.length === 2 && campaign.factions.length === 1 && campaign.items.length === 1 && campaign.articles.length === 2 && campaign.adventures.length === 1 && campaign.adventures[0].scenes.length === 2,
             'Entity Creation', 'Entity Creation failed', campaign
         );
 
@@ -251,6 +298,9 @@ const testCampaignHandlers = async (isMockMode: boolean) => {
 
         handleUpdateLocation(loc1.id, { parentLocationId: loc2.id });
         success &&= testLog(campaign?.locations.find(l=>l.id===loc1.id)?.parentLocationId === loc2.id && campaign?.locations.find(l=>l.id===loc2.id)?.subLocationIds.includes(loc1.id), 'handleUpdateLocation & Linking', 'handleUpdateLocation & Linking failed');
+        
+        handleUpdateArticle(article1.id, { parentArticleId: article2.id });
+        success &&= testLog(campaign?.articles.find(a=>a.id===article1.id)?.parentArticleId === article2.id && campaign?.articles.find(a=>a.id===article2.id)?.subArticleIds.includes(article1.id), 'handleUpdateArticle & Linking', 'handleUpdateArticle & Linking failed');
 
         handleUpdateAdventure(adventure.id, { title: 'New Adventure Title' });
         success &&= testLog(campaign?.adventures[0].title === 'New Adventure Title', 'handleUpdateAdventure', 'handleUpdateAdventure failed');
@@ -273,6 +323,9 @@ const testCampaignHandlers = async (isMockMode: boolean) => {
         // 5. Deletion & Cleanup
         handleDeleteScene(adventure.id, scene1.id);
         success &&= testLog(campaign?.adventures[0].scenes.length === 1, 'handleDeleteScene', 'handleDeleteScene failed');
+        
+        handleDeleteArticle(article2.id);
+        success &&= testLog(campaign?.articles.length === 1 && campaign?.articles.find(a=>a.id===article1.id)?.parentArticleId === undefined, 'handleDeleteArticle & Cleanup', 'handleDeleteArticle & Cleanup failed');
 
         handleDeleteItem(item.id);
         success &&= testLog(campaign?.items.length === 0, 'handleDeleteItem', 'handleDeleteItem failed');
@@ -292,6 +345,8 @@ const testCampaignHandlers = async (isMockMode: boolean) => {
 };
 
 export const runSmokeTests = async (isMockMode: boolean) => {
+  // Clear any saved campaign from a previous session to ensure a clean test run.
+  localStorage.removeItem('realmweaver-campaign');
   console.log(`%c🚀 Running application smoke tests... (Mock Mode: ${isMockMode})`, 'color: #7c3aed; font-size: 1.2em; font-weight: bold;');
   const servicesOk = await testServiceFunctions(isMockMode);
   const handlersOk = await testCampaignHandlers(isMockMode);

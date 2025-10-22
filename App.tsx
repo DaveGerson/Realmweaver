@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Campaign, Adventure, NPC, Location, Faction, Item, Scene } from './types';
+import type { Campaign, Adventure, NPC, Location, Faction, Item, Scene, Article } from './types';
 import type { BatchAddData } from './types';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { CampaignCreator } from './components/CampaignCreator';
@@ -12,19 +12,23 @@ import { LocationGenerator } from './components/LocationGenerator';
 import { FactionGenerator } from './components/FactionGenerator';
 import { ItemGenerator } from './components/ItemGenerator';
 import { SceneGenerator } from './components/SceneGenerator';
+import { ArticleGenerator } from './components/ArticleGenerator';
 import { NpcEditor } from './components/NpcEditor';
 import { LocationEditor } from './components/LocationEditor';
 import { FactionEditor } from './components/FactionEditor';
 import { ItemEditor } from './components/ItemEditor';
 import { SceneEditor } from './components/SceneEditor';
+import { ArticleEditor } from './components/ArticleEditor';
 import { DmCoach } from './components/DmCoach';
 import { EvocationWizard } from './components/EvocationWizard';
 import { Icons } from './components/Icons';
 import { runSmokeTests } from './smokeTest';
 import { produce } from 'immer';
 
-export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures';
-export type GeneratorType = 'npc' | 'location' | 'faction' | 'item' | 'adventure' | 'scene';
+export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook';
+export type GeneratorType = 'npc' | 'location' | 'faction' | 'item' | 'adventure' | 'scene' | 'article';
+
+const CAMPAIGN_STORAGE_KEY = 'realmweaver-campaign';
 
 const App: React.FC = () => {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
@@ -40,13 +44,35 @@ const App: React.FC = () => {
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
   const [selectedFactionId, setSelectedFactionId] = useState<string | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   
   const [isCoachOpen, setIsCoachOpen] = useState(false);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
 
+  // Load campaign from local storage on initial mount
+  useEffect(() => {
+    const savedCampaign = localStorage.getItem(CAMPAIGN_STORAGE_KEY);
+    if (savedCampaign) {
+      try {
+        const campaignData: Campaign = JSON.parse(savedCampaign);
+        setCampaign(campaignData);
+        setAppStatus('editing');
+      } catch (e) {
+        console.error("Failed to parse saved campaign data, clearing it.", e);
+        localStorage.removeItem(CAMPAIGN_STORAGE_KEY);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     runSmokeTests(isMockMode);
   }, [isMockMode]);
+
+  const handleSaveCampaign = () => {
+    if (campaign) {
+      localStorage.setItem(CAMPAIGN_STORAGE_KEY, JSON.stringify(campaign));
+    }
+  };
 
   const resetSelections = () => {
     setSelectedNpcId(null);
@@ -55,11 +81,12 @@ const App: React.FC = () => {
     setSelectedItemId(null);
     setSelectedAdventureId(null);
     setSelectedSceneId(null);
+    setSelectedArticleId(null);
     setActiveGenerator(null);
   };
   
   const handleCreateCampaign = (title: string, setting: string) => {
-    const newCampaign: Campaign = { id: crypto.randomUUID(), title, setting, adventures: [], npcs: [], locations: [], factions: [], items: [] };
+    const newCampaign: Campaign = { id: crypto.randomUUID(), title, setting, articles: [], adventures: [], npcs: [], locations: [], factions: [], items: [] };
     setCampaign(newCampaign);
     setAppStatus('editing');
     setActiveView('setting');
@@ -186,6 +213,60 @@ const App: React.FC = () => {
     if (selectedItemId === id) setSelectedItemId(null);
   };
 
+  // --- LORE ARTICLE HANDLERS ---
+  const handleArticleCreated = (newArticleData: Omit<Article, 'id'>) => {
+    const newArticle: Article = { ...newArticleData, id: crypto.randomUUID() };
+    setCampaign(prev => produce(prev, draft => { if (draft) draft.articles.push(newArticle); }));
+    setActiveGenerator(null);
+    setSelectedArticleId(newArticle.id);
+  };
+
+  const handleUpdateArticle = (id: string, updatedData: Partial<Article>) => {
+    setCampaign(prev => produce(prev, draft => {
+        if (!draft) return;
+        const articleIndex = draft.articles.findIndex(a => a.id === id);
+        if (articleIndex === -1) return;
+        const oldArticle = { ...draft.articles[articleIndex] };
+        Object.assign(draft.articles[articleIndex], updatedData);
+        const newArticle = draft.articles[articleIndex];
+
+        if (oldArticle.parentArticleId !== newArticle.parentArticleId) {
+            if (oldArticle.parentArticleId) {
+                const oldParent = draft.articles.find(p => p.id === oldArticle.parentArticleId);
+                if (oldParent) oldParent.subArticleIds = oldParent.subArticleIds.filter(subId => subId !== id);
+            }
+            if (newArticle.parentArticleId) {
+                const newParent = draft.articles.find(p => p.id === newArticle.parentArticleId);
+                if (newParent && !newParent.subArticleIds.includes(id)) newParent.subArticleIds.push(id);
+            }
+        }
+    }));
+  };
+
+  const handleDeleteArticle = (id: string) => {
+    setCampaign(prev => produce(prev, draft => {
+        if (!draft) return;
+        const articleToDelete = draft.articles.find(a => a.id === id);
+        if (!articleToDelete) return;
+
+        // Remove from parent's subArticleIds
+        if (articleToDelete.parentArticleId) {
+            const parent = draft.articles.find(p => p.id === articleToDelete.parentArticleId);
+            if (parent) parent.subArticleIds = parent.subArticleIds.filter(subId => subId !== id);
+        }
+
+        // Un-parent all children
+        articleToDelete.subArticleIds.forEach(childId => {
+            const child = draft.articles.find(c => c.id === childId);
+            if (child) child.parentArticleId = undefined; // Set children to be top-level
+        });
+        
+        // Delete article
+        draft.articles = draft.articles.filter(a => a.id !== id);
+    }));
+    if (selectedArticleId === id) setSelectedArticleId(null);
+  };
+
   // --- ADVENTURE & SCENE HANDLERS ---
   const handleAdventureCreated = (adventureData: Omit<Adventure, 'id' | 'scenes'>) => {
     const newAdventure: Adventure = { ...adventureData, id: crypto.randomUUID(), scenes: [] };
@@ -306,6 +387,7 @@ const App: React.FC = () => {
   const selectedLocation = useMemo(() => campaign?.locations.find(l => l.id === selectedLocationId) || null, [campaign, selectedLocationId]);
   const selectedFaction = useMemo(() => campaign?.factions.find(f => f.id === selectedFactionId) || null, [campaign, selectedFactionId]);
   const selectedItem = useMemo(() => campaign?.items.find(i => i.id === selectedItemId) || null, [campaign, selectedItemId]);
+  const selectedArticle = useMemo(() => campaign?.articles.find(a => a.id === selectedArticleId) || null, [campaign, selectedArticleId]);
   
   const handleSelectView = (view: EditorView) => {
     setActiveView(view);
@@ -320,12 +402,14 @@ const App: React.FC = () => {
       if (activeGenerator === 'location') return <ContentWrapper title="Generate New Location"><LocationGenerator onLocationCreated={handleLocationCreated} isMockMode={isMockMode} /></ContentWrapper>;
       if (activeGenerator === 'faction') return <ContentWrapper title="Generate New Faction"><FactionGenerator onFactionCreated={handleFactionCreated} isMockMode={isMockMode} /></ContentWrapper>;
       if (activeGenerator === 'item') return <ContentWrapper title="Generate New Item"><ItemGenerator onItemCreated={handleItemCreated} isMockMode={isMockMode} /></ContentWrapper>;
+      if (activeGenerator === 'article') return <ContentWrapper title="Create New Lore Article"><ArticleGenerator onArticleCreated={handleArticleCreated} isMockMode={isMockMode} /></ContentWrapper>;
       if (activeGenerator === 'adventure') return <ContentWrapper title="Create New Adventure"><AdventureCreator onAdventureCreated={handleAdventureCreated} /></ContentWrapper>;
       if (activeGenerator === 'scene' && selectedAdventure) return <ContentWrapper title="Create New Scene"><SceneGenerator onSceneCreated={(s) => handleSceneCreated(selectedAdventure.id, s)} isMockMode={isMockMode} /></ContentWrapper>;
 
       // Render Editors
       if (selectedScene && selectedAdventure) return <SceneEditor scene={selectedScene} allNpcs={campaign.npcs} allLocations={campaign.locations} onUpdate={(id, data) => handleUpdateScene(selectedAdventure.id, id, data)} onDelete={(id) => handleDeleteScene(selectedAdventure.id, id)} isMockMode={isMockMode} />;
       if (selectedAdventure) return <AdventureEditor adventure={selectedAdventure} campaign={campaign} onUpdate={handleUpdateAdventure} />;
+      if (selectedArticle) return <ArticleEditor article={selectedArticle} allArticles={campaign.articles} onUpdate={handleUpdateArticle} onDelete={handleDeleteArticle} isMockMode={isMockMode} />;
       if (selectedNpc) return <NpcEditor npc={selectedNpc} factions={campaign.factions} onUpdate={handleUpdateNpc} onDelete={handleDeleteNpc} isMockMode={isMockMode} />;
       if (selectedLocation) return <LocationEditor location={selectedLocation} allLocations={campaign.locations} onUpdate={handleUpdateLocation} isMockMode={isMockMode} />;
       if (selectedFaction) return <FactionEditor faction={selectedFaction} allNpcs={campaign.npcs} onUpdate={handleUpdateFaction} onDelete={handleDeleteFaction} isMockMode={isMockMode} />;
@@ -341,10 +425,9 @@ const App: React.FC = () => {
         factions: { icon: "Factions", text: "Select a faction from the sidebar to edit it, or create a new one." },
         items: { icon: "Items", text: "Select an item from the sidebar to edit it, or create a new one." },
         adventures: { icon: "Adventures", text: "Select an adventure or scene from the sidebar to edit it, or create a new one." },
+        lorebook: { icon: "FileCode", text: "Select a lore article from the sidebar to edit it, or create a new one." },
       };
       
-      // FIX: The original check `activeView !== 'setting'` was redundant and caused a type error.
-      // Using `in` provides a safe type guard to check if activeView is a key in placeholders.
       if (activeView in placeholders) {
           const { icon, text } = placeholders[activeView as keyof typeof placeholders];
           return <EditorPlaceholder icon={icon as keyof typeof Icons} text={text} />;
@@ -374,16 +457,25 @@ const App: React.FC = () => {
                   location: selectedLocationId,
                   faction: selectedFactionId,
                   item: selectedItemId,
+                  article: selectedArticleId,
                 }}
                 onSelect={(type, id) => {
                   resetSelections();
-                  setActiveView(type === 'scene' || type === 'adventure' ? 'adventures' : type as EditorView);
+                  if (type === 'scene' || type === 'adventure') {
+                    setActiveView('adventures');
+                  } else if (type === 'article') {
+                    setActiveView('lorebook');
+                  } else {
+                    setActiveView(type as EditorView);
+                  }
+                  
                   if (type === 'adventure') setSelectedAdventureId(id);
                   if (type === 'scene') setSelectedSceneId(id);
                   if (type === 'npc') setSelectedNpcId(id);
                   if (type === 'location') setSelectedLocationId(id);
                   if (type === 'faction') setSelectedFactionId(id);
                   if (type === 'item') setSelectedItemId(id);
+                  if (type === 'article') setSelectedArticleId(id);
                 }}
                 onShowGenerator={setActiveGenerator}
                 onReorderScene={handleReorderScene}
@@ -407,6 +499,7 @@ const App: React.FC = () => {
         onToggleMockMode={() => setIsMockMode(p => !p)} 
         onToggleCoach={() => setIsCoachOpen(p => !p)}
         onToggleWizard={() => setIsWizardOpen(true)}
+        onSaveCampaign={handleSaveCampaign}
       />
       <div className="flex-1 overflow-hidden flex relative">
         {renderApp()}
