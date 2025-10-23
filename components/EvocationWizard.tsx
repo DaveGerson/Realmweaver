@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+
+
+import React, { useState, useRef, useEffect } from 'react';
 import type { Campaign, SceneType } from '../types';
 import type { BatchAddData } from '../types';
-import { generateCampaignFill, generateNpc, generateLocation, generateFaction, generateItem, generateAdventure } from '../services/geminiService';
+import { generateCampaignFill, generateNpc, generateLocation, generateFaction, generateItem, generateAdventure, parseDocumentForEntities, generateChatResponse } from '../services/geminiService';
 import { Icons } from './Icons';
 import { Button } from './common/Button';
 import { twMerge } from 'tailwind-merge';
@@ -14,7 +16,7 @@ interface EvocationWizardProps {
   isMockMode: boolean;
 }
 
-type Mode = 'simple' | 'detailed';
+type Mode = 'simple' | 'detailed' | 'ingest' | 'chat';
 type EntityType = 'npcs' | 'locations' | 'factions' | 'items'; // Adventures handled separately now
 
 type SimpleDetailedPrompt = {
@@ -52,6 +54,11 @@ type SelectionState = {
     items: boolean[];
 }
 
+type ChatMessage = {
+    role: 'user' | 'model';
+    text: string;
+};
+
 const serializeCampaign = (campaign: Campaign): string => {
     let context = `Title: ${campaign.title}\nSetting: ${campaign.setting}\n`;
     if (campaign.npcs.length > 0) context += `NPCs: ${campaign.npcs.map(e => e.name).join(', ')}\n`;
@@ -74,112 +81,100 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
     const [mode, setMode] = useState<Mode>('simple');
     const [useCampaignContext, setUseCampaignContext] = useState(true);
 
-    // Simple Mode State
+    // Mode-specific State
     const [simplePrompt, setSimplePrompt] = useState('');
     const [qualifiers, setQualifiers] = useState({ theme: '', conflict: '', locations: '' });
-
-    // Detailed Mode State
     const [detailedPrompts, setDetailedPrompts] = useState<DetailedPrompts>(initialDetailedPrompts);
-
+    const [ingestedText, setIngestedText] = useState('');
+    const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+    const [chatInput, setChatInput] = useState('');
+    
     // Generation State
     const [isLoading, setIsLoading] = useState(false);
+    const [loadingMessage, setLoadingMessage] = useState('Evoking...');
     const [error, setError] = useState<string | null>(null);
     const [generatedData, setGeneratedData] = useState<BatchAddData | null>(null);
     const [selection, setSelection] = useState<SelectionState | null>(null);
 
-    const handleGenerate = async () => {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const resetGenerationState = () => {
         setIsLoading(true);
         setError(null);
         setGeneratedData(null);
         setSelection(null);
+    };
 
+    const processGeneratedData = (data: BatchAddData) => {
+        setGeneratedData(data);
+        setSelection({
+            npcs: Array(data.npcs.length).fill(true),
+            locations: Array(data.locations.length).fill(true),
+            factions: Array(data.factions.length).fill(true),
+            adventures: Array(data.adventures.length).fill(true),
+            items: Array(data.items.length).fill(true),
+        });
+    }
+
+    const handleGenerate = async () => {
+        resetGenerationState();
         const campaignContext = useCampaignContext ? serializeCampaign(campaign) : undefined;
 
         try {
-            if (mode === 'simple') {
-                if (!simplePrompt.trim()) {
-                    setError("Please enter a theme for your campaign.");
-                    setIsLoading(false);
-                    return;
-                }
-                let fullPrompt = `Theme: ${simplePrompt}\n`;
-                if (qualifiers.theme) fullPrompt += `Genre/Specific Themes: ${qualifiers.theme}\n`;
-                if (qualifiers.conflict) fullPrompt += `Central Conflict: ${qualifiers.conflict}\n`;
-                if (qualifiers.locations) fullPrompt += `Key Locations: ${qualifiers.locations}\n`;
+            let data: BatchAddData | null = null;
+            switch (mode) {
+                case 'simple':
+                    setLoadingMessage('Generating from theme...');
+                    if (!simplePrompt.trim()) { throw new Error("Please enter a theme for your campaign."); }
+                    let fullPrompt = `Theme: ${simplePrompt}\n`;
+                    if (qualifiers.theme) fullPrompt += `Genre/Specific Themes: ${qualifiers.theme}\n`;
+                    if (qualifiers.conflict) fullPrompt += `Central Conflict: ${qualifiers.conflict}\n`;
+                    if (qualifiers.locations) fullPrompt += `Key Locations: ${qualifiers.locations}\n`;
+                    data = await generateCampaignFill(fullPrompt, initialGenerationOptions, isMockMode, campaignContext);
+                    break;
 
-                const data = await generateCampaignFill(fullPrompt, initialGenerationOptions, isMockMode, campaignContext);
-                setGeneratedData(data);
-                setSelection({
-                    npcs: Array(data.npcs.length).fill(true),
-                    locations: Array(data.locations.length).fill(true),
-                    factions: Array(data.factions.length).fill(true),
-                    adventures: Array(data.adventures.length).fill(true),
-                    items: Array(data.items.length).fill(true),
-                });
-            } else { // Detailed Mode
-                const data: BatchAddData = { npcs: [], locations: [], factions: [], adventures: [], items: [] };
-                
-                const npcPromises = detailedPrompts.npcs.map(p => 
-                    generateNpc(p.prompt, false, isMockMode, campaignContext).then(res => ({ ...res, factionId: p.linkId }))
-                );
-                const locationPromises = detailedPrompts.locations.map(p => 
-                    generateLocation(p.prompt, isMockMode, campaignContext).then(res => ({ ...res, parentLocationId: p.linkId }))
-                );
-                const factionPromises = detailedPrompts.factions.map(p => generateFaction(p.prompt, isMockMode, campaignContext));
-                const itemPromises = detailedPrompts.items.map(p => generateItem(p.prompt, isMockMode, campaignContext));
-                
-                const adventurePromises = detailedPrompts.adventures
-                    .filter(adv => adv.prompt.trim() !== '' && adv.scenes.length > 0 && adv.scenes.some(s => s.prompt.trim() !== ''))
-                    .map(adv => {
-                        const scenesDescription = adv.scenes
-                            .filter(s => s.prompt.trim() !== '')
-                            .map(s => `- Scene Prompt: "${s.prompt}"${s.type ? ` (Suggested Type: ${s.type})` : ''}`)
-                            .join('\n');
-                        
-                        const fullPrompt = `Based on the following adventure concept, generate a complete adventure outline.
-Adventure Concept: "${adv.prompt}"
-
-The adventure's structure must be built around the following user-provided scenes. Generate full, detailed scenes based on these prompts:
-${scenesDescription}
-`;
-                        
-                        return generateAdventure(fullPrompt, isMockMode, campaignContext);
+                case 'detailed':
+                    setLoadingMessage('Generating from prompts...');
+                    const detailedData: BatchAddData = { npcs: [], locations: [], factions: [], adventures: [], items: [] };
+                    const npcPromises = detailedPrompts.npcs.map(p => generateNpc(p.prompt, false, isMockMode, campaignContext).then(res => ({ ...res, factionId: p.linkId })));
+                    const locationPromises = detailedPrompts.locations.map(p => generateLocation(p.prompt, isMockMode, campaignContext).then(res => ({ ...res, parentLocationId: p.linkId })));
+                    const factionPromises = detailedPrompts.factions.map(p => generateFaction(p.prompt, isMockMode, campaignContext));
+                    const itemPromises = detailedPrompts.items.map(p => generateItem(p.prompt, isMockMode, campaignContext));
+                    const adventurePromises = detailedPrompts.adventures.filter(adv => adv.prompt.trim() !== '' && adv.scenes.length > 0 && adv.scenes.some(s => s.prompt.trim() !== '')).map(adv => {
+                        const scenesDescription = adv.scenes.filter(s => s.prompt.trim() !== '').map(s => `- Scene Prompt: "${s.prompt}"${s.type ? ` (Suggested Type: ${s.type})` : ''}`).join('\n');
+                        const fullAdvPrompt = `Based on the following adventure concept, generate a complete adventure outline.\nAdventure Concept: "${adv.prompt}"\n\nThe adventure's structure must be built around the following user-provided scenes. Generate full, detailed scenes based on these prompts:\n${scenesDescription}`;
+                        return generateAdventure(fullAdvPrompt, isMockMode, campaignContext);
                     });
 
-
-                const [
-                    npcsResult,
-                    locationsResult,
-                    factionsResult,
-                    itemsResult,
-                    adventuresResult
-                ] = await Promise.all([
-                    Promise.all(npcPromises),
-                    Promise.all(locationPromises),
-                    Promise.all(factionPromises),
-                    Promise.all(itemPromises),
-                    Promise.all(adventurePromises)
-                ]);
+                    const [npcsResult, locationsResult, factionsResult, itemsResult, adventuresResult] = await Promise.all([Promise.all(npcPromises), Promise.all(locationPromises), Promise.all(factionPromises), Promise.all(itemPromises), Promise.all(adventurePromises)]);
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    detailedData.npcs = npcsResult.map(({ knowsPlayerHistory, ...restOfNpc }: any) => restOfNpc);
+                    detailedData.locations = locationsResult;
+                    detailedData.factions = factionsResult;
+                    detailedData.items = itemsResult;
+                    detailedData.adventures = adventuresResult;
+                    data = detailedData;
+                    break;
                 
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                data.npcs = npcsResult.map(({ knowsPlayerHistory, ...restOfNpc }: any) => restOfNpc);
-                data.locations = locationsResult;
-                data.factions = factionsResult;
-                data.items = itemsResult;
-                data.adventures = adventuresResult;
+                case 'ingest':
+                    setLoadingMessage('Parsing document...');
+                    if (!ingestedText.trim()) { throw new Error("Please provide some text to ingest."); }
+                    data = await parseDocumentForEntities(ingestedText, isMockMode, campaignContext);
+                    break;
                 
-                setGeneratedData(data);
-                setSelection({
-                    npcs: Array(data.npcs.length).fill(true),
-                    locations: Array(data.locations.length).fill(true),
-                    factions: Array(data.factions.length).fill(true),
-                    adventures: Array(data.adventures.length).fill(true),
-                    items: Array(data.items.length).fill(true),
-                });
+                case 'chat':
+                     setLoadingMessage('Generating from chat...');
+                    if (chatHistory.length === 0) { throw new Error("Please have a conversation with the assistant first."); }
+                    const chatTranscript = chatHistory.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`).join('\n\n');
+                    const chatPrompt = `Based on the following conversation transcript, generate a cohesive set of TTRPG world entities. Extract all the NPCs, locations, factions, items, and adventures we discussed.\n\n<Transcript>\n${chatTranscript}\n</Transcript>`;
+                    data = await generateCampaignFill(chatPrompt, initialGenerationOptions, isMockMode, campaignContext);
+                    break;
             }
+            if (data) processGeneratedData(data);
+
         } catch (err) {
             console.error(err);
-            setError("An error occurred during generation. Please try again.");
+            setError(err instanceof Error ? err.message : "An error occurred during generation.");
         } finally {
             setIsLoading(false);
         }
@@ -207,95 +202,23 @@ ${scenesDescription}
         }));
     };
 
-    // --- Detailed Prompt Handlers ---
-    const handleAddSimplePrompt = (type: EntityType) => {
-        setDetailedPrompts(produce(draft => {
-            draft[type].push({ id: crypto.randomUUID(), prompt: '' });
-        }));
-    };
-
-    const handleRemoveSimplePrompt = (type: EntityType, id: string) => {
-        setDetailedPrompts(produce(draft => {
-            draft[type] = draft[type].filter(p => p.id !== id) as any;
-        }));
-    };
-
-    const handleSimplePromptChange = (type: EntityType, id: string, prompt: string, linkId?: string) => {
-        setDetailedPrompts(produce(draft => {
-            const item = draft[type].find(p => p.id === id);
-            if (item) {
-                item.prompt = prompt;
-                if (linkId !== undefined) {
-                    item.linkId = linkId || undefined;
-                }
-            }
-        }));
-    };
-
-    const handleAddAdventure = () => {
-        setDetailedPrompts(produce(draft => {
-            draft.adventures.push({
-                id: crypto.randomUUID(),
-                prompt: '',
-                scenes: [{ id: crypto.randomUUID(), prompt: '' }]
-            });
-        }));
-    };
-
-    const handleRemoveAdventure = (id: string) => {
-        setDetailedPrompts(produce(draft => {
-            draft.adventures = draft.adventures.filter(a => a.id !== id);
-        }));
-    };
-
-    const handleAdventureChange = (id: string, prompt: string) => {
-        setDetailedPrompts(produce(draft => {
-            const adventure = draft.adventures.find(a => a.id === id);
-            if (adventure) adventure.prompt = prompt;
-        }));
-    };
-
-    const handleAddScene = (adventureId: string) => {
-        setDetailedPrompts(produce(draft => {
-            const adventure = draft.adventures.find(a => a.id === adventureId);
-            if (adventure) adventure.scenes.push({ id: crypto.randomUUID(), prompt: '' });
-        }));
-    };
-
-    const handleRemoveScene = (adventureId: string, sceneId: string) => {
-        setDetailedPrompts(produce(draft => {
-            const adventure = draft.adventures.find(a => a.id === adventureId);
-            if (adventure) adventure.scenes = adventure.scenes.filter(s => s.id !== sceneId);
-        }));
-    };
-    
-    const handleSceneChange = (adventureId: string, sceneId: string, prompt: string, type: SceneType | 'none') => {
-        setDetailedPrompts(produce(draft => {
-            const adventure = draft.adventures.find(a => a.id === adventureId);
-            if (adventure) {
-                const scene = adventure.scenes.find(s => s.id === sceneId);
-                if (scene) {
-                    scene.prompt = prompt;
-                    scene.type = type === 'none' ? undefined : type;
-                }
-            }
-        }));
-    };
-    
-    const hasSimplePrompts = !!simplePrompt.trim();
-    const hasDetailedPrompts = 
-        detailedPrompts.npcs.some(p => p.prompt.trim() !== '') ||
-        detailedPrompts.locations.some(p => p.prompt.trim() !== '') ||
-        detailedPrompts.factions.some(p => p.prompt.trim() !== '') ||
-        detailedPrompts.items.some(p => p.prompt.trim() !== '') ||
-        detailedPrompts.adventures.some(a => a.prompt.trim() !== '' && a.scenes.length > 0 && a.scenes.some(s => s.prompt.trim() !== ''));
-    const hasPrompts = mode === 'simple' ? hasSimplePrompts : hasDetailedPrompts;
-
+    const hasPrompts = 
+        (mode === 'simple' && !!simplePrompt.trim()) ||
+        (mode === 'detailed' && (
+            detailedPrompts.npcs.some(p => p.prompt.trim() !== '') ||
+            detailedPrompts.locations.some(p => p.prompt.trim() !== '') ||
+            detailedPrompts.factions.some(p => p.prompt.trim() !== '') ||
+            detailedPrompts.items.some(p => p.prompt.trim() !== '') ||
+            detailedPrompts.adventures.some(a => a.prompt.trim() !== '' && a.scenes.length > 0 && a.scenes.some(s => s.prompt.trim() !== ''))
+        )) ||
+        (mode === 'ingest' && !!ingestedText.trim()) ||
+        (mode === 'chat' && chatHistory.length > 0);
+        
     const hasGeneratedData = generatedData && selection;
 
     return (
         <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm z-20 flex items-center justify-center p-4" aria-modal="true" role="dialog">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-300">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-5xl h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-300">
                 <header className="flex items-center justify-between p-4 border-b border-slate-800 flex-shrink-0">
                     <div className="flex items-center gap-3">
                         <Icons.Wizard className="w-7 h-7 text-indigo-400" />
@@ -316,42 +239,24 @@ ${scenesDescription}
                     {/* --- Left Panel: Controls --- */}
                     <div className="w-1/2 border-r border-slate-800 flex flex-col">
                         <div className="p-4 border-b border-slate-800">
-                            <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1 rounded-lg border border-slate-800/50">
-                                <ModeButton label="Simple Mode" isActive={mode === 'simple'} onClick={() => setMode('simple')} />
-                                <ModeButton label="Detailed Mode" isActive={mode === 'detailed'} onClick={() => setMode('detailed')} />
+                            <div className="grid grid-cols-4 gap-2 bg-slate-950 p-1 rounded-lg border border-slate-800/50">
+                                <ModeButton label="Simple" icon={Icons.Sparkles} isActive={mode === 'simple'} onClick={() => setMode('simple')} />
+                                {/* FIX: Corrected icon name from 'Settings' to 'Setting' to match the export from Icons.ts. */}
+                                <ModeButton label="Detailed" icon={Icons.Setting} isActive={mode === 'detailed'} onClick={() => setMode('detailed')} />
+                                <ModeButton label="Ingest" icon={Icons.FileText} isActive={mode === 'ingest'} onClick={() => setMode('ingest')} />
+                                <ModeButton label="Chat" icon={Icons.Social} isActive={mode === 'chat'} onClick={() => setMode('chat')} />
                             </div>
                         </div>
-                        <div className="flex-1 p-6 overflow-y-auto custom-scrollbar space-y-6">
-                            {mode === 'simple' ? (
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold font-serif">Simple Generation</h3>
-                                    <p className="text-sm text-slate-400">Provide a central theme or idea. The AI will generate a cohesive set of entities to flesh out your world based on this concept.</p>
-                                    <textarea value={simplePrompt} onChange={(e) => setSimplePrompt(e.target.value)} placeholder="e.g., A floating city powered by a trapped storm elemental." rows={4} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 outline-none resize-y" />
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">Optional Qualifiers</label>
-                                        <div className="space-y-2">
-                                            <input type="text" value={qualifiers.theme} onChange={e => setQualifiers(p => ({...p, theme: e.target.value}))} placeholder="Theme/Genre (e.g., Political Intrigue, Cosmic Horror)" className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-1.5 text-sm placeholder:text-slate-600 focus:ring-1 focus:ring-indigo-500 outline-none" />
-                                            <input type="text" value={qualifiers.conflict} onChange={e => setQualifiers(p => ({...p, conflict: e.target.value}))} placeholder="Central Conflict (e.g., A brewing civil war)" className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-1.5 text-sm placeholder:text-slate-600 focus:ring-1 focus:ring-indigo-500 outline-none" />
-                                            <input type="text" value={qualifiers.locations} onChange={e => setQualifiers(p => ({...p, locations: e.target.value}))} placeholder="Key Locations (e.g., The Obsidian Spire, Sunken Market)" className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-1.5 text-sm placeholder:text-slate-600 focus:ring-1 focus:ring-indigo-500 outline-none" />
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold font-serif">Detailed Generation</h3>
-                                    <p className="text-sm text-slate-400">Add specific prompts for each entity you want to create. You can link new NPCs to existing factions and new locations to parent locations.</p>
-                                    <SimpleDetailedSection title="NPCs" items={detailedPrompts.npcs} onAdd={() => handleAddSimplePrompt('npcs')} onRemove={(id) => handleRemoveSimplePrompt('npcs', id)} onChange={(id, p, l) => handleSimplePromptChange('npcs', id, p, l)} linkOptions={campaign.factions.map(f => ({ value: f.id, label: f.name }))} linkNoun="Faction" />
-                                    <SimpleDetailedSection title="Locations" items={detailedPrompts.locations} onAdd={() => handleAddSimplePrompt('locations')} onRemove={(id) => handleRemoveSimplePrompt('locations', id)} onChange={(id, p, l) => handleSimplePromptChange('locations', id, p, l)} linkOptions={campaign.locations.map(l => ({ value: l.id, label: l.name }))} linkNoun="Parent" />
-                                    <SimpleDetailedSection title="Factions" items={detailedPrompts.factions} onAdd={() => handleAddSimplePrompt('factions')} onRemove={(id) => handleRemoveSimplePrompt('factions', id)} onChange={(id, p) => handleSimplePromptChange('factions', id, p)} />
-                                    <SimpleDetailedSection title="Items" items={detailedPrompts.items} onAdd={() => handleAddSimplePrompt('items')} onRemove={(id) => handleRemoveSimplePrompt('items', id)} onChange={(id, p) => handleSimplePromptChange('items', id, p)} />
-                                    <AdventureDetailedSection items={detailedPrompts.adventures} onAdd={handleAddAdventure} onRemove={handleRemoveAdventure} onChange={handleAdventureChange} onAddScene={handleAddScene} onRemoveScene={handleRemoveScene} onSceneChange={handleSceneChange} />
-                                </div>
-                            )}
+                        <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
+                            {mode === 'simple' && <SimpleModeView prompt={simplePrompt} onPromptChange={setSimplePrompt} qualifiers={qualifiers} onQualifiersChange={setQualifiers} />}
+                            {mode === 'detailed' && <DetailedModeView campaign={campaign} prompts={detailedPrompts} onPromptsChange={setDetailedPrompts} />}
+                            {mode === 'ingest' && <IngestModeView text={ingestedText} onTextChange={setIngestedText} fileInputRef={fileInputRef} />}
+                            {mode === 'chat' && <ChatModeView history={chatHistory} onHistoryChange={setChatHistory} input={chatInput} onInputChange={setChatInput} campaignContext={useCampaignContext ? serializeCampaign(campaign) : undefined} isMockMode={isMockMode} />}
                         </div>
                         <div className="p-4 border-t border-slate-800">
                              {error && <p className="text-xs text-red-400 mb-2 text-center">{error}</p>}
                             <Button onClick={handleGenerate} disabled={isLoading || !hasPrompts} className="w-full" size="lg">
-                                {isLoading ? <><Icons.Coach className="w-5 h-5 mr-2 animate-spin" />Evoking...</> : <><Icons.Sparkles className="w-5 h-5 mr-2" />Generate</>}
+                                {isLoading ? <><Icons.Coach className="w-5 h-5 mr-2 animate-spin" />{loadingMessage}</> : <><Icons.Sparkles className="w-5 h-5 mr-2" />{mode === 'chat' ? 'Generate Entities from Chat' : 'Generate'}</>}
                             </Button>
                         </div>
                     </div>
@@ -366,7 +271,7 @@ ${scenesDescription}
                                 <div className="flex flex-col items-center justify-center h-full text-slate-500">
                                     <Icons.Wizard className="w-16 h-16 mb-4 animate-pulse" />
                                     <p className="text-lg">The mists of creation swirl...</p>
-                                    <p className="text-sm">Please wait while the entities are being generated.</p>
+                                    <p className="text-sm">{loadingMessage}</p>
                                 </div>
                             )}
                             {!isLoading && !hasGeneratedData && (
@@ -399,9 +304,129 @@ ${scenesDescription}
     );
 };
 
+// --- Mode Components ---
 
-const ModeButton = ({ label, isActive, onClick }: { label: string; isActive: boolean; onClick: () => void; }) => (
-    <button onClick={onClick} className={twMerge('w-full px-3 py-2 text-sm font-semibold rounded-md transition-colors', isActive ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800')}>
+const SimpleModeView = ({ prompt, onPromptChange, qualifiers, onQualifiersChange }) => (
+    <div className="space-y-4">
+        <h3 className="text-lg font-semibold font-serif">Simple Generation</h3>
+        <p className="text-sm text-slate-400">Provide a central theme or idea. The AI will generate a cohesive set of entities to flesh out your world based on this concept.</p>
+        <textarea value={prompt} onChange={(e) => onPromptChange(e.target.value)} placeholder="e.g., A floating city powered by a trapped storm elemental." rows={4} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 outline-none resize-y" />
+        <div>
+            <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">Optional Qualifiers</label>
+            <div className="space-y-2">
+                <input type="text" value={qualifiers.theme} onChange={e => onQualifiersChange(p => ({...p, theme: e.target.value}))} placeholder="Theme/Genre (e.g., Political Intrigue, Cosmic Horror)" className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-1.5 text-sm placeholder:text-slate-600 focus:ring-1 focus:ring-indigo-500 outline-none" />
+                <input type="text" value={qualifiers.conflict} onChange={e => onQualifiersChange(p => ({...p, conflict: e.target.value}))} placeholder="Central Conflict (e.g., A brewing civil war)" className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-1.5 text-sm placeholder:text-slate-600 focus:ring-1 focus:ring-indigo-500 outline-none" />
+                <input type="text" value={qualifiers.locations} onChange={e => onQualifiersChange(p => ({...p, locations: e.target.value}))} placeholder="Key Locations (e.g., The Obsidian Spire, Sunken Market)" className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-1.5 text-sm placeholder:text-slate-600 focus:ring-1 focus:ring-indigo-500 outline-none" />
+            </div>
+        </div>
+    </div>
+);
+
+const DetailedModeView = ({ campaign, prompts, onPromptsChange }) => {
+    // --- Detailed Prompt Handlers ---
+    const handleAddSimplePrompt = (type: EntityType) => onPromptsChange(produce(draft => { draft[type].push({ id: crypto.randomUUID(), prompt: '' }); }));
+    const handleRemoveSimplePrompt = (type: EntityType, id: string) => onPromptsChange(produce(draft => { draft[type] = draft[type].filter(p => p.id !== id) as any; }));
+    const handleSimplePromptChange = (type: EntityType, id: string, prompt: string, linkId?: string) => {
+        onPromptsChange(produce(draft => {
+            const item = draft[type].find(p => p.id === id);
+            if (item) { item.prompt = prompt; if (linkId !== undefined) { item.linkId = linkId || undefined; } }
+        }));
+    };
+    const handleAddAdventure = () => onPromptsChange(produce(draft => { draft.adventures.push({ id: crypto.randomUUID(), prompt: '', scenes: [{ id: crypto.randomUUID(), prompt: '' }] }); }));
+    const handleRemoveAdventure = (id: string) => onPromptsChange(produce(draft => { draft.adventures = draft.adventures.filter(a => a.id !== id); }));
+    const handleAdventureChange = (id: string, prompt: string) => onPromptsChange(produce(draft => { const adv = draft.adventures.find(a => a.id === id); if(adv) adv.prompt = prompt; }));
+    const handleAddScene = (adventureId: string) => onPromptsChange(produce(draft => { const adv = draft.adventures.find(a => a.id === adventureId); if(adv) adv.scenes.push({ id: crypto.randomUUID(), prompt: '' }); }));
+    const handleRemoveScene = (adventureId: string, sceneId: string) => onPromptsChange(produce(draft => { const adv = draft.adventures.find(a => a.id === adventureId); if(adv) adv.scenes = adv.scenes.filter(s => s.id !== sceneId); }));
+    const handleSceneChange = (adventureId: string, sceneId: string, prompt: string, type: SceneType | 'none') => {
+        onPromptsChange(produce(draft => {
+            const adv = draft.adventures.find(a => a.id === adventureId);
+            if(adv) { const scene = adv.scenes.find(s => s.id === sceneId); if(scene) { scene.prompt = prompt; scene.type = type === 'none' ? undefined : type; } }
+        }));
+    };
+
+    return (
+        <div className="space-y-4">
+            <h3 className="text-lg font-semibold font-serif">Detailed Generation</h3>
+            <p className="text-sm text-slate-400">Add specific prompts for each entity you want to create. You can link new NPCs to existing factions and new locations to parent locations.</p>
+            <SimpleDetailedSection title="NPCs" items={prompts.npcs} onAdd={() => handleAddSimplePrompt('npcs')} onRemove={(id) => handleRemoveSimplePrompt('npcs', id)} onChange={(id, p, l) => handleSimplePromptChange('npcs', id, p, l)} linkOptions={campaign.factions.map(f => ({ value: f.id, label: f.name }))} linkNoun="Faction" />
+            <SimpleDetailedSection title="Locations" items={prompts.locations} onAdd={() => handleAddSimplePrompt('locations')} onRemove={(id) => handleRemoveSimplePrompt('locations', id)} onChange={(id, p, l) => handleSimplePromptChange('locations', id, p, l)} linkOptions={campaign.locations.map(l => ({ value: l.id, label: l.name }))} linkNoun="Parent" />
+            <SimpleDetailedSection title="Factions" items={prompts.factions} onAdd={() => handleAddSimplePrompt('factions')} onRemove={(id) => handleRemoveSimplePrompt('factions', id)} onChange={(id, p) => handleSimplePromptChange('factions', id, p)} />
+            <SimpleDetailedSection title="Items" items={prompts.items} onAdd={() => handleAddSimplePrompt('items')} onRemove={(id) => handleRemoveSimplePrompt('items', id)} onChange={(id, p) => handleSimplePromptChange('items', id, p)} />
+            <AdventureDetailedSection items={prompts.adventures} onAdd={handleAddAdventure} onRemove={handleRemoveAdventure} onChange={handleAdventureChange} onAddScene={handleAddScene} onRemoveScene={handleRemoveScene} onSceneChange={handleSceneChange} />
+        </div>
+    );
+};
+
+const IngestModeView = ({ text, onTextChange, fileInputRef }) => {
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => onTextChange(event.target?.result as string);
+            reader.readAsText(file);
+        }
+    };
+    return (
+        <div className="space-y-4">
+            <h3 className="text-lg font-semibold font-serif">Ingest Document</h3>
+            <p className="text-sm text-slate-400">Paste your existing campaign notes or upload a text file (.txt, .md, .json). The AI will read the document and extract any recognizable entities like NPCs, locations, and adventures.</p>
+            <textarea value={text} onChange={(e) => onTextChange(e.target.value)} placeholder="Paste your campaign notes here..." rows={12} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 outline-none resize-y" />
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".txt,.md,.json" className="hidden" />
+            <Button onClick={() => fileInputRef.current?.click()} variant="secondary" className="w-full"><Icons.FileUp className="w-4 h-4 mr-2" />Upload File</Button>
+        </div>
+    );
+};
+
+const ChatModeView = ({ history, onHistoryChange, input, onInputChange, campaignContext, isMockMode }) => {
+    const [isChatting, setIsChatting] = useState(false);
+    const chatEndRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [history]);
+    
+    const handleSendChat = async () => {
+        if (!input.trim()) return;
+        const newUserMessage: ChatMessage = { role: 'user', text: input };
+        const newHistory = [...history, newUserMessage];
+        onHistoryChange(newHistory);
+        onInputChange('');
+        setIsChatting(true);
+        try {
+            const response = await generateChatResponse(newHistory, campaignContext, isMockMode);
+            onHistoryChange(prev => [...prev, { role: 'model', text: response }]);
+        } catch (e) {
+            onHistoryChange(prev => [...prev, { role: 'model', text: "Sorry, I encountered an error. Please try again." }]);
+        } finally {
+            setIsChatting(false);
+        }
+    };
+
+    return (
+        <div className="space-y-4 h-full flex flex-col">
+            <h3 className="text-lg font-semibold font-serif">Chat Assistant</h3>
+            <p className="text-sm text-slate-400">Describe your ideas conversationally. The assistant will help you brainstorm and develop them. When you're ready, click "Generate Entities from Chat" below.</p>
+            <div className="flex-1 bg-slate-950 border border-slate-700 rounded-md p-2 overflow-y-auto custom-scrollbar flex flex-col gap-4">
+                {history.map((msg, index) => (
+                    <div key={index} className={twMerge("p-3 rounded-lg max-w-[85%] w-fit", msg.role === 'user' ? 'bg-indigo-600 self-end' : 'bg-slate-700 self-start')}>
+                        <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                    </div>
+                ))}
+                {isChatting && <div className="bg-slate-700 self-start p-3 rounded-lg"><Icons.Sparkles className="w-5 h-5 animate-pulse" /></div>}
+                <div ref={chatEndRef} />
+            </div>
+            <div className="flex items-center gap-2">
+                <input type="text" value={input} onChange={e => onInputChange(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendChat()} disabled={isChatting} placeholder="Let's create a mysterious forest..." className="flex-grow bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 outline-none" />
+                <Button onClick={handleSendChat} disabled={isChatting || !input.trim()}><Icons.Plus className="w-4 h-4" /> Send</Button>
+            </div>
+        </div>
+    )
+}
+
+
+const ModeButton = ({ label, icon: Icon, isActive, onClick }: { label: string; icon: React.ElementType, isActive: boolean; onClick: () => void; }) => (
+    <button onClick={onClick} className={twMerge('flex items-center justify-center gap-2 w-full px-3 py-2 text-sm font-semibold rounded-md transition-colors', isActive ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800')}>
+        <Icon className="w-4 h-4" />
         {label}
     </button>
 );

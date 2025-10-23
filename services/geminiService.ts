@@ -1,3 +1,4 @@
+
 import type { NPC, Location, Faction, RollableTable, Item, Scene, Adventure, Article, PointOfInterest } from '../types';
 import type { BatchAddData, AdventureForBatchAdd } from '../types';
 
@@ -95,4 +96,18 @@ export const generatePoiFromLoot = (prompt: string, campaignContext?: string, is
         return mockService.generatePoiFromLoot(prompt, campaignContext, isMockMode);
     }
     return aiRealmWeaver.generatePoiFromLoot(prompt, campaignContext);
+};
+
+export const parseDocumentForEntities = (documentContent: string, isMockMode: boolean = false, campaignContext?: string): Promise<BatchAddData> => {
+    if (isMockMode) {
+        return mockService.generateCampaignFill(documentContent, { npcs: true, locations: true, factions: true, adventures: true, items: true }, isMockMode, campaignContext);
+    }
+    return aiEvocationWizard.parseDocumentForEntities(documentContent, campaignContext);
+}
+
+export const generateChatResponse = (history: { role: 'user' | 'model', text: string }[], campaignContext?: string, isMockMode: boolean = false): Promise<string> => {
+    if (isMockMode) {
+        return mockService.generateChatResponse(history, campaignContext, isMockMode);
+    }
+    return aiEvocationWizard.generateChatResponse(history, campaignContext);
 }

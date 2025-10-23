@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Campaign, Adventure, NPC, Location, Faction, Item, Scene, Article } from './types';
+import type { Campaign, Adventure, NPC, Location, Faction, Item, Scene, Article, AdventureForBatchAdd } from './types';
 import type { BatchAddData } from './types';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { CampaignCreator } from './components/CampaignCreator';
@@ -7,7 +7,7 @@ import { CampaignSelector } from './components/CampaignSelector';
 import { Header } from './components/Header';
 import { CampaignSidebar } from './components/CampaignSidebar';
 import { AdventureEditor } from './components/AdventureEditor';
-import { AdventureCreator } from './components/AdventureCreator';
+import { AdventureDashboard } from './components/AdventureDashboard';
 import { NpcGenerator } from './components/NpcGenerator';
 import { LocationGenerator } from './components/LocationGenerator';
 import { FactionGenerator } from './components/FactionGenerator';
@@ -29,7 +29,7 @@ import { ExportModal } from './components/ExportModal';
 import { importCampaignFromJson, exportCampaignAsJson, exportCampaignAsObsidian } from './services/importExportService';
 
 export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook';
-export type GeneratorType = 'npc' | 'location' | 'faction' | 'item' | 'adventure' | 'scene' | 'article';
+export type GeneratorType = 'npc' | 'location' | 'faction' | 'item' | 'scene' | 'article';
 type AppStatus = 'loading' | 'welcome' | 'selecting' | 'creating' | 'editing';
 
 const CAMPAIGNS_STORAGE_KEY = 'realmweaver-campaigns';
@@ -374,14 +374,26 @@ const App: React.FC = () => {
   };
 
   // --- ADVENTURE & SCENE HANDLERS ---
-  const handleAdventureCreated = (adventureData: Omit<Adventure, 'id' | 'scenes'>) => {
-    const newAdventure: Adventure = { ...adventureData, id: crypto.randomUUID(), scenes: [] };
+  const handleFullAdventureCreated = (adventureData: AdventureForBatchAdd) => {
+    const newAdventure: Adventure = {
+        id: crypto.randomUUID(),
+        title: adventureData.title,
+        hook: adventureData.hook,
+        theme: adventureData.theme,
+        level: adventureData.level,
+        scenes: (adventureData.scenes || []).map(sceneData => ({
+            ...sceneData,
+            id: crypto.randomUUID(),
+        }))
+    };
     setCampaigns(prev => produce(prev, draft => {
         const campaign = draft.find(c => c.id === activeCampaignId);
-        if (campaign) campaign.adventures.push(newAdventure);
+        if (campaign) {
+            campaign.adventures.push(newAdventure);
+        }
     }));
-    setActiveGenerator(null);
     setSelectedAdventureId(newAdventure.id);
+    setActiveGenerator(null);
   };
 
   const handleUpdateAdventure = (id: string, updatedData: Partial<Adventure>) => {
@@ -518,10 +530,22 @@ const App: React.FC = () => {
       if (activeGenerator === 'faction') return <ContentWrapper title="Generate New Faction"><FactionGenerator onFactionCreated={handleFactionCreated} isMockMode={isMockMode} /></ContentWrapper>;
       if (activeGenerator === 'item') return <ContentWrapper title="Generate New Item"><ItemGenerator onItemCreated={handleItemCreated} isMockMode={isMockMode} /></ContentWrapper>;
       if (activeGenerator === 'article') return <ContentWrapper title="Create New Lore Article"><ArticleGenerator onArticleCreated={handleArticleCreated} isMockMode={isMockMode} /></ContentWrapper>;
-      if (activeGenerator === 'adventure') return <ContentWrapper title="Create New Adventure"><AdventureCreator onAdventureCreated={handleAdventureCreated} /></ContentWrapper>;
       if (activeGenerator === 'scene' && selectedAdventure) return <ContentWrapper title="Create New Scene"><SceneGenerator onSceneCreated={(s) => handleSceneCreated(selectedAdventure.id, s)} isMockMode={isMockMode} /></ContentWrapper>;
 
-      // Render Editors
+      // Render Editors & Dashboards
+      if (activeView === 'adventures' && !selectedAdventure) {
+        return <AdventureDashboard 
+                    adventures={activeCampaign.adventures} 
+                    onAdventureCreated={handleFullAdventureCreated}
+                    onSelectAdventure={(id) => {
+                        resetSelections();
+                        setActiveView('adventures');
+                        setSelectedAdventureId(id);
+                    }}
+                    isMockMode={isMockMode}
+                />;
+      }
+      
       if (selectedScene && selectedAdventure) return <SceneEditor scene={selectedScene} allNpcs={activeCampaign.npcs} allLocations={activeCampaign.locations} onUpdate={(id, data) => handleUpdateScene(selectedAdventure.id, id, data)} onDelete={(id) => handleDeleteScene(selectedAdventure.id, id)} isMockMode={isMockMode} />;
       if (selectedAdventure) return <AdventureEditor adventure={selectedAdventure} campaign={activeCampaign} onUpdate={handleUpdateAdventure} />;
       if (selectedArticle) return <ArticleEditor article={selectedArticle} allArticles={activeCampaign.articles} onUpdate={handleUpdateArticle} onDelete={handleDeleteArticle} isMockMode={isMockMode} />;
@@ -539,7 +563,6 @@ const App: React.FC = () => {
         locations: { icon: "Locations", text: "Select a location from the sidebar to edit it, or create a new one." },
         factions: { icon: "Factions", text: "Select a faction from the sidebar to edit it, or create a new one." },
         items: { icon: "Items", text: "Select an item from the sidebar to edit it, or create a new one." },
-        adventures: { icon: "Adventures", text: "Select an adventure or scene from the sidebar to edit it, or create a new one." },
         lorebook: { icon: "FileCode", text: "Select a lore article from the sidebar to edit it, or create a new one." },
       };
       

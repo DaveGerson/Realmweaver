@@ -1,6 +1,3 @@
-
-
-
 import { GoogleGenAI } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -12,6 +9,10 @@ export const generateWithSchema = async (prompt: string, schema: object, instruc
         responseSchema: schema,
         ...configOverrides,
     };
+    
+    if (modelName.includes('2.5')) {
+        config.thinkingConfig = { thinkingBudget: 32768 };
+    }
     
     const contextInstruction = campaignContext 
         ? `Reference the following existing campaign information for context and consistency:\n<campaign_context>\n${campaignContext}\n</campaign_context>\n\n`

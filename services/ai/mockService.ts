@@ -252,3 +252,12 @@ export const generatePoiFromLoot = async (prompt: string, campaignContext?: stri
         interactions: []
     });
 };
+
+// FIX: Add missing mock implementation for generateChatResponse.
+export const generateChatResponse = async (history: { role: 'user' | 'model', text: string }[], campaignContext?: string, isMockMode?: boolean): Promise<string> => {
+    console.log(`[MOCK MODE] Called generateChatResponse with history:`, history);
+    logContext(campaignContext);
+    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    const lastUserMessage = history.filter(h => h.role === 'user').pop();
+    return Promise.resolve(`This is a mocked response to your message: "${lastUserMessage?.text || '...'}"`);
+};

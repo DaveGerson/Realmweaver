@@ -270,7 +270,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                           <Icons.Adventures className="w-4 h-4" />
                           <span>Adventures</span>
                         </button>
-                        <button onClick={() => { onSelectView('adventures'); onShowGenerator('adventure') }} className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100">
+                        <button onClick={() => onSelectView('adventures')} className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100">
                             <Icons.Plus className="w-4 h-4" />
                         </button>
                     </div>
