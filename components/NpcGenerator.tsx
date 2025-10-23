@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import type { NPC } from '../types';
 import { generateNpc } from '../services/geminiService';
@@ -39,7 +38,13 @@ export const NpcGenerator: React.FC<NpcGeneratorProps> = ({ onNpcCreated, isMock
   };
   
   return (
-    <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 space-y-3">
+    <div className="relative bg-slate-900/50 p-4 rounded-lg border border-slate-800 space-y-3">
+      {isLoading && (
+        <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg z-10 transition-opacity duration-300 animate-in fade-in">
+          <Icons.Sparkles className="w-8 h-8 text-indigo-400 animate-spin" />
+          <p className="mt-2 text-sm text-slate-300">Generating NPC...</p>
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <Icons.Sparkles className="w-5 h-5 text-indigo-400" />
         <h3 className="text-md font-semibold text-slate-200 font-serif">Generate New NPC</h3>
@@ -62,6 +67,7 @@ export const NpcGenerator: React.FC<NpcGeneratorProps> = ({ onNpcCreated, isMock
                 checked={useGroundedSearch}
                 onChange={(e) => setUseGroundedSearch(e.target.checked)}
                 className="w-4 h-4 mr-2 bg-slate-800 border-slate-600 rounded text-indigo-600 focus:ring-indigo-500"
+                disabled={isLoading}
             />
             Generate from existing lore
         </label>

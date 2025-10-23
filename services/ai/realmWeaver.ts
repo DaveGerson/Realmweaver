@@ -1,5 +1,5 @@
 import { Type } from "@google/genai";
-import type { NPC, Location, Faction, Item, Scene, SkillCheck, AdventureForBatchAdd, Article } from '../../types';
+import type { NPC, Location, Faction, Item, Scene, SkillCheck, AdventureForBatchAdd, Article, PointOfInterest } from '../../types';
 import { generateWithSchema } from './core';
 
 // --- Schemas for consistent JSON output ---
@@ -102,6 +102,35 @@ export const articleSchema = {
     required: ['title', 'category', 'content'],
 };
 
+export const poiInteractionSchema = {
+    type: Type.OBJECT,
+    properties: {
+        description: { type: Type.STRING, description: "The condition, trigger, or skill check (e.g., 'DC 15 Arcana check')." },
+        outcome: { type: Type.STRING, description: "The result or information revealed if the condition is met." },
+    },
+    required: ['description', 'outcome'],
+};
+
+export const pointOfInterestSchema = {
+    type: Type.OBJECT,
+    properties: {
+        name: { type: Type.STRING, description: "A short, descriptive name for the point of interest based on the loot." },
+        passivePerceptionDC: { type: Type.INTEGER, description: "The passive perception DC required to notice this. Default to 10 if not obvious, 15+ if hidden." },
+        description: { type: Type.STRING, description: "A 'read-aloud' description for players who notice it, describing how the loot is found." },
+        investigationChecks: {
+            type: Type.ARRAY,
+            description: "A list of checks or conditions for discovering more details about the loot. Can be empty if it's just a simple item.",
+            items: poiInteractionSchema,
+        },
+        interactions: {
+            type: Type.ARRAY,
+            description: "A list of possible player actions and their outcomes (e.g., pulling a lever). Can be empty.",
+            items: poiInteractionSchema,
+        }
+    },
+    required: ['name', 'passivePerceptionDC', 'description', 'investigationChecks', 'interactions'],
+};
+
 // --- Generator Functions ---
 
 export const generateNpc = async (prompt: string, useGroundedSearch: boolean = false, campaignContext?: string): Promise<Omit<NPC, 'id' | 'factionId'>> => {
@@ -133,7 +162,7 @@ export const generateFaction = async (prompt: string, campaignContext?: string):
   const instructions = `You are The Prep Architect, an expert TTRPG assistant. Your task is to generate a detailed faction based on the user's prompt, conforming to the specified JSON schema.
 
 - **name:** The name of the faction or organization.
-- **description:** A summary of the faction's purpose, public image, and typical members.
+- **description:** A summary of the faction's purpose, public image, and a typical members.
 - **goals:** The faction's primary objectives. Make these actionable and clear, providing potential plot hooks for the GM.`;
   return generateWithSchema(prompt, factionSchema, instructions, {}, 'gemini-2.5-flash', campaignContext);
 };
@@ -206,4 +235,31 @@ export const generateArticle = async (prompt: string, campaignContext?: string):
 - **category:** The appropriate category for the article.
 - **content:** Write the article in an engaging, encyclopedic style. This is background information for the GM to understand the world's history, key events, or cosmology. Structure it for clarity and easy reference during a game.`;
   return generateWithSchema(prompt, articleSchema, instructions, {}, 'gemini-2.5-flash', campaignContext);
+};
+
+export const generatePoiFromLoot = async (prompt: string, campaignContext?: string): Promise<Omit<PointOfInterest, 'id'>> => {
+  const instructions = `You are a TTRPG designer creating an interactive element. Based on the following loot description, create a Point of Interest object describing how players discover it.
+
+- **name:** Create a compelling name for the Point of Interest, inspired by the loot (e.g., "The Sunken Chest", "The Skeleton's Grasp").
+- **passivePerceptionDC:** Set a DC to notice the item. 10 for easily visible, 13-15 for partially obscured, 16+ for well-hidden.
+- **description:** Write a read-aloud description of the scene where the loot is found.
+- **investigationChecks:** If there are details to learn by examining the loot (e.g., a maker's mark, a hidden compartment), create one or two checks. If the item is straightforward, return an empty array.
+- **interactions:** Only add interactions if the item itself implies an action (e.g., it has a button or lever). Otherwise, return an empty array.`;
+  const generatedData = await generateWithSchema(prompt, pointOfInterestSchema, instructions, {}, 'gemini-2.5-flash', campaignContext);
+  
+  // Add client-side IDs to sub-items
+  if (generatedData.investigationChecks && Array.isArray(generatedData.investigationChecks)) {
+    generatedData.investigationChecks = generatedData.investigationChecks.map((sc: Omit<SkillCheck, 'id'>) => ({
+      ...sc,
+      id: crypto.randomUUID()
+    }));
+  }
+   if (generatedData.interactions && Array.isArray(generatedData.interactions)) {
+    generatedData.interactions = generatedData.interactions.map((sc: Omit<SkillCheck, 'id'>) => ({
+      ...sc,
+      id: crypto.randomUUID()
+    }));
+  }
+
+  return generatedData;
 };

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import type { Campaign } from '../types';
+import type { Campaign, SceneType } from '../types';
 import type { BatchAddData } from '../types';
 import { generateCampaignFill, generateNpc, generateLocation, generateFaction, generateItem, generateAdventure } from '../services/geminiService';
 import { Icons } from './Icons';
 import { Button } from './common/Button';
 import { twMerge } from 'tailwind-merge';
+import { produce } from 'immer';
 
 interface EvocationWizardProps {
   campaign: Campaign;
@@ -14,20 +15,33 @@ interface EvocationWizardProps {
 }
 
 type Mode = 'simple' | 'detailed';
-type EntityType = 'npcs' | 'locations' | 'factions' | 'adventures' | 'items';
+type EntityType = 'npcs' | 'locations' | 'factions' | 'items'; // Adventures handled separately now
 
-type DetailedPrompt = {
+type SimpleDetailedPrompt = {
     id: string;
     prompt: string;
     linkId?: string;
 };
 
+// New types for detailed adventure creation
+type SceneDetailedPrompt = {
+    id: string;
+    prompt: string;
+    type?: SceneType;
+};
+
+type AdventureDetailedPrompt = {
+    id: string;
+    prompt: string;
+    scenes: SceneDetailedPrompt[];
+};
+
 type DetailedPrompts = {
-    npcs: DetailedPrompt[];
-    locations: DetailedPrompt[];
-    factions: DetailedPrompt[];
-    adventures: DetailedPrompt[];
-    items: DetailedPrompt[];
+    npcs: SimpleDetailedPrompt[];
+    locations: SimpleDetailedPrompt[];
+    factions: SimpleDetailedPrompt[];
+    adventures: AdventureDetailedPrompt[];
+    items: SimpleDetailedPrompt[];
 };
 
 type SelectionState = {
@@ -113,11 +127,26 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                 );
                 const factionPromises = detailedPrompts.factions.map(p => generateFaction(p.prompt, isMockMode, campaignContext));
                 const itemPromises = detailedPrompts.items.map(p => generateItem(p.prompt, isMockMode, campaignContext));
-                const adventurePromises = detailedPrompts.adventures.map(p => generateAdventure(p.prompt, isMockMode, campaignContext));
+                
+                const adventurePromises = detailedPrompts.adventures
+                    .filter(adv => adv.prompt.trim() !== '' && adv.scenes.length > 0 && adv.scenes.some(s => s.prompt.trim() !== ''))
+                    .map(adv => {
+                        const scenesDescription = adv.scenes
+                            .filter(s => s.prompt.trim() !== '')
+                            .map(s => `- Scene Prompt: "${s.prompt}"${s.type ? ` (Suggested Type: ${s.type})` : ''}`)
+                            .join('\n');
+                        
+                        const fullPrompt = `Based on the following adventure concept, generate a complete adventure outline.
+Adventure Concept: "${adv.prompt}"
 
-                // FIX: Refactored promise handling to prevent type inference issues.
-                // The previous implementation with direct destructuring and `as any` casting led to `unknown` types.
-                // This approach ensures results are correctly typed before processing and assigning to state.
+The adventure's structure must be built around the following user-provided scenes. Generate full, detailed scenes based on these prompts:
+${scenesDescription}
+`;
+                        
+                        return generateAdventure(fullPrompt, isMockMode, campaignContext);
+                    });
+
+
                 const [
                     npcsResult,
                     locationsResult,
@@ -132,8 +161,6 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                     Promise.all(adventurePromises)
                 ]);
                 
-                // The `generateNpc` function adds `knowsPlayerHistory`, which is not part of the BatchAddData type for NPCs.
-                // We must strip it out to prevent type errors.
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 data.npcs = npcsResult.map(({ knowsPlayerHistory, ...restOfNpc }: any) => restOfNpc);
                 data.locations = locationsResult;
@@ -171,38 +198,99 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
         onAddToCampaign(finalData);
     };
 
-    const handleSelectionChange = (type: EntityType, index: number, isChecked: boolean) => {
+    const handleSelectionChange = (type: keyof SelectionState, index: number, isChecked: boolean) => {
         if (!selection) return;
-        setSelection(prev => {
-            if (!prev) return null;
-            const newSelection = { ...prev };
-            newSelection[type][index] = isChecked;
-            return newSelection;
-        });
-    };
-
-    const handlePromptChange = (type: EntityType, id: string, prompt: string, linkId?: string) => {
-        setDetailedPrompts(prev => ({
-            ...prev,
-            [type]: prev[type].map(p => p.id === id ? { ...p, prompt, linkId: linkId !== undefined ? (linkId || undefined) : p.linkId } : p)
+        setSelection(produce(draft => {
+            if (draft) {
+                draft[type][index] = isChecked;
+            }
         }));
     };
 
-    const handleAddPrompt = (type: EntityType) => {
-        setDetailedPrompts(prev => ({
-            ...prev,
-            [type]: [...prev[type], { id: crypto.randomUUID(), prompt: '' }]
+    // --- Detailed Prompt Handlers ---
+    const handleAddSimplePrompt = (type: EntityType) => {
+        setDetailedPrompts(produce(draft => {
+            draft[type].push({ id: crypto.randomUUID(), prompt: '' });
         }));
     };
 
-    const handleRemovePrompt = (type: EntityType, id: string) => {
-        setDetailedPrompts(prev => ({
-            ...prev,
-            [type]: prev[type].filter(p => p.id !== id)
+    const handleRemoveSimplePrompt = (type: EntityType, id: string) => {
+        setDetailedPrompts(produce(draft => {
+            draft[type] = draft[type].filter(p => p.id !== id) as any;
+        }));
+    };
+
+    const handleSimplePromptChange = (type: EntityType, id: string, prompt: string, linkId?: string) => {
+        setDetailedPrompts(produce(draft => {
+            const item = draft[type].find(p => p.id === id);
+            if (item) {
+                item.prompt = prompt;
+                if (linkId !== undefined) {
+                    item.linkId = linkId || undefined;
+                }
+            }
+        }));
+    };
+
+    const handleAddAdventure = () => {
+        setDetailedPrompts(produce(draft => {
+            draft.adventures.push({
+                id: crypto.randomUUID(),
+                prompt: '',
+                scenes: [{ id: crypto.randomUUID(), prompt: '' }]
+            });
+        }));
+    };
+
+    const handleRemoveAdventure = (id: string) => {
+        setDetailedPrompts(produce(draft => {
+            draft.adventures = draft.adventures.filter(a => a.id !== id);
+        }));
+    };
+
+    const handleAdventureChange = (id: string, prompt: string) => {
+        setDetailedPrompts(produce(draft => {
+            const adventure = draft.adventures.find(a => a.id === id);
+            if (adventure) adventure.prompt = prompt;
+        }));
+    };
+
+    const handleAddScene = (adventureId: string) => {
+        setDetailedPrompts(produce(draft => {
+            const adventure = draft.adventures.find(a => a.id === adventureId);
+            if (adventure) adventure.scenes.push({ id: crypto.randomUUID(), prompt: '' });
+        }));
+    };
+
+    const handleRemoveScene = (adventureId: string, sceneId: string) => {
+        setDetailedPrompts(produce(draft => {
+            const adventure = draft.adventures.find(a => a.id === adventureId);
+            if (adventure) adventure.scenes = adventure.scenes.filter(s => s.id !== sceneId);
         }));
     };
     
-    const hasPrompts = mode === 'simple' ? !!simplePrompt.trim() : Object.values(detailedPrompts).some(p => p.length > 0);
+    const handleSceneChange = (adventureId: string, sceneId: string, prompt: string, type: SceneType | 'none') => {
+        setDetailedPrompts(produce(draft => {
+            const adventure = draft.adventures.find(a => a.id === adventureId);
+            if (adventure) {
+                const scene = adventure.scenes.find(s => s.id === sceneId);
+                if (scene) {
+                    scene.prompt = prompt;
+                    scene.type = type === 'none' ? undefined : type;
+                }
+            }
+        }));
+    };
+    
+    const hasSimplePrompts = !!simplePrompt.trim();
+    const hasDetailedPrompts = 
+        detailedPrompts.npcs.some(p => p.prompt.trim() !== '') ||
+        detailedPrompts.locations.some(p => p.prompt.trim() !== '') ||
+        detailedPrompts.factions.some(p => p.prompt.trim() !== '') ||
+        detailedPrompts.items.some(p => p.prompt.trim() !== '') ||
+        detailedPrompts.adventures.some(a => a.prompt.trim() !== '' && a.scenes.length > 0 && a.scenes.some(s => s.prompt.trim() !== ''));
+    const hasPrompts = mode === 'simple' ? hasSimplePrompts : hasDetailedPrompts;
+
     const hasGeneratedData = generatedData && selection;
 
     return (
@@ -252,11 +340,11 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                                 <div className="space-y-4">
                                     <h3 className="text-lg font-semibold font-serif">Detailed Generation</h3>
                                     <p className="text-sm text-slate-400">Add specific prompts for each entity you want to create. You can link new NPCs to existing factions and new locations to parent locations.</p>
-                                    <DetailedSection title="NPCs" items={detailedPrompts.npcs} onAdd={() => handleAddPrompt('npcs')} onRemove={(id) => handleRemovePrompt('npcs', id)} onChange={(id, p, l) => handlePromptChange('npcs', id, p, l)} linkOptions={campaign.factions.map(f => ({ value: f.id, label: f.name }))} linkNoun="Faction" />
-                                    <DetailedSection title="Locations" items={detailedPrompts.locations} onAdd={() => handleAddPrompt('locations')} onRemove={(id) => handleRemovePrompt('locations', id)} onChange={(id, p, l) => handlePromptChange('locations', id, p, l)} linkOptions={campaign.locations.map(l => ({ value: l.id, label: l.name }))} linkNoun="Parent" />
-                                    <DetailedSection title="Factions" items={detailedPrompts.factions} onAdd={() => handleAddPrompt('factions')} onRemove={(id) => handleRemovePrompt('factions', id)} onChange={(id, p) => handlePromptChange('factions', id, p)} />
-                                    <DetailedSection title="Items" items={detailedPrompts.items} onAdd={() => handleAddPrompt('items')} onRemove={(id) => handleRemovePrompt('items', id)} onChange={(id, p) => handlePromptChange('items', id, p)} />
-                                    <DetailedSection title="Adventures" items={detailedPrompts.adventures} onAdd={() => handleAddPrompt('adventures')} onRemove={(id) => handleRemovePrompt('adventures', id)} onChange={(id, p) => handlePromptChange('adventures', id, p)} />
+                                    <SimpleDetailedSection title="NPCs" items={detailedPrompts.npcs} onAdd={() => handleAddSimplePrompt('npcs')} onRemove={(id) => handleRemoveSimplePrompt('npcs', id)} onChange={(id, p, l) => handleSimplePromptChange('npcs', id, p, l)} linkOptions={campaign.factions.map(f => ({ value: f.id, label: f.name }))} linkNoun="Faction" />
+                                    <SimpleDetailedSection title="Locations" items={detailedPrompts.locations} onAdd={() => handleAddSimplePrompt('locations')} onRemove={(id) => handleRemoveSimplePrompt('locations', id)} onChange={(id, p, l) => handleSimplePromptChange('locations', id, p, l)} linkOptions={campaign.locations.map(l => ({ value: l.id, label: l.name }))} linkNoun="Parent" />
+                                    <SimpleDetailedSection title="Factions" items={detailedPrompts.factions} onAdd={() => handleAddSimplePrompt('factions')} onRemove={(id) => handleRemoveSimplePrompt('factions', id)} onChange={(id, p) => handleSimplePromptChange('factions', id, p)} />
+                                    <SimpleDetailedSection title="Items" items={detailedPrompts.items} onAdd={() => handleAddSimplePrompt('items')} onRemove={(id) => handleRemoveSimplePrompt('items', id)} onChange={(id, p) => handleSimplePromptChange('items', id, p)} />
+                                    <AdventureDetailedSection items={detailedPrompts.adventures} onAdd={handleAddAdventure} onRemove={handleRemoveAdventure} onChange={handleAdventureChange} onAddScene={handleAddScene} onRemoveScene={handleRemoveScene} onSceneChange={handleSceneChange} />
                                 </div>
                             )}
                         </div>
@@ -318,9 +406,9 @@ const ModeButton = ({ label, isActive, onClick }: { label: string; isActive: boo
     </button>
 );
 
-interface DetailedSectionProps {
+interface SimpleDetailedSectionProps {
     title: string;
-    items: DetailedPrompt[];
+    items: SimpleDetailedPrompt[];
     onAdd: () => void;
     onRemove: (id: string) => void;
     onChange: (id: string, prompt: string, linkId?: string) => void;
@@ -328,7 +416,7 @@ interface DetailedSectionProps {
     linkNoun?: string;
 }
 
-const DetailedSection: React.FC<DetailedSectionProps> = ({ title, items, onAdd, onRemove, onChange, linkOptions, linkNoun }) => {
+const SimpleDetailedSection: React.FC<SimpleDetailedSectionProps> = ({ title, items, onAdd, onRemove, onChange, linkOptions, linkNoun }) => {
     const [isExpanded, setIsExpanded] = useState(items.length > 0);
     return (
         <div className="bg-slate-950/50 border border-slate-800 rounded-lg">
@@ -364,6 +452,83 @@ const DetailedSection: React.FC<DetailedSectionProps> = ({ title, items, onAdd, 
         </div>
     );
 };
+
+// --- New Components for Adventure Detailed View ---
+const sceneTypeOptions: SceneType[] = ['combat', 'social', 'exploration', 'puzzle'];
+
+const ScenePromptItem: React.FC<{
+    scene: SceneDetailedPrompt;
+    onRemove: () => void;
+    onChange: (prompt: string, type: SceneType | 'none') => void;
+}> = ({ scene, onRemove, onChange }) => {
+    return (
+        <div className="bg-slate-800/50 p-2 rounded-md space-y-1.5">
+            <div className="flex items-start gap-2">
+                <textarea value={scene.prompt} onChange={(e) => onChange(e.target.value, scene.type || 'none')} placeholder="Scene prompt..." rows={2} className="flex-grow bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-sm resize-y outline-none focus:ring-1 focus:ring-indigo-500" />
+                <button onClick={onRemove} className="p-1 text-slate-500 hover:text-red-400 transition-colors mt-1"><Icons.Trash className="w-4 h-4" /></button>
+            </div>
+            <div className="flex items-center gap-2">
+                <select value={scene.type || 'none'} onChange={(e) => onChange(scene.prompt, e.target.value as SceneType | 'none')} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-indigo-500">
+                    <option value="none">-- Scene Type (Optional) --</option>
+                    {sceneTypeOptions.map(opt => <option key={opt} value={opt} className="capitalize">{opt}</option>)}
+                </select>
+            </div>
+        </div>
+    );
+};
+
+interface AdventureDetailedSectionProps {
+    items: AdventureDetailedPrompt[];
+    onAdd: () => void;
+    onRemove: (id: string) => void;
+    onChange: (id: string, prompt: string) => void;
+    onAddScene: (adventureId: string) => void;
+    onRemoveScene: (adventureId: string, sceneId: string) => void;
+    onSceneChange: (adventureId: string, sceneId: string, prompt: string, type: SceneType | 'none') => void;
+}
+
+const AdventureDetailedSection: React.FC<AdventureDetailedSectionProps> = ({ items, onAdd, onRemove, onChange, onAddScene, onRemoveScene, onSceneChange }) => {
+    const [isExpanded, setIsExpanded] = useState(true);
+    const title = "Adventures";
+    return (
+        <div className="bg-slate-950/50 border border-slate-800 rounded-lg">
+            <button onClick={() => setIsExpanded(p => !p)} className="w-full flex items-center justify-between p-3 text-left">
+                <h4 className="font-semibold text-slate-200">{title}</h4>
+                <div className="flex items-center gap-2">
+                    {items.length > 0 && <span className="text-xs bg-slate-700 text-slate-300 rounded-full px-2 py-0.5">{items.length}</span>}
+                    <Icons.ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
+                </div>
+            </button>
+            {isExpanded && (
+                <div className="p-3 border-t border-slate-800 space-y-2">
+                    {items.map(adventure => (
+                        <div key={adventure.id} className="bg-slate-800/50 p-2 rounded-md space-y-2 border border-slate-700/50">
+                            <div className="flex items-start gap-2">
+                                <textarea value={adventure.prompt} onChange={(e) => onChange(adventure.id, e.target.value)} placeholder="Adventure concept prompt..." rows={2} className="flex-grow bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-sm resize-y outline-none focus:ring-1 focus:ring-indigo-500" />
+                                <button onClick={() => onRemove(adventure.id)} className="p-1 text-slate-500 hover:text-red-400 transition-colors mt-1"><Icons.Trash className="w-4 h-4" /></button>
+                            </div>
+                            <div className="pl-4 border-l-2 border-slate-700 ml-2 space-y-2 pt-2">
+                                <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Scenes</h5>
+                                {adventure.scenes.length === 0 && <p className="text-xs text-amber-400 bg-amber-950 border border-amber-500/20 p-2 rounded-md">At least one scene is required for the adventure.</p>}
+                                {adventure.scenes.map(scene => (
+                                    <ScenePromptItem
+                                        key={scene.id}
+                                        scene={scene}
+                                        onRemove={() => onRemoveScene(adventure.id, scene.id)}
+                                        onChange={(prompt, type) => onSceneChange(adventure.id, scene.id, prompt, type)}
+                                    />
+                                ))}
+                                <Button onClick={() => onAddScene(adventure.id)} variant="ghost" size="sm" className="w-full"><Icons.Plus className="w-3.5 h-3.5 mr-1.5" />Add Scene</Button>
+                            </div>
+                        </div>
+                    ))}
+                    <Button onClick={onAdd} variant="secondary" size="sm" className="w-full"><Icons.Plus className="w-3.5 h-3.5 mr-1.5" />Add Adventure</Button>
+                </div>
+            )}
+        </div>
+    );
+};
+
 
 interface ResultsSectionProps {
     title: string;

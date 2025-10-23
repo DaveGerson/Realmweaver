@@ -1,4 +1,4 @@
-import type { NPC, Location, Faction, RollableTable, Item, Scene, Adventure, Article } from '../types';
+import type { NPC, Location, Faction, RollableTable, Item, Scene, Adventure, Article, PointOfInterest } from '../types';
 import type { BatchAddData, AdventureForBatchAdd } from '../types';
 
 import * as aiRealmWeaver from './ai/realmWeaver';
@@ -89,3 +89,10 @@ export const generateEnhancedText = (prompt: string, campaignContext?: string, i
     }
     return aiDmCoach.generateEnhancedText(prompt, campaignContext);
 };
+
+export const generatePoiFromLoot = (prompt: string, campaignContext?: string, isMockMode: boolean = false): Promise<Omit<PointOfInterest, 'id'>> => {
+    if (isMockMode) {
+        return mockService.generatePoiFromLoot(prompt, campaignContext, isMockMode);
+    }
+    return aiRealmWeaver.generatePoiFromLoot(prompt, campaignContext);
+}

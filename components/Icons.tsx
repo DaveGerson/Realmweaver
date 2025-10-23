@@ -1,6 +1,4 @@
 
-
-
 import {
   BookOpen,
   Users,
@@ -32,6 +30,8 @@ import {
   Wand2,
   X,
   Link2,
+  FileUp,
+  FileDown,
 } from 'lucide-react';
 
 export const Icons = {
@@ -58,9 +58,13 @@ export const Icons = {
   Travel: Bus,
   Help: HelpCircle,
   FileCode,
+  // FIX: Export FileText icon to be used for Markdown export.
+  FileText,
   Wizard: Wand2,
   X,
   Link: Link2,
+  FileUp,
+  FileDown,
 };
 
 export const SceneIcon = ({ type, className }: { type: string, className?: string }) => {

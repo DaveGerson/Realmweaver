@@ -1,4 +1,4 @@
-import type { NPC, Location, Faction, RollableTable, Item, Scene, SceneType, AdventureForBatchAdd, Article } from '../../types';
+import type { NPC, Location, Faction, RollableTable, Item, Scene, SceneType, AdventureForBatchAdd, Article, PointOfInterest } from '../../types';
 import type { BatchAddData } from '../../types';
 
 // --- Mock Data ---
@@ -20,7 +20,10 @@ const mockNpcData: Omit<NPC, 'id' | 'factionId'> = {
 const mockLocationData: Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'> = {
   name: "The Mocked Whispering Falls",
   description: "A serene waterfall that cascades into a crystal-clear pool, rumored to have healing properties.",
-  secrets: "Behind the waterfall is a hidden cave entrance."
+  secrets: "Behind the waterfall is a hidden cave entrance.",
+  loot: [],
+  connections: [],
+  pointsOfInterest: [],
 };
 
 const mockFactionData: Omit<Faction, 'id' | 'leaderId' | 'memberIds'> = {
@@ -233,4 +236,19 @@ export const generateEnhancedText = async (prompt: string, campaignContext?: str
     logContext(campaignContext);
     await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
     return Promise.resolve(`This is mocked enhanced text based on the prompt: "${prompt}". It is creative and evocative.`);
+};
+
+export const generatePoiFromLoot = async (prompt: string, campaignContext?: string, isMockMode: boolean = false): Promise<Omit<PointOfInterest, 'id'>> => {
+    console.log(`[MOCK MODE] Called generatePoiFromLoot with prompt: "${prompt}"`);
+    logContext(campaignContext);
+    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    return Promise.resolve({
+        name: `POI for "${prompt.substring(0, 20)}..."`,
+        passivePerceptionDC: 14,
+        description: `You notice something glinting under a pile of rubble. It's a ${prompt}.`,
+        investigationChecks: [
+            { id: 'mock-ic-1', description: 'DC 12 Investigation', outcome: 'The item seems to be of ancient make.'}
+        ],
+        interactions: []
+    });
 };

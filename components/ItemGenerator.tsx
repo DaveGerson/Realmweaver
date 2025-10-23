@@ -33,7 +33,13 @@ export const ItemGenerator: React.FC<ItemGeneratorProps> = ({ onItemCreated, isM
   };
   
   return (
-    <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 space-y-3">
+    <div className="relative bg-slate-900/50 p-4 rounded-lg border border-slate-800 space-y-3">
+      {isLoading && (
+        <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg z-10 transition-opacity duration-300 animate-in fade-in">
+          <Icons.Sparkles className="w-8 h-8 text-indigo-400 animate-spin" />
+          <p className="mt-2 text-sm text-slate-300">Generating Item...</p>
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <Icons.Sparkles className="w-5 h-5 text-indigo-400" />
         <h3 className="text-md font-semibold text-slate-200 font-serif">Generate New Item</h3>
