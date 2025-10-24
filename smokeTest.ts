@@ -1,5 +1,6 @@
 
-import type { Campaign, Adventure, NPC, Location, Item, Scene, Faction, BatchAddData, AdventureForBatchAdd, Article } from './types/index';
+
+import type { Campaign, NPC, Location, Item, Scene, Faction, BatchAddData, Article, PlayerCharacter } from './types/index';
 import { 
     generateNpc, 
     generateLocation, 
@@ -13,6 +14,10 @@ import {
     generateRollableTable,
     generateCampaignFill,
     generateEnhancedText,
+    generatePoiFromLoot,
+    parseDocumentForEntities,
+    generateChatResponse,
+    parseCharacterSheetPdf,
 } from './services/geminiService';
 import { createCampaignStore } from './services/campaignService';
 
@@ -30,7 +35,7 @@ const testLog = (condition: boolean, successMsg: string, failureMsg: string, dat
 // --- Test Suites ---
 
 const testServiceFunctions = async (isMockMode: boolean) => {
-  console.groupCollapsed('Smoke Test: Service Functions');
+  console.groupCollapsed('Smoke Test: Service Functions (Backend Simulation)');
   let success = true;
   try {
     const npc = await generateNpc('test npc prompt', false, isMockMode);
@@ -69,6 +74,18 @@ const testServiceFunctions = async (isMockMode: boolean) => {
     const enhancedText = await generateEnhancedText('test enhance prompt', undefined, isMockMode);
     success &&= testLog(typeof enhancedText === 'string' && enhancedText.length > 0, 'generateEnhancedText: Success', 'generateEnhancedText: Failed', enhancedText);
 
+    const poi = await generatePoiFromLoot('test loot prompt', undefined, isMockMode);
+    success &&= testLog(!!(poi && poi.name && Array.isArray(poi.investigationChecks)), 'generatePoiFromLoot: Success', 'generatePoiFromLoot: Failed', poi);
+
+    const parsedDoc = await parseDocumentForEntities('test doc content', isMockMode);
+    success &&= testLog(!!(parsedDoc && parsedDoc.npcs), 'parseDocumentForEntities: Success', 'parseDocumentForEntities: Failed', parsedDoc);
+
+    const chatResponse = await generateChatResponse([{ role: 'user', text: 'test chat' }], undefined, isMockMode);
+    success &&= testLog(typeof chatResponse === 'string' && chatResponse.length > 0, 'generateChatResponse: Success', 'generateChatResponse: Failed', chatResponse);
+
+    const parsedPdf = await parseCharacterSheetPdf('mock-base64-pdf', isMockMode);
+    success &&= testLog(!!(parsedPdf && parsedPdf.characterSocial.characterName === 'Elowyn'), 'parseCharacterSheetPdf: Success', 'parseCharacterSheetPdf: Failed', parsedPdf);
+
   } catch (e) {
     console.error('❌ Service function test failed with error:', e);
     success = false;
@@ -78,18 +95,13 @@ const testServiceFunctions = async (isMockMode: boolean) => {
 };
 
 const testCampaignHandlers = async (isMockMode: boolean) => {
-    console.groupCollapsed('Smoke Test: Full Lifecycle & Relational Logic');
+    console.groupCollapsed('Smoke Test: State Logic & Relationships (Frontend Simulation)');
     
     // Use an isolated instance of the campaign service for testing
     const testService = createCampaignStore();
-    // Override init to prevent localStorage side-effects and start fresh
     testService.init = () => {
-        // This is a bit of a hack to reset state without exposing a reset method
-        // In a real app, the factory might take an initial state.
         testService._updateState(draft => {
-            draft.campaigns = [];
-            draft.activeCampaignId = null;
-            draft.appStatus = 'welcome';
+            draft.campaigns = []; draft.activeCampaignId = null; draft.appStatus = 'welcome';
         });
     };
     testService.init();
@@ -101,66 +113,137 @@ const testCampaignHandlers = async (isMockMode: boolean) => {
     const findNpcByName = (name: string) => getActiveCampaign()?.npcs.find(e => e.name === name);
     const findFactionByName = (name: string) => getActiveCampaign()?.factions.find(e => e.name === name);
     const findLocationByName = (name: string) => getActiveCampaign()?.locations.find(e => e.name === name);
+    const findArticleByTitle = (title: string) => getActiveCampaign()?.articles.find(e => e.title === title);
     
     try {
-        // --- Test Execution ---
-        testService.createCampaign('Full Lifecycle Test Campaign', 'A world for testing the whole data flow.');
-        const { campaigns } = testService.getState();
-        success &&= testLog(campaigns.length === 1, '1. Campaign Creation', 'createCampaign failed');
-
-        // 2. Batch Add & Relationship Resolution
+        // --- 1. Setup ---
+        testService.createCampaign('Full Lifecycle Test Campaign', 'A world for testing.');
+        success &&= testLog(testService.getState().campaigns.length === 1, '1a. Campaign Creation', 'createCampaign failed');
         const mockData = await generateCampaignFill('full test', { npcs: true, locations: true, factions: true, adventures: true, items: true }, true);
         testService.batchAddToCampaign(mockData);
+        success &&= testLog(!!getActiveCampaign()?.adventures.length, '1b. Batch Add Data', 'batchAddToCampaign failed');
         
-        const elara = findNpcByName('Elara');
-        const kaelen = findNpcByName('Kaelen');
+        // --- 2. Manual Creation ---
+        const articleId = testService.createArticle({ title: 'Test Article', category: 'history', content: 'History', parentArticleId: undefined, subArticleIds: [] });
+        const subArticleId = testService.createArticle({ title: 'Sub Article', category: 'history', content: 'Sub History', parentArticleId: undefined, subArticleIds: [] });
+        const itemId = testService.createItem({ name: 'Test Item', description: 'Desc', rarity: 'common', properties: 'Props' });
+        success &&= testLog(!!findArticleByTitle('Test Article'), '2a. Article Creation', 'Article creation failed');
+        success &&= testLog(!!getActiveCampaign()?.items.find(i => i.id === itemId), '2b. Item Creation', 'Item creation failed');
+        
+        // --- 3. Link Verification (from Batch Add) ---
+        let elara = findNpcByName('Elara');
         const emeraldEnclave = findFactionByName('The Emerald Enclave');
-        const shadowSyndicate = findFactionByName('The Shadow Syndicate');
-        const sunkenTemple = findLocationByName('The Sunken Temple');
-        const tidalChamber = findLocationByName('The Tidal Chamber');
+        let sunkenTemple = findLocationByName('The Sunken Temple');
+        let tidalChamber = findLocationByName('The Tidal Chamber');
         const adventure = getActiveCampaign()?.adventures[0];
+        success &&= testLog(!!(elara && emeraldEnclave && elara.factionId === emeraldEnclave.id && emeraldEnclave.memberIds.includes(elara.id)), '3a. NPC-Faction Link', 'NPC-Faction link failed');
+        success &&= testLog(!!(tidalChamber && sunkenTemple && tidalChamber.parentLocationId === sunkenTemple.id && sunkenTemple.subLocationIds.includes(tidalChamber.id)), '3b. Location Hierarchy Link', 'Location hierarchy link failed');
+        success &&= testLog(!!(adventure && elara && adventure.scenes[0].npcIds.includes(elara.id)), '3c. Scene-NPC Link', 'Scene NPC link failed');
+        success &&= testLog(!!(adventure && sunkenTemple && adventure.scenes[0].locationId === sunkenTemple.id), '3d. Scene-Location Link', 'Scene location link failed');
 
-        success &&= testLog(!!(elara && emeraldEnclave && elara.factionId === emeraldEnclave.id), '2a. NPC-Faction Link (Elara)', 'Elara faction link failed');
-        success &&= testLog(!!(elara && emeraldEnclave && emeraldEnclave.memberIds.includes(elara.id)), '2b. Faction-NPC Link (Enclave)', 'Enclave member link failed');
-        success &&= testLog(!!(kaelen && shadowSyndicate && kaelen.factionId === shadowSyndicate.id), '2c. NPC-Faction Link (Kaelen)', 'Kaelen faction link failed');
-        success &&= testLog(!!(kaelen && shadowSyndicate && shadowSyndicate.memberIds.includes(kaelen.id)), '2d. Faction-NPC Link (Syndicate)', 'Syndicate member link failed');
-        success &&= testLog(!!(tidalChamber && sunkenTemple && tidalChamber.parentLocationId === sunkenTemple.id), '2e. Location Hierarchy (Child)', 'Child location parent link failed');
-        success &&= testLog(!!(sunkenTemple && tidalChamber && sunkenTemple.subLocationIds.includes(tidalChamber.id)), '2f. Location Hierarchy (Parent)', 'Parent location sub-location link failed');
-        success &&= testLog(!!(adventure && sunkenTemple && adventure.scenes[0].locationId === sunkenTemple.id), '2g. Scene-Location Link', 'Scene location link failed');
-        success &&= testLog(!!(adventure && elara && adventure.scenes[0].npcIds[0] === elara.id), '2h. Scene-NPC Link', 'Scene NPC link failed');
-        
-        // 3. Update & Relinking
-        if (elara && shadowSyndicate) {
-          testService.updateNpc(elara.id, { factionId: shadowSyndicate.id });
+        // --- 4. Update, Relinking & Edge Cases ---
+        const shadowSyndicatePreUpdate = findFactionByName('The Shadow Syndicate');
+        if (elara && shadowSyndicatePreUpdate) {
+            testService.updateNpc(elara.id, { factionId: shadowSyndicatePreUpdate.id });
         }
-        const updatedElara = findNpcByName('Elara');
+        // Re-fetch entities after update to avoid stale references
         const updatedEnclave = findFactionByName('The Emerald Enclave');
-        const updatedSyndicate = findFactionByName('The Shadow Syndicate');
-        success &&= testLog(!!(updatedElara && shadowSyndicate && updatedElara.factionId === shadowSyndicate.id), '3a. NPC Faction Update', 'NPC factionId did not update');
-        success &&= testLog(!!(elara && updatedEnclave && !updatedEnclave.memberIds.includes(elara.id)), '3b. Old Faction Cleanup', 'Old faction did not remove member');
-        success &&= testLog(!!(elara && updatedSyndicate && updatedSyndicate.memberIds.includes(elara.id)), '3c. New Faction Update', 'New faction did not add member');
-
-        // 4. Deletion & Cleanup
-        if (shadowSyndicate) {
-          testService.deleteFaction(shadowSyndicate.id);
-        }
-        const deletedSyndicate = findFactionByName('The Shadow Syndicate');
-        const cleanedKaelen = findNpcByName('Kaelen');
-        const cleanedElara = findNpcByName('Elara');
-        success &&= testLog(!deletedSyndicate, '4a. Faction Deletion', 'Faction was not deleted');
-        success &&= testLog(!!(cleanedKaelen && cleanedKaelen.factionId === undefined), '4b. Faction Deletion Cleanup (Kaelen)', 'Kaelen was not unassigned from deleted faction');
-        success &&= testLog(!!(cleanedElara && cleanedElara.factionId === undefined), '4c. Faction Deletion Cleanup (Elara)', 'Elara was not unassigned from deleted faction');
+        const updatedShadowSyndicate = findFactionByName('The Shadow Syndicate');
+        elara = findNpcByName('Elara'); // Re-fetch elara to get updated factionId
+        success &&= testLog(!!(updatedEnclave && elara && !updatedEnclave.memberIds.includes(elara.id)), '4a. NPC Faction Update (Old Faction)', 'Old faction did not remove member');
+        success &&= testLog(!!(updatedShadowSyndicate && elara && updatedShadowSyndicate.memberIds.includes(elara.id)), '4b. NPC Faction Update (New Faction)', 'New faction did not add member');
         
-        if (sunkenTemple) {
-            testService.deleteLocation(sunkenTemple.id); // Delete the parent
+        testService.updateArticle(subArticleId, { parentArticleId: articleId });
+        const parentArticle = findArticleByTitle('Test Article');
+        success &&= testLog(!!(parentArticle && parentArticle.subArticleIds.includes(subArticleId)), '4c. Article Hierarchy Update', 'Article hierarchy update failed');
+        
+        if (sunkenTemple && tidalChamber) {
+            const parentIdBefore = sunkenTemple.parentLocationId;
+            
+            // Temporarily spy on console.error to check if the correct error is logged without polluting the test output.
+            const originalConsoleError = console.error;
+            let capturedErrorArgs: unknown[] = [];
+            console.error = (...args: unknown[]) => {
+                capturedErrorArgs = args;
+            };
+            
+            testService.updateLocation(sunkenTemple.id, { parentLocationId: tidalChamber.id }); // This should trigger the error and abort.
+
+            // Restore the original console.error
+            console.error = originalConsoleError;
+
+            const updatedSunkenTemple = findLocationByName('The Sunken Temple');
+
+            const stateWasUnchanged = updatedSunkenTemple?.parentLocationId === parentIdBefore;
+            const correctErrorWasLogged = capturedErrorArgs.some(arg => 
+                typeof arg === 'string' && arg.includes('would create a circular dependency')
+            );
+            
+            success &&= testLog(
+                stateWasUnchanged && correctErrorWasLogged,
+                '4d. Location Circular Dependency Prevention',
+                `Location circular dependency prevention failed. State changed: ${!stateWasUnchanged}, Error logged: ${correctErrorWasLogged}`
+            );
         }
-        const deletedTemple = findLocationByName('The Sunken Temple');
+
+        // --- 5. Deletion & Cleanup ---
+        if (elara) testService.deleteNpc(elara.id);
+        const adventureAfterNpcDelete = getActiveCampaign()?.adventures[0];
+        success &&= testLog(!findNpcByName('Elara'), '5a. NPC Deletion', 'NPC was not deleted');
+        success &&= testLog(!!(adventureAfterNpcDelete && elara && !adventureAfterNpcDelete.scenes[0].npcIds.includes(elara.id)), '5b. Scene Cleanup on NPC Deletion', 'NPC not removed from scene');
+
+        const shadowSyndicate = findFactionByName('The Shadow Syndicate');
+        if (shadowSyndicate) testService.deleteFaction(shadowSyndicate.id);
+        const kaelen = findNpcByName('Kaelen');
+        success &&= testLog(!findFactionByName('The Shadow Syndicate'), '5c. Faction Deletion', 'Faction was not deleted');
+        success &&= testLog(!!(kaelen && kaelen.factionId === undefined), '5d. NPC Cleanup on Faction Deletion', 'NPC not unassigned from deleted faction');
+
+        sunkenTemple = findLocationByName('The Sunken Temple');
+        if (sunkenTemple) testService.deleteLocation(sunkenTemple.id);
         const cleanedTidalChamber = findLocationByName('The Tidal Chamber');
-        success &&= testLog(!deletedTemple, '4d. Location Deletion', 'Parent location was not deleted');
-        success &&= testLog(!!(cleanedTidalChamber && cleanedTidalChamber.parentLocationId === undefined), '4e. Parent Location Deletion Cleanup', 'Child location was not un-parented');
+        success &&= testLog(!findLocationByName('The Sunken Temple'), '5e. Parent Location Deletion', 'Parent location was not deleted');
+        success &&= testLog(!!(cleanedTidalChamber && cleanedTidalChamber.parentLocationId === undefined), '5f. Child Cleanup on Parent Deletion', 'Child location was not un-parented');
 
     } catch(e) {
-        console.error('❌ App handler test failed with error:', e);
+        console.error('❌ State handler test failed with error:', e);
+        success = false;
+    }
+    console.groupEnd();
+    return success;
+};
+
+const testImportExport = async () => {
+    console.groupCollapsed('Smoke Test: Import/Export Cycle');
+    const testService = createCampaignStore();
+    testService.init = () => {
+        testService._updateState(draft => {
+            draft.campaigns = []; draft.activeCampaignId = null; draft.appStatus = 'welcome';
+        });
+    };
+    testService.init();
+    let success = true;
+
+    try {
+        testService.createCampaign('Export Test', 'A world to be exported');
+        testService.createNpc({ name: 'Export NPC', description: 'desc', traits: 'traits', backstory: 'bs', motivations: 'motive', secrets: 'secret', stats: 'stats', exampleQuote: 'quote', knowsPlayerHistory: [] });
+        const originalCampaign = testService.getActiveCampaign();
+        if (!originalCampaign) return testLog(false, '', 'Failed to get campaign for export');
+
+        const exportedJson = JSON.stringify(originalCampaign, null, 2);
+        success &&= testLog(!!exportedJson, '1. Export to JSON string', 'Export failed');
+
+        const file = new File([exportedJson], "campaign.json", { type: "application/json" });
+        await testService.importCampaign(file);
+        
+        const { campaigns } = testService.getState();
+        success &&= testLog(campaigns.length === 2, '2. Campaign Import', 'Campaign count is incorrect after import');
+        
+        const importedCampaign = campaigns.find(c => c.title === 'Export Test' && c.id !== originalCampaign.id);
+        success &&= testLog(!!importedCampaign, '3a. Imported campaign found', 'Could not find imported campaign');
+        success &&= testLog(importedCampaign?.npcs.length === 1 && importedCampaign.npcs[0].name === 'Export NPC', '3b. Imported data is correct', 'Imported data is incorrect');
+
+    } catch (e) {
+        console.error('❌ Import/Export test failed with error:', e);
         success = false;
     }
     console.groupEnd();
@@ -174,7 +257,8 @@ export const runSmokeTests = async (isMockMode: boolean) => {
   console.log(`%c🚀 Running application smoke tests... (Mock Mode: ${isMockMode})`, 'color: #7c3aed; font-size: 1.2em; font-weight: bold;');
   const servicesOk = await testServiceFunctions(isMockMode);
   const handlersOk = await testCampaignHandlers(isMockMode);
-  if (servicesOk && handlersOk) {
+  const importExportOk = await testImportExport();
+  if (servicesOk && handlersOk && importExportOk) {
     console.log('%c✅ All smoke tests passed.', 'color: #10b981; font-size: 1.2em; font-weight: bold;');
   } else {
     console.log('%c❌ Some smoke tests failed. Check console for details.', 'color: #ef4444; font-size: 1.2em; font-weight: bold;');
