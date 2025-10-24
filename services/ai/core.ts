@@ -10,8 +10,10 @@ export const generateWithSchema = async (prompt: string, schema: object, instruc
         ...configOverrides,
     };
     
-    if (modelName.includes('2.5')) {
+    if (modelName.includes('gemini-2.5-pro')) {
         config.thinkingConfig = { thinkingBudget: 32768 };
+    } else if (modelName.includes('gemini-2.5-flash')) {
+        config.thinkingConfig = { thinkingBudget: 24576 };
     }
     
     const contextInstruction = campaignContext 

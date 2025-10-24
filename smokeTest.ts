@@ -36,7 +36,7 @@ const testServiceFunctions = async (isMockMode: boolean) => {
     success &&= testLog(!!(npc && npc.name), 'generateNpc: Success', 'generateNpc: Failed', npc);
     
     const location = await generateLocation('test location prompt', isMockMode);
-    success &&= testLog(!!(location && location.name), 'generateLocation: Success', 'generateLocation: Failed', location);
+    success &&= testLog(!!(location && location.name && Array.isArray(location.pointsOfInterest)), 'generateLocation: Success', 'generateLocation: Failed', location);
     
     const item = await generateItem('test item prompt', isMockMode);
     success &&= testLog(!!(item && item.name), 'generateItem: Success', 'generateItem: Failed', item);
@@ -77,138 +77,190 @@ const testServiceFunctions = async (isMockMode: boolean) => {
 };
 
 const testCampaignHandlers = async (isMockMode: boolean) => {
-    console.groupCollapsed('Smoke Test: App State Handlers (Multi-Campaign)');
+    console.groupCollapsed('Smoke Test: Full Lifecycle & Relational Logic');
     let campaigns: Campaign[] = [];
     let activeCampaignId: string | null = null;
     let success = true;
 
+    // --- State Accessors ---
     const getActiveCampaign = () => campaigns.find(c => c.id === activeCampaignId);
+    const findNpcByName = (name: string) => getActiveCampaign()?.npcs.find(e => e.name === name);
+    const findFactionByName = (name: string) => getActiveCampaign()?.factions.find(e => e.name === name);
+    const findLocationByName = (name: string) => getActiveCampaign()?.locations.find(e => e.name === name);
+
+    // --- Handlers (mirroring App.tsx logic) ---
+    const handleCreateCampaign = (title: string, setting: string) => {
+        const newCampaign: Campaign = { id: crypto.randomUUID(), title, setting, articles: [], adventures: [], npcs: [], locations: [], factions: [], items: [] };
+        campaigns = produce(campaigns, draft => { draft.push(newCampaign) });
+        activeCampaignId = newCampaign.id;
+    };
+    
+    const handleBatchAddToCampaign = (data: BatchAddData) => {
+      campaigns = produce(campaigns, draft => {
+          const campaign = draft.find(c => c.id === activeCampaignId);
+          if (!campaign) return;
+
+          const factionNameMap = new Map<string, string>();
+          const locationNameMap = new Map<string, string>();
+          const npcNameMap = new Map<string, string>();
+          
+          campaign.factions.forEach(f => factionNameMap.set(f.name.toLowerCase(), f.id));
+          campaign.locations.forEach(l => locationNameMap.set(l.name.toLowerCase(), l.id));
+          campaign.npcs.forEach(n => npcNameMap.set(n.name.toLowerCase(), n.id));
+
+          const newFactions = data.factions.map(d => ({ ...d, id: crypto.randomUUID(), memberIds: [] }));
+          newFactions.forEach(e => factionNameMap.set(e.name.toLowerCase(), e.id));
+          
+          const newLocations = data.locations.map(d => ({ ...d, id: crypto.randomUUID(), subLocationIds: [] }));
+          newLocations.forEach(e => locationNameMap.set(e.name.toLowerCase(), e.id));
+          
+          const newNpcs = data.npcs.map(d => ({ ...d, id: crypto.randomUUID(), knowsPlayerHistory: [] }));
+          newNpcs.forEach(e => npcNameMap.set(e.name.toLowerCase(), e.id));
+
+          const newItems = data.items.map(d => ({ ...d, id: crypto.randomUUID() }));
+          const newAdventures = data.adventures.map(d => ({ ...d, id: crypto.randomUUID(), scenes: d.scenes.map(s => ({...s, id: crypto.randomUUID()})) }));
+
+          campaign.factions.push(...newFactions);
+          campaign.locations.push(...newLocations);
+          campaign.npcs.push(...newNpcs);
+          campaign.items.push(...newItems);
+          campaign.adventures.push(...newAdventures);
+
+          campaign.npcs.forEach(npc => {
+              const factionName = npc.factionId;
+              if (factionName && factionNameMap.has(factionName.toLowerCase())) {
+                  const resolvedId = factionNameMap.get(factionName.toLowerCase())!;
+                  npc.factionId = resolvedId;
+                  const faction = campaign.factions.find(f => f.id === resolvedId);
+                  if (faction && !faction.memberIds.includes(npc.id)) faction.memberIds.push(npc.id);
+              }
+          });
+
+          campaign.locations.forEach(loc => {
+              const parentName = loc.parentLocationId;
+              if (parentName && locationNameMap.has(parentName.toLowerCase())) {
+                  const resolvedId = locationNameMap.get(parentName.toLowerCase())!;
+                  loc.parentLocationId = resolvedId;
+                  const parent = campaign.locations.find(p => p.id === resolvedId);
+                  if (parent && !parent.subLocationIds.includes(loc.id)) parent.subLocationIds.push(loc.id);
+              }
+          });
+          
+          campaign.adventures.forEach(adv => {
+            adv.scenes.forEach(scene => {
+                const locName = scene.locationId;
+                if(locName && locationNameMap.has(locName.toLowerCase())) {
+                    scene.locationId = locationNameMap.get(locName.toLowerCase());
+                }
+                if(scene.npcIds) {
+                    scene.npcIds = scene.npcIds.map(name => npcNameMap.get(name.toLowerCase()) || name);
+                }
+            })
+          })
+      });
+    };
+
+    const handleUpdateNpc = (id: string, updatedData: Partial<NPC>) => {
+       campaigns = produce(campaigns, draft => {
+          const campaign = draft.find(c => c.id === activeCampaignId);
+          if (!campaign) return;
+          const npc = campaign.npcs.find(n => n.id === id);
+          if(!npc) return;
+          
+          const oldFactionId = npc.factionId;
+          Object.assign(npc, updatedData);
+          const newFactionId = npc.factionId;
+
+          if (oldFactionId !== newFactionId) {
+              if (oldFactionId) {
+                  const oldFaction = campaign.factions.find(f => f.id === oldFactionId);
+                  if (oldFaction) oldFaction.memberIds = oldFaction.memberIds.filter(mId => mId !== id);
+              }
+              if (newFactionId) {
+                  const newFaction = campaign.factions.find(f => f.id === newFactionId);
+                  if (newFaction && !newFaction.memberIds.includes(id)) newFaction.memberIds.push(id);
+              }
+          }
+      });
+    };
+
+    const handleDeleteFaction = (id: string) => {
+        campaigns = produce(campaigns, draft => {
+            const c = draft.find(c => c.id === activeCampaignId);
+            if (!c) return;
+            c.factions = c.factions.filter(f => f.id !== id);
+            c.npcs.forEach(npc => { if (npc.factionId === id) npc.factionId = undefined; });
+        });
+    };
+
+     const handleDeleteLocation = (id: string) => {
+        campaigns = produce(campaigns, draft => {
+            const campaign = draft.find(c => c.id === activeCampaignId);
+            if (!campaign) return;
+            const locToDelete = campaign.locations.find(l => l.id === id);
+            if (!locToDelete) return;
+            if (locToDelete.parentLocationId) {
+                const parent = campaign.locations.find(p => p.id === locToDelete.parentLocationId);
+                if (parent) parent.subLocationIds = parent.subLocationIds.filter(subId => subId !== id);
+            }
+            locToDelete.subLocationIds.forEach(childId => {
+                const child = campaign.locations.find(c => c.id === childId);
+                if (child) child.parentLocationId = undefined;
+            });
+            campaign.locations = campaign.locations.filter(l => l.id !== id);
+        });
+    };
 
     try {
-        // --- Handlers (mirroring App.tsx logic) ---
-        const handleCreateCampaign = (title: string, setting: string) => {
-            const newCampaign: Campaign = { id: crypto.randomUUID(), title, setting, articles: [], adventures: [], npcs: [], locations: [], factions: [], items: [] };
-            campaigns = produce(campaigns, draft => { draft.push(newCampaign) });
-            activeCampaignId = newCampaign.id;
-        };
-        const handleUpdateCampaign = (updatedData: Partial<Campaign>) => {
-            campaigns = produce(campaigns, draft => {
-                const campaignIndex = draft.findIndex(c => c.id === activeCampaignId);
-                if (campaignIndex !== -1) Object.assign(draft[campaignIndex], updatedData);
-            });
-        };
-        const handleNpcCreated = (newNpcData: Omit<NPC, 'id'>) => {
-            const newNpc: NPC = { ...newNpcData, id: crypto.randomUUID() };
-            campaigns = produce(campaigns, draft => {
-                const c = draft.find(c => c.id === activeCampaignId);
-                if (c) c.npcs.push(newNpc);
-            });
-            return newNpc;
-        };
-        const handleUpdateNpc = (id: string, updatedData: Partial<NPC>) => {
-            campaigns = produce(campaigns, draft => {
-                const c = draft.find(c => c.id === activeCampaignId);
-                if (!c) return;
-                const npcIndex = c.npcs.findIndex(n => n.id === id);
-                if (npcIndex === -1) return;
-                Object.assign(c.npcs[npcIndex], updatedData);
-            });
-        };
-         const handleDeleteNpc = (id: string) => {
-            campaigns = produce(campaigns, draft => {
-                const c = draft.find(c => c.id === activeCampaignId);
-                if (c) c.npcs = c.npcs.filter(n => n.id !== id);
-            });
-        };
-        const handleLocationCreated = (newLocationData: Omit<Location, 'id'>) => {
-            const newLocation: Location = { ...newLocationData, id: crypto.randomUUID() };
-            campaigns = produce(campaigns, draft => {
-                const c = draft.find(c => c.id === activeCampaignId);
-                if(c) c.locations.push(newLocation);
-            });
-            return newLocation;
-        };
-        const handleFactionCreated = (newFactionData: Omit<Faction, 'id'>) => {
-            const newFaction: Faction = { ...newFactionData, id: crypto.randomUUID() };
-            campaigns = produce(campaigns, draft => {
-                const c = draft.find(c => c.id === activeCampaignId);
-                if(c) c.factions.push(newFaction);
-            });
-            return newFaction;
-        };
-        const handleAdventureCreated = (adventureData: Omit<Adventure, 'id' | 'scenes'>) => {
-            const newAdventure: Adventure = { ...adventureData, id: crypto.randomUUID(), scenes: [] };
-            campaigns = produce(campaigns, draft => {
-                const c = draft.find(c => c.id === activeCampaignId);
-                if (c) c.adventures.push(newAdventure);
-            });
-            return newAdventure;
-        };
-        const handleSceneCreated = (adventureId: string, newSceneData: Omit<Scene, 'id'>) => {
-            const newScene: Scene = { ...newSceneData, id: crypto.randomUUID() };
-            campaigns = produce(campaigns, draft => {
-                const c = draft.find(c => c.id === activeCampaignId);
-                if (!c) return;
-                const adventure = c.adventures.find(a => a.id === adventureId);
-                if (adventure) adventure.scenes.push(newScene);
-            });
-            return newScene;
-        };
-        const handleDeleteCampaign = (id: string) => {
-            campaigns = campaigns.filter(c => c.id !== id);
-            if (activeCampaignId === id) {
-                activeCampaignId = null;
-            }
-        };
-
         // --- Test Execution ---
-        
-        // 1. Creation of first campaign
-        handleCreateCampaign('Test Campaign 1', 'A world of floating islands.');
-        success &&= testLog(campaigns.length === 1 && campaigns[0].title === 'Test Campaign 1', 'handleCreateCampaign (1)', 'handleCreateCampaign (1) failed');
-        success &&= testLog(activeCampaignId === campaigns[0].id, 'Active Campaign set correctly (1)', 'Active Campaign not set (1)');
-        
-        const npc = handleNpcCreated({ ...(await generateNpc('test npc', false, isMockMode)), factionId: undefined });
-        handleLocationCreated({ ...(await generateLocation('loc 1', isMockMode)), parentLocationId: undefined, subLocationIds: [] });
-        handleFactionCreated({ ...(await generateFaction('test faction', isMockMode)), leaderId: undefined, memberIds: [] });
-        const adventure = handleAdventureCreated({ title: 'Test Adventure', hook: 'A test', theme: 'testing', level: 1 });
-        handleSceneCreated(adventure.id, { ...(await generateScene('scene 1', isMockMode)), locationId: undefined, npcIds: [] });
-        
-        const campaign1 = getActiveCampaign();
-        success &&= testLog(
-            campaign1?.npcs.length === 1 && campaign1.locations.length === 1 && campaign1.factions.length === 1 && campaign1.adventures.length === 1 && campaign1.adventures[0].scenes.length === 1,
-            'Entity Creation (Campaign 1)', 'Entity Creation (Campaign 1) failed', campaign1
-        );
+        handleCreateCampaign('Full Lifecycle Test Campaign', 'A world for testing the whole data flow.');
+        success &&= testLog(campaigns.length === 1, '1. Campaign Creation', 'handleCreateCampaign failed');
 
-        // 2. Create and switch to a second campaign
-        handleCreateCampaign('Test Campaign 2', 'An underwater kingdom.');
-        success &&= testLog(campaigns.length === 2 && getActiveCampaign()?.title === 'Test Campaign 2', 'handleCreateCampaign (2)', 'handleCreateCampaign (2) failed');
+        // 2. Batch Add & Relationship Resolution
+        const mockData = await generateCampaignFill('full test', { npcs: true, locations: true, factions: true, adventures: true, items: true }, true);
+        handleBatchAddToCampaign(mockData);
         
-        handleNpcCreated({ ...(await generateNpc('merman', false, isMockMode)), factionId: undefined });
-        const campaign2 = getActiveCampaign();
-        success &&= testLog(campaign2?.npcs.length === 1, 'Entity Creation (Campaign 2)', 'Entity Creation (Campaign 2) failed');
-        success &&= testLog(campaigns[0].npcs.length === 1, 'Campaign 1 state preserved', 'Campaign 1 state was mutated');
+        const elara = findNpcByName('Elara');
+        const kaelen = findNpcByName('Kaelen');
+        const emeraldEnclave = findFactionByName('The Emerald Enclave');
+        const shadowSyndicate = findFactionByName('The Shadow Syndicate');
+        const sunkenTemple = findLocationByName('The Sunken Temple');
+        const tidalChamber = findLocationByName('The Tidal Chamber');
+        const adventure = getActiveCampaign()?.adventures[0];
 
-        // 3. Switch back and update first campaign
-        activeCampaignId = campaigns[0].id;
-        handleUpdateCampaign({ title: 'New Title for Campaign 1' });
-        success &&= testLog(getActiveCampaign()?.title === 'New Title for Campaign 1', 'handleUpdateCampaign', 'handleUpdateCampaign failed');
+        success &&= testLog(elara?.factionId === emeraldEnclave?.id, '2a. NPC-Faction Link (Elara)', 'Elara faction link failed');
+        success &&= testLog(emeraldEnclave?.memberIds.includes(elara!.id) === true, '2b. Faction-NPC Link (Enclave)', 'Enclave member link failed');
+        success &&= testLog(kaelen?.factionId === shadowSyndicate?.id, '2c. NPC-Faction Link (Kaelen)', 'Kaelen faction link failed');
+        success &&= testLog(shadowSyndicate?.memberIds.includes(kaelen!.id) === true, '2d. Faction-NPC Link (Syndicate)', 'Syndicate member link failed');
+        success &&= testLog(tidalChamber?.parentLocationId === sunkenTemple?.id, '2e. Location Hierarchy (Child)', 'Child location parent link failed');
+        success &&= testLog(sunkenTemple?.subLocationIds.includes(tidalChamber!.id) === true, '2f. Location Hierarchy (Parent)', 'Parent location sub-location link failed');
+        success &&= testLog(adventure?.scenes[0].locationId === sunkenTemple?.id, '2g. Scene-Location Link', 'Scene location link failed');
+        success &&= testLog(adventure?.scenes[0].npcIds[0] === elara?.id, '2h. Scene-NPC Link', 'Scene NPC link failed');
         
-        handleUpdateNpc(npc.id, { name: 'New NPC Name' });
-        success &&= testLog(getActiveCampaign()?.npcs[0].name === 'New NPC Name', 'handleUpdateNpc', 'handleUpdateNpc failed');
+        // 3. Update & Relinking
+        handleUpdateNpc(elara!.id, { factionId: shadowSyndicate!.id });
+        const updatedElara = findNpcByName('Elara');
+        const updatedEnclave = findFactionByName('The Emerald Enclave');
+        const updatedSyndicate = findFactionByName('The Shadow Syndicate');
+        success &&= testLog(updatedElara?.factionId === shadowSyndicate!.id, '3a. NPC Faction Update', 'NPC factionId did not update');
+        success &&= testLog(updatedEnclave?.memberIds.includes(elara!.id) === false, '3b. Old Faction Cleanup', 'Old faction did not remove member');
+        success &&= testLog(updatedSyndicate?.memberIds.includes(elara!.id) === true, '3c. New Faction Update', 'New faction did not add member');
 
-        // 4. Deletion
-        handleDeleteCampaign(campaigns[1].id);
-        success &&= testLog(campaigns.length === 1, 'handleDeleteCampaign', 'handleDeleteCampaign failed');
+        // 4. Deletion & Cleanup
+        handleDeleteFaction(shadowSyndicate!.id);
+        const deletedSyndicate = findFactionByName('The Shadow Syndicate');
+        const cleanedKaelen = findNpcByName('Kaelen');
+        const cleanedElara = findNpcByName('Elara');
+        success &&= testLog(!deletedSyndicate, '4a. Faction Deletion', 'Faction was not deleted');
+        success &&= testLog(cleanedKaelen?.factionId === undefined, '4b. Faction Deletion Cleanup (Kaelen)', 'Kaelen was not unassigned from deleted faction');
+        success &&= testLog(cleanedElara?.factionId === undefined, '4c. Faction Deletion Cleanup (Elara)', 'Elara was not unassigned from deleted faction');
         
-        // Switch to a non-existent campaign
-        activeCampaignId = 'non-existent';
-        success &&= testLog(getActiveCampaign() === undefined, 'Active campaign is correctly undefined after deletion', 'Active campaign was not cleared');
-        
-        activeCampaignId = campaigns[0].id; // Reset for final check
-        handleDeleteNpc(npc.id);
-        success &&= testLog(getActiveCampaign()?.npcs.length === 0, 'handleDeleteNpc', 'handleDeleteNpc failed');
-        
+        handleDeleteLocation(sunkenTemple!.id); // Delete the parent
+        const deletedTemple = findLocationByName('The Sunken Temple');
+        const cleanedTidalChamber = findLocationByName('The Tidal Chamber');
+        success &&= testLog(!deletedTemple, '4d. Location Deletion', 'Parent location was not deleted');
+        success &&= testLog(cleanedTidalChamber?.parentLocationId === undefined, '4e. Parent Location Deletion Cleanup', 'Child location was not un-parented');
+
     } catch(e) {
         console.error('❌ App handler test failed with error:', e);
         success = false;

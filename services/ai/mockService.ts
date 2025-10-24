@@ -21,9 +21,26 @@ const mockLocationData: Omit<Location, 'id' | 'parentLocationId' | 'subLocationI
   name: "The Mocked Whispering Falls",
   description: "A serene waterfall that cascades into a crystal-clear pool, rumored to have healing properties.",
   secrets: "Behind the waterfall is a hidden cave entrance.",
-  loot: [],
-  connections: [],
-  pointsOfInterest: [],
+  loot: [
+      { id: "mock-loot-1", description: "A waterlogged chest containing 15gp", pointOfInterestId: "mock-poi-1" }
+  ],
+  connections: [
+      { id: "mock-conn-1", targetLocationId: "some-other-mock-id", description: "A hidden path leads to the Gloomwood" }
+  ],
+  pointsOfInterest: [
+      {
+          id: "mock-poi-1",
+          name: "The Sunken Chest",
+          passivePerceptionDC: 13,
+          description: "At the bottom of the crystal-clear pool, a small, barnacle-encrusted chest is partially visible, half-buried in the silt.",
+          investigationChecks: [
+              { id: 'mock-ic-1', description: "DC 12 Investigation", outcome: "The chest is not locked, but the latch is rusted shut. It can be forced open with a DC 14 Strength check." }
+          ],
+          interactions: [
+              { id: 'mock-ia-1', description: "If players make a loud noise or disturb the water too much", outcome: "A territorial Giant Crab scuttles out from a nearby rock to defend its territory." }
+          ]
+      }
+  ],
 };
 
 const mockFactionData: Omit<Faction, 'id' | 'leaderId' | 'memberIds'> = {
@@ -80,57 +97,51 @@ const mockArticleData: Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds'>
   content: "A long and bloody conflict fought between the dwarves of Ironhold and the goblins of the Slashed Eye tribe. The war concluded with the dwarves victorious, but at a great cost, leaving many ancient mountain passes haunted by the spirits of the fallen.",
 };
 
-const mockCampaignFillData: BatchAddData = {
+const mockComplexCampaignFillData: BatchAddData = {
     npcs: [
-        { name: "Captain Mockimus", description: "A stern, one-eyed captain.", traits: "Taps his wooden leg.", exampleQuote: "Arrr, matey.", backstory: "Lost his eye to a kraken.", motivations: "Find that kraken.", secrets: "Is secretly afraid of water.", stats: "Veteran" },
-        { name: "Salty Mock", description: "A parrot with an attitude.", traits: "Squawks insults.", exampleQuote: "Pieces of eight!", backstory: "Was Mockimus's first mate.", motivations: "Crackers.", secrets: "Knows where the treasure is.", stats: "Annoying" },
+        { name: "Elara", description: "A stoic warden of the woods.", traits: "Speaks to animals.", exampleQuote: "The forest remembers.", backstory: "Raised by wolves.", motivations: "Protect the ancient groves.", secrets: "Is part dryad.", stats: "Ranger", factionId: "The Emerald Enclave" },
+        { name: "Kaelen", description: "A shadowy figure in a dark cloak.", traits: "Never shows his face.", exampleQuote: "Knowledge is a sharper blade than any sword.", backstory: "A disgraced noble.", motivations: "To reclaim his birthright.", secrets: "Works for the Shadow Syndicate.", stats: "Assassin", factionId: "The Shadow Syndicate" },
     ],
     locations: [
-        { name: "The Mocking Siren Tavern", description: "A rundown tavern.", secrets: "The rum is watered down." },
-        { name: "Mock Rock", description: "A skull-shaped rock.", secrets: "It's just a rock." },
+        { name: "The Sunken Temple", description: "An ancient temple slowly being reclaimed by the sea.", secrets: "A hidden chamber lies behind the main altar.", parentLocationId: undefined, loot: [], connections: [], pointsOfInterest: [] },
+        { name: "The Tidal Chamber", description: "A chamber that floods with the high tide.", secrets: "The tide reveals glowing runes on the walls.", parentLocationId: "The Sunken Temple", loot: [], connections: [], pointsOfInterest: [] },
     ],
     factions: [
-        { name: "The Mockaneers", description: "A feared pirate crew.", goals: "Get rich." }
+        { name: "The Emerald Enclave", description: "Guardians of the natural order.", goals: "To stop civilization's encroachment." },
+        { name: "The Shadow Syndicate", description: "A guild of spies and information brokers.", goals: "To control the city from the shadows." }
     ],
     adventures: [
         { 
-            title: "The Mock Treasure of Mock Rock", 
-            hook: "A tattered map promises immense riches, but also speaks of a skeletal curse.", 
-            theme: "Pirate, Treasure Hunt, Undead", 
-            level: 3,
+            title: "The Sunken Temple's Secret", 
+            hook: "A powerful artifact is said to be hidden within a Sunken Temple, but a rising tide threatens to seal it away forever.", 
+            theme: "Exploration, Puzzle, Time-Pressure", 
+            level: 4,
             scenes: [
                 {
-                    title: "The Rusty Cutlass Tavern",
-                    type: "social" as SceneType,
-                    readAloudText: "The tavern is a cacophony of sea shanties and spilled rum. A one-eyed pirate in the corner seems to be watching you.",
-                    gmNotes: "The pirate, 'Patchy' Pete, knows about the map and will try to steal it or offer to partner up.",
-                    skillChecks: [{ id: "mock-sc-wiz-1", skill: "Insight", dc: 14, description: "To notice Pete's shifty eyes." }],
-                    rewards: "A potential ally or rival",
-                    npcIds: [],
+                    title: "The Temple Entrance",
+                    type: "exploration" as SceneType,
+                    readAloudText: "The entrance to the temple is a grand, seaweed-choked archway. Saltwater drips from the ceiling, and the sound of the distant tide echoes ominously.",
+                    gmNotes: "The players meet Elara here, who warns them of the temple's dangers and the rising tide.",
+                    skillChecks: [{ id: "mock-sc-wiz-1", skill: "Nature", dc: 14, description: "To understand the tidal patterns and estimate they have about 3 hours." }],
+                    rewards: "Guidance from Elara.",
+                    npcIds: ["Elara"],
+                    locationId: "The Sunken Temple"
                 },
                 {
-                    title: "The Perilous Voyage",
-                    type: "exploration" as SceneType,
-                    readAloudText: "The sea journey to Mock Rock is treacherous, with jagged rocks hidden beneath the waves and a strange, unnatural fog.",
-                    gmNotes: "A skill challenge to navigate. Failure could lead to a combat encounter with reef sharks.",
-                    skillChecks: [{ id: "mock-sc-wiz-2", skill: "Vehicle (Water)", dc: 15, description: "To safely navigate the ship." }],
-                    rewards: "Safe arrival at Mock Rock",
-                    npcIds: [],
-                },
-                 {
-                    title: "The Crypt of Captain Mockbeard",
-                    type: "combat" as SceneType,
-                    readAloudText: "Inside the skull-shaped cave, a treasure chest sits atop a pile of gold. As you approach, skeletal pirates claw their way out of the ground!",
-                    gmNotes: "Standard skeletons, but their captain has a special ability. The chest is trapped.",
-                    skillChecks: [{ id: "mock-sc-wiz-3", skill: "Investigation", dc: 16, description: "To spot the poison dart trap on the chest." }],
-                    rewards: "250 gold pieces and a +1 Scimitar",
-                    npcIds: [],
+                    title: "The Tidal Chamber Puzzle",
+                    type: "puzzle" as SceneType,
+                    readAloudText: "This circular chamber is already ankle-deep in water. Runes glow on the walls, shifting in a complex pattern as the water level slowly rises.",
+                    gmNotes: "Kaelen is here, also trying to solve the puzzle. He may fight the players or attempt to trick them.",
+                    skillChecks: [{ id: "mock-sc-wiz-2", skill: "Arcana", dc: 16, description: "To decipher the runes and solve the puzzle." }],
+                    rewards: "Access to the artifact.",
+                    npcIds: ["Kaelen"],
+                    locationId: "The Tidal Chamber"
                 }
             ]
         }
     ],
     items: [
-        { name: "Mocking Spyglass", description: "A spyglass that shows you what you least expect.", rarity: 'rare', properties: 'Can cast Scrying once per day.' }
+        { name: "Amulet of the Tides", description: "An amulet that allows the wearer to breathe underwater.", rarity: 'uncommon', properties: 'Grants the Water Breathing spell once per day.' }
     ]
 };
 
@@ -217,8 +228,7 @@ export const generateCampaignFill = async (prompt: string, options: { npcs: bool
     logContext(campaignContext);
     await new Promise(resolve => setTimeout(resolve, MOCK_DELAY * 2));
     
-    // Create a mutable copy to work with
-    const data = JSON.parse(JSON.stringify(mockCampaignFillData));
+    const data = JSON.parse(JSON.stringify(mockComplexCampaignFillData));
     
     const result: BatchAddData = {
       npcs: options.npcs ? data.npcs : [],

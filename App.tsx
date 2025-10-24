@@ -1,3 +1,6 @@
+
+
+
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Campaign, Adventure, NPC, Location, Faction, Item, Scene, Article, AdventureForBatchAdd } from './types';
 import type { BatchAddData } from './types';
@@ -27,6 +30,11 @@ import { runSmokeTests } from './smokeTest';
 import { produce } from 'immer';
 import { ExportModal } from './components/ExportModal';
 import { importCampaignFromJson, exportCampaignAsJson, exportCampaignAsObsidian } from './services/importExportService';
+import { NpcDashboard } from './components/NpcDashboard';
+import { LocationDashboard } from './components/LocationDashboard';
+import { FactionDashboard } from './components/FactionDashboard';
+import { ItemDashboard } from './components/ItemDashboard';
+import { ArticleDashboard } from './components/ArticleDashboard';
 
 export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook';
 export type GeneratorType = 'npc' | 'location' | 'faction' | 'item' | 'scene' | 'article';
@@ -215,7 +223,23 @@ const App: React.FC = () => {
     setCampaigns(prev => produce(prev, draft => {
         const campaign = draft.find(c => c.id === activeCampaignId);
         if (!campaign) return;
+
+        const npcToDelete = campaign.npcs.find(n => n.id === id);
+        if (!npcToDelete) return;
+        
+        // Remove from faction
+        const factionId = npcToDelete.factionId;
+        if (factionId) {
+            const faction = campaign.factions.find(f => f.id === factionId);
+            if (faction) {
+                faction.memberIds = faction.memberIds.filter(memberId => memberId !== id);
+            }
+        }
+        
+        // Delete NPC
         campaign.npcs = campaign.npcs.filter(n => n.id !== id);
+
+        // Remove from scenes
         campaign.adventures.forEach(adv => {
             adv.scenes.forEach(scene => {
                 scene.npcIds = scene.npcIds.filter(npcId => npcId !== id);
@@ -256,6 +280,39 @@ const App: React.FC = () => {
           }
         }
     }));
+  };
+
+  const handleDeleteLocation = (id: string) => {
+    setCampaigns(prev => produce(prev, draft => {
+        const campaign = draft.find(c => c.id === activeCampaignId);
+        if (!campaign) return;
+
+        const locToDelete = campaign.locations.find(l => l.id === id);
+        if (!locToDelete) return;
+
+        // Remove from parent's subLocationIds
+        if (locToDelete.parentLocationId) {
+            const parent = campaign.locations.find(p => p.id === locToDelete.parentLocationId);
+            if (parent) parent.subLocationIds = parent.subLocationIds.filter(subId => subId !== id);
+        }
+
+        // Un-parent all children
+        locToDelete.subLocationIds.forEach(childId => {
+            const child = campaign.locations.find(c => c.id === childId);
+            if (child) child.parentLocationId = undefined;
+        });
+
+        // Remove from scenes
+        campaign.adventures.forEach(adv => {
+            adv.scenes.forEach(scene => {
+                if (scene.locationId === id) scene.locationId = undefined;
+            });
+        });
+        
+        // Delete location
+        campaign.locations = campaign.locations.filter(l => l.id !== id);
+    }));
+    if (selectedLocationId === id) setSelectedLocationId(null);
   };
   
   const handleFactionCreated = (newFactionData: Omit<Faction, 'id'>) => {
@@ -456,55 +513,104 @@ const App: React.FC = () => {
   };
 
   const handleBatchAddToCampaign = (data: BatchAddData) => {
-    setCampaigns(prev => produce(prev, draft => {
-        const campaign = draft.find(c => c.id === activeCampaignId);
-        if (!campaign) return;
-        
-        // 1. Create all new entities and add them to the campaign draft
-        const newNpcs = data.npcs.map(npcData => ({ ...npcData, id: crypto.randomUUID(), knowsPlayerHistory: [] }));
-        const newLocations = data.locations.map(locData => ({ ...locData, id: crypto.randomUUID(), subLocationIds: [], connections: locData.connections || [] }));
-        const newFactions = data.factions.map(facData => ({ ...facData, id: crypto.randomUUID(), leaderId: undefined, memberIds: [] }));
-        const newItems = data.items.map(itemData => ({ ...itemData, id: crypto.randomUUID() }));
-        const newAdventures = data.adventures.map(advData => {
-            const newAdventure: Adventure = { 
-                ...advData, 
-                id: crypto.randomUUID(),
-                scenes: (advData.scenes || []).map(sceneData => ({
-                    ...sceneData,
-                    id: crypto.randomUUID(),
-                    locationId: undefined, // ensure these are not set by default
-                    npcIds: [],
-                }))
-            };
-            return newAdventure;
-        });
+      setCampaigns(prev => produce(prev, draft => {
+          const campaign = draft.find(c => c.id === activeCampaignId);
+          if (!campaign) return;
 
-        campaign.npcs.push(...newNpcs);
-        campaign.locations.push(...newLocations);
-        campaign.factions.push(...newFactions);
-        campaign.items.push(...newItems);
-        campaign.adventures.push(...newAdventures);
+          // Create maps to resolve names to newly created IDs
+          const factionNameMap = new Map<string, string>();
+          const locationNameMap = new Map<string, string>();
+          const npcNameMap = new Map<string, string>();
 
-        // 2. Update existing entities with links from the new entities
-        newNpcs.forEach(npc => {
-            if (npc.factionId) {
-                const faction = campaign.factions.find(f => f.id === npc.factionId);
-                if (faction) {
-                    faction.memberIds.push(npc.id);
-                }
-            }
-        });
+          // Add existing entities to maps for linking
+          campaign.factions.forEach(f => factionNameMap.set(f.name.toLowerCase(), f.id));
+          campaign.locations.forEach(l => locationNameMap.set(l.name.toLowerCase(), l.id));
+          campaign.npcs.forEach(n => npcNameMap.set(n.name.toLowerCase(), n.id));
 
-        newLocations.forEach(loc => {
-            if (loc.parentLocationId) {
-                const parent = campaign.locations.find(p => p.id === loc.parentLocationId);
-                if (parent) {
-                    parent.subLocationIds.push(loc.id);
-                }
-            }
-        });
-    }));
-    setIsWizardOpen(false);
+          // 1. Create entities and populate maps
+          const newFactions = data.factions.map(facData => {
+              const newFac = { ...facData, id: crypto.randomUUID(), leaderId: undefined, memberIds: [] };
+              factionNameMap.set(newFac.name.toLowerCase(), newFac.id);
+              return newFac;
+          });
+
+          const newLocations = data.locations.map(locData => {
+              const newLoc = { ...locData, id: crypto.randomUUID(), subLocationIds: [], connections: locData.connections || [], pointsOfInterest: locData.pointsOfInterest || [], loot: locData.loot || [] };
+              locationNameMap.set(newLoc.name.toLowerCase(), newLoc.id);
+              return newLoc;
+          });
+
+          const newNpcs = data.npcs.map(npcData => {
+              const newNpc = { ...npcData, id: crypto.randomUUID(), knowsPlayerHistory: [] };
+              npcNameMap.set(newNpc.name.toLowerCase(), newNpc.id);
+              return newNpc;
+          });
+          
+          const newItems = data.items.map(itemData => ({ ...itemData, id: crypto.randomUUID() }));
+          
+          const newAdventures = data.adventures.map(advData => {
+              const newAdventure: Adventure = {
+                  ...advData,
+                  id: crypto.randomUUID(),
+                  scenes: (advData.scenes || []).map(sceneData => ({
+                      ...sceneData,
+                      id: crypto.randomUUID(),
+                  }))
+              };
+              return newAdventure;
+          });
+
+          // Add new entities to the campaign
+          campaign.factions.push(...newFactions);
+          campaign.locations.push(...newLocations);
+          campaign.npcs.push(...newNpcs);
+          campaign.items.push(...newItems);
+          campaign.adventures.push(...newAdventures);
+
+          // 2. Resolve relationships using the maps.
+          const allNpcsInDraft = campaign.npcs;
+          const allLocationsInDraft = campaign.locations;
+          const allFactionsInDraft = campaign.factions;
+
+          allNpcsInDraft.forEach(npc => {
+              const factionName = npc.factionId; // This is a name, not an ID yet for new NPCs
+              if (factionName && factionNameMap.has(factionName.toLowerCase())) {
+                  const resolvedFactionId = factionNameMap.get(factionName.toLowerCase())!;
+                  const faction = allFactionsInDraft.find(f => f.id === resolvedFactionId);
+                  if (faction && !faction.memberIds.includes(npc.id)) {
+                      faction.memberIds.push(npc.id);
+                  }
+                  npc.factionId = resolvedFactionId;
+              }
+          });
+
+          allLocationsInDraft.forEach(loc => {
+              const parentLocationName = loc.parentLocationId; // Name, not ID yet
+              if (parentLocationName && locationNameMap.has(parentLocationName.toLowerCase())) {
+                  const resolvedParentId = locationNameMap.get(parentLocationName.toLowerCase())!;
+                  const parent = allLocationsInDraft.find(p => p.id === resolvedParentId);
+                  if (parent && !parent.subLocationIds.includes(loc.id)) {
+                      parent.subLocationIds.push(loc.id);
+                  }
+                  loc.parentLocationId = resolvedParentId;
+              }
+          });
+          
+          campaign.adventures.forEach(adv => {
+              adv.scenes.forEach(scene => {
+                  const locationName = scene.locationId; // Name, not ID yet
+                  if (locationName && locationNameMap.has(locationName.toLowerCase())) {
+                      scene.locationId = locationNameMap.get(locationName.toLowerCase());
+                  }
+                  if (scene.npcIds && Array.isArray(scene.npcIds)) {
+                      scene.npcIds = scene.npcIds
+                          .map(npcIdOrName => npcNameMap.get(npcIdOrName.toLowerCase()) || npcIdOrName)
+                          .filter(id => allNpcsInDraft.some(npc => npc.id === id));
+                  }
+              });
+          });
+      }));
+      setIsWizardOpen(false);
   };
 
   // --- Memos for selected items ---
@@ -525,15 +631,19 @@ const App: React.FC = () => {
       if (!activeCampaign) return null;
 
       // Render Generators
-      if (activeGenerator === 'npc') return <ContentWrapper title="Generate New NPC"><NpcGenerator onNpcCreated={handleNpcCreated} isMockMode={isMockMode} /></ContentWrapper>;
-      if (activeGenerator === 'location') return <ContentWrapper title="Generate New Location"><LocationGenerator onLocationCreated={handleLocationCreated} isMockMode={isMockMode} /></ContentWrapper>;
-      if (activeGenerator === 'faction') return <ContentWrapper title="Generate New Faction"><FactionGenerator onFactionCreated={handleFactionCreated} isMockMode={isMockMode} /></ContentWrapper>;
-      if (activeGenerator === 'item') return <ContentWrapper title="Generate New Item"><ItemGenerator onItemCreated={handleItemCreated} isMockMode={isMockMode} /></ContentWrapper>;
-      if (activeGenerator === 'article') return <ContentWrapper title="Create New Lore Article"><ArticleGenerator onArticleCreated={handleArticleCreated} isMockMode={isMockMode} /></ContentWrapper>;
       if (activeGenerator === 'scene' && selectedAdventure) return <ContentWrapper title="Create New Scene"><SceneGenerator onSceneCreated={(s) => handleSceneCreated(selectedAdventure.id, s)} isMockMode={isMockMode} /></ContentWrapper>;
 
-      // Render Editors & Dashboards
-      if (activeView === 'adventures' && !selectedAdventure) {
+      // Render Editors & Dashboards - Editors take priority if an item is selected
+      if (selectedScene && selectedAdventure) return <SceneEditor scene={selectedScene} allNpcs={activeCampaign.npcs} allLocations={activeCampaign.locations} onUpdate={(id, data) => handleUpdateScene(selectedAdventure.id, id, data)} onDelete={(id) => handleDeleteScene(selectedAdventure.id, id)} isMockMode={isMockMode} />;
+      if (selectedAdventure) return <AdventureEditor adventure={selectedAdventure} campaign={activeCampaign} onUpdate={handleUpdateAdventure} />;
+      if (selectedArticle) return <ArticleEditor article={selectedArticle} allArticles={activeCampaign.articles} onUpdate={handleUpdateArticle} onDelete={handleDeleteArticle} isMockMode={isMockMode} />;
+      if (selectedNpc) return <NpcEditor npc={selectedNpc} factions={activeCampaign.factions} onUpdate={handleUpdateNpc} onDelete={handleDeleteNpc} isMockMode={isMockMode} />;
+      if (selectedLocation) return <LocationEditor location={selectedLocation} allLocations={activeCampaign.locations} onUpdate={handleUpdateLocation} onDelete={handleDeleteLocation} isMockMode={isMockMode} />;
+      if (selectedFaction) return <FactionEditor faction={selectedFaction} allNpcs={activeCampaign.npcs} onUpdate={handleUpdateFaction} onDelete={handleDeleteFaction} isMockMode={isMockMode} />;
+      if (selectedItem) return <ItemEditor item={selectedItem} onUpdate={handleUpdateItem} onDelete={handleDeleteItem} isMockMode={isMockMode} />;
+
+      // If no specific item is selected, show the corresponding dashboard
+      if (activeView === 'adventures') {
         return <AdventureDashboard 
                     adventures={activeCampaign.adventures} 
                     onAdventureCreated={handleFullAdventureCreated}
@@ -545,32 +655,16 @@ const App: React.FC = () => {
                     isMockMode={isMockMode}
                 />;
       }
-      
-      if (selectedScene && selectedAdventure) return <SceneEditor scene={selectedScene} allNpcs={activeCampaign.npcs} allLocations={activeCampaign.locations} onUpdate={(id, data) => handleUpdateScene(selectedAdventure.id, id, data)} onDelete={(id) => handleDeleteScene(selectedAdventure.id, id)} isMockMode={isMockMode} />;
-      if (selectedAdventure) return <AdventureEditor adventure={selectedAdventure} campaign={activeCampaign} onUpdate={handleUpdateAdventure} />;
-      if (selectedArticle) return <ArticleEditor article={selectedArticle} allArticles={activeCampaign.articles} onUpdate={handleUpdateArticle} onDelete={handleDeleteArticle} isMockMode={isMockMode} />;
-      if (selectedNpc) return <NpcEditor npc={selectedNpc} factions={activeCampaign.factions} onUpdate={handleUpdateNpc} onDelete={handleDeleteNpc} isMockMode={isMockMode} />;
-      if (selectedLocation) return <LocationEditor location={selectedLocation} allLocations={activeCampaign.locations} onUpdate={handleUpdateLocation} isMockMode={isMockMode} />;
-      if (selectedFaction) return <FactionEditor faction={selectedFaction} allNpcs={activeCampaign.npcs} onUpdate={handleUpdateFaction} onDelete={handleDeleteFaction} isMockMode={isMockMode} />;
-      if (selectedItem) return <ItemEditor item={selectedItem} onUpdate={handleUpdateItem} onDelete={handleDeleteItem} isMockMode={isMockMode} />;
+      if (activeView === 'npcs') return <NpcDashboard npcs={activeCampaign.npcs} onNpcCreated={handleNpcCreated} onSelectNpc={setSelectedNpcId} isMockMode={isMockMode} />;
+      if (activeView === 'locations') return <LocationDashboard locations={activeCampaign.locations} onLocationCreated={handleLocationCreated} onSelectLocation={setSelectedLocationId} isMockMode={isMockMode} />;
+      if (activeView === 'factions') return <FactionDashboard factions={activeCampaign.factions} onFactionCreated={handleFactionCreated} onSelectFaction={setSelectedFactionId} isMockMode={isMockMode} />;
+      if (activeView === 'items') return <ItemDashboard items={activeCampaign.items} onItemCreated={handleItemCreated} onSelectItem={setSelectedItemId} isMockMode={isMockMode} />;
+      if (activeView === 'lorebook') return <ArticleDashboard articles={activeCampaign.articles} onArticleCreated={handleArticleCreated} onSelectArticle={setSelectedArticleId} isMockMode={isMockMode} />;
 
-      // Render Top-Level Views
+      // Render Top-Level Setting View
       if (activeView === 'setting') return <CampaignSettingEditor campaign={activeCampaign} onUpdate={handleUpdateCampaign} />;
 
-      // Fallback Placeholders
-      const placeholders = {
-        npcs: { icon: "NPCs", text: "Select an NPC from the sidebar to edit them, or create a new one." },
-        locations: { icon: "Locations", text: "Select a location from the sidebar to edit it, or create a new one." },
-        factions: { icon: "Factions", text: "Select a faction from the sidebar to edit it, or create a new one." },
-        items: { icon: "Items", text: "Select an item from the sidebar to edit it, or create a new one." },
-        lorebook: { icon: "FileCode", text: "Select a lore article from the sidebar to edit it, or create a new one." },
-      };
-      
-      if (activeView in placeholders) {
-          const { icon, text } = placeholders[activeView as keyof typeof placeholders];
-          return <EditorPlaceholder icon={icon as keyof typeof Icons} text={text} />;
-      }
-
+      // Fallback
       return <EditorPlaceholder icon="Campaign" text="Select an item from the sidebar to get started." />;
   };
 
@@ -608,116 +702,103 @@ const App: React.FC = () => {
                   } else if (type === 'article') {
                     setActiveView('lorebook');
                   } else {
-                    setActiveView(type as EditorView);
+                    setActiveView((type + 's') as EditorView);
                   }
-                  
-                  if (type === 'adventure') setSelectedAdventureId(id);
-                  if (type === 'scene') setSelectedSceneId(id);
-                  if (type === 'npc') setSelectedNpcId(id);
-                  if (type === 'location') setSelectedLocationId(id);
-                  if (type === 'faction') setSelectedFactionId(id);
-                  if (type === 'item') setSelectedItemId(id);
-                  if (type === 'article') setSelectedArticleId(id);
+
+                  switch (type) {
+                    case 'adventure': setSelectedAdventureId(id); break;
+                    case 'scene': setSelectedSceneId(id); break;
+                    case 'npc': setSelectedNpcId(id); break;
+                    case 'location': setSelectedLocationId(id); break;
+                    case 'faction': setSelectedFactionId(id); break;
+                    case 'item': setSelectedItemId(id); break;
+                    case 'article': setSelectedArticleId(id); break;
+                  }
                 }}
-                onShowGenerator={setActiveGenerator}
+                onShowGenerator={(type) => { resetSelections(); setActiveGenerator(type); }}
                 onReorderScene={handleReorderScene}
               />
-              <main className="flex-1 overflow-y-auto custom-scrollbar">
+              <main className="flex-1 overflow-hidden">
                 {renderMainContent()}
               </main>
             </div>
           );
         }
+        return <CampaignSelector campaigns={campaigns} onSelect={handleSelectCampaign} onDelete={handleDeleteCampaign} onCreateNew={() => setAppStatus('creating')} />;
+      default:
         return null;
     }
   };
 
   return (
-    <div className="bg-slate-950 text-slate-200 h-screen flex flex-col font-sans">
-      <Header 
-        activeCampaign={activeCampaign}
-        isMockMode={isMockMode} 
-        onToggleMockMode={() => setIsMockMode(p => !p)} 
-        onToggleCoach={() => setIsCoachOpen(p => !p)}
-        onToggleWizard={() => setIsWizardOpen(true)}
-        onSaveCampaign={handleSaveCampaign}
-        onSwitchCampaign={() => { setActiveCampaignId(null); setAppStatus('selecting'); }}
-        onCreateNew={() => { setActiveCampaignId(null); setAppStatus('creating'); }}
-        onImportCampaign={handleImportCampaign}
-        onShowExportModal={() => setIsExportModalOpen(true)}
-      />
-      <div className="flex-1 overflow-hidden flex relative">
-        {renderApp()}
-        {isCoachOpen && activeCampaign && ( <DmCoach campaign={activeCampaign} onClose={() => setIsCoachOpen(false)} isMockMode={isMockMode} /> )}
-        {isWizardOpen && activeCampaign && ( <EvocationWizard campaign={activeCampaign} onClose={() => setIsWizardOpen(false)} onAddToCampaign={handleBatchAddToCampaign} isMockMode={isMockMode} /> )}
-        {isExportModalOpen && activeCampaign && (
-            <ExportModal
-                campaignTitle={activeCampaign.title}
-                onClose={() => setIsExportModalOpen(false)}
-                onExportJson={() => {
-                    exportCampaignAsJson(activeCampaign);
-                    setIsExportModalOpen(false);
-                }}
-                onExportObsidian={() => {
-                    exportCampaignAsObsidian(activeCampaign);
-                    setIsExportModalOpen(false);
-                }}
+    <div className="h-screen w-screen bg-slate-950 text-slate-200 flex flex-col font-sans">
+        {appStatus === 'editing' && activeCampaign && (
+            <Header
+                activeCampaign={activeCampaign}
+                isMockMode={isMockMode}
+                onToggleMockMode={() => setIsMockMode(p => !p)}
+                onToggleCoach={() => setIsCoachOpen(p => !p)}
+                onToggleWizard={() => setIsWizardOpen(p => !p)}
+                onSaveCampaign={handleSaveCampaign}
+                onSwitchCampaign={() => { setActiveCampaignId(null); setAppStatus('selecting'); }}
+                onCreateNew={() => { setActiveCampaignId(null); setAppStatus('creating'); }}
+                onImportCampaign={handleImportCampaign}
+                onShowExportModal={() => setIsExportModalOpen(true)}
             />
         )}
-      </div>
+        {renderApp()}
+        {isCoachOpen && activeCampaign && (
+            <DmCoach campaign={activeCampaign} onClose={() => setIsCoachOpen(false)} isMockMode={isMockMode} />
+        )}
+         {isWizardOpen && activeCampaign && (
+            <EvocationWizard campaign={activeCampaign} onClose={() => setIsWizardOpen(false)} onAddToCampaign={handleBatchAddToCampaign} isMockMode={isMockMode} />
+        )}
+         {isExportModalOpen && activeCampaign && (
+            <ExportModal 
+                campaignTitle={activeCampaign.title}
+                onClose={() => setIsExportModalOpen(false)}
+                onExportJson={() => { exportCampaignAsJson(activeCampaign); setIsExportModalOpen(false); }}
+                onExportObsidian={() => { exportCampaignAsObsidian(activeCampaign); setIsExportModalOpen(false); }}
+            />
+        )}
     </div>
   );
 };
 
 // --- Helper Components ---
 const CampaignSettingEditor = ({ campaign, onUpdate }: { campaign: Campaign, onUpdate: (data: Partial<Campaign>) => void }) => {
-    const [formData, setFormData] = useState({ title: campaign.title, setting: campaign.setting });
-    useEffect(() => { setFormData({ title: campaign.title, setting: campaign.setting })}, [campaign]);
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    const handleBlur = () => onUpdate(formData);
-
+    const [setting, setSetting] = useState(campaign.setting);
     return (
-        <div className="p-6 md:p-8 h-full space-y-8 animate-in fade-in duration-300">
-          <header className="space-y-2">
-            <div className="flex items-center gap-3 text-indigo-400"> <Icons.Setting className="w-8 h-8" /> <h1 className="text-3xl font-bold font-serif text-slate-100">Campaign Setting</h1> </div>
-            <p className="text-slate-400">Define the high-level details of your world. This sets the stage for all adventures to come.</p>
-          </header>
-          <div className="space-y-6 bg-slate-900/50 p-6 rounded-xl border border-slate-800/50">
-            <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1.5">Campaign Title</label>
-              <input type="text" name="title" value={formData.title} onChange={handleChange} onBlur={handleBlur} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1.5">World Setting</label>
-              <textarea name="setting" value={formData.setting} onChange={handleChange} onBlur={handleBlur} rows={10} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all resize-y" placeholder="Describe the world's history, key conflicts, and overall mood..." />
-            </div>
-          </div>
+        <div className="p-8 h-full overflow-y-auto custom-scrollbar">
+            <h1 className="text-3xl font-bold font-serif mb-2 text-slate-100">Campaign Setting</h1>
+            <p className="text-slate-400 mb-6">This is the high-level overview of your world. It will be used as context for all future AI generations.</p>
+            <textarea
+                value={setting}
+                onChange={e => setSetting(e.target.value)}
+                onBlur={() => onUpdate({ setting })}
+                rows={20}
+                className="w-full bg-slate-900 border border-slate-700 rounded-md p-4 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all resize-y"
+                placeholder="Describe your world's history, major conflicts, key themes, and current state..."
+            />
         </div>
     );
 };
+
+const ContentWrapper = ({ title, children }: { title: string, children: React.ReactNode }) => (
+  <div className="p-8 h-full overflow-y-auto custom-scrollbar">
+    <h1 className="text-3xl font-bold font-serif mb-6 text-slate-100">{title}</h1>
+    <div className="max-w-2xl mx-auto">{children}</div>
+  </div>
+);
 
 const EditorPlaceholder = ({ icon, text }: { icon: keyof typeof Icons, text: string }) => {
     const Icon = Icons[icon];
     return (
-        <div className="h-full flex flex-col items-center justify-center text-slate-500 p-8 text-center">
-            <Icon className="w-16 h-16 mb-4" /> <p>{text}</p>
+        <div className="flex flex-col items-center justify-center h-full text-slate-600">
+            <Icon className="w-24 h-24 mb-4" />
+            <p className="text-lg">{text}</p>
         </div>
     );
 };
-
-const ContentWrapper: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <div className="p-6 md:p-8 h-full space-y-8 animate-in fade-in duration-300">
-    <header className="space-y-2">
-        <div className="flex items-center gap-3 text-indigo-400">
-            <Icons.Sparkles className="w-8 h-8" />
-            <h1 className="text-3xl font-bold font-serif text-slate-100">{title}</h1>
-        </div>
-    </header>
-    <div className="max-w-md">
-        {children}
-    </div>
-  </div>
-);
-
 
 export default App;

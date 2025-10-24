@@ -3,20 +3,22 @@ import type { Location, LocationConnection, PointOfInterest, PoiInteraction, Loo
 import { Icons } from './Icons';
 import { Button } from './common/Button';
 import { AiTextarea } from './common/Textarea';
-import { generateEnhancedText } from '../services/geminiService';
+import { generateEnhancedText, generatePoiFromLoot } from '../services/geminiService';
 
 interface LocationEditorProps {
   location: Location;
   allLocations: Location[]; // To select a parent
   onUpdate: (id: string, updatedData: Partial<Location>) => void;
+  onDelete: (id: string) => void;
   isMockMode: boolean;
 }
 
 type GenerationField = 'description' | 'secrets';
 
-export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLocations, onUpdate, isMockMode }) => {
+export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLocations, onUpdate, onDelete, isMockMode }) => {
   const [formData, setFormData] = useState(location);
   const [isGenerating, setIsGenerating] = useState<GenerationField | null>(null);
+  const [generatingPoiFor, setGeneratingPoiFor] = useState<string | null>(null);
 
   useEffect(() => {
     setFormData(location);
@@ -54,6 +56,12 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
       console.error("AI generation failed:", error);
     } finally {
       setIsGenerating(null);
+    }
+  };
+
+  const handleDelete = () => {
+    if (window.confirm(`Are you sure you want to delete ${location.name}? This action cannot be undone.`)) {
+        onDelete(location.id);
     }
   };
 
@@ -164,6 +172,29 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     }
   };
 
+  const handleGeneratePoi = async (lootItem: LootItem) => {
+    if (!lootItem.description) return;
+    setGeneratingPoiFor(lootItem.id);
+    try {
+        const poiData = await generatePoiFromLoot(lootItem.description, undefined, isMockMode);
+        const newPoi: PointOfInterest = { ...poiData, id: crypto.randomUUID() };
+        
+        const newPois = [...(formData.pointsOfInterest || []), newPoi];
+        const newLoot = (formData.loot || []).map(item =>
+            item.id === lootItem.id ? { ...item, pointOfInterestId: newPoi.id } : item
+        );
+        
+        const updatedData = { pointsOfInterest: newPois, loot: newLoot };
+        setFormData(prev => ({ ...prev, ...updatedData }));
+        onUpdate(location.id, updatedData);
+
+    } catch (err) {
+        console.error("Failed to generate Point of Interest from loot", err);
+    } finally {
+        setGeneratingPoiFor(null);
+    }
+  };
+
   // Filter out the current location and its own children from the list of possible parents
   const possibleParents = allLocations.filter(l => {
     if (l.id === location.id) return false; // Can't be its own parent
@@ -183,11 +214,17 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
 
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
-      <header className="space-y-2">
-        <div className="flex items-center gap-3 text-indigo-400">
-          <Icons.Locations className="w-8 h-8" />
-          <h1 className="text-3xl font-bold font-serif text-slate-100">Location Editor</h1>
+      <header className="flex justify-between items-start">
+        <div className="space-y-2">
+            <div className="flex items-center gap-3 text-indigo-400">
+              <Icons.Locations className="w-8 h-8" />
+              <h1 className="text-3xl font-bold font-serif text-slate-100">Location Editor</h1>
+            </div>
         </div>
+        <Button variant="danger" size="sm" onClick={handleDelete}>
+            <Icons.Trash className="w-3.5 h-3.5 mr-2" />
+            Delete Location
+        </Button>
       </header>
       
       <div className="space-y-6 bg-slate-900/50 p-6 rounded-xl border border-slate-800/50">
@@ -231,6 +268,17 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                     <option key={poi.id} value={poi.id}>{poi.name}</option>
                   ))}
                 </select>
+                <button 
+                  onClick={() => handleGeneratePoi(item)} 
+                  disabled={generatingPoiFor === item.id || !item.description}
+                  className="text-indigo-400 hover:text-indigo-300 p-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed group relative"
+                  aria-label="Generate Point of Interest from loot"
+                >
+                  {generatingPoiFor === item.id ? <Icons.Sparkles className="w-4 h-4 animate-spin" /> : <Icons.Sparkles className="w-4 h-4" />}
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-slate-900 text-slate-300 text-xs rounded-md p-2 border border-slate-700 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg">
+                    Generate an interactive Point of Interest for this loot item.
+                  </span>
+                </button>
                 <button onClick={() => handleDeleteLootItem(item.id)} className="text-slate-500 hover:text-red-400 p-1 rounded transition-colors">
                   <Icons.Trash className="w-4 h-4" />
                 </button>

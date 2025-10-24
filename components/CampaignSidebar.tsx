@@ -196,7 +196,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                             <Icons.FileCode className="w-4 h-4" />
                             <span>Lorebook</span>
                         </button>
-                        <button onClick={() => { onSelectView('lorebook'); onShowGenerator('article'); }} className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100">
+                        <button onClick={() => onSelectView('lorebook')} className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100">
                             <Icons.Plus className="w-4 h-4" />
                         </button>
                     </div>
@@ -232,7 +232,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                                     <Icon className="w-4 h-4" /> <span>{group.label}</span>
                                     <Icons.ChevronDown className={`w-3.5 h-3.5 ml-auto transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
                                 </button>
-                                <button onClick={() => { onSelectView(group.view); onShowGenerator(group.generatorType); }} className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100 mr-2">
+                                <button onClick={() => onSelectView(group.view)} className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100 mr-2">
                                     <Icons.Plus className="w-4 h-4" />
                                 </button>
                             </div>

@@ -241,7 +241,6 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                         <div className="p-4 border-b border-slate-800">
                             <div className="grid grid-cols-4 gap-2 bg-slate-950 p-1 rounded-lg border border-slate-800/50">
                                 <ModeButton label="Simple" icon={Icons.Sparkles} isActive={mode === 'simple'} onClick={() => setMode('simple')} />
-                                {/* FIX: Corrected icon name from 'Settings' to 'Setting' to match the export from Icons.ts. */}
                                 <ModeButton label="Detailed" icon={Icons.Setting} isActive={mode === 'detailed'} onClick={() => setMode('detailed')} />
                                 <ModeButton label="Ingest" icon={Icons.FileText} isActive={mode === 'ingest'} onClick={() => setMode('ingest')} />
                                 <ModeButton label="Chat" icon={Icons.Social} isActive={mode === 'chat'} onClick={() => setMode('chat')} />
