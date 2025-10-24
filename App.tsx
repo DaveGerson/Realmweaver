@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useMemo, useSyncExternalStore } from 'react';
 import type { Campaign, Adventure, NPC, Location, Faction, Item, Scene, Article, SessionLog, PlayerCharacter } from './types/index';
 import { WelcomeScreen } from './components/WelcomeScreen';
@@ -135,7 +134,7 @@ const App: React.FC = () => {
       if (!activeCampaign) return null;
 
       // Render Generators
-      if (activeGenerator === 'scene' && selectedAdventure) return <ContentWrapper title="Create New Scene"><SceneGenerator onSceneCreated={(s) => campaignService.createScene(selectedAdventure.id, s)} isMockMode={isMockMode} /></ContentWrapper>;
+      if (activeGenerator === 'scene' && selectedAdventure) return <ContentWrapper title="Create New Scene" icon="Scenes"><SceneGenerator onSceneCreated={(s) => campaignService.createScene(selectedAdventure.id, s)} isMockMode={isMockMode} /></ContentWrapper>;
 
       // Render Editors & Dashboards - Editors take priority if an item is selected
       if (selectedPlayerCharacter) return <PlayerCharacterEditor pc={selectedPlayerCharacter} onUpdate={campaignService.updatePlayerCharacter} onDelete={campaignService.deletePlayerCharacter} />;
@@ -192,115 +191,56 @@ const App: React.FC = () => {
         }} onSelectSessionLog={setSelectedSessionLogId} />;
       if (activeView === 'npcs') return <NpcDashboard npcs={activeCampaign.npcs} onNpcCreated={(npcData) => {
             const newId = campaignService.createNpc(npcData);
-            setActiveGenerator(null);
+            setActiveView('npcs');
             setSelectedNpcId(newId);
         }} onSelectNpc={setSelectedNpcId} isMockMode={isMockMode} />;
       if (activeView === 'locations') return <LocationDashboard locations={activeCampaign.locations} onLocationCreated={(locData) => {
             const newId = campaignService.createLocation(locData);
-            setActiveGenerator(null);
+            setActiveView('locations');
             setSelectedLocationId(newId);
         }} onSelectLocation={setSelectedLocationId} isMockMode={isMockMode} />;
       if (activeView === 'factions') return <FactionDashboard factions={activeCampaign.factions} onFactionCreated={(facData) => {
             const newId = campaignService.createFaction(facData);
-            setActiveGenerator(null);
+            setActiveView('factions');
             setSelectedFactionId(newId);
         }} onSelectFaction={setSelectedFactionId} isMockMode={isMockMode} />;
       if (activeView === 'items') return <ItemDashboard items={activeCampaign.items} onItemCreated={(itemData) => {
             const newId = campaignService.createItem(itemData);
-            setActiveGenerator(null);
+            setActiveView('items');
             setSelectedItemId(newId);
         }} onSelectItem={setSelectedItemId} isMockMode={isMockMode} />;
-      if (activeView === 'lorebook') return <ArticleDashboard articles={activeCampaign.articles} onArticleCreated={(articleData) => {
-            const newId = campaignService.createArticle(articleData);
-            setActiveGenerator(null);
+      if (activeView === 'lorebook') return <ArticleDashboard articles={activeCampaign.articles} onArticleCreated={(artData) => {
+            const newId = campaignService.createArticle(artData);
+            setActiveView('lorebook');
             setSelectedArticleId(newId);
         }} onSelectArticle={setSelectedArticleId} isMockMode={isMockMode} />;
 
-      // Render Top-Level Setting View
-      if (activeView === 'setting') return <CampaignSettingEditor campaign={activeCampaign} onUpdate={campaignService.updateCampaign} />;
+      // Fallback to Campaign Setting Editor
+      if (activeView === 'setting') {
+          return (
+              <ContentWrapper title="Campaign Setting" icon="Setting">
+                  <CampaignSettingEditor campaign={activeCampaign} onUpdate={campaignService.updateCampaign} />
+              </ContentWrapper>
+          );
+      }
 
-      // Fallback
-      return <EditorPlaceholder icon="Campaign" text="Select an item from the sidebar to get started." />;
+      return null;
   };
 
-  const renderApp = () => {
-    switch(appStatus) {
-      case 'loading':
-        return null;
+  const appContent = () => {
+    switch (appStatus) {
       case 'welcome':
-        return <WelcomeScreen onStart={campaignService.startNewCampaignCreation} />;
-      case 'selecting':
-        return <CampaignSelector campaigns={campaigns} onSelect={campaignService.selectCampaign} onDelete={campaignService.deleteCampaign} onCreateNew={campaignService.startNewCampaignCreation} />;
+        return <WelcomeScreen onStart={() => campaignService.prepareNewCampaign()} />;
       case 'creating':
-        return <CampaignCreator onCreateCampaign={(title, setting) => {
-            campaignService.createCampaign(title, setting);
-            setActiveView('setting');
-        }} />;
+        return <CampaignCreator onCreateCampaign={campaignService.createCampaign} />;
+      case 'selecting':
+        return <CampaignSelector campaigns={campaigns} onSelect={campaignService.selectCampaign} onDelete={campaignService.deleteCampaign} onCreateNew={() => campaignService.prepareNewCampaign()} />;
       case 'editing':
+      case 'loading':
         if (activeCampaign) {
           return (
-            <div className="flex-1 flex overflow-hidden">
-              <CampaignSidebar
-                campaign={activeCampaign}
-                activeView={activeView}
-                onSelectView={handleSelectView}
-                selectedIds={{
-                  adventure: selectedAdventureId,
-                  scene: selectedSceneId,
-                  npc: selectedNpcId,
-                  location: selectedLocationId,
-                  faction: selectedFactionId,
-                  item: selectedItemId,
-                  article: selectedArticleId,
-                  sessionLog: selectedSessionLogId,
-                  playerCharacter: selectedPlayerCharacterId,
-                }}
-                onSelect={(type, id) => {
-                  resetSelections();
-                  if (type === 'scene' || type === 'adventure') {
-                    setActiveView('adventures');
-                  } else if (type === 'article') {
-                    setActiveView('lorebook');
-                  } else if (type === 'session-log') {
-                    setActiveView('session-logs');
-                  } else if (type === 'player-character') {
-                    setActiveView('player-characters');
-                  }
-                   else {
-                    setActiveView((type + 's') as EditorView);
-                  }
-
-                  switch (type) {
-                    case 'adventure': setSelectedAdventureId(id); break;
-                    case 'scene': setSelectedSceneId(id); break;
-                    case 'npc': setSelectedNpcId(id); break;
-                    case 'location': setSelectedLocationId(id); break;
-                    case 'faction': setSelectedFactionId(id); break;
-                    case 'item': setSelectedItemId(id); break;
-                    case 'article': setSelectedArticleId(id); break;
-                    case 'session-log': setSelectedSessionLogId(id); break;
-                    case 'player-character': setSelectedPlayerCharacterId(id); break;
-                  }
-                }}
-                onShowGenerator={(type) => { resetSelections(); setActiveGenerator(type); }}
-                onReorderScene={campaignService.reorderScene}
-              />
-              <main className="flex-1 overflow-hidden">
-                {renderMainContent()}
-              </main>
-            </div>
-          );
-        }
-        return <CampaignSelector campaigns={campaigns} onSelect={campaignService.selectCampaign} onDelete={campaignService.deleteCampaign} onCreateNew={campaignService.startNewCampaignCreation} />;
-      default:
-        return null;
-    }
-  };
-
-  return (
-    <div className="h-screen w-screen bg-slate-950 text-slate-200 flex flex-col font-sans">
-        {appStatus === 'editing' && activeCampaign && (
-            <Header
+            <>
+              <Header 
                 activeCampaign={activeCampaign}
                 isMockMode={isMockMode}
                 onToggleMockMode={() => setIsMockMode(p => !p)}
@@ -308,73 +248,125 @@ const App: React.FC = () => {
                 onToggleWizard={() => setIsWizardOpen(p => !p)}
                 onSaveCampaign={campaignService.saveCampaign}
                 onSwitchCampaign={campaignService.switchToCampaignSelector}
-                onCreateNew={campaignService.prepareNewCampaign}
+                onCreateNew={campaignService.startNewCampaignCreation}
                 onImportCampaign={handleImportCampaign}
                 onShowExportModal={() => setIsExportModalOpen(true)}
-            />
-        )}
-        {renderApp()}
-        {isCoachOpen && activeCampaign && (
-            <DmCoach campaign={activeCampaign} onClose={() => setIsCoachOpen(false)} isMockMode={isMockMode} />
-        )}
-         {isWizardOpen && activeCampaign && (
-            <EvocationWizard campaign={activeCampaign} onClose={() => setIsWizardOpen(false)} onAddToCampaign={(data) => {
-                campaignService.batchAddToCampaign(data);
-                setIsWizardOpen(false);
-            }} isMockMode={isMockMode} />
-        )}
-         {isExportModalOpen && activeCampaign && (
-            <ExportModal 
-                campaignTitle={activeCampaign.title}
-                onClose={() => setIsExportModalOpen(false)}
-                onExportJson={() => { exportCampaignAsJson(activeCampaign); setIsExportModalOpen(false); }}
-                onExportObsidian={() => { exportCampaignAsObsidian(activeCampaign); setIsExportModalOpen(false); }}
-            />
-        )}
+              />
+              <div className="flex-1 flex overflow-hidden">
+                <CampaignSidebar 
+                  campaign={activeCampaign} 
+                  activeView={activeView} 
+                  onSelectView={handleSelectView}
+                  selectedIds={{
+                      adventure: selectedAdventureId,
+                      scene: selectedSceneId,
+                      npc: selectedNpcId,
+                      location: selectedLocationId,
+                      faction: selectedFactionId,
+                      item: selectedItemId,
+                      article: selectedArticleId,
+                      sessionLog: selectedSessionLogId,
+                      playerCharacter: selectedPlayerCharacterId,
+                  }}
+                  onSelect={(type, id) => {
+                      resetSelections();
+                      switch(type) {
+                          case 'adventure': setActiveView('adventures'); setSelectedAdventureId(id); break;
+                          case 'scene': setSelectedSceneId(id); break;
+                          case 'npc': setActiveView('npcs'); setSelectedNpcId(id); break;
+                          case 'location': setActiveView('locations'); setSelectedLocationId(id); break;
+                          case 'faction': setActiveView('factions'); setSelectedFactionId(id); break;
+                          case 'item': setActiveView('items'); setSelectedItemId(id); break;
+                          case 'article': setActiveView('lorebook'); setSelectedArticleId(id); break;
+                          case 'session-log': setActiveView('session-logs'); setSelectedSessionLogId(id); break;
+                          case 'player-character': setActiveView('player-characters'); setSelectedPlayerCharacterId(id); break;
+                      }
+                  }}
+                  onShowGenerator={(type) => {
+                    if (type === 'scene') {
+                      if (!selectedAdventureId) {
+                        alert("Please select an adventure first to add a scene to it.");
+                        return;
+                      }
+                    }
+                    setActiveGenerator(type);
+                  }}
+                  onReorderScene={campaignService.reorderScene}
+                />
+                <main className="flex-1 overflow-y-auto bg-slate-950 text-slate-100">
+                  {renderMainContent()}
+                </main>
+                {isCoachOpen && <DmCoach campaign={activeCampaign} onClose={() => setIsCoachOpen(false)} isMockMode={isMockMode} />}
+                {isWizardOpen && <EvocationWizard campaign={activeCampaign} onClose={() => setIsWizardOpen(false)} onAddToCampaign={campaignService.batchAddToCampaign} isMockMode={isMockMode}/>}
+                {isExportModalOpen && <ExportModal 
+                  campaignTitle={activeCampaign.title}
+                  onClose={() => setIsExportModalOpen(false)} 
+                  onExportJson={() => { exportCampaignAsJson(activeCampaign); setIsExportModalOpen(false); }}
+                  onExportObsidian={() => { exportCampaignAsObsidian(activeCampaign); setIsExportModalOpen(false); }}
+                />}
+              </div>
+            </>
+          );
+        }
+        return null; // or a loading spinner
+      default:
+        return <div>Unhandled App Status</div>;
+    }
+  };
+
+  return (
+    <div className="h-screen w-screen bg-slate-950 text-slate-100 flex flex-col font-sans antialiased">
+      {appContent()}
     </div>
   );
 };
 
-// --- Helper Components ---
-const CampaignSettingEditor = ({ campaign, onUpdate }: { campaign: Campaign, onUpdate: (data: Partial<Campaign>) => void }) => {
-    const [setting, setSetting] = useState(campaign.setting);
-    
-    // Ensure local state updates if the underlying campaign object changes
-    useEffect(() => {
-        setSetting(campaign.setting);
-    }, [campaign.setting]);
 
+// A local wrapper component for consistent page layouts in simple generator/editor views
+const ContentWrapper: React.FC<{ title: string; children: React.ReactNode, icon?: keyof typeof Icons }> = ({ title, children, icon }) => {
+    const Icon = icon ? Icons[icon] : null;
     return (
-        <div className="p-8 h-full overflow-y-auto custom-scrollbar">
-            <h1 className="text-3xl font-bold font-serif mb-2 text-slate-100">Campaign Setting</h1>
-            <p className="text-slate-400 mb-6">This is the high-level overview of your world. It will be used as context for all future AI generations.</p>
-            <textarea
-                value={setting}
-                onChange={e => setSetting(e.target.value)}
-                onBlur={() => onUpdate({ setting })}
-                rows={20}
-                className="w-full bg-slate-900 border border-slate-700 rounded-md p-4 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all resize-y"
-                placeholder="Describe your world's history, major conflicts, key themes, and current state..."
-            />
+        <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
+            <div className="flex items-center gap-3 text-indigo-400">
+                {Icon && <Icon className="w-8 h-8" />}
+                <h1 className="text-3xl font-bold font-serif text-slate-100">{title}</h1>
+            </div>
+            {children}
         </div>
     );
 };
 
-const ContentWrapper = ({ title, children }: { title: string, children: React.ReactNode }) => (
-  <div className="p-8 h-full overflow-y-auto custom-scrollbar">
-    <h1 className="text-3xl font-bold font-serif mb-6 text-slate-100">{title}</h1>
-    <div className="max-w-2xl mx-auto">{children}</div>
-  </div>
-);
+// Local component for editing the top-level campaign settings.
+const CampaignSettingEditor: React.FC<{campaign: Campaign, onUpdate: (data: Partial<Campaign>) => void}> = ({ campaign, onUpdate }) => {
+  const [formData, setFormData] = useState({ title: campaign.title, setting: campaign.setting });
 
-const EditorPlaceholder = ({ icon, text }: { icon: keyof typeof Icons, text: string }) => {
-    const Icon = Icons[icon];
-    return (
-        <div className="flex flex-col items-center justify-center h-full text-slate-600">
-            <Icon className="w-24 h-24 mb-4" />
-            <p className="text-lg">{text}</p>
+  useEffect(() => {
+    setFormData({ title: campaign.title, setting: campaign.setting });
+  }, [campaign]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleBlur = () => {
+    if (formData.title !== campaign.title || formData.setting !== campaign.setting) {
+      onUpdate(formData);
+    }
+  };
+
+  return (
+    <div className="space-y-6 bg-slate-900/50 p-6 rounded-xl border border-slate-800/50 max-w-2xl">
+        <div>
+            <label className="block text-sm font-medium text-slate-400 mb-1.5">Campaign Title</label>
+            <input type="text" name="title" value={formData.title} onChange={handleChange} onBlur={handleBlur} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-600"/>
         </div>
-    );
+        <div>
+            <label className="block text-sm font-medium text-slate-400 mb-1.5">World Setting Synopsis</label>
+            <textarea name="setting" value={formData.setting} onChange={handleChange} onBlur={handleBlur} rows={12} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-600 resize-y" placeholder="A high-level description of the world, its history, and its current state..." />
+        </div>
+    </div>
+  )
 };
 
 export default App;

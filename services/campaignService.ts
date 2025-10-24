@@ -1,5 +1,4 @@
 
-
 import { produce } from 'immer';
 import type { 
     Campaign, 
@@ -50,7 +49,6 @@ export function createCampaignStore() {
     const saveState = () => {
         if (state.appStatus !== 'loading') {
             try {
-                // FIX: Corrected typo from CAMPAIGIGNS_STORAGE_KEY to CAMPAIGNS_STORAGE_KEY
                 localStorage.setItem(CAMPAIGNS_STORAGE_KEY, JSON.stringify(state.campaigns));
                 if (state.activeCampaignId) {
                     localStorage.setItem(ACTIVE_CAMPAIGN_ID_KEY, state.activeCampaignId);
@@ -73,6 +71,72 @@ export function createCampaignStore() {
         if (!currentState.activeCampaignId) return null;
         return currentState.campaigns.find(c => c.id === currentState.activeCampaignId) || null;
     }
+    
+    // --- Relationship Management & Validation Helpers ---
+    // Note: These helpers directly mutate the draft object passed from an Immer producer.
+
+    const _synchronizeNpcFactionLink = (draftCampaign: Campaign, npcId: string, oldFactionId?: string, newFactionId?: string) => {
+        if (oldFactionId === newFactionId) return;
+
+        if (oldFactionId) {
+            const oldFaction = draftCampaign.factions.find(f => f.id === oldFactionId);
+            if (oldFaction) oldFaction.memberIds = oldFaction.memberIds.filter(id => id !== npcId);
+        }
+        if (newFactionId) {
+            const newFaction = draftCampaign.factions.find(f => f.id === newFactionId);
+            if (newFaction && !newFaction.memberIds.includes(npcId)) newFaction.memberIds.push(npcId);
+        }
+    };
+
+    const _isLocationParentingAllowed = (draftCampaign: Campaign, childId: string, newParentId: string): boolean => {
+        let currentId: string | undefined = newParentId;
+        while (currentId) {
+            if (currentId === childId) return false; // Cycle detected
+            const current = draftCampaign.locations.find(l => l.id === currentId);
+            // If we can't find the parent in the chain, it means it's a broken link, but not a cycle.
+            if (!current) return true;
+            currentId = current.parentLocationId;
+        }
+        return true;
+    };
+
+    const _synchronizeLocationHierarchy = (draftCampaign: Campaign, locationId: string, oldParentId?: string, newParentId?: string) => {
+        if (oldParentId === newParentId) return;
+
+        if (oldParentId) {
+            const oldParent = draftCampaign.locations.find(l => l.id === oldParentId);
+            if (oldParent) oldParent.subLocationIds = oldParent.subLocationIds.filter(id => id !== locationId);
+        }
+        if (newParentId) {
+            const newParent = draftCampaign.locations.find(l => l.id === newParentId);
+            if (newParent && !newParent.subLocationIds.includes(locationId)) newParent.subLocationIds.push(locationId);
+        }
+    };
+    
+    const _isArticleParentingAllowed = (draftCampaign: Campaign, childId: string, newParentId: string): boolean => {
+        let currentId: string | undefined = newParentId;
+        while (currentId) {
+            if (currentId === childId) return false; // Cycle detected
+            const current = draftCampaign.articles.find(a => a.id === currentId);
+            if (!current) return true;
+            currentId = current.parentArticleId;
+        }
+        return true;
+    };
+
+    const _synchronizeArticleHierarchy = (draftCampaign: Campaign, articleId: string, oldParentId?: string, newParentId?: string) => {
+        if (oldParentId === newParentId) return;
+
+        if (oldParentId) {
+            const oldParent = draftCampaign.articles.find(a => a.id === oldParentId);
+            if (oldParent) oldParent.subArticleIds = oldParent.subArticleIds.filter(id => id !== articleId);
+        }
+        if (newParentId) {
+            const newParent = draftCampaign.articles.find(a => a.id === newParentId);
+            if (newParent && !newParent.subArticleIds.includes(articleId)) newParent.subArticleIds.push(articleId);
+        }
+    };
+
 
     const service = {
         // --- Store subscription & state access ---
@@ -168,7 +232,13 @@ export function createCampaignStore() {
             const newNpc: NPC = { ...newNpcData, id: crypto.randomUUID() };
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
-                if (campaign) campaign.npcs.push(newNpc);
+                if (campaign) {
+                    campaign.npcs.push(newNpc);
+                    // Also handle initial faction assignment
+                    if (newNpc.factionId) {
+                        _synchronizeNpcFactionLink(campaign, newNpc.id, undefined, newNpc.factionId);
+                    }
+                }
             });
             return newNpc.id;
         },
@@ -176,39 +246,32 @@ export function createCampaignStore() {
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
                 if (!campaign) return;
-                const npcIndex = campaign.npcs.findIndex(n => n.id === id);
-                if (npcIndex === -1) return;
+                const npc = campaign.npcs.find(n => n.id === id);
+                if (!npc) return;
                 
-                const oldNpc = campaign.npcs[npcIndex];
-                const oldFactionId = oldNpc.factionId;
-                Object.assign(oldNpc, updatedData);
-                const newFactionId = campaign.npcs[npcIndex].factionId;
+                const oldFactionId = npc.factionId;
+                Object.assign(npc, updatedData);
+                const newFactionId = npc.factionId;
 
-                if (oldFactionId !== newFactionId) {
-                    if (oldFactionId) {
-                        const oldFaction = campaign.factions.find(f => f.id === oldFactionId);
-                        if (oldFaction) oldFaction.memberIds = oldFaction.memberIds.filter(memberId => memberId !== id);
-                    }
-                    if (newFactionId) {
-                        const newFaction = campaign.factions.find(f => f.id === newFactionId);
-                        if (newFaction && !newFaction.memberIds.includes(id)) newFaction.memberIds.push(id);
-                    }
-                }
+                _synchronizeNpcFactionLink(campaign, id, oldFactionId, newFactionId);
             });
         },
         deleteNpc(id: string) {
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
                 if (!campaign) return;
-                const npcToDelete = campaign.npcs.find(n => n.id === id);
-                if (!npcToDelete) return;
+                const npcIndex = campaign.npcs.findIndex(n => n.id === id);
+                if (npcIndex === -1) return;
                 
-                if (npcToDelete.factionId) {
-                    const faction = campaign.factions.find(f => f.id === npcToDelete.factionId);
-                    if (faction) faction.memberIds = faction.memberIds.filter(memberId => memberId !== id);
-                }
+                const npcToDelete = campaign.npcs[npcIndex];
                 
-                campaign.npcs = campaign.npcs.filter(n => n.id !== id);
+                // Unlink from faction
+                _synchronizeNpcFactionLink(campaign, id, npcToDelete.factionId, undefined);
+                
+                // Remove from NPC list
+                campaign.npcs.splice(npcIndex, 1);
+                
+                // Remove from all scenes
                 campaign.adventures.forEach(adv => adv.scenes.forEach(scene => {
                     scene.npcIds = scene.npcIds.filter(npcId => npcId !== id);
                 }));
@@ -219,7 +282,12 @@ export function createCampaignStore() {
             const newLocation: Location = { ...newLocationData, id: crypto.randomUUID() };
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
-                if(campaign) campaign.locations.push(newLocation)
+                if(campaign) {
+                    campaign.locations.push(newLocation);
+                    if (newLocation.parentLocationId) {
+                        _synchronizeLocationHierarchy(campaign, newLocation.id, undefined, newLocation.parentLocationId);
+                    }
+                }
             });
             return newLocation.id;
         },
@@ -227,43 +295,48 @@ export function createCampaignStore() {
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
                 if (!campaign) return;
-                const locIndex = campaign.locations.findIndex(l => l.id === id);
-                if (locIndex === -1) return;
-                const oldLoc = { ...campaign.locations[locIndex] };
-                Object.assign(campaign.locations[locIndex], updatedData);
-                const newLoc = campaign.locations[locIndex];
-        
-                if (oldLoc.parentLocationId !== newLoc.parentLocationId) {
-                    if (oldLoc.parentLocationId) {
-                        const oldParent = campaign.locations.find(p => p.id === oldLoc.parentLocationId);
-                        if (oldParent) oldParent.subLocationIds = oldParent.subLocationIds.filter(subId => subId !== id);
-                    }
-                    if (newLoc.parentLocationId) {
-                        const newParent = campaign.locations.find(p => p.id === newLoc.parentLocationId);
-                        if (newParent && !newParent.subLocationIds.includes(id)) newParent.subLocationIds.push(id);
-                    }
+                const location = campaign.locations.find(l => l.id === id);
+                if (!location) return;
+
+                const oldParentId = location.parentLocationId;
+                
+                // Validate before applying changes
+                if ('parentLocationId' in updatedData && updatedData.parentLocationId && !_isLocationParentingAllowed(campaign, id, updatedData.parentLocationId)) {
+                    console.error(`Invalid parenting update for Location ${id}: would create a circular dependency.`);
+                    return; // Abort update if parenting is invalid
                 }
+                
+                Object.assign(location, updatedData);
+                const newParentId = location.parentLocationId;
+        
+                _synchronizeLocationHierarchy(campaign, id, oldParentId, newParentId);
             });
         },
         deleteLocation(id: string) {
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
                 if (!campaign) return;
-                const locToDelete = campaign.locations.find(l => l.id === id);
-                if (!locToDelete) return;
+                const locIndex = campaign.locations.findIndex(l => l.id === id);
+                if (locIndex === -1) return;
+
+                const locToDelete = campaign.locations[locIndex];
         
-                if (locToDelete.parentLocationId) {
-                    const parent = campaign.locations.find(p => p.id === locToDelete.parentLocationId);
-                    if (parent) parent.subLocationIds = parent.subLocationIds.filter(subId => subId !== id);
-                }
+                // Unlink from parent
+                _synchronizeLocationHierarchy(campaign, id, locToDelete.parentLocationId, undefined);
+                
+                // Un-parent all children
                 locToDelete.subLocationIds.forEach(childId => {
                     const child = campaign.locations.find(c => c.id === childId);
                     if (child) child.parentLocationId = undefined;
                 });
+                
+                // Remove the location
+                campaign.locations.splice(locIndex, 1);
+                
+                // Clean up references
                 campaign.adventures.forEach(adv => adv.scenes.forEach(scene => {
                     if (scene.locationId === id) scene.locationId = undefined;
                 }));
-                campaign.locations = campaign.locations.filter(l => l.id !== id);
             });
         },
         
@@ -287,8 +360,17 @@ export function createCampaignStore() {
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
                 if (!campaign) return;
+                const factionToDelete = campaign.factions.find(f => f.id === id);
+                if (!factionToDelete) return;
+
+                // Unlink all member NPCs
+                factionToDelete.memberIds.forEach(npcId => {
+                    const npc = campaign.npcs.find(n => n.id === npcId);
+                    if (npc) npc.factionId = undefined;
+                });
+                
+                // Remove faction
                 campaign.factions = campaign.factions.filter(f => f.id !== id);
-                campaign.npcs.forEach(npc => { if (npc.factionId === id) npc.factionId = undefined; });
             });
         },
         
@@ -319,7 +401,12 @@ export function createCampaignStore() {
             const newArticle: Article = { ...newArticleData, id: crypto.randomUUID() };
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
-                if (campaign) campaign.articles.push(newArticle);
+                if (campaign) {
+                    campaign.articles.push(newArticle);
+                    if(newArticle.parentArticleId) {
+                        _synchronizeArticleHierarchy(campaign, newArticle.id, undefined, newArticle.parentArticleId);
+                    }
+                }
             });
             return newArticle.id;
         },
@@ -327,42 +414,42 @@ export function createCampaignStore() {
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
                 if (!campaign) return;
-                const articleIndex = campaign.articles.findIndex(a => a.id === id);
-                if (articleIndex === -1) return;
-                const oldArticle = { ...campaign.articles[articleIndex] };
-                Object.assign(campaign.articles[articleIndex], updatedData);
-                const newArticle = campaign.articles[articleIndex];
-        
-                if (oldArticle.parentArticleId !== newArticle.parentArticleId) {
-                    if (oldArticle.parentArticleId) {
-                        const oldParent = campaign.articles.find(p => p.id === oldArticle.parentArticleId);
-                        if (oldParent) oldParent.subArticleIds = oldParent.subArticleIds.filter(subId => subId !== id);
-                    }
-                    if (newArticle.parentArticleId) {
-                        const newParent = campaign.articles.find(p => p.id === newArticle.parentArticleId);
-                        if (newParent && !newParent.subArticleIds.includes(id)) newParent.subArticleIds.push(id);
-                    }
+                const article = campaign.articles.find(a => a.id === id);
+                if (!article) return;
+                
+                const oldParentId = article.parentArticleId;
+                
+                if ('parentArticleId' in updatedData && updatedData.parentArticleId && !_isArticleParentingAllowed(campaign, id, updatedData.parentArticleId)) {
+                     console.error(`Invalid parenting update for Article ${id}: would create a circular dependency.`);
+                    return;
                 }
+
+                Object.assign(article, updatedData);
+                const newParentId = article.parentArticleId;
+        
+                _synchronizeArticleHierarchy(campaign, id, oldParentId, newParentId);
             });
         },
         deleteArticle(id: string) {
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
                 if (!campaign) return;
-                const articleToDelete = campaign.articles.find(a => a.id === id);
-                if (!articleToDelete) return;
+                const articleIndex = campaign.articles.findIndex(a => a.id === id);
+                if (articleIndex === -1) return;
+
+                const articleToDelete = campaign.articles[articleIndex];
+                
+                // Unlink from parent
+                _synchronizeArticleHierarchy(campaign, id, articleToDelete.parentArticleId, undefined);
         
-                if (articleToDelete.parentArticleId) {
-                    const parent = campaign.articles.find(p => p.id === articleToDelete.parentArticleId);
-                    if (parent) parent.subArticleIds = parent.subArticleIds.filter(subId => subId !== id);
-                }
-        
+                // Un-parent all children
                 articleToDelete.subArticleIds.forEach(childId => {
                     const child = campaign.articles.find(c => c.id === childId);
                     if (child) child.parentArticleId = undefined;
                 });
                 
-                campaign.articles = campaign.articles.filter(a => a.id !== id);
+                // Remove the article
+                campaign.articles.splice(articleIndex, 1);
             });
         },
         
