@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import type { NPC } from '../types';
-import { generateNpc } from '../services/geminiService';
-import { Icons } from './Icons';
-import { Button } from './common/Button';
+import type { NPC } from '../../types';
+import { generateNpc } from '../../services/geminiService';
+import { Icons } from '../Icons';
+import { Button } from '../common/Button';
 
 interface NpcGeneratorProps {
   onNpcCreated: (npc: Omit<NPC, 'id'>) => void;

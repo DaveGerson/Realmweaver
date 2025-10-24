@@ -1,7 +1,7 @@
 import React from 'react';
-import type { Item } from '../types';
-import { ItemGenerator } from './ItemGenerator';
-import { Icons } from './Icons';
+import type { Item } from '../../types';
+import { ItemGenerator } from '../generators/ItemGenerator';
+import { Icons } from '../Icons';
 
 interface ItemDashboardProps {
   items: Item[];

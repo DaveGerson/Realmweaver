@@ -5,6 +5,7 @@ import type { Location } from './Location';
 import type { Faction } from './Faction';
 import type { Item } from './Item';
 import type { Article } from './Article';
+import type { SessionLog } from './SessionLog';
 
 export interface Campaign {
   id: string;
@@ -16,4 +17,5 @@ export interface Campaign {
   locations: Location[];
   factions: Faction[];
   items: Item[];
+  sessionLogs: SessionLog[];
 }

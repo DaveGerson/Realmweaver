@@ -323,12 +323,24 @@ const SimpleModeView = ({ prompt, onPromptChange, qualifiers, onQualifiersChange
 
 const DetailedModeView = ({ campaign, prompts, onPromptsChange }) => {
     // --- Detailed Prompt Handlers ---
-    const handleAddSimplePrompt = (type: EntityType) => onPromptsChange(produce(draft => { draft[type].push({ id: crypto.randomUUID(), prompt: '' }); }));
-    const handleRemoveSimplePrompt = (type: EntityType, id: string) => onPromptsChange(produce(draft => { draft[type] = draft[type].filter(p => p.id !== id) as any; }));
+    // FIX: Corrected typing issues in handlers by explicitly casting the draft part to `SimpleDetailedPrompt[]`.
+    const handleAddSimplePrompt = (type: EntityType) => onPromptsChange(produce(draft => { (draft[type] as SimpleDetailedPrompt[]).push({ id: crypto.randomUUID(), prompt: '' }); }));
+    const handleRemoveSimplePrompt = (type: EntityType, id: string) => onPromptsChange(produce(draft => {
+        const items = draft[type] as SimpleDetailedPrompt[];
+        const index = items.findIndex(p => p.id === id);
+        if (index > -1) {
+            items.splice(index, 1);
+        }
+    }));
     const handleSimplePromptChange = (type: EntityType, id: string, prompt: string, linkId?: string) => {
         onPromptsChange(produce(draft => {
-            const item = draft[type].find(p => p.id === id);
-            if (item) { item.prompt = prompt; if (linkId !== undefined) { item.linkId = linkId || undefined; } }
+            const item = (draft[type] as SimpleDetailedPrompt[]).find(p => p.id === id);
+            if (item) {
+                item.prompt = prompt;
+                if (linkId !== undefined) {
+                    item.linkId = linkId || undefined;
+                }
+            }
         }));
     };
     const handleAddAdventure = () => onPromptsChange(produce(draft => { draft.adventures.push({ id: crypto.randomUUID(), prompt: '', scenes: [{ id: crypto.randomUUID(), prompt: '' }] }); }));

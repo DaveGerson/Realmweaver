@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import type { Scene } from '../types';
-import { generateScene } from '../services/geminiService';
-import { Icons } from './Icons';
-import { Button } from './common/Button';
+import type { Scene } from '../../types';
+import { generateScene } from '../../services/geminiService';
+import { Icons } from '../Icons';
+import { Button } from '../common/Button';
 
 interface SceneGeneratorProps {
   onSceneCreated: (scene: Omit<Scene, 'id'>) => void;

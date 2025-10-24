@@ -1,8 +1,9 @@
 
 
 
+
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Campaign, Adventure, NPC, Location, Faction, Item, Scene, Article, AdventureForBatchAdd } from './types';
+import type { Campaign, Adventure, NPC, Location, Faction, Item, Scene, Article, AdventureForBatchAdd, SessionLog } from './types';
 import type { BatchAddData } from './types';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { CampaignCreator } from './components/CampaignCreator';
@@ -10,19 +11,15 @@ import { CampaignSelector } from './components/CampaignSelector';
 import { Header } from './components/Header';
 import { CampaignSidebar } from './components/CampaignSidebar';
 import { AdventureEditor } from './components/AdventureEditor';
-import { AdventureDashboard } from './components/AdventureDashboard';
-import { NpcGenerator } from './components/NpcGenerator';
-import { LocationGenerator } from './components/LocationGenerator';
-import { FactionGenerator } from './components/FactionGenerator';
-import { ItemGenerator } from './components/ItemGenerator';
-import { SceneGenerator } from './components/SceneGenerator';
-import { ArticleGenerator } from './components/ArticleGenerator';
+import { AdventureDashboard } from './components/dashboards/AdventureDashboard';
+import { SceneGenerator } from './components/generators/SceneGenerator';
 import { NpcEditor } from './components/NpcEditor';
 import { LocationEditor } from './components/LocationEditor';
 import { FactionEditor } from './components/FactionEditor';
 import { ItemEditor } from './components/ItemEditor';
 import { SceneEditor } from './components/SceneEditor';
 import { ArticleEditor } from './components/ArticleEditor';
+import { SessionLogEditor } from './components/SessionLogEditor';
 import { DmCoach } from './components/DmCoach';
 import { EvocationWizard } from './components/EvocationWizard';
 import { Icons } from './components/Icons';
@@ -30,13 +27,15 @@ import { runSmokeTests } from './smokeTest';
 import { produce } from 'immer';
 import { ExportModal } from './components/ExportModal';
 import { importCampaignFromJson, exportCampaignAsJson, exportCampaignAsObsidian } from './services/importExportService';
-import { NpcDashboard } from './components/NpcDashboard';
-import { LocationDashboard } from './components/LocationDashboard';
-import { FactionDashboard } from './components/FactionDashboard';
-import { ItemDashboard } from './components/ItemDashboard';
-import { ArticleDashboard } from './components/ArticleDashboard';
+import { NpcDashboard } from './components/dashboards/NpcDashboard';
+import { LocationDashboard } from './components/dashboards/LocationDashboard';
+import { FactionDashboard } from './components/dashboards/FactionDashboard';
+import { ItemDashboard } from './components/dashboards/ItemDashboard';
+import { ArticleDashboard } from './components/dashboards/ArticleDashboard';
+import { SessionLogDashboard } from './components/dashboards/SessionLogDashboard';
 
-export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook';
+
+export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs';
 export type GeneratorType = 'npc' | 'location' | 'faction' | 'item' | 'scene' | 'article';
 type AppStatus = 'loading' | 'welcome' | 'selecting' | 'creating' | 'editing';
 
@@ -59,6 +58,7 @@ const App: React.FC = () => {
   const [selectedFactionId, setSelectedFactionId] = useState<string | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
+  const [selectedSessionLogId, setSelectedSessionLogId] = useState<string | null>(null);
   
   const [isCoachOpen, setIsCoachOpen] = useState(false);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
@@ -129,11 +129,12 @@ const App: React.FC = () => {
     setSelectedAdventureId(null);
     setSelectedSceneId(null);
     setSelectedArticleId(null);
+    setSelectedSessionLogId(null);
     setActiveGenerator(null);
   };
   
   const handleCreateCampaign = (title: string, setting: string) => {
-    const newCampaign: Campaign = { id: crypto.randomUUID(), title, setting, articles: [], adventures: [], npcs: [], locations: [], factions: [], items: [] };
+    const newCampaign: Campaign = { id: crypto.randomUUID(), title, setting, articles: [], adventures: [], npcs: [], locations: [], factions: [], items: [], sessionLogs: [] };
     setCampaigns(prev => [...prev, newCampaign]);
     setActiveCampaignId(newCampaign.id);
     setAppStatus('editing');
@@ -512,6 +513,39 @@ const App: React.FC = () => {
     }));
   };
 
+  // --- SESSION LOG HANDLERS ---
+  const handleSessionLogCreated = (newLogData: Omit<SessionLog, 'id'>) => {
+    const newLog: SessionLog = { ...newLogData, id: crypto.randomUUID() };
+    setCampaigns(prev => produce(prev, draft => {
+        const campaign = draft.find(c => c.id === activeCampaignId);
+        if (campaign) {
+            campaign.sessionLogs = [...(campaign.sessionLogs || []), newLog];
+        }
+    }));
+    setActiveView('session-logs');
+    setSelectedSessionLogId(newLog.id);
+  };
+
+  const handleUpdateSessionLog = (id: string, updatedData: Partial<SessionLog>) => {
+      setCampaigns(prev => produce(prev, draft => {
+          const campaign = draft.find(c => c.id === activeCampaignId);
+          if (!campaign || !campaign.sessionLogs) return;
+          const log = campaign.sessionLogs.find(l => l.id === id);
+          if (log) Object.assign(log, updatedData);
+      }));
+  };
+
+  const handleDeleteSessionLog = (id: string) => {
+      setCampaigns(prev => produce(prev, draft => {
+          const campaign = draft.find(c => c.id === activeCampaignId);
+          if (campaign) {
+              campaign.sessionLogs = (campaign.sessionLogs || []).filter(l => l.id !== id);
+          }
+      }));
+      if (selectedSessionLogId === id) setSelectedSessionLogId(null);
+  };
+
+
   const handleBatchAddToCampaign = (data: BatchAddData) => {
       setCampaigns(prev => produce(prev, draft => {
           const campaign = draft.find(c => c.id === activeCampaignId);
@@ -621,6 +655,7 @@ const App: React.FC = () => {
   const selectedFaction = useMemo(() => activeCampaign?.factions.find(f => f.id === selectedFactionId) || null, [activeCampaign, selectedFactionId]);
   const selectedItem = useMemo(() => activeCampaign?.items.find(i => i.id === selectedItemId) || null, [activeCampaign, selectedItemId]);
   const selectedArticle = useMemo(() => activeCampaign?.articles.find(a => a.id === selectedArticleId) || null, [activeCampaign, selectedArticleId]);
+  const selectedSessionLog = useMemo(() => activeCampaign?.sessionLogs?.find(s => s.id === selectedSessionLogId) || null, [activeCampaign, selectedSessionLogId]);
   
   const handleSelectView = (view: EditorView) => {
     setActiveView(view);
@@ -634,6 +669,7 @@ const App: React.FC = () => {
       if (activeGenerator === 'scene' && selectedAdventure) return <ContentWrapper title="Create New Scene"><SceneGenerator onSceneCreated={(s) => handleSceneCreated(selectedAdventure.id, s)} isMockMode={isMockMode} /></ContentWrapper>;
 
       // Render Editors & Dashboards - Editors take priority if an item is selected
+      if (selectedSessionLog) return <SessionLogEditor log={selectedSessionLog} onUpdate={handleUpdateSessionLog} onDelete={handleDeleteSessionLog} />;
       if (selectedScene && selectedAdventure) return <SceneEditor scene={selectedScene} allNpcs={activeCampaign.npcs} allLocations={activeCampaign.locations} onUpdate={(id, data) => handleUpdateScene(selectedAdventure.id, id, data)} onDelete={(id) => handleDeleteScene(selectedAdventure.id, id)} isMockMode={isMockMode} />;
       if (selectedAdventure) return <AdventureEditor adventure={selectedAdventure} campaign={activeCampaign} onUpdate={handleUpdateAdventure} />;
       if (selectedArticle) return <ArticleEditor article={selectedArticle} allArticles={activeCampaign.articles} onUpdate={handleUpdateArticle} onDelete={handleDeleteArticle} isMockMode={isMockMode} />;
@@ -655,6 +691,7 @@ const App: React.FC = () => {
                     isMockMode={isMockMode}
                 />;
       }
+      if (activeView === 'session-logs') return <SessionLogDashboard sessionLogs={activeCampaign.sessionLogs || []} onSessionLogCreated={handleSessionLogCreated} onSelectSessionLog={setSelectedSessionLogId} />;
       if (activeView === 'npcs') return <NpcDashboard npcs={activeCampaign.npcs} onNpcCreated={handleNpcCreated} onSelectNpc={setSelectedNpcId} isMockMode={isMockMode} />;
       if (activeView === 'locations') return <LocationDashboard locations={activeCampaign.locations} onLocationCreated={handleLocationCreated} onSelectLocation={setSelectedLocationId} isMockMode={isMockMode} />;
       if (activeView === 'factions') return <FactionDashboard factions={activeCampaign.factions} onFactionCreated={handleFactionCreated} onSelectFaction={setSelectedFactionId} isMockMode={isMockMode} />;
@@ -694,6 +731,7 @@ const App: React.FC = () => {
                   faction: selectedFactionId,
                   item: selectedItemId,
                   article: selectedArticleId,
+                  sessionLog: selectedSessionLogId,
                 }}
                 onSelect={(type, id) => {
                   resetSelections();
@@ -701,6 +739,8 @@ const App: React.FC = () => {
                     setActiveView('adventures');
                   } else if (type === 'article') {
                     setActiveView('lorebook');
+                  } else if (type === 'session-log') {
+                    setActiveView('session-logs');
                   } else {
                     setActiveView((type + 's') as EditorView);
                   }
@@ -713,6 +753,7 @@ const App: React.FC = () => {
                     case 'faction': setSelectedFactionId(id); break;
                     case 'item': setSelectedItemId(id); break;
                     case 'article': setSelectedArticleId(id); break;
+                    case 'session-log': setSelectedSessionLogId(id); break;
                   }
                 }}
                 onShowGenerator={(type) => { resetSelections(); setActiveGenerator(type); }}

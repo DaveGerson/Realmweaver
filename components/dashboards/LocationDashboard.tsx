@@ -1,7 +1,7 @@
 import React from 'react';
-import type { Location } from '../types';
-import { LocationGenerator } from './LocationGenerator';
-import { Icons } from './Icons';
+import type { Location } from '../../types';
+import { LocationGenerator } from '../generators/LocationGenerator';
+import { Icons } from '../Icons';
 
 interface LocationDashboardProps {
   locations: Location[];

@@ -112,6 +112,18 @@ const generateMarkdownForCampaign = (campaign: Campaign): string => {
         });
     }
 
+    // Session Logs
+    if (campaign.sessionLogs && campaign.sessionLogs.length > 0) {
+        md += `## Session Logs\n\n`;
+        campaign.sessionLogs.forEach(log => {
+            md += `### ${log.title} (${new Date(log.sessionDate).toLocaleDateString()})\n\n`;
+            if (log.recap) md += `**Recap:**\n${log.recap}\n\n`;
+            if (log.notableEvents) md += `**Notable Events:**\n${log.notableEvents}\n\n`;
+            if (log.looseEnds) md += `**Loose Ends:**\n${log.looseEnds}\n\n`;
+        });
+    }
+
+
     return md;
 };
 
@@ -148,6 +160,10 @@ export const importCampaignFromJson = (file: File): Promise<Campaign> => {
                 const data = JSON.parse(result);
                 // Basic validation
                 if (data.id && data.title && Array.isArray(data.npcs)) {
+                    // Ensure sessionLogs exists for backward compatibility
+                    if (!data.sessionLogs) {
+                        data.sessionLogs = [];
+                    }
                     resolve(data as Campaign);
                 } else {
                     reject(new Error("Invalid campaign file format."));

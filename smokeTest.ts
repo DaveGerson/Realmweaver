@@ -90,7 +90,7 @@ const testCampaignHandlers = async (isMockMode: boolean) => {
 
     // --- Handlers (mirroring App.tsx logic) ---
     const handleCreateCampaign = (title: string, setting: string) => {
-        const newCampaign: Campaign = { id: crypto.randomUUID(), title, setting, articles: [], adventures: [], npcs: [], locations: [], factions: [], items: [] };
+        const newCampaign: Campaign = { id: crypto.randomUUID(), title, setting, articles: [], adventures: [], npcs: [], locations: [], factions: [], items: [], sessionLogs: [] };
         campaigns = produce(campaigns, draft => { draft.push(newCampaign) });
         activeCampaignId = newCampaign.id;
     };

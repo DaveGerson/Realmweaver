@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import type { Article } from '../types';
-import { generateArticle } from '../services/geminiService';
-import { Icons } from './Icons';
-import { Button } from './common/Button';
+import type { Article } from '../../types';
+import { generateArticle } from '../../services/geminiService';
+import { Icons } from '../Icons';
+import { Button } from '../common/Button';
 
 interface ArticleGeneratorProps {
   onArticleCreated: (article: Omit<Article, 'id'>) => void;

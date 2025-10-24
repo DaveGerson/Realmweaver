@@ -1,7 +1,7 @@
 import React from 'react';
-import type { Article } from '../types';
-import { ArticleGenerator } from './ArticleGenerator';
-import { Icons } from './Icons';
+import type { Article } from '../../types';
+import { ArticleGenerator } from '../generators/ArticleGenerator';
+import { Icons } from '../Icons';
 
 interface ArticleDashboardProps {
   articles: Article[];

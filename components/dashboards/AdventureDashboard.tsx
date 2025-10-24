@@ -1,7 +1,7 @@
 import React from 'react';
-import type { Adventure, AdventureForBatchAdd } from '../types';
-import { AdventureGenerator } from './AdventureGenerator';
-import { Icons } from './Icons';
+import type { Adventure, AdventureForBatchAdd } from '../../types';
+import { AdventureGenerator } from '../generators/AdventureGenerator';
+import { Icons } from '../Icons';
 
 interface AdventureDashboardProps {
   adventures: Adventure[];

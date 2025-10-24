@@ -10,3 +10,4 @@ export * from './Campaign';
 export * from './RollableTable';
 export * from './SkillCheck';
 export * from './Evocation';
+export * from './SessionLog';

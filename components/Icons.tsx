@@ -32,6 +32,7 @@ import {
   Link2,
   FileUp,
   FileDown,
+  BookCopy,
 } from 'lucide-react';
 
 export const Icons = {
@@ -43,6 +44,7 @@ export const Icons = {
   Items: ScrollText,
   Adventures: BookOpen,
   Scenes: FileText,
+  SessionLog: BookCopy,
   Plus,
   Trash: Trash2,
   ChevronDown,
