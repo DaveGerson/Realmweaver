@@ -1,4 +1,5 @@
 
+
 import { produce } from 'immer';
 import type { 
     Campaign, 
@@ -11,9 +12,11 @@ import type {
     Article, 
     AdventureForBatchAdd, 
     SessionLog,
+    PlayerCharacter,
     BatchAddData
 } from '../types/index';
 import { importCampaignFromJson } from './importExportService';
+import { parseCharacterSheetPdf } from './geminiService';
 
 type AppStatus = 'loading' | 'welcome' | 'selecting' | 'creating' | 'editing';
 
@@ -115,7 +118,7 @@ export function createCampaignStore() {
         saveCampaign() { console.log("Campaign state saved."); saveState(); },
         createCampaign(title: string, setting: string) {
             updateState(draft => {
-                const newCampaign: Campaign = { id: crypto.randomUUID(), title, setting, articles: [], adventures: [], npcs: [], locations: [], factions: [], items: [], sessionLogs: [] };
+                const newCampaign: Campaign = { id: crypto.randomUUID(), title, setting, articles: [], adventures: [], npcs: [], locations: [], factions: [], items: [], sessionLogs: [], playerCharacters: [] };
                 draft.campaigns.push(newCampaign);
                 draft.activeCampaignId = newCampaign.id;
                 draft.appStatus = 'editing';
@@ -457,6 +460,39 @@ export function createCampaignStore() {
                 const campaign = getActiveCampaignFromState(draft);
                 if (campaign) {
                     campaign.sessionLogs = (campaign.sessionLogs || []).filter(l => l.id !== id);
+                }
+            });
+        },
+
+        createPlayerCharacter(newPcData: Omit<PlayerCharacter, 'id'>) {
+            const newPc: PlayerCharacter = { ...newPcData, id: crypto.randomUUID() };
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (campaign) {
+                    campaign.playerCharacters = [...(campaign.playerCharacters || []), newPc];
+                }
+            });
+            return newPc.id;
+        },
+        async createPlayerCharacterFromPdf(pdfBase64: string, isMockMode: boolean) {
+            const activeCampaign = this.getActiveCampaign();
+            const campaignContext = activeCampaign ? `Campaign Title: ${activeCampaign.title}\nSetting: ${activeCampaign.setting}` : undefined;
+            const pcData = await parseCharacterSheetPdf(pdfBase64, isMockMode, campaignContext);
+            return this.createPlayerCharacter(pcData);
+        },
+        updatePlayerCharacter(id: string, updatedData: Partial<PlayerCharacter>) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign || !campaign.playerCharacters) return;
+                const pc = campaign.playerCharacters.find(p => p.id === id);
+                if (pc) Object.assign(pc, updatedData);
+            });
+        },
+        deletePlayerCharacter(id: string) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (campaign) {
+                    campaign.playerCharacters = (campaign.playerCharacters || []).filter(p => p.id !== id);
                 }
             });
         },

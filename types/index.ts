@@ -1,3 +1,4 @@
+
 // FIX: This file had placeholder content. Creating a barrel file to export all types.
 export * from './Adventure';
 export * from './Article';
@@ -11,3 +12,4 @@ export * from './RollableTable';
 export * from './SkillCheck';
 export * from './Evocation';
 export * from './SessionLog';
+export * from './PlayerCharacter';

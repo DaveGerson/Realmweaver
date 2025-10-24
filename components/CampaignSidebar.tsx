@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import type { Campaign, Article } from '../types/index';
 import { Icons, SceneIcon } from './Icons';
@@ -14,6 +15,7 @@ type SelectedIds = {
     item: string | null;
     article: string | null;
     sessionLog: string | null;
+    playerCharacter: string | null;
 }
 
 interface CampaignSidebarProps {
@@ -21,7 +23,7 @@ interface CampaignSidebarProps {
     activeView: EditorView;
     onSelectView: (view: EditorView) => void;
     selectedIds: SelectedIds;
-    onSelect: (type: 'adventure' | 'scene' | 'npc' | 'location' | 'faction' | 'item' | 'article' | 'session-log', id: string) => void;
+    onSelect: (type: 'adventure' | 'scene' | 'npc' | 'location' | 'faction' | 'item' | 'article' | 'session-log' | 'player-character', id: string) => void;
     onShowGenerator: (type: GeneratorType) => void;
     onReorderScene: (adventureId: string, draggedSceneId: string, targetSceneId: string) => void;
 }
@@ -326,6 +328,39 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                     </div>
                 </div>
 
+                <div className="space-y-1">
+                    <div className="flex items-center justify-between px-3 py-2 group">
+                        <button
+                          onClick={() => onSelectView('player-characters')}
+                          className={twMerge(
+                            'flex items-center gap-3 text-sm transition-colors w-full',
+                            activeView === 'player-characters' ? 'text-indigo-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
+                          )}
+                        >
+                          <Icons.PlayerCharacters className="w-4 h-4" />
+                          <span>Player Characters</span>
+                        </button>
+                        <button onClick={() => onSelectView('player-characters')} className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100">
+                            <Icons.Plus className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <div className="pl-4 border-l border-slate-700 ml-5 space-y-1">
+                        {(campaign.playerCharacters || []).map(pc => (
+                            <button
+                                key={pc.id}
+                                onClick={() => onSelect('player-character', pc.id)}
+                                className={twMerge(
+                                    'w-full text-left text-sm truncate px-2 py-1.5 rounded-md flex items-center transition-all duration-100',
+                                    selectedIds.playerCharacter === pc.id ? 'bg-slate-700 text-white' : 'hover:bg-slate-800 text-slate-400'
+                                )}
+                                title={pc.characterSocial.characterName}
+                            >
+                                {pc.characterSocial.characterName}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                
                 <div className="space-y-1">
                     <div className="flex items-center justify-between px-3 py-2 group">
                         <button

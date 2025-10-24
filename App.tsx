@@ -1,6 +1,7 @@
 
+
 import React, { useState, useEffect, useMemo, useSyncExternalStore } from 'react';
-import type { Campaign, Adventure, NPC, Location, Faction, Item, Scene, Article, SessionLog } from './types/index';
+import type { Campaign, Adventure, NPC, Location, Faction, Item, Scene, Article, SessionLog, PlayerCharacter } from './types/index';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { CampaignCreator } from './components/CampaignCreator';
 import { CampaignSelector } from './components/CampaignSelector';
@@ -16,6 +17,7 @@ import { ItemEditor } from './components/ItemEditor';
 import { SceneEditor } from './components/SceneEditor';
 import { ArticleEditor } from './components/ArticleEditor';
 import { SessionLogEditor } from './components/SessionLogEditor';
+import { PlayerCharacterEditor } from './components/PlayerCharacterEditor';
 import { DmCoach } from './components/DmCoach';
 import { EvocationWizard } from './components/EvocationWizard';
 import { Icons } from './components/Icons';
@@ -28,10 +30,11 @@ import { FactionDashboard } from './components/dashboards/FactionDashboard';
 import { ItemDashboard } from './components/dashboards/ItemDashboard';
 import { ArticleDashboard } from './components/dashboards/ArticleDashboard';
 import { SessionLogDashboard } from './components/dashboards/SessionLogDashboard';
+import { PlayerCharacterDashboard } from './components/dashboards/PlayerCharacterDashboard';
 import { campaignService } from './services/campaignService';
 
 
-export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs';
+export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters';
 export type GeneratorType = 'npc' | 'location' | 'faction' | 'item' | 'scene' | 'article';
 
 const App: React.FC = () => {
@@ -54,6 +57,7 @@ const App: React.FC = () => {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   const [selectedSessionLogId, setSelectedSessionLogId] = useState<string | null>(null);
+  const [selectedPlayerCharacterId, setSelectedPlayerCharacterId] = useState<string | null>(null);
   
   const [isCoachOpen, setIsCoachOpen] = useState(false);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
@@ -75,6 +79,7 @@ const App: React.FC = () => {
     setSelectedSceneId(null);
     setSelectedArticleId(null);
     setSelectedSessionLogId(null);
+    setSelectedPlayerCharacterId(null);
     setActiveGenerator(null);
   };
 
@@ -88,6 +93,27 @@ const App: React.FC = () => {
       }
   };
 
+  const handleImportPC = async (file: File) => {
+    return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            if (event.target?.result) {
+                try {
+                    const base64 = (event.target.result as string).split(',')[1];
+                    const newId = await campaignService.createPlayerCharacterFromPdf(base64, isMockMode);
+                    resolve(newId);
+                } catch (err) {
+                    reject(err);
+                }
+            } else {
+                reject(new Error("Could not read file."));
+            }
+        };
+        reader.onerror = () => reject(new Error("Error reading file."));
+        reader.readAsDataURL(file);
+    });
+};
+
   // --- Memos for selected items ---
   const selectedAdventure = useMemo(() => activeCampaign?.adventures.find(a => a.id === selectedAdventureId) || null, [activeCampaign, selectedAdventureId]);
   const selectedScene = useMemo(() => selectedAdventure?.scenes.find(s => s.id === selectedSceneId) || null, [selectedAdventure, selectedSceneId]);
@@ -97,6 +123,8 @@ const App: React.FC = () => {
   const selectedItem = useMemo(() => activeCampaign?.items.find(i => i.id === selectedItemId) || null, [activeCampaign, selectedItemId]);
   const selectedArticle = useMemo(() => activeCampaign?.articles.find(a => a.id === selectedArticleId) || null, [activeCampaign, selectedArticleId]);
   const selectedSessionLog = useMemo(() => activeCampaign?.sessionLogs?.find(s => s.id === selectedSessionLogId) || null, [activeCampaign, selectedSessionLogId]);
+  const selectedPlayerCharacter = useMemo(() => activeCampaign?.playerCharacters?.find(p => p.id === selectedPlayerCharacterId) || null, [activeCampaign, selectedPlayerCharacterId]);
+
   
   const handleSelectView = (view: EditorView) => {
     setActiveView(view);
@@ -110,6 +138,7 @@ const App: React.FC = () => {
       if (activeGenerator === 'scene' && selectedAdventure) return <ContentWrapper title="Create New Scene"><SceneGenerator onSceneCreated={(s) => campaignService.createScene(selectedAdventure.id, s)} isMockMode={isMockMode} /></ContentWrapper>;
 
       // Render Editors & Dashboards - Editors take priority if an item is selected
+      if (selectedPlayerCharacter) return <PlayerCharacterEditor pc={selectedPlayerCharacter} onUpdate={campaignService.updatePlayerCharacter} onDelete={campaignService.deletePlayerCharacter} />;
       if (selectedSessionLog) return <SessionLogEditor log={selectedSessionLog} onUpdate={campaignService.updateSessionLog} onDelete={campaignService.deleteSessionLog} />;
       if (selectedScene && selectedAdventure) return <SceneEditor scene={selectedScene} allNpcs={activeCampaign.npcs} allLocations={activeCampaign.locations} onUpdate={(id, data) => campaignService.updateScene(selectedAdventure.id, id, data)} onDelete={(id) => campaignService.deleteScene(selectedAdventure.id, id)} isMockMode={isMockMode} />;
       if (selectedAdventure) return <AdventureEditor adventure={selectedAdventure} campaign={activeCampaign} onUpdate={campaignService.updateAdventure} />;
@@ -136,6 +165,26 @@ const App: React.FC = () => {
                     isMockMode={isMockMode}
                 />;
       }
+      if (activeView === 'player-characters') return <PlayerCharacterDashboard 
+          playerCharacters={activeCampaign.playerCharacters || []}
+          onImport={async (file) => {
+            try {
+                const newId = await handleImportPC(file);
+                resetSelections();
+                setActiveView('player-characters');
+                setSelectedPlayerCharacterId(newId);
+            } catch (error) {
+                console.error("PC Import failed:", error);
+                alert(`Failed to import character sheet: ${error instanceof Error ? error.message : "Unknown error"}`);
+            }
+          }}
+          onSelectPlayerCharacter={(id) => {
+            resetSelections();
+            setActiveView('player-characters');
+            setSelectedPlayerCharacterId(id);
+          }}
+          isMockMode={isMockMode}
+        />;
       if (activeView === 'session-logs') return <SessionLogDashboard sessionLogs={activeCampaign.sessionLogs || []} onSessionLogCreated={(logData) => {
             const newId = campaignService.createSessionLog(logData);
             setActiveView('session-logs');
@@ -204,6 +253,7 @@ const App: React.FC = () => {
                   item: selectedItemId,
                   article: selectedArticleId,
                   sessionLog: selectedSessionLogId,
+                  playerCharacter: selectedPlayerCharacterId,
                 }}
                 onSelect={(type, id) => {
                   resetSelections();
@@ -213,7 +263,10 @@ const App: React.FC = () => {
                     setActiveView('lorebook');
                   } else if (type === 'session-log') {
                     setActiveView('session-logs');
-                  } else {
+                  } else if (type === 'player-character') {
+                    setActiveView('player-characters');
+                  }
+                   else {
                     setActiveView((type + 's') as EditorView);
                   }
 
@@ -226,6 +279,7 @@ const App: React.FC = () => {
                     case 'item': setSelectedItemId(id); break;
                     case 'article': setSelectedArticleId(id); break;
                     case 'session-log': setSelectedSessionLogId(id); break;
+                    case 'player-character': setSelectedPlayerCharacterId(id); break;
                   }
                 }}
                 onShowGenerator={(type) => { resetSelections(); setActiveGenerator(type); }}

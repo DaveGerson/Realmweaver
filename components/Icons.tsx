@@ -1,4 +1,5 @@
 
+
 import {
   BookOpen,
   Users,
@@ -33,6 +34,7 @@ import {
   FileUp,
   FileDown,
   BookCopy,
+  UsersRound,
 } from 'lucide-react';
 
 export const Icons = {
@@ -45,6 +47,7 @@ export const Icons = {
   Adventures: BookOpen,
   Scenes: FileText,
   SessionLog: BookCopy,
+  PlayerCharacters: UsersRound,
   Plus,
   Trash: Trash2,
   ChevronDown,

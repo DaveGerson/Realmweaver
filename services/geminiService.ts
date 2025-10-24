@@ -1,5 +1,6 @@
 
-import type { NPC, Location, Faction, RollableTable, Item, Scene, Adventure, Article, PointOfInterest } from '../types/index';
+
+import type { NPC, Location, Faction, RollableTable, Item, Scene, Adventure, Article, PointOfInterest, PlayerCharacter } from '../types/index';
 import type { BatchAddData, AdventureForBatchAdd } from '../types/index';
 
 import * as aiRealmWeaver from './ai/realmWeaver';
@@ -110,4 +111,11 @@ export const generateChatResponse = (history: { role: 'user' | 'model', text: st
         return mockService.generateChatResponse(history, campaignContext, isMockMode);
     }
     return aiEvocationWizard.generateChatResponse(history, campaignContext);
+}
+
+export const parseCharacterSheetPdf = (pdfBase64: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<PlayerCharacter, 'id'>> => {
+    if (isMockMode) {
+        return mockService.parseCharacterSheetPdf(pdfBase64, campaignContext, isMockMode);
+    }
+    return aiEvocationWizard.parseCharacterSheetPdf(pdfBase64, campaignContext);
 }

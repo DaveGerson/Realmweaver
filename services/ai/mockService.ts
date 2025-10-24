@@ -1,4 +1,5 @@
-import type { NPC, Location, Faction, RollableTable, Item, Scene, SceneType, AdventureForBatchAdd, Article, PointOfInterest } from '../../types/index';
+
+import type { NPC, Location, Faction, RollableTable, Item, Scene, SceneType, AdventureForBatchAdd, Article, PointOfInterest, PlayerCharacter } from '../../types/index';
 import type { BatchAddData } from '../../types/index';
 
 // --- Mock Data ---
@@ -260,6 +261,63 @@ export const generatePoiFromLoot = async (prompt: string, campaignContext?: stri
             { id: 'mock-ic-1', description: 'DC 12 Investigation', outcome: 'The item seems to be of ancient make.'}
         ],
         interactions: []
+    });
+};
+
+export const parseCharacterSheetPdf = async (pdfBase64: string, campaignContext?: string, isMockMode?: boolean): Promise<Omit<PlayerCharacter, 'id'>> => {
+    console.log(`[MOCK MODE] Called parseCharacterSheetPdf`);
+    logContext(campaignContext);
+    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY * 2));
+    return Promise.resolve({
+        playerName: "Djinsidevoice",
+        characterSocial: {
+            characterName: "Elowyn",
+            background: "Soldier",
+            species: "Dark Elf (Drow)",
+            personality: "I can stare down a hell hound without flinching. I face problems head-on. A simple, direct solution is the best path to success.",
+            appearance: "A standard Dark Elf with typical features for their species.",
+            backstory: "Elowyn's first memory was of fire and the sickening wet sound of blades colliding with flesh. A band of orcs had found the cave network by chance, and the long history between drow and orcs had spawned no friendships over the centuries. He survived by sheer luck, finding a tiny crevice that was too small to notice in the cave network. He watched as orcs picked over the bodies, one snatching the necklace from his mother's body. Once the orcs moved on, Elowyn made his way to the surface to find a way to survive. He was taken in by a band of migrants, where he learned to hunt and support his newly found tribe. But as time went on, his desire for revenge remained strong. When the kingdom began recruiting for war against the orcs, Elowyn joined the ranks and advanced quickly. However, his unit was deceived and ambushed, and he was the last one standing before being struck down.",
+            ideals: "Independence. When people follow orders blindly, they embrace a kind of tyranny. (Chaotic)",
+            bonds: "I'll never forget the crushing defeat my company suffered or the enemies who dealt it.",
+            flaws: "My hatred of my enemies is blind and unreasoning."
+        },
+        characterStatistics: {
+            classes: {
+                charClass: "Ranger",
+                level: 5,
+                subclass: "Ronin"
+            },
+            attributes: {
+                strength: 14,
+                dexterity: 16,
+                constitution: 14,
+                intelligence: 10,
+                wisdom: 10,
+                charisma: 11
+            },
+            skills: {
+                acrobatics: "proficient",
+                animal_handling: "none",
+                arcana: "none",
+                athletics: "proficient",
+                deception: "none",
+                history: "none",
+                insight: "none",
+                intimidation: "proficient",
+                investigation: "none",
+                medicine: "none",
+                nature: "none",
+                perception: "proficient",
+                performance: "none",
+                persuasion: "none",
+                religion: "none",
+                sleight_of_hand: "proficient",
+                stealth: "proficient",
+                survival: "proficient"
+            },
+            actions: ["Acheron Blade, Longsword", "Crossbow, Heavy", "Orcish Eye Taker", "Unarmed Strike"],
+            specialActions: ["Favored Enemy", "Natural Explorer", "Fighting Style: Archery", "Spellcasting", "Ranger Archetype: Ronin", "Primeval Awareness", "Slash Draw", "Extra Attack", "Sharpshooter"]
+        }
     });
 };
 

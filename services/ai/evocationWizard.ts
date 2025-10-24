@@ -1,9 +1,87 @@
+
+
 import { Type } from "@google/genai";
-import type { SkillCheck, BatchAddData } from '../../types/index';
+import type { SkillCheck, BatchAddData, PlayerCharacter } from '../../types/index';
 import { npcSchema, locationSchema, factionSchema, itemSchema, adventureWithScenesSchema } from './realmWeaver';
-import { generateWithSchema, generateText } from './core';
+import { generateWithSchema, generateChatCompletion } from './core';
 
 // --- Schemas ---
+
+export const playerCharacterSchema = {
+    type: Type.OBJECT,
+    properties: {
+        playerName: { type: Type.STRING, description: "The player's name, often found at the top right." },
+        characterSocial: {
+            type: Type.OBJECT,
+            properties: {
+                characterName: { type: Type.STRING, description: "The character's name." },
+                background: { type: Type.STRING, description: "The character's background (e.g., Soldier, Sage)." },
+                species: { type: Type.STRING, description: "The character's species or race (e.g., Dark Elf (Drow))." },
+                personality: { type: Type.STRING, description: "The character's personality traits, usually in a dedicated box." },
+                appearance: { type: Type.STRING, description: "A summary of the character's appearance. If not explicitly stated, infer from species and other details." },
+                backstory: { type: Type.STRING, description: "The character's backstory, often on a separate page." },
+                ideals: { type: Type.STRING, description: "The character's ideals." },
+                bonds: { type: Type.STRING, description: "The character's bonds." },
+                flaws: { type: Type.STRING, description: "The character's flaws." },
+            },
+            required: ['characterName', 'background', 'species', 'personality', 'appearance', 'backstory', 'ideals', 'bonds', 'flaws'],
+        },
+        characterStatistics: {
+            type: Type.OBJECT,
+            properties: {
+                classes: {
+                    type: Type.OBJECT,
+                    properties: {
+                        charClass: { type: Type.STRING, description: "The character's primary class (e.g., Ranger)." },
+                        subclass: { type: Type.STRING, description: "The character's subclass, if specified." },
+                        level: { type: Type.INTEGER, description: "The character's level for that class." },
+                    },
+                    required: ['charClass', 'level'],
+                },
+                attributes: {
+                    type: Type.OBJECT,
+                    properties: {
+                        strength: { type: Type.INTEGER },
+                        dexterity: { type: Type.INTEGER },
+                        constitution: { type: Type.INTEGER },
+                        intelligence: { type: Type.INTEGER },
+                        wisdom: { type: Type.INTEGER },
+                        charisma: { type: Type.INTEGER },
+                    },
+                    required: ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'],
+                },
+                skills: {
+                    type: Type.OBJECT,
+                    properties: {
+                        acrobatics: { type: Type.STRING, enum: ["none", "half", "proficient", "expertise"] },
+                        animal_handling: { type: Type.STRING, enum: ["none", "half", "proficient", "expertise"] },
+                        arcana: { type: Type.STRING, enum: ["none", "half", "proficient", "expertise"] },
+                        athletics: { type: Type.STRING, enum: ["none", "half", "proficient", "expertise"] },
+                        deception: { type: Type.STRING, enum: ["none", "half", "proficient", "expertise"] },
+                        history: { type: Type.STRING, enum: ["none", "half", "proficient", "expertise"] },
+                        insight: { type: Type.STRING, enum: ["none", "half", "proficient", "expertise"] },
+                        intimidation: { type: Type.STRING, enum: ["none", "half", "proficient", "expertise"] },
+                        investigation: { type: Type.STRING, enum: ["none", "half", "proficient", "expertise"] },
+                        medicine: { type: Type.STRING, enum: ["none", "half", "proficient", "expertise"] },
+                        nature: { type: Type.STRING, enum: ["none", "half", "proficient", "expertise"] },
+                        perception: { type: Type.STRING, enum: ["none", "half", "proficient", "expertise"] },
+                        performance: { type: Type.STRING, enum: ["none", "half", "proficient", "expertise"] },
+                        persuasion: { type: Type.STRING, enum: ["none", "half", "proficient", "expertise"] },
+                        religion: { type: Type.STRING, enum: ["none", "half", "proficient", "expertise"] },
+                        sleight_of_hand: { type: Type.STRING, enum: ["none", "half", "proficient", "expertise"] },
+                        stealth: { type: Type.STRING, enum: ["none", "half", "proficient", "expertise"] },
+                        survival: { type: Type.STRING, enum: ["none", "half", "proficient", "expertise"] },
+                    },
+                    required: ['acrobatics', 'animal_handling', 'arcana', 'athletics', 'deception', 'history', 'insight', 'intimidation', 'investigation', 'medicine', 'nature', 'perception', 'performance', 'persuasion', 'religion', 'sleight_of_hand', 'stealth', 'survival'],
+                },
+                actions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "List of the names of weapon attacks and other standard actions listed under the 'Actions' section." },
+                specialActions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "List of the names of features and traits from the 'Features & Traits' page (e.g., 'Favored Enemy', 'Sharpshooter')." },
+            },
+            required: ['classes', 'attributes', 'skills'],
+        },
+    },
+    required: ['playerName', 'characterSocial', 'characterStatistics'],
+};
 
 const campaignFillSchema = {
     type: Type.OBJECT,
@@ -77,12 +155,35 @@ export const parseDocumentForEntities = async (documentContent: string, campaign
     return postProcessResult(result);
 }
 
+export const parseCharacterSheetPdf = async (pdfBase64: string, campaignContext?: string): Promise<Omit<PlayerCharacter, 'id'>> => {
+    const instructions = `You are an expert D&D 5e data entry assistant. Your task is to parse the provided D&D Beyond character sheet PDF and extract all character information into a structured JSON object.
+- For ability scores, use the large number, not the small modifier.
+- For skills, if a skill's bubble is filled in, it is 'proficient'. If it also has a 'P' it is also 'proficient'. If it has an 'E', it is 'expertise'. Otherwise, it is 'none'.
+- Extract class and level from the top of the sheet.
+- Extract personality traits, ideals, bonds, and flaws from their respective boxes.
+- Summarize the character's backstory from the backstory page.
+- For actions, list the names of weapon attacks and other standard actions listed under the 'Actions' section.
+- For special actions, list the names of features and traits from the 'Features & Traits' page (e.g., 'Favored Enemy', 'Sharpshooter').`;
+    
+    const pdfPart = {
+        inlineData: {
+            mimeType: 'application/pdf',
+            data: pdfBase64,
+        },
+    };
+
+    const textPart = { text: "Parse this character sheet." };
+
+    const response = await generateWithSchema('', playerCharacterSchema, instructions, { contents: { parts: [pdfPart, textPart] } }, 'gemini-2.5-flash', campaignContext);
+
+    return response as Omit<PlayerCharacter, 'id'>;
+};
+
 export const generateChatResponse = async (history: { role: 'user' | 'model', text: string }[], campaignContext?: string): Promise<string> => {
-    const modelName = 'gemini-flash-lite-latest'; // Use a fast model for conversational turns
+    const modelName = 'gemini-flash-lite-latest';
     const systemInstruction = `You are a creative, collaborative world-building assistant for a TTRPG Dungeon Master. Your tone is friendly and inquisitive. Help the user brainstorm ideas for their campaign. Ask clarifying questions and offer creative suggestions to help them flesh out their ideas for NPCs, locations, factions, and story hooks. Keep your responses concise (2-4 sentences).`;
 
     const contents = history.map(h => ({ role: h.role, parts: [{text: h.text}] }));
 
-    const response = await generateText(JSON.stringify({systemInstruction, contents}), modelName, campaignContext);
-    return response;
+    return await generateChatCompletion(contents, systemInstruction, modelName, campaignContext);
 };

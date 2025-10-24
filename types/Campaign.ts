@@ -1,3 +1,4 @@
+
 // types/Campaign.ts
 import type { Adventure } from './Adventure';
 import type { NPC } from './NPC';
@@ -6,6 +7,7 @@ import type { Faction } from './Faction';
 import type { Item } from './Item';
 import type { Article } from './Article';
 import type { SessionLog } from './SessionLog';
+import type { PlayerCharacter } from './PlayerCharacter';
 
 export interface Campaign {
   id: string;
@@ -18,4 +20,5 @@ export interface Campaign {
   factions: Faction[];
   items: Item[];
   sessionLogs: SessionLog[];
+  playerCharacters: PlayerCharacter[];
 }
