@@ -1,6 +1,6 @@
 
-import type { NPC, Location, Faction, RollableTable, Item, Scene, Adventure, Article, PointOfInterest } from '../types';
-import type { BatchAddData, AdventureForBatchAdd } from '../types';
+import type { NPC, Location, Faction, RollableTable, Item, Scene, Adventure, Article, PointOfInterest } from '../types/index';
+import type { BatchAddData, AdventureForBatchAdd } from '../types/index';
 
 import * as aiRealmWeaver from './ai/realmWeaver';
 import * as aiDmCoach from './ai/dmCoach';

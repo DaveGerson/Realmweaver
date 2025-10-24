@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Faction } from '../../types';
+import type { Faction } from '../../types/index';
 import { FactionGenerator } from '../generators/FactionGenerator';
 import { Icons } from '../Icons';
 

@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import type { Location, LocationConnection, PointOfInterest, PoiInteraction, LootItem } from '../types';
+import type { Location, LocationConnection, PointOfInterest, PoiInteraction, LootItem } from '../types/index';
 import { Icons } from './Icons';
 import { Button } from './common/Button';
 import { AiTextarea } from './common/Textarea';

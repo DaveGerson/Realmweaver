@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { Scene, SceneType, NPC, Location, SkillCheck } from '../types';
+import type { Scene, SceneType, NPC, Location, SkillCheck } from '../types/index';
 import { Icons } from './Icons';
 import { Button } from './common/Button';
 import { AiTextarea } from './common/Textarea';

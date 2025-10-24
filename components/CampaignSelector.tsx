@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Campaign } from '../types';
+import type { Campaign } from '../types/index';
 import { Icons } from './Icons';
 import { Button } from './common/Button';
 

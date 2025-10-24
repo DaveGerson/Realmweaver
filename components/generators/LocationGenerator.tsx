@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Location } from '../../types';
+import type { Location } from '../../types/index';
 import { generateLocation } from '../../services/geminiService';
 import { Icons } from '../Icons';
 import { Button } from '../common/Button';

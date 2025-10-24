@@ -1,6 +1,5 @@
-
 import { Type } from "@google/genai";
-import type { SkillCheck, BatchAddData } from '../../types';
+import type { SkillCheck, BatchAddData } from '../../types/index';
 import { npcSchema, locationSchema, factionSchema, itemSchema, adventureWithScenesSchema } from './realmWeaver';
 import { generateWithSchema, generateText } from './core';
 

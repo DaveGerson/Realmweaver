@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Location } from '../../types';
+import type { Location } from '../../types/index';
 import { LocationGenerator } from '../generators/LocationGenerator';
 import { Icons } from '../Icons';
 

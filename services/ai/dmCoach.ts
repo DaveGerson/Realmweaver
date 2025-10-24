@@ -1,5 +1,5 @@
 import { Type } from "@google/genai";
-import type { RollableTable } from '../../types';
+import type { RollableTable } from '../../types/index';
 import { generateText, generateWithSchema } from './core';
 
 // --- Schemas ---

@@ -1,5 +1,6 @@
+
 import React from 'react';
-import type { Adventure, AdventureForBatchAdd } from '../../types';
+import type { Adventure, AdventureForBatchAdd } from '../../types/index';
 import { AdventureGenerator } from '../generators/AdventureGenerator';
 import { Icons } from '../Icons';
 

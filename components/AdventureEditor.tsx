@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import type { Adventure, Campaign } from '../types';
+import type { Adventure, Campaign } from '../types/index';
 import { Icons } from './Icons';
 import { PrepDocumentView } from './PrepDocumentView';
 import { twMerge } from 'tailwind-merge';

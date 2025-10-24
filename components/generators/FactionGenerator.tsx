@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Faction } from '../../types';
+import type { Faction } from '../../types/index';
 import { generateFaction } from '../../services/geminiService';
 import { Icons } from '../Icons';
 import { Button } from '../common/Button';

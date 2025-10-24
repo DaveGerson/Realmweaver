@@ -1,5 +1,5 @@
 import React from 'react';
-import type { NPC } from '../../types';
+import type { NPC } from '../../types/index';
 import { NpcGenerator } from '../generators/NpcGenerator';
 import { Icons } from '../Icons';
 

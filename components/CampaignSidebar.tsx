@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import type { Campaign, Article } from '../types';
+import type { Campaign, Article } from '../types/index';
 import { Icons, SceneIcon } from './Icons';
 import type { EditorView, GeneratorType } from '../App';
 import { twMerge } from 'tailwind-merge';
@@ -342,7 +343,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                         </button>
                     </div>
                     <div className="pl-4 border-l border-slate-700 ml-5 space-y-1">
-                        {(campaign.sessionLogs || []).map(log => (
+                        {(campaign.sessionLogs || []).sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime()).map(log => (
                             <button
                                 key={log.id}
                                 onClick={() => onSelect('session-log', log.id)}

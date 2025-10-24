@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { SessionLog } from '../types';
+import type { SessionLog } from '../types/index';
 import { Icons } from './Icons';
 import { Button } from './common/Button';
 

@@ -1,8 +1,8 @@
 
 
 import React, { useState, useRef, useEffect } from 'react';
-import type { Campaign, SceneType } from '../types';
-import type { BatchAddData } from '../types';
+import type { Campaign, SceneType } from '../types/index';
+import type { BatchAddData } from '../types/index';
 import { generateCampaignFill, generateNpc, generateLocation, generateFaction, generateItem, generateAdventure, parseDocumentForEntities, generateChatResponse } from '../services/geminiService';
 import { Icons } from './Icons';
 import { Button } from './common/Button';
@@ -323,18 +323,18 @@ const SimpleModeView = ({ prompt, onPromptChange, qualifiers, onQualifiersChange
 
 const DetailedModeView = ({ campaign, prompts, onPromptsChange }) => {
     // --- Detailed Prompt Handlers ---
-    // FIX: Corrected typing issues in handlers by explicitly casting the draft part to `SimpleDetailedPrompt[]`.
-    const handleAddSimplePrompt = (type: EntityType) => onPromptsChange(produce(draft => { (draft[type] as SimpleDetailedPrompt[]).push({ id: crypto.randomUUID(), prompt: '' }); }));
-    const handleRemoveSimplePrompt = (type: EntityType, id: string) => onPromptsChange(produce(draft => {
-        const items = draft[type] as SimpleDetailedPrompt[];
+    // FIX: Explicitly type the `draft` object in `produce` callbacks to resolve type inference issues. This fixes errors and removes the need for type casting.
+    const handleAddSimplePrompt = (type: EntityType) => onPromptsChange(produce((draft: DetailedPrompts) => { draft[type].push({ id: crypto.randomUUID(), prompt: '' }); }));
+    const handleRemoveSimplePrompt = (type: EntityType, id: string) => onPromptsChange(produce((draft: DetailedPrompts) => {
+        const items = draft[type];
         const index = items.findIndex(p => p.id === id);
         if (index > -1) {
             items.splice(index, 1);
         }
     }));
     const handleSimplePromptChange = (type: EntityType, id: string, prompt: string, linkId?: string) => {
-        onPromptsChange(produce(draft => {
-            const item = (draft[type] as SimpleDetailedPrompt[]).find(p => p.id === id);
+        onPromptsChange(produce((draft: DetailedPrompts) => {
+            const item = draft[type].find(p => p.id === id);
             if (item) {
                 item.prompt = prompt;
                 if (linkId !== undefined) {
@@ -343,13 +343,13 @@ const DetailedModeView = ({ campaign, prompts, onPromptsChange }) => {
             }
         }));
     };
-    const handleAddAdventure = () => onPromptsChange(produce(draft => { draft.adventures.push({ id: crypto.randomUUID(), prompt: '', scenes: [{ id: crypto.randomUUID(), prompt: '' }] }); }));
-    const handleRemoveAdventure = (id: string) => onPromptsChange(produce(draft => { draft.adventures = draft.adventures.filter(a => a.id !== id); }));
-    const handleAdventureChange = (id: string, prompt: string) => onPromptsChange(produce(draft => { const adv = draft.adventures.find(a => a.id === id); if(adv) adv.prompt = prompt; }));
-    const handleAddScene = (adventureId: string) => onPromptsChange(produce(draft => { const adv = draft.adventures.find(a => a.id === adventureId); if(adv) adv.scenes.push({ id: crypto.randomUUID(), prompt: '' }); }));
-    const handleRemoveScene = (adventureId: string, sceneId: string) => onPromptsChange(produce(draft => { const adv = draft.adventures.find(a => a.id === adventureId); if(adv) adv.scenes = adv.scenes.filter(s => s.id !== sceneId); }));
+    const handleAddAdventure = () => onPromptsChange(produce((draft: DetailedPrompts) => { draft.adventures.push({ id: crypto.randomUUID(), prompt: '', scenes: [{ id: crypto.randomUUID(), prompt: '' }] }); }));
+    const handleRemoveAdventure = (id: string) => onPromptsChange(produce((draft: DetailedPrompts) => { draft.adventures = draft.adventures.filter(a => a.id !== id); }));
+    const handleAdventureChange = (id: string, prompt: string) => onPromptsChange(produce((draft: DetailedPrompts) => { const adv = draft.adventures.find(a => a.id === id); if(adv) adv.prompt = prompt; }));
+    const handleAddScene = (adventureId: string) => onPromptsChange(produce((draft: DetailedPrompts) => { const adv = draft.adventures.find(a => a.id === adventureId); if(adv) adv.scenes.push({ id: crypto.randomUUID(), prompt: '' }); }));
+    const handleRemoveScene = (adventureId: string, sceneId: string) => onPromptsChange(produce((draft: DetailedPrompts) => { const adv = draft.adventures.find(a => a.id === adventureId); if(adv) adv.scenes = adv.scenes.filter(s => s.id !== sceneId); }));
     const handleSceneChange = (adventureId: string, sceneId: string, prompt: string, type: SceneType | 'none') => {
-        onPromptsChange(produce(draft => {
+        onPromptsChange(produce((draft: DetailedPrompts) => {
             const adv = draft.adventures.find(a => a.id === adventureId);
             if(adv) { const scene = adv.scenes.find(s => s.id === sceneId); if(scene) { scene.prompt = prompt; scene.type = type === 'none' ? undefined : type; } }
         }));

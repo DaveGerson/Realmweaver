@@ -1,4 +1,5 @@
-import type { Campaign, Article } from '../types';
+// FIX: Updated type import path to use the barrel file 'types/index.ts'.
+import type { Campaign, Article } from '../types/index';
 
 const generateMarkdownForCampaign = (campaign: Campaign): string => {
     let md = `# ${campaign.title}\n\n`;
@@ -115,7 +116,7 @@ const generateMarkdownForCampaign = (campaign: Campaign): string => {
     // Session Logs
     if (campaign.sessionLogs && campaign.sessionLogs.length > 0) {
         md += `## Session Logs\n\n`;
-        campaign.sessionLogs.forEach(log => {
+        campaign.sessionLogs.sort((a, b) => new Date(a.sessionDate).getTime() - new Date(b.sessionDate).getTime()).forEach(log => {
             md += `### ${log.title} (${new Date(log.sessionDate).toLocaleDateString()})\n\n`;
             if (log.recap) md += `**Recap:**\n${log.recap}\n\n`;
             if (log.notableEvents) md += `**Notable Events:**\n${log.notableEvents}\n\n`;

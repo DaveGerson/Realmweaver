@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { NPC } from '../../types';
+import type { NPC } from '../../types/index';
 import { generateNpc } from '../../services/geminiService';
 import { Icons } from '../Icons';
 import { Button } from '../common/Button';

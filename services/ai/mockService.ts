@@ -1,5 +1,5 @@
-import type { NPC, Location, Faction, RollableTable, Item, Scene, SceneType, AdventureForBatchAdd, Article, PointOfInterest } from '../../types';
-import type { BatchAddData } from '../../types';
+import type { NPC, Location, Faction, RollableTable, Item, Scene, SceneType, AdventureForBatchAdd, Article, PointOfInterest } from '../../types/index';
+import type { BatchAddData } from '../../types/index';
 
 // --- Mock Data ---
 const mockNpcData: Omit<NPC, 'id' | 'factionId'> = {

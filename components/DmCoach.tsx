@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { X, Clipboard, Check } from 'lucide-react';
-import type { Campaign, RollableTable, RollableTableEntry } from '../types';
+import type { Campaign, RollableTable, RollableTableEntry } from '../types/index';
 import { generateNarration, generateImprovisation, generateRollableTable } from '../services/geminiService';
 import { Icons } from './Icons';
 import { Button } from './common/Button';

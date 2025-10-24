@@ -1,10 +1,6 @@
 
-
-
-
-import React, { useState, useEffect, useMemo } from 'react';
-import type { Campaign, Adventure, NPC, Location, Faction, Item, Scene, Article, AdventureForBatchAdd, SessionLog } from './types';
-import type { BatchAddData } from './types';
+import React, { useState, useEffect, useMemo, useSyncExternalStore } from 'react';
+import type { Campaign, Adventure, NPC, Location, Faction, Item, Scene, Article, SessionLog } from './types/index';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { CampaignCreator } from './components/CampaignCreator';
 import { CampaignSelector } from './components/CampaignSelector';
@@ -24,30 +20,29 @@ import { DmCoach } from './components/DmCoach';
 import { EvocationWizard } from './components/EvocationWizard';
 import { Icons } from './components/Icons';
 import { runSmokeTests } from './smokeTest';
-import { produce } from 'immer';
 import { ExportModal } from './components/ExportModal';
-import { importCampaignFromJson, exportCampaignAsJson, exportCampaignAsObsidian } from './services/importExportService';
+import { exportCampaignAsJson, exportCampaignAsObsidian } from './services/importExportService';
 import { NpcDashboard } from './components/dashboards/NpcDashboard';
 import { LocationDashboard } from './components/dashboards/LocationDashboard';
 import { FactionDashboard } from './components/dashboards/FactionDashboard';
 import { ItemDashboard } from './components/dashboards/ItemDashboard';
 import { ArticleDashboard } from './components/dashboards/ArticleDashboard';
 import { SessionLogDashboard } from './components/dashboards/SessionLogDashboard';
+import { campaignService } from './services/campaignService';
 
 
 export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs';
 export type GeneratorType = 'npc' | 'location' | 'faction' | 'item' | 'scene' | 'article';
-type AppStatus = 'loading' | 'welcome' | 'selecting' | 'creating' | 'editing';
-
-const CAMPAIGNS_STORAGE_KEY = 'realmweaver-campaigns';
-const ACTIVE_CAMPAIGN_ID_KEY = 'realmweaver-active-campaign-id';
 
 const App: React.FC = () => {
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
-  const [isMockMode, setIsMockMode] = useState(true);
-  const [appStatus, setAppStatus] = useState<AppStatus>('loading');
+  const { campaigns, activeCampaignId, appStatus } = useSyncExternalStore(
+    campaignService.subscribe,
+    campaignService.getState
+  );
   
+  const [isMockMode, setIsMockMode] = useState(true);
+  
+  // UI-specific state that remains in the component
   const [activeView, setActiveView] = useState<EditorView>('setting');
   const [activeGenerator, setActiveGenerator] = useState<GeneratorType | null>(null);
 
@@ -65,61 +60,11 @@ const App: React.FC = () => {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
 
-  // Load campaigns from local storage on initial mount
-  useEffect(() => {
-    const savedCampaigns = localStorage.getItem(CAMPAIGNS_STORAGE_KEY);
-    const savedActiveId = localStorage.getItem(ACTIVE_CAMPAIGN_ID_KEY);
-
-    if (savedCampaigns) {
-      try {
-        const campaignsData: Campaign[] = JSON.parse(savedCampaigns);
-        setCampaigns(campaignsData);
-        if (savedActiveId && campaignsData.some(c => c.id === savedActiveId)) {
-          setActiveCampaignId(savedActiveId);
-          setAppStatus('editing');
-        } else if (campaignsData.length > 0) {
-          setAppStatus('selecting');
-        } else {
-           setAppStatus('welcome');
-        }
-      } catch (e) {
-        console.error("Failed to parse saved campaigns, clearing storage.", e);
-        localStorage.removeItem(CAMPAIGNS_STORAGE_KEY);
-        localStorage.removeItem(ACTIVE_CAMPAIGN_ID_KEY);
-        setAppStatus('welcome');
-      }
-    } else {
-      setAppStatus('welcome');
-    }
-  }, []);
-
-  // Persist campaigns to local storage whenever they change
-  useEffect(() => {
-    if (appStatus !== 'loading') {
-      localStorage.setItem(CAMPAIGNS_STORAGE_KEY, JSON.stringify(campaigns));
-    }
-  }, [campaigns, appStatus]);
-
-  // Persist active campaign ID
-  useEffect(() => {
-    if (activeCampaignId) {
-      localStorage.setItem(ACTIVE_CAMPAIGN_ID_KEY, activeCampaignId);
-    } else {
-      localStorage.removeItem(ACTIVE_CAMPAIGN_ID_KEY);
-    }
-  }, [activeCampaignId]);
-
   useEffect(() => {
     runSmokeTests(isMockMode);
   }, [isMockMode]);
 
   const activeCampaign = useMemo(() => campaigns.find(c => c.id === activeCampaignId), [campaigns, activeCampaignId]);
-
-  const handleSaveCampaign = () => {
-    // The useEffect for `campaigns` state handles saving automatically.
-    // This function can be used for explicit save actions if needed in the UI.
-    console.log("Campaign state saved.");
-  };
 
   const resetSelections = () => {
     setSelectedNpcId(null);
@@ -132,519 +77,15 @@ const App: React.FC = () => {
     setSelectedSessionLogId(null);
     setActiveGenerator(null);
   };
-  
-  const handleCreateCampaign = (title: string, setting: string) => {
-    const newCampaign: Campaign = { id: crypto.randomUUID(), title, setting, articles: [], adventures: [], npcs: [], locations: [], factions: [], items: [], sessionLogs: [] };
-    setCampaigns(prev => [...prev, newCampaign]);
-    setActiveCampaignId(newCampaign.id);
-    setAppStatus('editing');
-    setActiveView('setting');
-  };
-
-  const handleDeleteCampaign = (id: string) => {
-    if (window.confirm("Are you sure you want to permanently delete this campaign?")) {
-        setCampaigns(prev => prev.filter(c => c.id !== id));
-        if (activeCampaignId === id) {
-            setActiveCampaignId(null);
-            setAppStatus('selecting');
-        }
-    }
-  };
-
-  const handleSelectCampaign = (id: string) => {
-    setActiveCampaignId(id);
-    setAppStatus('editing');
-  };
 
   const handleImportCampaign = async (file: File) => {
-    try {
-        const importedCampaign = await importCampaignFromJson(file);
-        
-        // Check if a campaign with the same ID already exists. If so, generate a new ID.
-        if (campaigns.some(c => c.id === importedCampaign.id)) {
-            console.warn("Imported campaign has a conflicting ID. Assigning a new one.");
-            importedCampaign.id = crypto.randomUUID();
-        }
-
-        setCampaigns(prev => [...prev, importedCampaign]);
-        alert(`Campaign "${importedCampaign.title}" imported successfully!`);
-        setActiveCampaignId(null);
-        setAppStatus('selecting');
-
-    } catch (error) {
-        console.error("Import failed:", error);
-        alert(`Import failed: ${error instanceof Error ? error.message : "Unknown error"}`);
-    }
-  };
-  
-  const handleUpdateCampaign = (updatedData: Partial<Campaign>) => {
-    setCampaigns(prev => produce(prev, draft => {
-      const campaign = draft.find(c => c.id === activeCampaignId);
-      if (campaign) Object.assign(campaign, updatedData);
-    }));
-  };
-  
-  // --- WORLD ENTITY HANDLERS ---
-  const handleNpcCreated = (newNpcData: Omit<NPC, 'id'>) => {
-    const newNpc: NPC = { ...newNpcData, id: crypto.randomUUID() };
-    setCampaigns(prev => produce(prev, draft => { 
-        const campaign = draft.find(c => c.id === activeCampaignId);
-        if (campaign) campaign.npcs.push(newNpc);
-    }));
-    setActiveGenerator(null);
-    setSelectedNpcId(newNpc.id);
-  };
-
-  const handleUpdateNpc = (id: string, updatedData: Partial<NPC>) => {
-      setCampaigns(prev => produce(prev, draft => {
-          const campaign = draft.find(c => c.id === activeCampaignId);
-          if (!campaign) return;
-          const npcIndex = campaign.npcs.findIndex(n => n.id === id);
-          if (npcIndex === -1) return;
-          
-          const oldNpc = campaign.npcs[npcIndex];
-          const oldFactionId = oldNpc.factionId;
-          Object.assign(oldNpc, updatedData);
-          const newFactionId = campaign.npcs[npcIndex].factionId;
-
-          if (oldFactionId !== newFactionId) {
-              if (oldFactionId) {
-                  const oldFaction = campaign.factions.find(f => f.id === oldFactionId);
-                  if (oldFaction) oldFaction.memberIds = oldFaction.memberIds.filter(memberId => memberId !== id);
-              }
-              if (newFactionId) {
-                  const newFaction = campaign.factions.find(f => f.id === newFactionId);
-                  if (newFaction && !newFaction.memberIds.includes(id)) newFaction.memberIds.push(id);
-              }
-          }
-      }));
-  };
-
-  const handleDeleteNpc = (id: string) => {
-    setCampaigns(prev => produce(prev, draft => {
-        const campaign = draft.find(c => c.id === activeCampaignId);
-        if (!campaign) return;
-
-        const npcToDelete = campaign.npcs.find(n => n.id === id);
-        if (!npcToDelete) return;
-        
-        // Remove from faction
-        const factionId = npcToDelete.factionId;
-        if (factionId) {
-            const faction = campaign.factions.find(f => f.id === factionId);
-            if (faction) {
-                faction.memberIds = faction.memberIds.filter(memberId => memberId !== id);
-            }
-        }
-        
-        // Delete NPC
-        campaign.npcs = campaign.npcs.filter(n => n.id !== id);
-
-        // Remove from scenes
-        campaign.adventures.forEach(adv => {
-            adv.scenes.forEach(scene => {
-                scene.npcIds = scene.npcIds.filter(npcId => npcId !== id);
-            });
-        });
-    }));
-    if (selectedNpcId === id) setSelectedNpcId(null);
-  };
-
-  const handleLocationCreated = (newLocationData: Omit<Location, 'id'>) => {
-    const newLocation: Location = { ...newLocationData, id: crypto.randomUUID() };
-    setCampaigns(prev => produce(prev, draft => {
-        const campaign = draft.find(c => c.id === activeCampaignId);
-        if(campaign) campaign.locations.push(newLocation)
-    }));
-    setActiveGenerator(null);
-    setSelectedLocationId(newLocation.id);
-  };
-  
-  const handleUpdateLocation = (id: string, updatedData: Partial<Location>) => {
-    setCampaigns(prev => produce(prev, draft => {
-        const campaign = draft.find(c => c.id === activeCampaignId);
-        if (!campaign) return;
-        const locIndex = campaign.locations.findIndex(l => l.id === id);
-        if (locIndex === -1) return;
-        const oldLoc = { ...campaign.locations[locIndex] };
-        Object.assign(campaign.locations[locIndex], updatedData);
-        const newLoc = campaign.locations[locIndex];
-
-        if (oldLoc.parentLocationId !== newLoc.parentLocationId) {
-          if (oldLoc.parentLocationId) {
-            const oldParent = campaign.locations.find(p => p.id === oldLoc.parentLocationId);
-            if (oldParent) oldParent.subLocationIds = oldParent.subLocationIds.filter(subId => subId !== id);
-          }
-          if (newLoc.parentLocationId) {
-            const newParent = campaign.locations.find(p => p.id === newLoc.parentLocationId);
-            if (newParent && !newParent.subLocationIds.includes(id)) newParent.subLocationIds.push(id);
-          }
-        }
-    }));
-  };
-
-  const handleDeleteLocation = (id: string) => {
-    setCampaigns(prev => produce(prev, draft => {
-        const campaign = draft.find(c => c.id === activeCampaignId);
-        if (!campaign) return;
-
-        const locToDelete = campaign.locations.find(l => l.id === id);
-        if (!locToDelete) return;
-
-        // Remove from parent's subLocationIds
-        if (locToDelete.parentLocationId) {
-            const parent = campaign.locations.find(p => p.id === locToDelete.parentLocationId);
-            if (parent) parent.subLocationIds = parent.subLocationIds.filter(subId => subId !== id);
-        }
-
-        // Un-parent all children
-        locToDelete.subLocationIds.forEach(childId => {
-            const child = campaign.locations.find(c => c.id === childId);
-            if (child) child.parentLocationId = undefined;
-        });
-
-        // Remove from scenes
-        campaign.adventures.forEach(adv => {
-            adv.scenes.forEach(scene => {
-                if (scene.locationId === id) scene.locationId = undefined;
-            });
-        });
-        
-        // Delete location
-        campaign.locations = campaign.locations.filter(l => l.id !== id);
-    }));
-    if (selectedLocationId === id) setSelectedLocationId(null);
-  };
-  
-  const handleFactionCreated = (newFactionData: Omit<Faction, 'id'>) => {
-    const newFaction: Faction = { ...newFactionData, id: crypto.randomUUID() };
-    setCampaigns(prev => produce(prev, draft => {
-        const campaign = draft.find(c => c.id === activeCampaignId);
-        if(campaign) campaign.factions.push(newFaction)
-    }));
-    setActiveGenerator(null);
-    setSelectedFactionId(newFaction.id);
-  };
-
-  const handleUpdateFaction = (id: string, updatedData: Partial<Faction>) => {
-    setCampaigns(prev => produce(prev, draft => {
-        const campaign = draft.find(c => c.id === activeCampaignId);
-        if (!campaign) return;
-        const faction = campaign.factions.find(f => f.id === id);
-        if (faction) Object.assign(faction, updatedData);
-    }));
-  };
-
-  const handleDeleteFaction = (id: string) => {
-    setCampaigns(prev => produce(prev, draft => {
-      const campaign = draft.find(c => c.id === activeCampaignId);
-      if (!campaign) return;
-      campaign.factions = campaign.factions.filter(f => f.id !== id);
-      campaign.npcs.forEach(npc => { if (npc.factionId === id) npc.factionId = undefined; });
-    }));
-    if (selectedFactionId === id) setSelectedFactionId(null);
-  };
-  
-  const handleItemCreated = (newItemData: Omit<Item, 'id'>) => {
-    const newItem: Item = { ...newItemData, id: crypto.randomUUID() };
-    setCampaigns(prev => produce(prev, draft => {
-        const campaign = draft.find(c => c.id === activeCampaignId);
-        if (campaign) campaign.items.push(newItem);
-    }));
-    setActiveGenerator(null);
-    setSelectedItemId(newItem.id);
-  };
-
-  const handleUpdateItem = (id: string, updatedData: Partial<Item>) => {
-    setCampaigns(prev => produce(prev, draft => {
-        const campaign = draft.find(c => c.id === activeCampaignId);
-        if (!campaign) return;
-        const item = campaign.items.find(i => i.id === id);
-        if (item) Object.assign(item, updatedData);
-    }));
-  };
-
-  const handleDeleteItem = (id: string) => {
-    setCampaigns(prev => produce(prev, draft => {
-        const campaign = draft.find(c => c.id === activeCampaignId);
-        if (campaign) campaign.items = campaign.items.filter(i => i.id !== id);
-    }));
-    if (selectedItemId === id) setSelectedItemId(null);
-  };
-
-  // --- LORE ARTICLE HANDLERS ---
-  const handleArticleCreated = (newArticleData: Omit<Article, 'id'>) => {
-    const newArticle: Article = { ...newArticleData, id: crypto.randomUUID() };
-    setCampaigns(prev => produce(prev, draft => {
-        const campaign = draft.find(c => c.id === activeCampaignId);
-        if (campaign) campaign.articles.push(newArticle);
-    }));
-    setActiveGenerator(null);
-    setSelectedArticleId(newArticle.id);
-  };
-
-  const handleUpdateArticle = (id: string, updatedData: Partial<Article>) => {
-    setCampaigns(prev => produce(prev, draft => {
-        const campaign = draft.find(c => c.id === activeCampaignId);
-        if (!campaign) return;
-        const articleIndex = campaign.articles.findIndex(a => a.id === id);
-        if (articleIndex === -1) return;
-        const oldArticle = { ...campaign.articles[articleIndex] };
-        Object.assign(campaign.articles[articleIndex], updatedData);
-        const newArticle = campaign.articles[articleIndex];
-
-        if (oldArticle.parentArticleId !== newArticle.parentArticleId) {
-            if (oldArticle.parentArticleId) {
-                const oldParent = campaign.articles.find(p => p.id === oldArticle.parentArticleId);
-                if (oldParent) oldParent.subArticleIds = oldParent.subArticleIds.filter(subId => subId !== id);
-            }
-            if (newArticle.parentArticleId) {
-                const newParent = campaign.articles.find(p => p.id === newArticle.parentArticleId);
-                if (newParent && !newParent.subArticleIds.includes(id)) newParent.subArticleIds.push(id);
-            }
-        }
-    }));
-  };
-
-  const handleDeleteArticle = (id: string) => {
-    setCampaigns(prev => produce(prev, draft => {
-        const campaign = draft.find(c => c.id === activeCampaignId);
-        if (!campaign) return;
-        const articleToDelete = campaign.articles.find(a => a.id === id);
-        if (!articleToDelete) return;
-
-        // Remove from parent's subArticleIds
-        if (articleToDelete.parentArticleId) {
-            const parent = campaign.articles.find(p => p.id === articleToDelete.parentArticleId);
-            if (parent) parent.subArticleIds = parent.subArticleIds.filter(subId => subId !== id);
-        }
-
-        // Un-parent all children
-        articleToDelete.subArticleIds.forEach(childId => {
-            const child = campaign.articles.find(c => c.id === childId);
-            if (child) child.parentArticleId = undefined; // Set children to be top-level
-        });
-        
-        // Delete article
-        campaign.articles = campaign.articles.filter(a => a.id !== id);
-    }));
-    if (selectedArticleId === id) setSelectedArticleId(null);
-  };
-
-  // --- ADVENTURE & SCENE HANDLERS ---
-  const handleFullAdventureCreated = (adventureData: AdventureForBatchAdd) => {
-    const newAdventure: Adventure = {
-        id: crypto.randomUUID(),
-        title: adventureData.title,
-        hook: adventureData.hook,
-        theme: adventureData.theme,
-        level: adventureData.level,
-        scenes: (adventureData.scenes || []).map(sceneData => ({
-            ...sceneData,
-            id: crypto.randomUUID(),
-        }))
-    };
-    setCampaigns(prev => produce(prev, draft => {
-        const campaign = draft.find(c => c.id === activeCampaignId);
-        if (campaign) {
-            campaign.adventures.push(newAdventure);
-        }
-    }));
-    setSelectedAdventureId(newAdventure.id);
-    setActiveGenerator(null);
-  };
-
-  const handleUpdateAdventure = (id: string, updatedData: Partial<Adventure>) => {
-    setCampaigns(prev => produce(prev, draft => {
-        const campaign = draft.find(c => c.id === activeCampaignId);
-        if (!campaign) return;
-        const adventure = campaign.adventures.find(a => a.id === id);
-        if (adventure) Object.assign(adventure, updatedData);
-    }));
-  };
-
-  const handleSceneCreated = (adventureId: string, newSceneData: Omit<Scene, 'id'>) => {
-    const newScene: Scene = { ...newSceneData, id: crypto.randomUUID() };
-    setCampaigns(prev => produce(prev, draft => {
-        const campaign = draft.find(c => c.id === activeCampaignId);
-        if (!campaign) return;
-        const adventure = campaign.adventures.find(a => a.id === adventureId);
-        if (adventure) adventure.scenes.push(newScene);
-    }));
-    setActiveGenerator(null);
-    setSelectedSceneId(newScene.id);
-  };
-
-  const handleUpdateScene = (adventureId: string, sceneId: string, updatedData: Partial<Scene>) => {
-    setCampaigns(prev => produce(prev, draft => {
-        const campaign = draft.find(c => c.id === activeCampaignId);
-        if (!campaign) return;
-        const adventure = campaign.adventures.find(a => a.id === adventureId);
-        if (!adventure) return;
-        const scene = adventure.scenes.find(s => s.id === sceneId);
-        if (scene) Object.assign(scene, updatedData);
-    }));
-  };
-
-  const handleDeleteScene = (adventureId: string, sceneId: string) => {
-    setCampaigns(prev => produce(prev, draft => {
-        const campaign = draft.find(c => c.id === activeCampaignId);
-        if (!campaign) return;
-        const adventure = campaign.adventures.find(a => a.id === adventureId);
-        if (adventure) adventure.scenes = adventure.scenes.filter(s => s.id !== sceneId);
-    }));
-    if (selectedSceneId === sceneId) setSelectedSceneId(null);
-  };
-
-  const handleReorderScene = (adventureId: string, draggedSceneId: string, targetSceneId: string) => {
-    setCampaigns(prev => produce(prev, draft => {
-        const campaign = draft.find(c => c.id === activeCampaignId);
-        if (!campaign) return;
-        const adventure = campaign.adventures.find(a => a.id === adventureId);
-        if (!adventure) return;
-
-        const draggedIndex = adventure.scenes.findIndex(s => s.id === draggedSceneId);
-        const targetIndex = adventure.scenes.findIndex(s => s.id === targetSceneId);
-
-        if (draggedIndex > -1 && targetIndex > -1) {
-            const [draggedItem] = adventure.scenes.splice(draggedIndex, 1);
-            adventure.scenes.splice(targetIndex, 0, draggedItem);
-        }
-    }));
-  };
-
-  // --- SESSION LOG HANDLERS ---
-  const handleSessionLogCreated = (newLogData: Omit<SessionLog, 'id'>) => {
-    const newLog: SessionLog = { ...newLogData, id: crypto.randomUUID() };
-    setCampaigns(prev => produce(prev, draft => {
-        const campaign = draft.find(c => c.id === activeCampaignId);
-        if (campaign) {
-            campaign.sessionLogs = [...(campaign.sessionLogs || []), newLog];
-        }
-    }));
-    setActiveView('session-logs');
-    setSelectedSessionLogId(newLog.id);
-  };
-
-  const handleUpdateSessionLog = (id: string, updatedData: Partial<SessionLog>) => {
-      setCampaigns(prev => produce(prev, draft => {
-          const campaign = draft.find(c => c.id === activeCampaignId);
-          if (!campaign || !campaign.sessionLogs) return;
-          const log = campaign.sessionLogs.find(l => l.id === id);
-          if (log) Object.assign(log, updatedData);
-      }));
-  };
-
-  const handleDeleteSessionLog = (id: string) => {
-      setCampaigns(prev => produce(prev, draft => {
-          const campaign = draft.find(c => c.id === activeCampaignId);
-          if (campaign) {
-              campaign.sessionLogs = (campaign.sessionLogs || []).filter(l => l.id !== id);
-          }
-      }));
-      if (selectedSessionLogId === id) setSelectedSessionLogId(null);
-  };
-
-
-  const handleBatchAddToCampaign = (data: BatchAddData) => {
-      setCampaigns(prev => produce(prev, draft => {
-          const campaign = draft.find(c => c.id === activeCampaignId);
-          if (!campaign) return;
-
-          // Create maps to resolve names to newly created IDs
-          const factionNameMap = new Map<string, string>();
-          const locationNameMap = new Map<string, string>();
-          const npcNameMap = new Map<string, string>();
-
-          // Add existing entities to maps for linking
-          campaign.factions.forEach(f => factionNameMap.set(f.name.toLowerCase(), f.id));
-          campaign.locations.forEach(l => locationNameMap.set(l.name.toLowerCase(), l.id));
-          campaign.npcs.forEach(n => npcNameMap.set(n.name.toLowerCase(), n.id));
-
-          // 1. Create entities and populate maps
-          const newFactions = data.factions.map(facData => {
-              const newFac = { ...facData, id: crypto.randomUUID(), leaderId: undefined, memberIds: [] };
-              factionNameMap.set(newFac.name.toLowerCase(), newFac.id);
-              return newFac;
-          });
-
-          const newLocations = data.locations.map(locData => {
-              const newLoc = { ...locData, id: crypto.randomUUID(), subLocationIds: [], connections: locData.connections || [], pointsOfInterest: locData.pointsOfInterest || [], loot: locData.loot || [] };
-              locationNameMap.set(newLoc.name.toLowerCase(), newLoc.id);
-              return newLoc;
-          });
-
-          const newNpcs = data.npcs.map(npcData => {
-              const newNpc = { ...npcData, id: crypto.randomUUID(), knowsPlayerHistory: [] };
-              npcNameMap.set(newNpc.name.toLowerCase(), newNpc.id);
-              return newNpc;
-          });
-          
-          const newItems = data.items.map(itemData => ({ ...itemData, id: crypto.randomUUID() }));
-          
-          const newAdventures = data.adventures.map(advData => {
-              const newAdventure: Adventure = {
-                  ...advData,
-                  id: crypto.randomUUID(),
-                  scenes: (advData.scenes || []).map(sceneData => ({
-                      ...sceneData,
-                      id: crypto.randomUUID(),
-                  }))
-              };
-              return newAdventure;
-          });
-
-          // Add new entities to the campaign
-          campaign.factions.push(...newFactions);
-          campaign.locations.push(...newLocations);
-          campaign.npcs.push(...newNpcs);
-          campaign.items.push(...newItems);
-          campaign.adventures.push(...newAdventures);
-
-          // 2. Resolve relationships using the maps.
-          const allNpcsInDraft = campaign.npcs;
-          const allLocationsInDraft = campaign.locations;
-          const allFactionsInDraft = campaign.factions;
-
-          allNpcsInDraft.forEach(npc => {
-              const factionName = npc.factionId; // This is a name, not an ID yet for new NPCs
-              if (factionName && factionNameMap.has(factionName.toLowerCase())) {
-                  const resolvedFactionId = factionNameMap.get(factionName.toLowerCase())!;
-                  const faction = allFactionsInDraft.find(f => f.id === resolvedFactionId);
-                  if (faction && !faction.memberIds.includes(npc.id)) {
-                      faction.memberIds.push(npc.id);
-                  }
-                  npc.factionId = resolvedFactionId;
-              }
-          });
-
-          allLocationsInDraft.forEach(loc => {
-              const parentLocationName = loc.parentLocationId; // Name, not ID yet
-              if (parentLocationName && locationNameMap.has(parentLocationName.toLowerCase())) {
-                  const resolvedParentId = locationNameMap.get(parentLocationName.toLowerCase())!;
-                  const parent = allLocationsInDraft.find(p => p.id === resolvedParentId);
-                  if (parent && !parent.subLocationIds.includes(loc.id)) {
-                      parent.subLocationIds.push(loc.id);
-                  }
-                  loc.parentLocationId = resolvedParentId;
-              }
-          });
-          
-          campaign.adventures.forEach(adv => {
-              adv.scenes.forEach(scene => {
-                  const locationName = scene.locationId; // Name, not ID yet
-                  if (locationName && locationNameMap.has(locationName.toLowerCase())) {
-                      scene.locationId = locationNameMap.get(locationName.toLowerCase());
-                  }
-                  if (scene.npcIds && Array.isArray(scene.npcIds)) {
-                      scene.npcIds = scene.npcIds
-                          .map(npcIdOrName => npcNameMap.get(npcIdOrName.toLowerCase()) || npcIdOrName)
-                          .filter(id => allNpcsInDraft.some(npc => npc.id === id));
-                  }
-              });
-          });
-      }));
-      setIsWizardOpen(false);
+      try {
+          const title = await campaignService.importCampaign(file);
+          alert(`Campaign "${title}" imported successfully!`);
+      } catch (error) {
+          console.error("Import failed:", error);
+          alert(`Import failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      }
   };
 
   // --- Memos for selected items ---
@@ -661,28 +102,32 @@ const App: React.FC = () => {
     setActiveView(view);
     resetSelections();
   };
-
+  
   const renderMainContent = () => {
       if (!activeCampaign) return null;
 
       // Render Generators
-      if (activeGenerator === 'scene' && selectedAdventure) return <ContentWrapper title="Create New Scene"><SceneGenerator onSceneCreated={(s) => handleSceneCreated(selectedAdventure.id, s)} isMockMode={isMockMode} /></ContentWrapper>;
+      if (activeGenerator === 'scene' && selectedAdventure) return <ContentWrapper title="Create New Scene"><SceneGenerator onSceneCreated={(s) => campaignService.createScene(selectedAdventure.id, s)} isMockMode={isMockMode} /></ContentWrapper>;
 
       // Render Editors & Dashboards - Editors take priority if an item is selected
-      if (selectedSessionLog) return <SessionLogEditor log={selectedSessionLog} onUpdate={handleUpdateSessionLog} onDelete={handleDeleteSessionLog} />;
-      if (selectedScene && selectedAdventure) return <SceneEditor scene={selectedScene} allNpcs={activeCampaign.npcs} allLocations={activeCampaign.locations} onUpdate={(id, data) => handleUpdateScene(selectedAdventure.id, id, data)} onDelete={(id) => handleDeleteScene(selectedAdventure.id, id)} isMockMode={isMockMode} />;
-      if (selectedAdventure) return <AdventureEditor adventure={selectedAdventure} campaign={activeCampaign} onUpdate={handleUpdateAdventure} />;
-      if (selectedArticle) return <ArticleEditor article={selectedArticle} allArticles={activeCampaign.articles} onUpdate={handleUpdateArticle} onDelete={handleDeleteArticle} isMockMode={isMockMode} />;
-      if (selectedNpc) return <NpcEditor npc={selectedNpc} factions={activeCampaign.factions} onUpdate={handleUpdateNpc} onDelete={handleDeleteNpc} isMockMode={isMockMode} />;
-      if (selectedLocation) return <LocationEditor location={selectedLocation} allLocations={activeCampaign.locations} onUpdate={handleUpdateLocation} onDelete={handleDeleteLocation} isMockMode={isMockMode} />;
-      if (selectedFaction) return <FactionEditor faction={selectedFaction} allNpcs={activeCampaign.npcs} onUpdate={handleUpdateFaction} onDelete={handleDeleteFaction} isMockMode={isMockMode} />;
-      if (selectedItem) return <ItemEditor item={selectedItem} onUpdate={handleUpdateItem} onDelete={handleDeleteItem} isMockMode={isMockMode} />;
+      if (selectedSessionLog) return <SessionLogEditor log={selectedSessionLog} onUpdate={campaignService.updateSessionLog} onDelete={campaignService.deleteSessionLog} />;
+      if (selectedScene && selectedAdventure) return <SceneEditor scene={selectedScene} allNpcs={activeCampaign.npcs} allLocations={activeCampaign.locations} onUpdate={(id, data) => campaignService.updateScene(selectedAdventure.id, id, data)} onDelete={(id) => campaignService.deleteScene(selectedAdventure.id, id)} isMockMode={isMockMode} />;
+      if (selectedAdventure) return <AdventureEditor adventure={selectedAdventure} campaign={activeCampaign} onUpdate={campaignService.updateAdventure} />;
+      if (selectedArticle) return <ArticleEditor article={selectedArticle} allArticles={activeCampaign.articles} onUpdate={campaignService.updateArticle} onDelete={campaignService.deleteArticle} isMockMode={isMockMode} />;
+      if (selectedNpc) return <NpcEditor npc={selectedNpc} factions={activeCampaign.factions} onUpdate={campaignService.updateNpc} onDelete={campaignService.deleteNpc} isMockMode={isMockMode} />;
+      if (selectedLocation) return <LocationEditor location={selectedLocation} allLocations={activeCampaign.locations} onUpdate={campaignService.updateLocation} onDelete={campaignService.deleteLocation} isMockMode={isMockMode} />;
+      if (selectedFaction) return <FactionEditor faction={selectedFaction} allNpcs={activeCampaign.npcs} onUpdate={campaignService.updateFaction} onDelete={campaignService.deleteFaction} isMockMode={isMockMode} />;
+      if (selectedItem) return <ItemEditor item={selectedItem} onUpdate={campaignService.updateItem} onDelete={campaignService.deleteItem} isMockMode={isMockMode} />;
 
       // If no specific item is selected, show the corresponding dashboard
       if (activeView === 'adventures') {
         return <AdventureDashboard 
                     adventures={activeCampaign.adventures} 
-                    onAdventureCreated={handleFullAdventureCreated}
+                    onAdventureCreated={(advData) => {
+                        const newId = campaignService.createFullAdventure(advData);
+                        setSelectedAdventureId(newId);
+                        setActiveGenerator(null);
+                    }}
                     onSelectAdventure={(id) => {
                         resetSelections();
                         setActiveView('adventures');
@@ -691,15 +136,39 @@ const App: React.FC = () => {
                     isMockMode={isMockMode}
                 />;
       }
-      if (activeView === 'session-logs') return <SessionLogDashboard sessionLogs={activeCampaign.sessionLogs || []} onSessionLogCreated={handleSessionLogCreated} onSelectSessionLog={setSelectedSessionLogId} />;
-      if (activeView === 'npcs') return <NpcDashboard npcs={activeCampaign.npcs} onNpcCreated={handleNpcCreated} onSelectNpc={setSelectedNpcId} isMockMode={isMockMode} />;
-      if (activeView === 'locations') return <LocationDashboard locations={activeCampaign.locations} onLocationCreated={handleLocationCreated} onSelectLocation={setSelectedLocationId} isMockMode={isMockMode} />;
-      if (activeView === 'factions') return <FactionDashboard factions={activeCampaign.factions} onFactionCreated={handleFactionCreated} onSelectFaction={setSelectedFactionId} isMockMode={isMockMode} />;
-      if (activeView === 'items') return <ItemDashboard items={activeCampaign.items} onItemCreated={handleItemCreated} onSelectItem={setSelectedItemId} isMockMode={isMockMode} />;
-      if (activeView === 'lorebook') return <ArticleDashboard articles={activeCampaign.articles} onArticleCreated={handleArticleCreated} onSelectArticle={setSelectedArticleId} isMockMode={isMockMode} />;
+      if (activeView === 'session-logs') return <SessionLogDashboard sessionLogs={activeCampaign.sessionLogs || []} onSessionLogCreated={(logData) => {
+            const newId = campaignService.createSessionLog(logData);
+            setActiveView('session-logs');
+            setSelectedSessionLogId(newId);
+        }} onSelectSessionLog={setSelectedSessionLogId} />;
+      if (activeView === 'npcs') return <NpcDashboard npcs={activeCampaign.npcs} onNpcCreated={(npcData) => {
+            const newId = campaignService.createNpc(npcData);
+            setActiveGenerator(null);
+            setSelectedNpcId(newId);
+        }} onSelectNpc={setSelectedNpcId} isMockMode={isMockMode} />;
+      if (activeView === 'locations') return <LocationDashboard locations={activeCampaign.locations} onLocationCreated={(locData) => {
+            const newId = campaignService.createLocation(locData);
+            setActiveGenerator(null);
+            setSelectedLocationId(newId);
+        }} onSelectLocation={setSelectedLocationId} isMockMode={isMockMode} />;
+      if (activeView === 'factions') return <FactionDashboard factions={activeCampaign.factions} onFactionCreated={(facData) => {
+            const newId = campaignService.createFaction(facData);
+            setActiveGenerator(null);
+            setSelectedFactionId(newId);
+        }} onSelectFaction={setSelectedFactionId} isMockMode={isMockMode} />;
+      if (activeView === 'items') return <ItemDashboard items={activeCampaign.items} onItemCreated={(itemData) => {
+            const newId = campaignService.createItem(itemData);
+            setActiveGenerator(null);
+            setSelectedItemId(newId);
+        }} onSelectItem={setSelectedItemId} isMockMode={isMockMode} />;
+      if (activeView === 'lorebook') return <ArticleDashboard articles={activeCampaign.articles} onArticleCreated={(articleData) => {
+            const newId = campaignService.createArticle(articleData);
+            setActiveGenerator(null);
+            setSelectedArticleId(newId);
+        }} onSelectArticle={setSelectedArticleId} isMockMode={isMockMode} />;
 
       // Render Top-Level Setting View
-      if (activeView === 'setting') return <CampaignSettingEditor campaign={activeCampaign} onUpdate={handleUpdateCampaign} />;
+      if (activeView === 'setting') return <CampaignSettingEditor campaign={activeCampaign} onUpdate={campaignService.updateCampaign} />;
 
       // Fallback
       return <EditorPlaceholder icon="Campaign" text="Select an item from the sidebar to get started." />;
@@ -710,11 +179,14 @@ const App: React.FC = () => {
       case 'loading':
         return null;
       case 'welcome':
-        return <WelcomeScreen onStart={() => setAppStatus('creating')} />;
+        return <WelcomeScreen onStart={campaignService.startNewCampaignCreation} />;
       case 'selecting':
-        return <CampaignSelector campaigns={campaigns} onSelect={handleSelectCampaign} onDelete={handleDeleteCampaign} onCreateNew={() => setAppStatus('creating')} />;
+        return <CampaignSelector campaigns={campaigns} onSelect={campaignService.selectCampaign} onDelete={campaignService.deleteCampaign} onCreateNew={campaignService.startNewCampaignCreation} />;
       case 'creating':
-        return <CampaignCreator onCreateCampaign={handleCreateCampaign} />;
+        return <CampaignCreator onCreateCampaign={(title, setting) => {
+            campaignService.createCampaign(title, setting);
+            setActiveView('setting');
+        }} />;
       case 'editing':
         if (activeCampaign) {
           return (
@@ -757,7 +229,7 @@ const App: React.FC = () => {
                   }
                 }}
                 onShowGenerator={(type) => { resetSelections(); setActiveGenerator(type); }}
-                onReorderScene={handleReorderScene}
+                onReorderScene={campaignService.reorderScene}
               />
               <main className="flex-1 overflow-hidden">
                 {renderMainContent()}
@@ -765,7 +237,7 @@ const App: React.FC = () => {
             </div>
           );
         }
-        return <CampaignSelector campaigns={campaigns} onSelect={handleSelectCampaign} onDelete={handleDeleteCampaign} onCreateNew={() => setAppStatus('creating')} />;
+        return <CampaignSelector campaigns={campaigns} onSelect={campaignService.selectCampaign} onDelete={campaignService.deleteCampaign} onCreateNew={campaignService.startNewCampaignCreation} />;
       default:
         return null;
     }
@@ -780,9 +252,9 @@ const App: React.FC = () => {
                 onToggleMockMode={() => setIsMockMode(p => !p)}
                 onToggleCoach={() => setIsCoachOpen(p => !p)}
                 onToggleWizard={() => setIsWizardOpen(p => !p)}
-                onSaveCampaign={handleSaveCampaign}
-                onSwitchCampaign={() => { setActiveCampaignId(null); setAppStatus('selecting'); }}
-                onCreateNew={() => { setActiveCampaignId(null); setAppStatus('creating'); }}
+                onSaveCampaign={campaignService.saveCampaign}
+                onSwitchCampaign={campaignService.switchToCampaignSelector}
+                onCreateNew={campaignService.prepareNewCampaign}
                 onImportCampaign={handleImportCampaign}
                 onShowExportModal={() => setIsExportModalOpen(true)}
             />
@@ -792,7 +264,10 @@ const App: React.FC = () => {
             <DmCoach campaign={activeCampaign} onClose={() => setIsCoachOpen(false)} isMockMode={isMockMode} />
         )}
          {isWizardOpen && activeCampaign && (
-            <EvocationWizard campaign={activeCampaign} onClose={() => setIsWizardOpen(false)} onAddToCampaign={handleBatchAddToCampaign} isMockMode={isMockMode} />
+            <EvocationWizard campaign={activeCampaign} onClose={() => setIsWizardOpen(false)} onAddToCampaign={(data) => {
+                campaignService.batchAddToCampaign(data);
+                setIsWizardOpen(false);
+            }} isMockMode={isMockMode} />
         )}
          {isExportModalOpen && activeCampaign && (
             <ExportModal 
@@ -809,6 +284,12 @@ const App: React.FC = () => {
 // --- Helper Components ---
 const CampaignSettingEditor = ({ campaign, onUpdate }: { campaign: Campaign, onUpdate: (data: Partial<Campaign>) => void }) => {
     const [setting, setSetting] = useState(campaign.setting);
+    
+    // Ensure local state updates if the underlying campaign object changes
+    useEffect(() => {
+        setSetting(campaign.setting);
+    }, [campaign.setting]);
+
     return (
         <div className="p-8 h-full overflow-y-auto custom-scrollbar">
             <h1 className="text-3xl font-bold font-serif mb-2 text-slate-100">Campaign Setting</h1>

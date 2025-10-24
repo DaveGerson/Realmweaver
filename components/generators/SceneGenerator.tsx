@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Scene } from '../../types';
+import type { Scene } from '../../types/index';
 import { generateScene } from '../../services/geminiService';
 import { Icons } from '../Icons';
 import { Button } from '../common/Button';

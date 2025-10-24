@@ -1,6 +1,5 @@
-
 import React, { useMemo, useState } from 'react';
-import type { Adventure, Campaign } from '../types';
+import type { Adventure, Campaign } from '../types/index';
 import { Button } from './common/Button';
 import { Clipboard, Check } from 'lucide-react';
 

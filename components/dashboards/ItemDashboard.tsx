@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Item } from '../../types';
+import type { Item } from '../../types/index';
 import { ItemGenerator } from '../generators/ItemGenerator';
 import { Icons } from '../Icons';
 

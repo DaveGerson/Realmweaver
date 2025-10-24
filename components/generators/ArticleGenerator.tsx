@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Article } from '../../types';
+import type { Article } from '../../types/index';
 import { generateArticle } from '../../services/geminiService';
 import { Icons } from '../Icons';
 import { Button } from '../common/Button';

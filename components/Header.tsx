@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Icons } from './Icons';
-import type { Campaign } from '../types';
+import type { Campaign } from '../types/index';
 
 interface HeaderProps {
   activeCampaign: Campaign | null;

@@ -1,5 +1,6 @@
+
 import { Type } from "@google/genai";
-import type { NPC, Location, Faction, Item, Scene, SkillCheck, AdventureForBatchAdd, Article, PointOfInterest } from '../../types';
+import type { NPC, Location, Faction, Item, Scene, SkillCheck, AdventureForBatchAdd, Article, PointOfInterest } from '../../types/index';
 import { generateWithSchema } from './core';
 
 // --- Schemas for consistent JSON output ---

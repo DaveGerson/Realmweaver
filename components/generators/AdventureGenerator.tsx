@@ -1,8 +1,9 @@
+
 import React, { useState } from 'react';
 import { generateAdventure } from '../../services/geminiService';
 import { Icons } from '../Icons';
 import { Button } from '../common/Button';
-import type { AdventureForBatchAdd } from '../../types';
+import type { AdventureForBatchAdd } from '../../types/index';
 
 interface AdventureGeneratorProps {
   onAdventureCreated: (adventureData: AdventureForBatchAdd) => void;
