@@ -2,7 +2,7 @@
 import React from 'react';
 import type { PlayerCharacter } from '../../types/index';
 import { PlayerCharacterImporter } from '../generators/PlayerCharacterImporter';
-import { Icons } from '../Icons';
+import { Icons } from '../common/Icons';
 
 interface PlayerCharacterDashboardProps {
   playerCharacters: PlayerCharacter[];

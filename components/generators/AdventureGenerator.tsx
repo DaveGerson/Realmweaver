@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { generateAdventure } from '../../services/geminiService';
-import { Icons } from '../Icons';
+import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import type { AdventureForBatchAdd } from '../../types/index';
 

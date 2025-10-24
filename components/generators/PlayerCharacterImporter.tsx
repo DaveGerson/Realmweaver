@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { Icons } from '../Icons';
+import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 
 interface PlayerCharacterImporterProps {

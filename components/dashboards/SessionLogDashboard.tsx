@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import type { SessionLog } from '../../types/index';
-import { Icons } from '../Icons';
+import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 
 interface SessionLogDashboardProps {

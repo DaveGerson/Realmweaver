@@ -1,7 +1,8 @@
+
 import React, { useState } from 'react';
 import type { Location } from '../../types/index';
 import { generateLocation } from '../../services/geminiService';
-import { Icons } from '../Icons';
+import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 
 interface LocationGeneratorProps {

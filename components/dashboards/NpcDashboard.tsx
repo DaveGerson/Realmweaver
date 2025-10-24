@@ -1,7 +1,8 @@
+
 import React from 'react';
 import type { NPC } from '../../types/index';
 import { NpcGenerator } from '../generators/NpcGenerator';
-import { Icons } from '../Icons';
+import { Icons } from '../common/Icons';
 
 interface NpcDashboardProps {
   npcs: NPC[];

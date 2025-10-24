@@ -1,7 +1,8 @@
+
 import React from 'react';
 import type { Faction } from '../../types/index';
 import { FactionGenerator } from '../generators/FactionGenerator';
-import { Icons } from '../Icons';
+import { Icons } from '../common/Icons';
 
 interface FactionDashboardProps {
   factions: Faction[];
