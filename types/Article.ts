@@ -1,3 +1,4 @@
+
 // types/Article.ts
 export type ArticleCategory = 'lore' | 'history' | 'cosmology';
 
@@ -8,4 +9,5 @@ export interface Article {
   content: string;
   parentArticleId?: string;
   subArticleIds: string[];
+  relatedEntityIds?: string[]; // IDs of NPCs, Locations, Factions, Items linked to this lore
 }

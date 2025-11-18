@@ -1,3 +1,5 @@
+
+
 import type { Campaign, NPC, Location, Item, Scene, Faction, BatchAddData, Article, PlayerCharacter } from './types/index';
 import { 
     generateNpc, 
@@ -159,6 +161,15 @@ const testCampaignHandlers = async (isMockMode: boolean) => {
         const parentArticle = findArticleByTitle('Test Article');
         success &&= testLog(!!(parentArticle && parentArticle.subArticleIds.includes(subArticleId)), '4c. Article Hierarchy Update', 'Article hierarchy update failed');
         
+        // Active Scene Test
+        const firstSceneId = adventure?.scenes[0].id;
+        if (firstSceneId) {
+            testService.setActiveScene(firstSceneId);
+            success &&= testLog(getActiveCampaign()?.activeSceneId === firstSceneId, '4d. Set Active Scene', 'Active Scene not set');
+            testService.setActiveScene(null);
+            success &&= testLog(getActiveCampaign()?.activeSceneId === undefined, '4e. Unset Active Scene', 'Active Scene not unset');
+        }
+
         if (sunkenTemple && tidalChamber) {
             const parentIdBefore = sunkenTemple.parentLocationId;
             
@@ -183,7 +194,7 @@ const testCampaignHandlers = async (isMockMode: boolean) => {
             
             success &&= testLog(
                 stateWasUnchanged && correctErrorWasLogged,
-                '4d. Location Circular Dependency Prevention',
+                '4f. Location Circular Dependency Prevention',
                 `Location circular dependency prevention failed. State changed: ${!stateWasUnchanged}, Error logged: ${correctErrorWasLogged}`
             );
         }

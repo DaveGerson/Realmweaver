@@ -1,3 +1,4 @@
+
 # Welcome to RealmWeaver!
 
 <p align="center">
@@ -28,7 +29,7 @@ Click **"Weave Campaign"**, and you'll be taken to the main editor interface.
 The editor is divided into a few key areas:
 - **Campaign Sidebar (Left):** This is your campaign's table of contents. It's where you'll find all your NPCs, locations, adventures, and items, neatly organized.
 - **Main Editor (Center):** This is your primary workspace. It's where you'll edit the details of your world and use the AI to generate new content.
-- **Header (Top):** From here, you can access powerful tools like the DM Coach and Evocation Wizard.
+- **Header (Top):** From here, you can access powerful tools like the Session Weaver and Evocation Wizard.
 
 ---
 
@@ -54,10 +55,12 @@ You can generate Locations, Factions, and Items using the same simple process! A
 
 ## 📖 Crafting Your Story: Adventures & Scenes
 
-A world is just a stage; adventures are the play.
+A world is just a stage; adventures are the play. RealmWeaver defines these terms precisely to help you structure your prep:
 
-### Adventures and Scenes
-In RealmWeaver, an **Adventure** is like a folder for your story arc. Inside, you create **Scenes**, which are the individual encounters or story beats.
+*   **Adventure:** A collection of Scenes that form a complete narrative arc or storyline.
+*   **Scene:** A component part of an Adventure. It represents a distinct unit of gameplay—a specific location, event, or interaction (e.g., a social negotiation, a puzzle room, or a combat scenario).
+
+### Creating Adventures and Scenes
 
 1.  **Create an Adventure:** Click the `+` next to "Adventures" in the sidebar to create a new story arc. Give it a title and a target level for your players.
 2.  **Generate a Scene:** Click the `+` that appears when you hover over your new adventure. This is where you can generate the core of your gameplay.
@@ -76,13 +79,27 @@ Tired of copying and pasting everything into a separate notes app? You don't hav
 
 ---
 
-## 🎲 Your In-Session Assistant: The DM Coach
+## ⚔️ Running the Game: Combat Tracker & Session Weaver
 
-Players have a knack for doing the unexpected. When they go off-script, the DM Coach has your back. Access it from the header at the top of the screen.
+When the dice start rolling, you need tools to manage the chaos.
+
+### Active Scenes
+Mark a specific Scene as "Active" using the **"Start Session Here"** button in the scene editor. This tells RealmWeaver exactly where the party is, allowing the Session Weaver to give you highly relevant, context-aware assistance.
+
+### Combat Tracker (The Encounter State)
+While a **Scene** describes the *setup* for a fight, the **Combat Tracker** manages the **Encounter**—the live, mechanical state of D&D 5e combat.
+- Access it via the sidebar under **Session Tools**.
+- Track **Initiative order**, current **HP**, and rounds.
+- Add PCs and NPCs directly from your campaign roster or create generic monsters on the fly.
+
+### The Session Weaver (formerly DM Coach)
+Players have a knack for doing the unexpected. When they go off-script, the Session Weaver has your back. Access it from the header at the top of the screen.
+
+The Session Weaver is aware of your **Active Scene**, your **Campaign Notes**, and the **Lore** relevant to the current location.
 
 - **Narrator:** Need to describe a location on the fly? Type "Describe a bustling fantasy marketplace" and get beautiful, read-aloud text instantly.
 - **Improviser:** Did your players just try to adopt the goblin you planned for them to fight? Type that in and get instant, creative ideas for consequences and future plot hooks.
-- **Rollable Table:** Need a quick table for random tavern patrons or items in a wizard's pocket? The coach can whip one up for you in seconds.
+- **Rollable Table:** Need a quick table for random tavern patrons or items in a wizard's pocket? The Weaver can whip one up for you in seconds.
 - **Low-Latency Mode:** Need a super-fast response during a session? Flick this toggle on to use a faster AI model, perfect for in-the-moment improvisation.
 
 ---

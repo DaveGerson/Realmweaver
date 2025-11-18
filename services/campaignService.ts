@@ -1,4 +1,5 @@
 
+
 import { produce } from 'immer';
 import type { 
     Campaign, 
@@ -13,7 +14,8 @@ import type {
     SessionLog,
     PlayerCharacter,
     BatchAddData,
-    Note
+    Note,
+    Encounter
 } from '../types/index';
 import { importCampaignFromJson } from './importExportService';
 import { parseCharacterSheetPdf } from './geminiService';
@@ -182,6 +184,14 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         }
     };
 
+    const _removeEntityFromArticles = (draftCampaign: Campaign, entityId: string) => {
+        draftCampaign.articles.forEach(article => {
+            if (article.relatedEntityIds) {
+                article.relatedEntityIds = article.relatedEntityIds.filter(id => id !== entityId);
+            }
+        });
+    };
+
 
     const service = {
         // --- Store subscription & state access ---
@@ -212,7 +222,9 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                             ...c,
                             notes: c.notes || [],
                             sessionLogs: c.sessionLogs || [],
-                            playerCharacters: c.playerCharacters || []
+                            playerCharacters: c.playerCharacters || [],
+                            // Ensure activeEncounter is initialized if missing in older saves
+                            activeEncounter: c.activeEncounter || { id: crypto.randomUUID(), round: 1, turnIndex: 0, combatants: [] }
                         }));
 
                         if (savedActiveId && draft.campaigns.some(c => c.id === savedActiveId)) {
@@ -244,7 +256,21 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         },
         createCampaign(title: string, setting: string) {
             updateState(draft => {
-                const newCampaign: Campaign = { id: crypto.randomUUID(), title, setting, articles: [], adventures: [], npcs: [], locations: [], factions: [], items: [], sessionLogs: [], playerCharacters: [], notes: [] };
+                const newCampaign: Campaign = { 
+                    id: crypto.randomUUID(), 
+                    title, 
+                    setting, 
+                    articles: [], 
+                    adventures: [], 
+                    npcs: [], 
+                    locations: [], 
+                    factions: [], 
+                    items: [], 
+                    sessionLogs: [], 
+                    playerCharacters: [], 
+                    notes: [],
+                    activeEncounter: { id: crypto.randomUUID(), round: 1, turnIndex: 0, combatants: [] }
+                };
                 draft.campaigns.push(newCampaign);
                 draft.activeCampaignId = newCampaign.id;
                 draft.appStatus = 'editing';
@@ -287,6 +313,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     importedCampaign.notes = importedCampaign.notes || [];
                     importedCampaign.sessionLogs = importedCampaign.sessionLogs || [];
                     importedCampaign.playerCharacters = importedCampaign.playerCharacters || [];
+                    importedCampaign.activeEncounter = importedCampaign.activeEncounter || { id: crypto.randomUUID(), round: 1, turnIndex: 0, combatants: [] };
                     
                     draft.campaigns.push(importedCampaign);
                     draft.activeCampaignId = null;
@@ -310,6 +337,15 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             updateState(draft => { draft.activeCampaignId = null; draft.appStatus = 'selecting'; }); 
         },
         prepareNewCampaign() { _internalUpdate(draft => { draft.activeCampaignId = null; draft.appStatus = 'creating'; }); },
+        
+        setActiveScene(sceneId: string | null) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (campaign) {
+                    campaign.activeSceneId = sceneId || undefined;
+                }
+            });
+        },
 
         // --- Entity Actions (Creators return the new ID for selection) ---
         createNpc(newNpcData: Omit<NPC, 'id'>) {
@@ -352,6 +388,9 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 // Unlink from faction
                 _synchronizeNpcFactionLink(campaign, id, npcToDelete.factionId, undefined);
                 
+                // Cleanup article references
+                _removeEntityFromArticles(campaign, id);
+
                 // Remove from NPC list
                 campaign.npcs.splice(npcIndex, 1);
                 
@@ -414,6 +453,9 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     if (child) child.parentLocationId = undefined;
                 });
                 
+                // Cleanup article references
+                _removeEntityFromArticles(campaign, id);
+
                 // Remove the location
                 campaign.locations.splice(locIndex, 1);
                 
@@ -452,6 +494,14 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     const npc = campaign.npcs.find(n => n.id === npcId);
                     if (npc) npc.factionId = undefined;
                 });
+                
+                // Cleanup Location control references
+                campaign.locations.forEach(loc => {
+                    if (loc.controllingFactionId === id) loc.controllingFactionId = undefined;
+                });
+
+                // Cleanup article references
+                _removeEntityFromArticles(campaign, id);
                 
                 // Remove faction
                 campaign.factions = campaign.factions.filter(f => f.id !== id);
@@ -694,6 +744,15 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 const campaign = getActiveCampaignFromState(draft);
                 if (campaign) {
                     campaign.notes = (campaign.notes || []).filter(n => n.id !== id);
+                }
+            });
+        },
+
+        updateEncounter(updatedEncounter: Encounter) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (campaign) {
+                    campaign.activeEncounter = updatedEncounter;
                 }
             });
         },

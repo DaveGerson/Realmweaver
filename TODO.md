@@ -1,3 +1,4 @@
+
 # RealmWeaver Roadmap & TODO
 
 This document outlines key user stories and technical tasks to guide the future development of RealmWeaver.
@@ -7,7 +8,7 @@ This document outlines key user stories and technical tasks to guide the future 
 ## 1. Data Model: Worldbuilding & Entities
 **Goal:** Deepen the simulation of the world by expanding how entities are defined and related.
 
-### 1.1. Dynamic Entity Relationships
+### 1.1. Dynamic Entity Relationships (Bi-Directional Graph)
 **As a GM, I want to define specific relationships between NPCs (e.g., "Sibling", "Rival", "Debtor") so that the social web of my campaign is explicit and queryable.**
 - [ ] Update `NPC` type to include a `relationships` array (targetId, type, description).
 - [ ] Update `Faction` type to track standing/reputation with other factions.
@@ -47,12 +48,11 @@ This document outlines key user stories and technical tasks to guide the future 
 ## 2. Context Integration: Data Model into DM Coach
 **Goal:** Make the AI smarter by feeding it the *right* data at the *right* time.
 
-### 2.1. Location-Aware Context Injection
-**As a GM, when I ask the Coach to "Describe the room", I want it to automatically know which Location and Scene I am currently running without me pasting it in.**
-- [ ] Track `activeSceneId` and `activeLocationId` in the global application state.
-- [ ] Update `geminiService` to look up the active entity objects before sending the prompt.
-- [ ] Feed the "Read Aloud" text of the current scene into the system prompt as "Current Context".
-- [ ] If inside a sub-location, recursively inject parent location descriptions.
+### 2.1. Semantic Search & Vector Database (Major Gap)
+**As a GM, I want the Coach to answer questions about obscure lore written months ago without me manually selecting it.**
+- [ ] *Architectural Consideration:* The current context injection relies on user selection. This is limiting.
+- [ ] Implement a client-side vector store (like `transformers.js` embeddings or a lightweight vector DB) to index all Articles, Descriptions, and Logs.
+- [ ] When the user chats with the Coach, semantic search retrieves the most relevant chunks of text from the entire campaign and injects them into the context window.
 
 ### 2.2. @Mention Entity Referencing
 **As a GM, I want to type "@NPCName" in the chat to force the AI to look up that specific entity's details and use them in the answer.**

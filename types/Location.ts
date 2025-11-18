@@ -1,3 +1,4 @@
+
 // types/Location.ts
 export interface LocationConnection {
   id: string;
@@ -36,4 +37,5 @@ export interface Location {
   subLocationIds: string[];
   connections?: LocationConnection[];
   pointsOfInterest?: PointOfInterest[];
+  controllingFactionId?: string; // The faction that controls or influences this area
 }

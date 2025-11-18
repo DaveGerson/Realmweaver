@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo, useSyncExternalStore } from 'react';
 import type { Campaign, Adventure, NPC, Location, Faction, Item, Scene, Article, SessionLog, PlayerCharacter, Note } from './types/index';
 import { WelcomeScreen } from './components/views/WelcomeScreen';
@@ -19,6 +20,8 @@ import { SessionLogEditor } from './components/editors/SessionLogEditor';
 import { PlayerCharacterEditor } from './components/editors/PlayerCharacterEditor';
 import { NoteEditor } from './components/editors/NoteEditor';
 import { CampaignSettingEditor } from './components/editors/CampaignSettingEditor';
+import { CombatTracker } from './components/tools/CombatTracker';
+import { RelationshipGraph } from './components/visualizers/RelationshipGraph'; // Import the graph
 import { ContentWrapper } from './components/layout/ContentWrapper';
 import { DmCoach } from './components/dialogs/DmCoach';
 import { EvocationWizard } from './components/dialogs/EvocationWizard';
@@ -36,7 +39,7 @@ import { NoteDashboard } from './components/dashboards/NoteDashboard';
 import { campaignService } from './services/campaignService';
 
 
-export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'notes';
+export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'notes' | 'combat' | 'relationships';
 export type GeneratorType = 'npc' | 'location' | 'faction' | 'item' | 'scene' | 'article';
 
 const App: React.FC = () => {
@@ -130,6 +133,102 @@ const App: React.FC = () => {
   const selectedPlayerCharacter = useMemo(() => activeCampaign?.playerCharacters?.find(p => p.id === selectedPlayerCharacterId) || null, [activeCampaign, selectedPlayerCharacterId]);
   const selectedNote = useMemo(() => activeCampaign?.notes?.find(n => n.id === selectedNoteId) || null, [activeCampaign, selectedNoteId]);
   
+  // --- Context Construction for Session Weaver ---
+  const currentContext = useMemo(() => {
+      if (!activeCampaign) return '';
+      let context = `Campaign: ${activeCampaign.title}\nSetting: ${activeCampaign.setting}\n\n`;
+
+      // Helper to append related lore to context
+      const appendRelatedLore = (entityId: string) => {
+          const relatedArticles = activeCampaign.articles.filter(a => a.relatedEntityIds?.includes(entityId));
+          if (relatedArticles.length > 0) {
+              context += `\nRELEVANT LORE:\n`;
+              relatedArticles.forEach(article => {
+                  context += `- ${article.title} (${article.category}): ${article.content.substring(0, 300)}${article.content.length > 300 ? '...' : ''}\n`;
+              });
+              context += `\n`;
+          }
+      };
+
+      // 1. ACTIVE SESSION STATE (Primary Context)
+      if (activeCampaign.activeSceneId) {
+         let activeScene: Scene | undefined;
+         let activeAdventure: Adventure | undefined;
+         // Find scene and adventure
+         for (const adv of activeCampaign.adventures) {
+             const s = adv.scenes.find(s => s.id === activeCampaign.activeSceneId);
+             if (s) {
+                 activeScene = s;
+                 activeAdventure = adv;
+                 break;
+             }
+         }
+         
+         if (activeScene && activeAdventure) {
+             context += `--- CURRENT SESSION STATUS ---\n`;
+             context += `The party is actively playing the scene "${activeScene.title}" in the adventure "${activeAdventure.title}".\n`;
+             context += `Scene Type: ${activeScene.type}\n`;
+             if (activeScene.readAloudText) context += `Description: "${activeScene.readAloudText}"\n`;
+             if (activeScene.gmNotes) context += `GM Notes: ${activeScene.gmNotes}\n`;
+             
+             // Active Location Context
+             if (activeScene.locationId) {
+                 const loc = activeCampaign.locations.find(l => l.id === activeScene.locationId);
+                 if (loc) {
+                     context += `Current Location: ${loc.name}. ${loc.description}\n`;
+                     appendRelatedLore(loc.id);
+                 }
+             }
+             
+             // Active NPCs Context
+             if (activeScene.npcIds.length > 0) {
+                 const npcs = activeCampaign.npcs.filter(n => activeScene!.npcIds.includes(n.id));
+                 context += `NPCs Present: ${npcs.map(n => `${n.name} (${n.traits})`).join('; ')}\n`;
+                 npcs.forEach(n => appendRelatedLore(n.id));
+             }
+             context += `\n`;
+         }
+      }
+
+      // 2. CAMPAIGN NOTES (Secondary Context)
+      if (activeCampaign.notes.length > 0) {
+          context += `--- RECENT CAMPAIGN NOTES ---\n`;
+          // Include top 5 most recently modified notes to fit in context window
+          const recentNotes = [...activeCampaign.notes]
+              .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime())
+              .slice(0, 5);
+          
+          recentNotes.forEach(n => {
+              context += `[Note: ${n.title}]: ${n.content.substring(0, 200)}${n.content.length > 200 ? '...' : ''}\n`;
+          });
+          context += `\n`;
+      }
+
+      // 3. CURRENT EDITOR SELECTION (User Focus)
+      // If the user is viewing something *different* than the active scene, give context on that too.
+      let selectionContext = '';
+      if (selectedScene && selectedAdventure && selectedScene.id !== activeCampaign.activeSceneId) {
+          selectionContext += `USER IS VIEWING SCENE: "${selectedScene.title}" (Adventure: ${selectedAdventure.title})\n`;
+          if (selectedScene.gmNotes) selectionContext += `Notes: ${selectedScene.gmNotes}\n`;
+      } else if (selectedLocation) {
+          selectionContext += `USER IS VIEWING LOCATION: "${selectedLocation.name}"\n`;
+          if (selectedLocation.description) selectionContext += `Desc: ${selectedLocation.description}\n`;
+      } else if (selectedNpc) {
+          selectionContext += `USER IS VIEWING NPC: "${selectedNpc.name}"\n`;
+          if (selectedNpc.traits) selectionContext += `Traits: ${selectedNpc.traits}\n`;
+      } else if (selectedFaction) {
+           selectionContext += `USER IS VIEWING FACTION: "${selectedFaction.name}"\n`;
+           if (selectedFaction.goals) selectionContext += `Goals: ${selectedFaction.goals}\n`;
+      }
+
+      if (selectionContext) {
+          context += `--- CURRENT USER FOCUS ---\n${selectionContext}`;
+      }
+
+      return context;
+  }, [activeCampaign, activeCampaign?.activeSceneId, activeCampaign?.notes, selectedScene, selectedAdventure, selectedLocation, selectedNpc, selectedFaction]);
+
+
   const handleSelectView = (view: EditorView) => {
     setActiveView(view);
     resetSelections();
@@ -176,11 +275,11 @@ const App: React.FC = () => {
       if (selectedPlayerCharacter) return <PlayerCharacterEditor pc={selectedPlayerCharacter} onUpdate={campaignService.updatePlayerCharacter} onDelete={(id) => { campaignService.deletePlayerCharacter(id); resetSelections(); }} />;
       if (selectedSessionLog) return <SessionLogEditor log={selectedSessionLog} onUpdate={campaignService.updateSessionLog} onDelete={(id) => { campaignService.deleteSessionLog(id); resetSelections(); }} />;
       if (selectedNote) return <NoteEditor note={selectedNote} onUpdate={campaignService.updateNote} onDelete={(id) => { campaignService.deleteNote(id); resetSelections(); }} isMockMode={isMockMode} />;
-      if (selectedScene && selectedAdventure) return <SceneEditor scene={selectedScene} allNpcs={activeCampaign.npcs} allLocations={activeCampaign.locations} onUpdate={(id, data) => campaignService.updateScene(selectedAdventure.id, id, data)} onDelete={(id) => { campaignService.deleteScene(selectedAdventure.id, id); setSelectedSceneId(null); }} isMockMode={isMockMode} />;
+      if (selectedScene && selectedAdventure) return <SceneEditor scene={selectedScene} allNpcs={activeCampaign.npcs} allLocations={activeCampaign.locations} onUpdate={(id, data) => campaignService.updateScene(selectedAdventure.id, id, data)} onDelete={(id) => { campaignService.deleteScene(selectedAdventure.id, id); setSelectedSceneId(null); }} isMockMode={isMockMode} isActiveScene={activeCampaign.activeSceneId === selectedScene.id} onSetActive={campaignService.setActiveScene} />;
       if (selectedAdventure) return <AdventureEditor adventure={selectedAdventure} campaign={activeCampaign} onUpdate={campaignService.updateAdventure} />;
-      if (selectedArticle) return <ArticleEditor article={selectedArticle} allArticles={activeCampaign.articles} onUpdate={campaignService.updateArticle} onDelete={(id) => { campaignService.deleteArticle(id); resetSelections(); }} isMockMode={isMockMode} />;
+      if (selectedArticle) return <ArticleEditor article={selectedArticle} allArticles={activeCampaign.articles} allNpcs={activeCampaign.npcs} allLocations={activeCampaign.locations} allFactions={activeCampaign.factions} onUpdate={campaignService.updateArticle} onDelete={(id) => { campaignService.deleteArticle(id); resetSelections(); }} isMockMode={isMockMode} />;
       if (selectedNpc) return <NpcEditor npc={selectedNpc} factions={activeCampaign.factions} onUpdate={campaignService.updateNpc} onDelete={(id) => { campaignService.deleteNpc(id); resetSelections(); }} isMockMode={isMockMode} />;
-      if (selectedLocation) return <LocationEditor location={selectedLocation} allLocations={activeCampaign.locations} onUpdate={campaignService.updateLocation} onDelete={(id) => { campaignService.deleteLocation(id); resetSelections(); }} isMockMode={isMockMode} />;
+      if (selectedLocation) return <LocationEditor location={selectedLocation} allLocations={activeCampaign.locations} allFactions={activeCampaign.factions} onUpdate={campaignService.updateLocation} onDelete={(id) => { campaignService.deleteLocation(id); resetSelections(); }} isMockMode={isMockMode} />;
       if (selectedFaction) return <FactionEditor faction={selectedFaction} allNpcs={activeCampaign.npcs} onUpdate={campaignService.updateFaction} onDelete={(id) => { campaignService.deleteFaction(id); resetSelections(); }} isMockMode={isMockMode} />;
       if (selectedItem) return <ItemEditor item={selectedItem} onUpdate={campaignService.updateItem} onDelete={(id) => { campaignService.deleteItem(id); resetSelections(); }} isMockMode={isMockMode} />;
 
@@ -257,6 +356,26 @@ const App: React.FC = () => {
             setSelectedArticleId(newId);
         }} onSelectArticle={setSelectedArticleId} isMockMode={isMockMode} />;
 
+      // Combat Tracker View
+      if (activeView === 'combat') {
+        return <CombatTracker 
+            encounter={activeCampaign.activeEncounter || { id: 'default', round: 1, turnIndex: 0, combatants: [] }} 
+            onUpdate={campaignService.updateEncounter} 
+            campaignNpcs={activeCampaign.npcs}
+            campaignPcs={activeCampaign.playerCharacters || []}
+        />;
+      }
+
+      // Relationship Graph View
+      if (activeView === 'relationships') {
+          // We cast the onNodeSelect handler types because RelationshipGraph is generic for "types"
+          // but handleSelect expects specific string literals.
+          return <RelationshipGraph 
+            campaign={activeCampaign} 
+            onNodeSelect={(type, id) => handleSelect(type as any, id)} 
+          />;
+      }
+
       // Fallback to Campaign Setting Editor
       if (activeView === 'setting') {
           return (
@@ -325,10 +444,10 @@ const App: React.FC = () => {
                   }}
                   onReorderScene={campaignService.reorderScene}
                 />
-                <main className="flex-1 overflow-y-auto bg-slate-950 text-slate-100">
+                <main className="flex-1 overflow-y-auto bg-slate-900 text-slate-100 relative">
                   {renderMainContent()}
                 </main>
-                {isCoachOpen && <DmCoach campaign={activeCampaign} onClose={() => setIsCoachOpen(false)} isMockMode={isMockMode} />}
+                {isCoachOpen && <DmCoach campaign={activeCampaign} activeContext={currentContext} onClose={() => setIsCoachOpen(false)} isMockMode={isMockMode} />}
                 {isWizardOpen && <EvocationWizard 
                     campaign={activeCampaign} 
                     onClose={() => setIsWizardOpen(false)} 

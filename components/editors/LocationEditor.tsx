@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import type { Location, LocationConnection, PointOfInterest, PoiInteraction, LootItem } from '../../types/index';
+import type { Location, LocationConnection, PointOfInterest, PoiInteraction, LootItem, Faction } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
@@ -9,6 +9,7 @@ import { generateEnhancedText, generatePoiFromLoot } from '../../services/gemini
 interface LocationEditorProps {
   location: Location;
   allLocations: Location[]; // To select a parent
+  allFactions?: Faction[]; // To select controlling faction
   onUpdate: (id: string, updatedData: Partial<Location>) => void;
   onDelete: (id: string) => void;
   isMockMode: boolean;
@@ -16,7 +17,7 @@ interface LocationEditorProps {
 
 type GenerationField = 'description' | 'secrets';
 
-export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLocations, onUpdate, onDelete, isMockMode }) => {
+export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLocations, allFactions = [], onUpdate, onDelete, isMockMode }) => {
   const [formData, setFormData] = useState(location);
   const [isGenerating, setIsGenerating] = useState<GenerationField | null>(null);
   const [generatingPoiFor, setGeneratingPoiFor] = useState<string | null>(null);
@@ -41,6 +42,13 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     const newParentId = value === "none" ? undefined : value;
     setFormData(prev => ({ ...prev, [name]: newParentId }));
     onUpdate(location.id, { [name]: newParentId });
+  };
+  
+  const handleFactionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const { value } = e.target;
+    const newFactionId = value === "none" ? undefined : value;
+    setFormData(prev => ({ ...prev, controllingFactionId: newFactionId }));
+    onUpdate(location.id, { controllingFactionId: newFactionId });
   };
   
   const handleAiGenerate = async (field: GenerationField) => {
@@ -345,6 +353,13 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                     {possibleParents.map(loc => (<option key={loc.id} value={loc.id}>{loc.name}</option>))}
                 </select>
             </div>
+             <div>
+                <label className="block text-sm font-medium text-slate-400 mb-1.5">Controlling Faction</label>
+                <select name="controllingFactionId" value={formData.controllingFactionId || "none"} onChange={handleFactionChange} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all">
+                    <option value="none">-- None --</option>
+                    {allFactions.map(f => (<option key={f.id} value={f.id}>{f.name}</option>))}
+                </select>
+            </div>
             <div>
                  <label className="block text-sm font-medium text-slate-400 mb-1.5">Sub-Locations</label>
                  {subLocations.length > 0 ? (<ul className="list-disc list-inside text-slate-300 text-sm space-y-1 mt-2 pl-2">{subLocations.map(loc => <li key={loc.id}>{loc.name}</li>)}</ul>) : (<p className="text-sm text-slate-500 italic mt-2">No sub-locations assigned.</p>)}
@@ -358,7 +373,6 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     </div>
   );
 };
-
 
 // --- Point of Interest Sub-Component ---
 interface PointOfInterestEditorProps {

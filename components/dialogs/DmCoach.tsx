@@ -11,11 +11,12 @@ type CoachTool = 'narrate' | 'improvise' | 'table';
 
 interface DmCoachProps {
   campaign: Campaign;
+  activeContext?: string;
   onClose: () => void;
   isMockMode: boolean;
 }
 
-export const DmCoach: React.FC<DmCoachProps> = ({ campaign, onClose, isMockMode }) => {
+export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClose, isMockMode }) => {
     const [activeTool, setActiveTool] = useState<CoachTool>('narrate');
     const [prompt, setPrompt] = useState('');
     const [result, setResult] = useState<string | RollableTable | null>(null);
@@ -58,7 +59,7 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, onClose, isMockMode 
         setError(null);
         setResult(null);
 
-        const campaignContext = `Campaign Title: ${campaign.title}\nSetting: ${campaign.setting}\n`;
+        const campaignContext = `Campaign Title: ${campaign.title}\nSetting: ${campaign.setting}\n\n${activeContext || ''}`;
 
         try {
             const resultData = await currentTool.action(prompt, campaignContext, useLiteModel, isMockMode);
@@ -83,7 +84,7 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, onClose, isMockMode 
             <header className="flex items-center justify-between p-4 border-b border-slate-800 flex-shrink-0">
                 <div className="flex items-center gap-3">
                     <Icons.Coach className="w-6 h-6 text-indigo-400" />
-                    <h2 className="text-lg font-bold font-serif">DM Coach</h2>
+                    <h2 className="text-lg font-bold font-serif">Session Weaver</h2>
                 </div>
                  <div className="flex items-center gap-3">
                     <span className={`text-xs font-medium ${useLiteModel ? 'text-green-400' : 'text-slate-500'}`}>
@@ -134,6 +135,14 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, onClose, isMockMode 
             </div>
 
             <div className="flex-1 flex flex-col p-4 pt-0 overflow-y-auto custom-scrollbar">
+                {/* Active Context Hint */}
+                {activeContext && (
+                     <div className="mb-4 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-md text-xs text-indigo-300">
+                        <span className="font-bold uppercase tracking-wider block mb-1">Active Context:</span> 
+                        <span className="line-clamp-3">{activeContext.split('\n').filter(line => !line.startsWith('Campaign:') && !line.startsWith('Setting:')).join(' ')}</span>
+                     </div>
+                )}
+
                 <div className="space-y-4">
                     <div>
                         <h3 className="text-md font-semibold font-serif text-slate-200">{currentTool.title}</h3>

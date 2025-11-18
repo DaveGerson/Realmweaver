@@ -145,10 +145,10 @@ export const Header: React.FC<HeaderProps> = ({
            <button 
               onClick={onToggleCoach} 
               className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-indigo-500 rounded-md p-1 -m-1"
-              aria-label="Toggle DM Coach"
+              aria-label="Toggle Session Weaver"
             >
             <Icons.Coach className="w-5 h-5 text-indigo-400" />
-            <span>DM Coach</span>
+            <span>Session Weaver</span>
           </button>
           <div className="flex items-center gap-3">
               <span className={`text-xs font-medium ${isMockMode ? 'text-indigo-400' : 'text-slate-500'}`}>

@@ -14,3 +14,4 @@ export * from './Evocation';
 export * from './SessionLog';
 export * from './PlayerCharacter';
 export * from './Note';
+export * from './Encounter';

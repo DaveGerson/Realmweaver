@@ -13,11 +13,13 @@ interface SceneEditorProps {
   onUpdate: (id: string, updatedData: Partial<Scene>) => void;
   onDelete: (id: string) => void;
   isMockMode: boolean;
+  isActiveScene?: boolean;
+  onSetActive?: (id: string | null) => void;
 }
 
 const sceneTypeOptions: SceneType[] = ['combat', 'social', 'exploration', 'puzzle'];
 
-export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLocations, onUpdate, onDelete, isMockMode }) => {
+export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLocations, onUpdate, onDelete, isMockMode, isActiveScene, onSetActive }) => {
   const [formData, setFormData] = useState(scene);
   const [isGenerating, setIsGenerating] = useState<keyof Omit<Scene, 'id' | 'type' | 'locationId' | 'npcIds' | 'skillChecks'> | null>(null);
 
@@ -107,10 +109,27 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
               <h1 className="text-3xl font-bold font-serif text-slate-100">Scene Editor</h1>
             </div>
         </div>
-        <Button variant="danger" size="sm" onClick={handleDelete}>
-            <Icons.Trash className="w-3.5 h-3.5 mr-2" />
-            Delete Scene
-        </Button>
+        <div className="flex gap-3">
+             {onSetActive && (
+                <Button
+                    variant={isActiveScene ? "primary" : "secondary"}
+                    size="sm"
+                    onClick={() => onSetActive(isActiveScene ? null : scene.id)}
+                    className={isActiveScene ? "ring-2 ring-offset-2 ring-offset-slate-900 ring-indigo-500" : ""}
+                >
+                    {isActiveScene ? (
+                         <>
+                            <Icons.Sparkles className="w-4 h-4 mr-2 animate-pulse" />
+                            Active Session Scene
+                        </>
+                    ) : "Start Session Here"}
+                </Button>
+            )}
+            <Button variant="danger" size="sm" onClick={handleDelete}>
+                <Icons.Trash className="w-3.5 h-3.5 mr-2" />
+                Delete Scene
+            </Button>
+        </div>
       </header>
       
       <div className="space-y-6 bg-slate-900/50 p-6 rounded-xl border border-slate-800/50">

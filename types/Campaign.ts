@@ -9,6 +9,7 @@ import type { Article } from './Article';
 import type { SessionLog } from './SessionLog';
 import type { PlayerCharacter } from './PlayerCharacter';
 import type { Note } from './Note';
+import type { Encounter } from './Encounter';
 
 export interface Campaign {
   id: string;
@@ -23,4 +24,6 @@ export interface Campaign {
   sessionLogs: SessionLog[];
   playerCharacters: PlayerCharacter[];
   notes: Note[];
+  activeEncounter?: Encounter;
+  activeSceneId?: string; // The ID of the scene currently being played in the session
 }

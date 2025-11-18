@@ -1,3 +1,4 @@
+
 # Technical Design Document: D&D RealmWeaver
 
 ## 1. Introduction
@@ -40,7 +41,7 @@ The project is organized into a modular structure to separate concerns and impro
 │   ├── common/           # Reusable, generic components (Button, AiTextarea)
 │   ├── AdventureEditor.tsx
 │   ├── CampaignSidebar.tsx
-│   ├── DmCoach.tsx         # Slide-out panel for live DM assistance
+│   ├── DmCoach.tsx         # Slide-out panel for live DM assistance (Session Weaver)
 │   ├── EvocationWizard.tsx # Modal for batch content generation
 │   ├── NpcEditor.tsx     # (and other editor components)
 │   ├── NpcGenerator.tsx  # (and other generator components)
@@ -70,7 +71,7 @@ The application employs a centralized state management pattern within the main `
 
 ### 4.1. Single Source of Truth
 
-- The entire campaign's data (NPCs, locations, adventures, etc.) is held in a single state object: `const [campaign, setCampaign] = useState<Campaign | null>(null);`.
+- The entire campaign's data (NPCs, locations, adventures, active scenes, notes, etc.) is held in a single state object: `const [campaign, setCampaign] = useState<Campaign | null>(null);`.
 - This object is the single source of truth for the application. All UI components render based on this state.
 
 ### 4.2. Immutable Updates with Immer
@@ -133,18 +134,40 @@ The interaction with the Gemini API is the core of the application.
 
 ---
 
-## 6. Key Components
+## 6. The Knowledge Graph & Session Weaver
+
+RealmWeaver operates on Graph Design Principles, ensuring entities are interconnected rather than isolated.
+
+### 6.1. Interconnectivity Points
+- **Adventure -> Scene:** Strong hierarchical link.
+- **Scene -> Location/NPC:** Scenes occur at a Location and involve NPCs.
+- **NPC -> Faction:** NPCs belong to factions (`factionId`).
+- **Location -> Faction:** Locations can be controlled/influenced by factions (`controllingFactionId`).
+- **Lore (Article) -> Entities:** Articles can be linked to any number of NPCs, Locations, or Factions (`relatedEntityIds`).
+
+### 6.2. Context Injection (Session Weaver)
+The `App.tsx` component builds a highly rich context string for the `SessionWeaver` (formerly DM Coach). This is critical for ensuring the AI understands the current game state. The context construction follows this priority:
+1.  **Active Session State:** Checks `campaign.activeSceneId`. If set, it injects the current Scene, Adventure, Location, and present NPCs.
+2.  **Campaign Notes:** Injects the most recently modified Campaign Notes to ensure the AI is aware of user-created reminders or plot threads.
+3.  **Current Focus:** If the user is navigating the editor (e.g. editing an Item) while the session is active, that focused item is also added to the context.
+4.  **Relevant Lore:** It recursively scans for Lore Articles linked to any entity currently in the context (Active Location, Active NPCs) and injects their content.
+
+This ensures the AI "knows" the web of relationships surrounding the party at any given moment.
+
+---
+
+## 7. Key Components
 
 - **`App.tsx`:** The root component that manages all campaign state and orchestrates the rendering of different views (welcome screen, campaign creator, main editor).
 - **`CampaignSidebar.tsx`:** Renders the navigation tree for the entire campaign. It displays lists of all entities and handles selection, creation triggers, and scene reordering via drag-and-drop.
 - **Generator Components (`NpcGenerator.tsx`, etc.):** Simple form components responsible for taking a user prompt and initiating the AI generation process via the `geminiService`.
 - **Editor Components (`NpcEditor.tsx`, etc.):** More complex components that display and allow editing of a single entity's data. They manage local form state for input fields and call `onUpdate` props to persist changes to the global state in `App.tsx`. They also feature the "AI-Assist" functionality for enhancing individual text fields.
-- **`DmCoach.tsx`:** A stateful slide-out panel that functions as a separate mini-application. It takes the campaign as context but manages its own state for prompts, results, and the active tool.
+- **`DmCoach.tsx` (Session Weaver):** A stateful slide-out panel that functions as a separate mini-application. It takes the campaign as context but manages its own state for prompts, results, and the active tool.
 - **`EvocationWizard.tsx`:** A complex modal component for batch generation. It has two modes ('simple' and 'detailed') and manages a significant amount of its own state before passing the final, curated `BatchAddData` object to `App.tsx` for integration.
 
 ---
 
-## 7. Testing
+## 8. Testing
 
 - **`smokeTest.ts`:** An automated script (`runSmokeTests`) that can be triggered from the application.
   - **`testServiceFunctions`:** Directly calls each function in `geminiService` to ensure the AI (or mock service) returns data in the expected format.

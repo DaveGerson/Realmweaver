@@ -187,6 +187,12 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                     active={activeView === 'setting'}
                     onClick={() => onSelectView('setting')}
                 />
+                <NavItem
+                    label="World Graph"
+                    icon="Coach" // Reusing the brain/network icon for the graph
+                    active={activeView === 'relationships'}
+                    onClick={() => onSelectView('relationships')}
+                />
                 
                 <div className="space-y-1">
                     <div className="flex items-center justify-between px-3 py-2 group">
@@ -215,41 +221,6 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                                 expandedArticles={expandedArticles}
                                 toggleArticle={toggleArticle}
                             />
-                        ))}
-                    </div>
-                </div>
-
-                {/* Notes Section */}
-                <div className="space-y-1">
-                     <div className="flex items-center justify-between px-3 py-2 group">
-                        <button
-                          onClick={() => onSelectView('notes')}
-                          className={twMerge(
-                            'flex items-center gap-3 text-sm transition-colors w-full',
-                            activeView === 'notes' ? 'text-indigo-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
-                          )}
-                        >
-                          <Icons.Notes className="w-4 h-4" />
-                          <span>Campaign Notes</span>
-                        </button>
-                        <button onClick={() => onSelectView('notes')} className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100">
-                            <Icons.Plus className="w-4 h-4" />
-                        </button>
-                    </div>
-                    <div className="pl-4 border-l border-slate-700 ml-5 space-y-0.5">
-                         {(campaign.notes || []).map(note => (
-                            <button
-                                key={note.id}
-                                onClick={() => onSelect('note', note.id)}
-                                className={twMerge(
-                                    'w-full text-left text-sm truncate px-2 py-1.5 rounded-md flex items-center transition-all duration-100',
-                                    selectedIds.note === note.id ? 'bg-slate-700 text-white' : 'hover:bg-slate-800 text-slate-400'
-                                )}
-                                title={note.title}
-                            >
-                                <Icons.Notes className="w-3 h-3 mr-2 flex-shrink-0"/>
-                                <span className="truncate">{note.title}</span>
-                            </button>
                         ))}
                     </div>
                 </div>
@@ -295,6 +266,81 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                         </div>
                     );
                 })}
+                
+                 {/* Session Tools Section */}
+                 <NavHeader label="Session Tools" />
+                 <div className="space-y-1">
+                     <NavItem
+                        label="Combat Tracker"
+                        icon="Combat"
+                        active={activeView === 'combat'}
+                        onClick={() => onSelectView('combat')}
+                    />
+                    <div className="flex items-center justify-between px-3 py-2 group">
+                        <button
+                          onClick={() => onSelectView('session-logs')}
+                          className={twMerge(
+                            'flex items-center gap-3 text-sm transition-colors w-full',
+                            activeView === 'session-logs' ? 'text-indigo-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
+                          )}
+                        >
+                          <Icons.SessionLog className="w-4 h-4" />
+                          <span>Session Logs</span>
+                        </button>
+                        <button onClick={() => onSelectView('session-logs')} className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100">
+                            <Icons.Plus className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <div className="pl-4 border-l border-slate-700 ml-5 space-y-1">
+                        {(campaign.sessionLogs || []).sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime()).map(log => (
+                            <button
+                                key={log.id}
+                                onClick={() => onSelect('session-log', log.id)}
+                                className={twMerge(
+                                    'w-full text-left text-sm truncate px-2 py-1.5 rounded-md flex items-center transition-all duration-100',
+                                    selectedIds.sessionLog === log.id ? 'bg-slate-700 text-white' : 'hover:bg-slate-800 text-slate-400'
+                                )}
+                                title={log.title}
+                            >
+                                {log.title}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                
+                <div className="space-y-1">
+                     <div className="flex items-center justify-between px-3 py-2 group">
+                        <button
+                          onClick={() => onSelectView('notes')}
+                          className={twMerge(
+                            'flex items-center gap-3 text-sm transition-colors w-full',
+                            activeView === 'notes' ? 'text-indigo-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
+                          )}
+                        >
+                          <Icons.Notes className="w-4 h-4" />
+                          <span>Campaign Notes</span>
+                        </button>
+                        <button onClick={() => onSelectView('notes')} className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100">
+                            <Icons.Plus className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <div className="pl-4 border-l border-slate-700 ml-5 space-y-0.5">
+                         {(campaign.notes || []).map(note => (
+                            <button
+                                key={note.id}
+                                onClick={() => onSelect('note', note.id)}
+                                className={twMerge(
+                                    'w-full text-left text-sm truncate px-2 py-1.5 rounded-md flex items-center transition-all duration-100',
+                                    selectedIds.note === note.id ? 'bg-slate-700 text-white' : 'hover:bg-slate-800 text-slate-400'
+                                )}
+                                title={note.title}
+                            >
+                                <Icons.Notes className="w-3 h-3 mr-2 flex-shrink-0"/>
+                                <span className="truncate">{note.title}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
 
                 <NavHeader label="Storylines" />
                  <div className="space-y-1">
@@ -396,38 +442,6 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                     </div>
                 </div>
                 
-                <div className="space-y-1">
-                    <div className="flex items-center justify-between px-3 py-2 group">
-                        <button
-                          onClick={() => onSelectView('session-logs')}
-                          className={twMerge(
-                            'flex items-center gap-3 text-sm transition-colors w-full',
-                            activeView === 'session-logs' ? 'text-indigo-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
-                          )}
-                        >
-                          <Icons.SessionLog className="w-4 h-4" />
-                          <span>Session Logs</span>
-                        </button>
-                        <button onClick={() => onSelectView('session-logs')} className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100">
-                            <Icons.Plus className="w-4 h-4" />
-                        </button>
-                    </div>
-                    <div className="pl-4 border-l border-slate-700 ml-5 space-y-1">
-                        {(campaign.sessionLogs || []).sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime()).map(log => (
-                            <button
-                                key={log.id}
-                                onClick={() => onSelect('session-log', log.id)}
-                                className={twMerge(
-                                    'w-full text-left text-sm truncate px-2 py-1.5 rounded-md flex items-center transition-all duration-100',
-                                    selectedIds.sessionLog === log.id ? 'bg-slate-700 text-white' : 'hover:bg-slate-800 text-slate-400'
-                                )}
-                                title={log.title}
-                            >
-                                {log.title}
-                            </button>
-                        ))}
-                    </div>
-                </div>
             </nav>
         </aside>
     );

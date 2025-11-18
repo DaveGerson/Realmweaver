@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import type { Article, ArticleCategory } from '../../types/index';
+import type { Article, ArticleCategory, NPC, Location, Faction } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
@@ -9,6 +9,9 @@ import { generateEnhancedText } from '../../services/geminiService';
 interface ArticleEditorProps {
   article: Article;
   allArticles: Article[];
+  allNpcs?: NPC[];
+  allLocations?: Location[];
+  allFactions?: Faction[];
   onUpdate: (id: string, updatedData: Partial<Article>) => void;
   onDelete: (id: string) => void;
   isMockMode: boolean;
@@ -16,7 +19,7 @@ interface ArticleEditorProps {
 
 const categoryOptions: ArticleCategory[] = ['lore', 'history', 'cosmology'];
 
-export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticles, onUpdate, onDelete, isMockMode }) => {
+export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticles, allNpcs = [], allLocations = [], allFactions = [], onUpdate, onDelete, isMockMode }) => {
   const [formData, setFormData] = useState(article);
   const [isGenerating, setIsGenerating] = useState<keyof Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds' | 'category'> | null>(null);
 
@@ -42,6 +45,16 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
     onUpdate(article.id, { [name]: finalValue });
   };
   
+  const handleRelatedEntityToggle = (entityId: string) => {
+      const currentRelated = formData.relatedEntityIds || [];
+      const newRelated = currentRelated.includes(entityId)
+        ? currentRelated.filter(id => id !== entityId)
+        : [...currentRelated, entityId];
+        
+      setFormData(prev => ({ ...prev, relatedEntityIds: newRelated }));
+      onUpdate(article.id, { relatedEntityIds: newRelated });
+  }
+
   const handleDelete = () => {
     if (window.confirm(`Are you sure you want to delete the article "${article.title}"? This cannot be undone.`)) {
         onDelete(article.id);
@@ -132,6 +145,19 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
           onAiGenerate={() => handleAiGenerate('content')}
           isGenerating={isGenerating === 'content'}
         />
+        
+        {/* Related Entities Section */}
+        <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-800/50">
+            <label className="block text-sm font-medium text-slate-400 mb-3">Related Entities</label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-h-60 overflow-y-auto custom-scrollbar">
+                <EntityList title="NPCs" entities={allNpcs} selectedIds={formData.relatedEntityIds || []} onToggle={handleRelatedEntityToggle} />
+                <EntityList title="Locations" entities={allLocations} selectedIds={formData.relatedEntityIds || []} onToggle={handleRelatedEntityToggle} />
+                <EntityList title="Factions" entities={allFactions} selectedIds={formData.relatedEntityIds || []} onToggle={handleRelatedEntityToggle} />
+            </div>
+             {(allNpcs.length === 0 && allLocations.length === 0 && allFactions.length === 0) && (
+                <p className="text-xs text-slate-500 italic text-center py-2">Create NPCs, Locations, or Factions to link them here.</p>
+            )}
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -164,3 +190,25 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
     </div>
   );
 };
+
+const EntityList = ({ title, entities, selectedIds, onToggle }: { title: string, entities: {id: string, name: string}[], selectedIds: string[], onToggle: (id: string) => void }) => {
+    if (entities.length === 0) return null;
+    return (
+        <div>
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{title}</h4>
+            <div className="space-y-1">
+                {entities.map(entity => (
+                    <label key={entity.id} className="flex items-center gap-2 p-1 rounded hover:bg-slate-800 cursor-pointer">
+                        <input 
+                            type="checkbox" 
+                            checked={selectedIds.includes(entity.id)} 
+                            onChange={() => onToggle(entity.id)}
+                            className="rounded border-slate-600 bg-slate-900 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-slate-900"
+                        />
+                        <span className="text-sm text-slate-300 truncate">{entity.name}</span>
+                    </label>
+                ))}
+            </div>
+        </div>
+    )
+}
