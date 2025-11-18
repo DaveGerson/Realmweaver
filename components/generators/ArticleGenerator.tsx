@@ -8,9 +8,10 @@ import { Button } from '../common/Button';
 interface ArticleGeneratorProps {
   onArticleCreated: (article: Omit<Article, 'id'>) => void;
   isMockMode: boolean;
+  isOfficialSetting?: boolean;
 }
 
-export const ArticleGenerator: React.FC<ArticleGeneratorProps> = ({ onArticleCreated, isMockMode }) => {
+export const ArticleGenerator: React.FC<ArticleGeneratorProps> = ({ onArticleCreated, isMockMode, isOfficialSetting = false }) => {
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +24,7 @@ export const ArticleGenerator: React.FC<ArticleGeneratorProps> = ({ onArticleCre
     setIsLoading(true);
     setError(null);
     try {
-      const articleData = await generateArticle(prompt, isMockMode);
+      const articleData = await generateArticle(prompt, isOfficialSetting, isMockMode);
       const newArticle: Omit<Article, 'id'> = {
           ...articleData,
           parentArticleId: undefined,
@@ -52,6 +53,7 @@ export const ArticleGenerator: React.FC<ArticleGeneratorProps> = ({ onArticleCre
       </div>
       <p className="text-sm text-slate-400 flex-grow">
         Describe a piece of lore, a historical event, or a cosmological concept for your world.
+        {isOfficialSetting && <span className="block mt-1 text-indigo-400 text-xs">Google Search enabled for canon accuracy.</span>}
       </p>
       <textarea
         value={prompt}

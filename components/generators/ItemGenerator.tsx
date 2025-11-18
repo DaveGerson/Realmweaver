@@ -8,9 +8,10 @@ import { Button } from '../common/Button';
 interface ItemGeneratorProps {
   onItemCreated: (item: Omit<Item, 'id'>) => void;
   isMockMode: boolean;
+  isOfficialSetting?: boolean;
 }
 
-export const ItemGenerator: React.FC<ItemGeneratorProps> = ({ onItemCreated, isMockMode }) => {
+export const ItemGenerator: React.FC<ItemGeneratorProps> = ({ onItemCreated, isMockMode, isOfficialSetting = false }) => {
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +24,7 @@ export const ItemGenerator: React.FC<ItemGeneratorProps> = ({ onItemCreated, isM
     setIsLoading(true);
     setError(null);
     try {
-      const itemData = await generateItem(prompt, isMockMode);
+      const itemData = await generateItem(prompt, isOfficialSetting, isMockMode);
       onItemCreated(itemData);
       setPrompt('');
     } catch (err) {
@@ -47,6 +48,7 @@ export const ItemGenerator: React.FC<ItemGeneratorProps> = ({ onItemCreated, isM
       </div>
       <p className="text-sm text-slate-400 flex-grow">
         Describe a magical item, and the AI will create its description, rarity, and properties.
+        {isOfficialSetting && <span className="block mt-1 text-indigo-400 text-xs">Google Search enabled for canon accuracy.</span>}
       </p>
       <textarea
         value={prompt}

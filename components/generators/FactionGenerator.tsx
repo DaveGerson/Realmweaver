@@ -8,9 +8,10 @@ import { Button } from '../common/Button';
 interface FactionGeneratorProps {
   onFactionCreated: (faction: Omit<Faction, 'id'>) => void;
   isMockMode: boolean;
+  isOfficialSetting?: boolean;
 }
 
-export const FactionGenerator: React.FC<FactionGeneratorProps> = ({ onFactionCreated, isMockMode }) => {
+export const FactionGenerator: React.FC<FactionGeneratorProps> = ({ onFactionCreated, isMockMode, isOfficialSetting = false }) => {
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +24,7 @@ export const FactionGenerator: React.FC<FactionGeneratorProps> = ({ onFactionCre
     setIsLoading(true);
     setError(null);
     try {
-      const factionData = await generateFaction(prompt, isMockMode);
+      const factionData = await generateFaction(prompt, isOfficialSetting, isMockMode);
       const newFaction: Omit<Faction, 'id'> = {
           ...factionData,
           leaderId: undefined,
@@ -52,6 +53,7 @@ export const FactionGenerator: React.FC<FactionGeneratorProps> = ({ onFactionCre
       </div>
       <p className="text-sm text-slate-400 flex-grow">
         Describe a faction or organization, and the AI will define its goals and purpose.
+        {isOfficialSetting && <span className="block mt-1 text-indigo-400 text-xs">Google Search enabled for canon accuracy.</span>}
       </p>
       <textarea
         value={prompt}

@@ -9,14 +9,15 @@ interface FactionDashboardProps {
   onFactionCreated: (data: Omit<Faction, 'id'>) => void;
   onSelectFaction: (id: string) => void;
   isMockMode: boolean;
+  isOfficialSetting?: boolean;
 }
 
-export const FactionDashboard: React.FC<FactionDashboardProps> = ({ factions, onFactionCreated, onSelectFaction, isMockMode }) => {
+export const FactionDashboard: React.FC<FactionDashboardProps> = ({ factions, onFactionCreated, onSelectFaction, isMockMode, isOfficialSetting }) => {
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1">
-          <FactionGenerator onFactionCreated={onFactionCreated} isMockMode={isMockMode} />
+          <FactionGenerator onFactionCreated={onFactionCreated} isMockMode={isMockMode} isOfficialSetting={isOfficialSetting} />
         </div>
         <div className="lg:col-span-2">
           <h2 className="text-2xl font-bold font-serif text-slate-200 mb-4">Existing Factions</h2>

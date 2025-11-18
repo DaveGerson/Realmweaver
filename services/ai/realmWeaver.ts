@@ -150,35 +150,38 @@ export const generateNpc = async (prompt: string, useGroundedSearch: boolean = f
   return { ...generatedData, knowsPlayerHistory: [] }; // The AI doesn't generate this field, so return an empty array.
 };
 
-export const generateLocation = async (prompt: string, campaignContext?: string): Promise<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>> => {
+export const generateLocation = async (prompt: string, useGroundedSearch: boolean = false, campaignContext?: string): Promise<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>> => {
   const instructions = `You are The Prep Architect, an expert TTRPG assistant. Your task is to generate a detailed, ready-to-run location based on the user's prompt, conforming to the specified JSON schema.
 
 - **name:** The name of the location.
 - **description:** A "read-aloud" description focusing on sensory details (sight, sound, smell) to set the scene for players. Keep it evocative but concise.
 - **secrets:** Hidden details, lore, or clues that players can discover through investigation. Frame these as "investigation" opportunities (e.g., "A DC 15 Investigation check on the bookshelf reveals a false book that acts as a lever.").`;
-  return generateWithSchema(prompt, locationSchema, instructions, {}, 'gemini-2.5-flash', campaignContext);
+  const configOverrides = useGroundedSearch ? { tools: [{googleSearch: {}}] } : {};
+  return generateWithSchema(prompt, locationSchema, instructions, configOverrides, 'gemini-2.5-flash', campaignContext);
 };
 
-export const generateFaction = async (prompt: string, campaignContext?: string): Promise<Omit<Faction, 'id' | 'leaderId' | 'memberIds'>> => {
+export const generateFaction = async (prompt: string, useGroundedSearch: boolean = false, campaignContext?: string): Promise<Omit<Faction, 'id' | 'leaderId' | 'memberIds'>> => {
   const instructions = `You are The Prep Architect, an expert TTRPG assistant. Your task is to generate a detailed faction based on the user's prompt, conforming to the specified JSON schema.
 
 - **name:** The name of the faction or organization.
 - **description:** A summary of the faction's purpose, public image, and a typical members.
 - **goals:** The faction's primary objectives. Make these actionable and clear, providing potential plot hooks for the GM.`;
-  return generateWithSchema(prompt, factionSchema, instructions, {}, 'gemini-2.5-flash', campaignContext);
+  const configOverrides = useGroundedSearch ? { tools: [{googleSearch: {}}] } : {};
+  return generateWithSchema(prompt, factionSchema, instructions, configOverrides, 'gemini-2.5-flash', campaignContext);
 };
 
-export const generateItem = async (prompt: string, campaignContext?: string): Promise<Omit<Item, 'id'>> => {
+export const generateItem = async (prompt: string, useGroundedSearch: boolean = false, campaignContext?: string): Promise<Omit<Item, 'id'>> => {
   const instructions = `You are The Prep Architect, an expert TTRPG assistant. Your task is to generate a detailed magic item based on the user's prompt, conforming to the specified JSON schema.
 
 - **name:** The name of the item.
 - **description:** An evocative description of the item's appearance and history, suitable for reading to players.
 - **rarity:** The item's rarity level.
 - **properties:** Mechanically precise details of the item's abilities, attunement requirements, and usage rules. Ensure clarity for game mechanics.`;
-  return generateWithSchema(prompt, itemSchema, instructions, {}, 'gemini-2.5-flash', campaignContext);
+  const configOverrides = useGroundedSearch ? { tools: [{googleSearch: {}}] } : {};
+  return generateWithSchema(prompt, itemSchema, instructions, configOverrides, 'gemini-2.5-flash', campaignContext);
 };
 
-export const generateScene = async (prompt: string, campaignContext?: string): Promise<Omit<Scene, 'id' | 'locationId' | 'npcIds'>> => {
+export const generateScene = async (prompt: string, useGroundedSearch: boolean = false, campaignContext?: string): Promise<Omit<Scene, 'id' | 'locationId' | 'npcIds'>> => {
   const instructions = `You are The Prep Architect, an expert TTRPG assistant. Your task is to generate a complete, ready-to-run scene based on the user's prompt, conforming to the specified JSON schema.
 
 - **title:** A clear, descriptive title for the scene.
@@ -187,7 +190,8 @@ export const generateScene = async (prompt: string, campaignContext?: string): P
 - **gmNotes:** A comprehensive overview for the GM. This MUST include the scene's primary goal, setup details, potential complications, and information on any monsters or antagonists present (including their tactics).
 - **skillChecks:** Explicitly defined skill checks with a skill, a DC, and a clear description of what success and failure mean.
 - **rewards:** Any treasure, items, information, or other rewards players might gain.`;
-  const generatedData = await generateWithSchema(prompt, sceneSchema, instructions, {}, 'gemini-2.5-flash', campaignContext);
+  const configOverrides = useGroundedSearch ? { tools: [{googleSearch: {}}] } : {};
+  const generatedData = await generateWithSchema(prompt, sceneSchema, instructions, configOverrides, 'gemini-2.5-flash', campaignContext);
   
   // Add client-side IDs to skill checks
   if (generatedData.skillChecks && Array.isArray(generatedData.skillChecks)) {
@@ -200,7 +204,7 @@ export const generateScene = async (prompt: string, campaignContext?: string): P
   return generatedData;
 };
 
-export const generateAdventure = async (prompt: string, campaignContext?: string): Promise<AdventureForBatchAdd> => {
+export const generateAdventure = async (prompt: string, useGroundedSearch: boolean = false, campaignContext?: string): Promise<AdventureForBatchAdd> => {
     const instructions = `You are The Prep Architect, an expert TTRPG adventure designer. Based on the user's prompt, generate a complete adventure outline with 2-3 fully detailed scenes, conforming to the specified JSON schema.
 
 - **title:** A compelling title for the adventure.
@@ -208,7 +212,8 @@ export const generateAdventure = async (prompt: string, campaignContext?: string
 - **hook:** A "read-aloud" plot hook to engage the players immediately.
 - **theme:** Keywords describing the adventure's mood and genre.
 - **scenes:** Generate 2-3 interconnected scenes. Each scene must be fully fleshed out as per the scene generation guidelines: include high-quality read-aloud text, comprehensive GM notes (goals, setup, antagonists), clear skill checks, and defined rewards.`;
-    const generatedData = await generateWithSchema(prompt, adventureWithScenesSchema, instructions, {}, 'gemini-2.5-flash', campaignContext);
+    const configOverrides = useGroundedSearch ? { tools: [{googleSearch: {}}] } : {};
+    const generatedData = await generateWithSchema(prompt, adventureWithScenesSchema, instructions, configOverrides, 'gemini-2.5-flash', campaignContext);
 
     // Post-process the result to add IDs to skill checks within scenes, but not scene IDs themselves.
     if (generatedData.scenes && Array.isArray(generatedData.scenes)) {
@@ -229,13 +234,14 @@ export const generateAdventure = async (prompt: string, campaignContext?: string
     return generatedData as AdventureForBatchAdd;
 };
 
-export const generateArticle = async (prompt: string, campaignContext?: string): Promise<Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds'>> => {
+export const generateArticle = async (prompt: string, useGroundedSearch: boolean = false, campaignContext?: string): Promise<Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds'>> => {
   const instructions = `You are The Prep Architect, an expert TTRPG loremaster. Your task is to generate a detailed lore article based on the user's prompt, conforming to the specified JSON schema.
 
 - **title:** A clear title for the lore entry.
 - **category:** The appropriate category for the article.
 - **content:** Write the article in an engaging, encyclopedic style. This is background information for the GM to understand the world's history, key events, or cosmology. Structure it for clarity and easy reference during a game.`;
-  return generateWithSchema(prompt, articleSchema, instructions, {}, 'gemini-2.5-flash', campaignContext);
+  const configOverrides = useGroundedSearch ? { tools: [{googleSearch: {}}] } : {};
+  return generateWithSchema(prompt, articleSchema, instructions, configOverrides, 'gemini-2.5-flash', campaignContext);
 };
 
 export const generatePoiFromLoot = async (prompt: string, campaignContext?: string): Promise<Omit<PointOfInterest, 'id'>> => {

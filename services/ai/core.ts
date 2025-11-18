@@ -1,5 +1,4 @@
 
-
 import { GoogleGenAI } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -29,9 +28,11 @@ export const generateWithSchema = async (prompt: string, schema: object, instruc
     if (config.tools) {
         delete config.responseMimeType;
         delete config.responseSchema;
-        const groundedPrompt = `Based on grounded search results for the character "${prompt}", generate a detailed entity for a fantasy tabletop RPG like Dungeons & Dragons, summarizing their key information from established lore. If the character is not well-known, create a new character inspired by the prompt.`;
+        const groundedPrompt = `Use Google Search to ground your response in official lore if applicable.`;
         // When using tools, we instruct the model to return JSON via the prompt itself.
-        contents = `${contextInstruction}${groundedPrompt}\n\nIMPORTANT: Your entire response must be a single, valid JSON object that conforms to this structure: name, description, traits, exampleQuote, backstory, motivations, secrets, stats. Do not wrap it in markdown.`;
+        // We also append the instructions to ensure the model follows the requested format.
+        const schemaString = JSON.stringify(schema, null, 2);
+        contents = `${instructions}\n\n${contextInstruction}${groundedPrompt}\nPrompt: "${prompt}"\n\nIMPORTANT: Your entire response must be a single, valid JSON object that conforms to this schema:\n${schemaString}\n\nDo not wrap it in markdown blocks like \`\`\`json ... \`\`\`. Just return the raw JSON string.\nEnsure all newlines within string values are escaped as \\n. Do not use literal unescaped newlines in strings.`;
     } else if (config.contents) {
         // Allow passing pre-constructed multimodal content
         contents = config.contents;

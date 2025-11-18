@@ -8,9 +8,10 @@ import type { AdventureForBatchAdd } from '../../types/index';
 interface AdventureGeneratorProps {
   onAdventureCreated: (adventureData: AdventureForBatchAdd) => void;
   isMockMode: boolean;
+  isOfficialSetting?: boolean;
 }
 
-export const AdventureGenerator: React.FC<AdventureGeneratorProps> = ({ onAdventureCreated, isMockMode }) => {
+export const AdventureGenerator: React.FC<AdventureGeneratorProps> = ({ onAdventureCreated, isMockMode, isOfficialSetting = false }) => {
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +24,7 @@ export const AdventureGenerator: React.FC<AdventureGeneratorProps> = ({ onAdvent
     setIsLoading(true);
     setError(null);
     try {
-      const adventureData = await generateAdventure(prompt, isMockMode);
+      const adventureData = await generateAdventure(prompt, isOfficialSetting, isMockMode);
       onAdventureCreated(adventureData);
       setPrompt('');
     } catch (err) {
@@ -47,6 +48,7 @@ export const AdventureGenerator: React.FC<AdventureGeneratorProps> = ({ onAdvent
       </div>
       <p className="text-sm text-slate-400 flex-grow">
         Describe a concept for an adventure, and the AI will generate a complete outline with a hook, theme, and multiple scenes to get you started.
+        {isOfficialSetting && <span className="block mt-1 text-indigo-400 text-xs">Google Search enabled for canon accuracy.</span>}
       </p>
       <textarea
         value={prompt}

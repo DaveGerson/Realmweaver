@@ -1,5 +1,4 @@
 
-
 import { produce } from 'immer';
 import type { 
     Campaign, 
@@ -15,7 +14,8 @@ import type {
     PlayerCharacter,
     BatchAddData,
     Note,
-    Encounter
+    Encounter,
+    SettingType
 } from '../types/index';
 import { importCampaignFromJson } from './importExportService';
 import { parseCharacterSheetPdf } from './geminiService';
@@ -220,6 +220,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         // Migrate old data: ensure notes array exists
                         draft.campaigns = campaignsData.map(c => ({
                             ...c,
+                            settingType: c.settingType || 'custom',
                             notes: c.notes || [],
                             sessionLogs: c.sessionLogs || [],
                             playerCharacters: c.playerCharacters || [],
@@ -254,12 +255,14 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             _internalUpdate(draft => { draft.saveStatus = 'saving'; });
             setTimeout(persistToStorage, 0);
         },
-        createCampaign(title: string, setting: string) {
+        createCampaign(title: string, setting: string, settingType: SettingType = 'custom', officialSetting?: string) {
             updateState(draft => {
                 const newCampaign: Campaign = { 
                     id: crypto.randomUUID(), 
                     title, 
-                    setting, 
+                    setting,
+                    settingType,
+                    officialSetting,
                     articles: [], 
                     adventures: [], 
                     npcs: [], 
@@ -310,6 +313,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         importedCampaign.id = crypto.randomUUID();
                     }
                     // Ensure compatibility
+                    importedCampaign.settingType = importedCampaign.settingType || 'custom';
                     importedCampaign.notes = importedCampaign.notes || [];
                     importedCampaign.sessionLogs = importedCampaign.sessionLogs || [];
                     importedCampaign.playerCharacters = importedCampaign.playerCharacters || [];

@@ -1,11 +1,10 @@
 
-
 import type { Campaign, NPC, Location, Item, Scene, Faction, BatchAddData, Article, PlayerCharacter } from './types/index';
 import { 
     generateNpc, 
     generateLocation, 
     generateItem, 
-    generateScene,
+    generateScene, 
     generateFaction,
     generateAdventure,
     generateArticle,
@@ -38,27 +37,43 @@ const testServiceFunctions = async (isMockMode: boolean) => {
   console.groupCollapsed('Smoke Test: Service Functions (Backend Simulation)');
   let success = true;
   try {
+    // 1. Standard Generation
     const npc = await generateNpc('test npc prompt', false, isMockMode);
     success &&= testLog(!!(npc && npc.name), 'generateNpc: Success', 'generateNpc: Failed', npc);
     
-    const location = await generateLocation('test location prompt', isMockMode);
+    const location = await generateLocation('test location prompt', false, isMockMode);
     success &&= testLog(!!(location && location.name && typeof location.secrets === 'string'), 'generateLocation: Success', 'generateLocation: Failed', location);
     
-    const item = await generateItem('test item prompt', isMockMode);
+    const item = await generateItem('test item prompt', false, isMockMode);
     success &&= testLog(!!(item && item.name), 'generateItem: Success', 'generateItem: Failed', item);
 
-    const scene = await generateScene('test scene prompt', isMockMode);
+    const scene = await generateScene('test scene prompt', false, isMockMode);
     success &&= testLog(!!(scene && scene.title && scene.readAloudText), 'generateScene: Success', 'generateScene: Failed', scene);
     
-    const faction = await generateFaction('test faction prompt', isMockMode);
+    const faction = await generateFaction('test faction prompt', false, isMockMode);
     success &&= testLog(!!(faction && faction.name), 'generateFaction: Success', 'generateFaction: Failed', faction);
     
-    const adventure = await generateAdventure('test adventure prompt', isMockMode);
+    const adventure = await generateAdventure('test adventure prompt', false, isMockMode);
     success &&= testLog(!!(adventure && adventure.title && Array.isArray(adventure.scenes)), 'generateAdventure: Success', 'generateAdventure: Failed', adventure);
     
-    const article = await generateArticle('test article prompt', isMockMode);
+    const article = await generateArticle('test article prompt', false, isMockMode);
     success &&= testLog(!!(article && article.title && article.content), 'generateArticle: Success', 'generateArticle: Failed', article);
 
+    // 2. Grounded Generation (New Features)
+    console.log('   Testing Grounded Search variants...');
+    const npcGrounded = await generateNpc('Drizzt Do\'Urden', true, isMockMode);
+    success &&= testLog(!!(npcGrounded && npcGrounded.name), 'generateNpc (Grounded): Success', 'generateNpc (Grounded): Failed', npcGrounded);
+
+    const locationGrounded = await generateLocation('Castle Ravenloft', true, isMockMode);
+    success &&= testLog(!!(locationGrounded && locationGrounded.name), 'generateLocation (Grounded): Success', 'generateLocation (Grounded): Failed', locationGrounded);
+
+    const factionGrounded = await generateFaction('Harpers', true, isMockMode);
+    success &&= testLog(!!(factionGrounded && factionGrounded.name), 'generateFaction (Grounded): Success', 'generateFaction (Grounded): Failed', factionGrounded);
+
+    const itemGrounded = await generateItem('Vorpal Sword', true, isMockMode);
+    success &&= testLog(!!(itemGrounded && itemGrounded.name), 'generateItem (Grounded): Success', 'generateItem (Grounded): Failed', itemGrounded);
+
+    // 3. DM Tools & Utilities
     const narration = await generateNarration('test narration prompt', undefined, false, isMockMode);
     success &&= testLog(typeof narration === 'string' && narration.length > 0, 'generateNarration: Success', 'generateNarration: Failed', narration);
 
@@ -83,6 +98,7 @@ const testServiceFunctions = async (isMockMode: boolean) => {
     const chatResponse = await generateChatResponse([{ role: 'user', text: 'test chat' }], undefined, isMockMode);
     success &&= testLog(typeof chatResponse === 'string' && chatResponse.length > 0, 'generateChatResponse: Success', 'generateChatResponse: Failed', chatResponse);
 
+    // Always test PDF parsing in Mock Mode to ensure logic flow is correct
     if (isMockMode) {
       const parsedPdf = await parseCharacterSheetPdf('mock-base64-pdf', isMockMode);
       success &&= testLog(!!(parsedPdf && parsedPdf.characterSocial.characterName === 'Elowyn'), 'parseCharacterSheetPdf: Success', 'parseCharacterSheetPdf: Failed', parsedPdf);
@@ -118,21 +134,37 @@ const testCampaignHandlers = async (isMockMode: boolean) => {
     const findFactionByName = (name: string) => getActiveCampaign()?.factions.find(e => e.name === name);
     const findLocationByName = (name: string) => getActiveCampaign()?.locations.find(e => e.name === name);
     const findArticleByTitle = (title: string) => getActiveCampaign()?.articles.find(e => e.title === title);
+    const findPcByName = (name: string) => getActiveCampaign()?.playerCharacters.find(e => e.characterSocial.characterName === name);
+    const findNoteByTitle = (title: string) => getActiveCampaign()?.notes.find(e => e.title === title);
     
     try {
-        // --- 1. Setup ---
+        // --- 1. Setup & Creation ---
         testService.createCampaign('Full Lifecycle Test Campaign', 'A world for testing.');
         success &&= testLog(testService.getState().campaigns.length === 1, '1a. Campaign Creation', 'createCampaign failed');
+        
+        testService.createCampaign('Official Test', 'Canon Lore', 'official', 'Forgotten Realms');
+        const officialC = testService.getActiveCampaign();
+        success &&= testLog(!!(officialC && officialC.settingType === 'official' && officialC.officialSetting === 'Forgotten Realms'), '1b. Official Campaign Creation', 'Official campaign creation failed');
+        
+        // Switch back to first campaign for main tests
+        const firstCampaignId = testService.getState().campaigns[0].id;
+        testService.selectCampaign(firstCampaignId);
+        
         const mockData = await generateCampaignFill('full test', { npcs: true, locations: true, factions: true, adventures: true, items: true }, true);
         testService.batchAddToCampaign(mockData);
-        success &&= testLog(!!getActiveCampaign()?.adventures.length, '1b. Batch Add Data', 'batchAddToCampaign failed');
+        success &&= testLog(!!getActiveCampaign()?.adventures.length, '1c. Batch Add Data', 'batchAddToCampaign failed');
         
         // --- 2. Manual Creation ---
         const articleId = testService.createArticle({ title: 'Test Article', category: 'history', content: 'History', parentArticleId: undefined, subArticleIds: [] });
         const subArticleId = testService.createArticle({ title: 'Sub Article', category: 'history', content: 'Sub History', parentArticleId: undefined, subArticleIds: [] });
         const itemId = testService.createItem({ name: 'Test Item', description: 'Desc', rarity: 'common', properties: 'Props' });
+        const noteId = testService.createNote({ title: 'Test Note', content: 'Note Content', tags: [] });
+        const pcId = testService.createPlayerCharacter({ playerName: 'TestPlayer', characterSocial: { characterName: 'TestPC' } as any, characterStatistics: { classes: { charClass: 'Fighter', level: 1 } } as any });
+
         success &&= testLog(!!findArticleByTitle('Test Article'), '2a. Article Creation', 'Article creation failed');
         success &&= testLog(!!getActiveCampaign()?.items.find(i => i.id === itemId), '2b. Item Creation', 'Item creation failed');
+        success &&= testLog(!!findNoteByTitle('Test Note'), '2c. Note Creation', 'Note creation failed');
+        success &&= testLog(!!findPcByName('TestPC'), '2d. Player Character Creation', 'PC creation failed');
         
         // --- 3. Link Verification (from Batch Add) ---
         let elara = findNpcByName('Elara');
@@ -169,6 +201,11 @@ const testCampaignHandlers = async (isMockMode: boolean) => {
             testService.setActiveScene(null);
             success &&= testLog(getActiveCampaign()?.activeSceneId === undefined, '4e. Unset Active Scene', 'Active Scene not unset');
         }
+        
+        // Encounter Update Test
+        const encounter = { id: 'e1', round: 2, turnIndex: 1, combatants: [] };
+        testService.updateEncounter(encounter);
+        success &&= testLog(getActiveCampaign()?.activeEncounter?.round === 2, '4f. Encounter Update', 'Encounter update failed');
 
         if (sunkenTemple && tidalChamber) {
             const parentIdBefore = sunkenTemple.parentLocationId;
@@ -194,7 +231,7 @@ const testCampaignHandlers = async (isMockMode: boolean) => {
             
             success &&= testLog(
                 stateWasUnchanged && correctErrorWasLogged,
-                '4f. Location Circular Dependency Prevention',
+                '4g. Location Circular Dependency Prevention',
                 `Location circular dependency prevention failed. State changed: ${!stateWasUnchanged}, Error logged: ${correctErrorWasLogged}`
             );
         }
@@ -216,6 +253,9 @@ const testCampaignHandlers = async (isMockMode: boolean) => {
         const cleanedTidalChamber = findLocationByName('The Tidal Chamber');
         success &&= testLog(!findLocationByName('The Sunken Temple'), '5e. Parent Location Deletion', 'Parent location was not deleted');
         success &&= testLog(!!(cleanedTidalChamber && cleanedTidalChamber.parentLocationId === undefined), '5f. Child Cleanup on Parent Deletion', 'Child location was not un-parented');
+
+        if (pcId) testService.deletePlayerCharacter(pcId);
+        success &&= testLog(!findPcByName('TestPC'), '5g. Player Character Deletion', 'PC was not deleted');
 
     } catch(e) {
         console.error('❌ State handler test failed with error:', e);

@@ -1,5 +1,4 @@
 
-
 import React, { useState, useRef, useEffect } from 'react';
 import type { Campaign, SceneType } from '../types/index';
 import type { BatchAddData } from '../types/index';
@@ -137,13 +136,13 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                     setLoadingMessage('Generating from prompts...');
                     const detailedData: BatchAddData = { npcs: [], locations: [], factions: [], adventures: [], items: [] };
                     const npcPromises = detailedPrompts.npcs.map(p => generateNpc(p.prompt, false, isMockMode, campaignContext).then(res => ({ ...res, factionId: p.linkId })));
-                    const locationPromises = detailedPrompts.locations.map(p => generateLocation(p.prompt, isMockMode, campaignContext).then(res => ({ ...res, parentLocationId: p.linkId })));
-                    const factionPromises = detailedPrompts.factions.map(p => generateFaction(p.prompt, isMockMode, campaignContext));
-                    const itemPromises = detailedPrompts.items.map(p => generateItem(p.prompt, isMockMode, campaignContext));
+                    const locationPromises = detailedPrompts.locations.map(p => generateLocation(p.prompt, false, isMockMode, campaignContext).then(res => ({ ...res, parentLocationId: p.linkId })));
+                    const factionPromises = detailedPrompts.factions.map(p => generateFaction(p.prompt, false, isMockMode, campaignContext));
+                    const itemPromises = detailedPrompts.items.map(p => generateItem(p.prompt, false, isMockMode, campaignContext));
                     const adventurePromises = detailedPrompts.adventures.filter(adv => adv.prompt.trim() !== '' && adv.scenes.length > 0 && adv.scenes.some(s => s.prompt.trim() !== '')).map(adv => {
                         const scenesDescription = adv.scenes.filter(s => s.prompt.trim() !== '').map(s => `- Scene Prompt: "${s.prompt}"${s.type ? ` (Suggested Type: ${s.type})` : ''}`).join('\n');
                         const fullAdvPrompt = `Based on the following adventure concept, generate a complete adventure outline.\nAdventure Concept: "${adv.prompt}"\n\nThe adventure's structure must be built around the following user-provided scenes. Generate full, detailed scenes based on these prompts:\n${scenesDescription}`;
-                        return generateAdventure(fullAdvPrompt, isMockMode, campaignContext);
+                        return generateAdventure(fullAdvPrompt, false, isMockMode, campaignContext);
                     });
 
                     const [npcsResult, locationsResult, factionsResult, itemsResult, adventuresResult] = await Promise.all([Promise.all(npcPromises), Promise.all(locationPromises), Promise.all(factionPromises), Promise.all(itemPromises), Promise.all(adventurePromises)]);
@@ -303,8 +302,7 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
     );
 };
 
-// --- Mode Components ---
-
+// ... Mode Components and Helpers remain unchanged ...
 const SimpleModeView = ({ prompt, onPromptChange, qualifiers, onQualifiersChange }) => (
     <div className="space-y-4">
         <h3 className="text-lg font-semibold font-serif">Simple Generation</h3>

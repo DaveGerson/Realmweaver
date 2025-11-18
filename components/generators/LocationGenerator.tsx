@@ -8,9 +8,10 @@ import { Button } from '../common/Button';
 interface LocationGeneratorProps {
   onLocationCreated: (location: Omit<Location, 'id'>) => void;
   isMockMode: boolean;
+  isOfficialSetting?: boolean;
 }
 
-export const LocationGenerator: React.FC<LocationGeneratorProps> = ({ onLocationCreated, isMockMode }) => {
+export const LocationGenerator: React.FC<LocationGeneratorProps> = ({ onLocationCreated, isMockMode, isOfficialSetting = false }) => {
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +24,7 @@ export const LocationGenerator: React.FC<LocationGeneratorProps> = ({ onLocation
     setIsLoading(true);
     setError(null);
     try {
-      const locationData = await generateLocation(prompt, isMockMode);
+      const locationData = await generateLocation(prompt, isOfficialSetting, isMockMode);
       const newLocation: Omit<Location, 'id'> = {
           ...locationData,
           parentLocationId: undefined,
@@ -55,6 +56,7 @@ export const LocationGenerator: React.FC<LocationGeneratorProps> = ({ onLocation
       </div>
       <p className="text-sm text-slate-400 flex-grow">
         Describe a location, and the AI will create a vivid description and hidden secrets.
+        {isOfficialSetting && <span className="block mt-1 text-indigo-400 text-xs">Google Search enabled for canon accuracy.</span>}
       </p>
       <textarea
         value={prompt}

@@ -8,9 +8,10 @@ import { Button } from '../common/Button';
 interface SceneGeneratorProps {
   onSceneCreated: (scene: Omit<Scene, 'id'>) => void;
   isMockMode: boolean;
+  isOfficialSetting?: boolean;
 }
 
-export const SceneGenerator: React.FC<SceneGeneratorProps> = ({ onSceneCreated, isMockMode }) => {
+export const SceneGenerator: React.FC<SceneGeneratorProps> = ({ onSceneCreated, isMockMode, isOfficialSetting = false }) => {
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +24,7 @@ export const SceneGenerator: React.FC<SceneGeneratorProps> = ({ onSceneCreated, 
     setIsLoading(true);
     setError(null);
     try {
-      const sceneData = await generateScene(prompt, isMockMode);
+      const sceneData = await generateScene(prompt, isOfficialSetting, isMockMode);
       const newScene: Omit<Scene, 'id'> = {
           ...sceneData,
           locationId: undefined,
@@ -52,6 +53,7 @@ export const SceneGenerator: React.FC<SceneGeneratorProps> = ({ onSceneCreated, 
       </div>
       <p className="text-sm text-slate-400">
         Describe a situation. (e.g., "A tense negotiation with a goblin chief")
+        {isOfficialSetting && <span className="block mt-1 text-indigo-400 text-xs">Google Search enabled.</span>}
       </p>
       <textarea
         value={prompt}

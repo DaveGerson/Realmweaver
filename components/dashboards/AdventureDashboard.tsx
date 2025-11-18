@@ -9,14 +9,15 @@ interface AdventureDashboardProps {
   onAdventureCreated: (data: AdventureForBatchAdd) => void;
   onSelectAdventure: (id: string) => void;
   isMockMode: boolean;
+  isOfficialSetting?: boolean;
 }
 
-export const AdventureDashboard: React.FC<AdventureDashboardProps> = ({ adventures, onAdventureCreated, onSelectAdventure, isMockMode }) => {
+export const AdventureDashboard: React.FC<AdventureDashboardProps> = ({ adventures, onAdventureCreated, onSelectAdventure, isMockMode, isOfficialSetting }) => {
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1">
-          <AdventureGenerator onAdventureCreated={onAdventureCreated} isMockMode={isMockMode} />
+          <AdventureGenerator onAdventureCreated={onAdventureCreated} isMockMode={isMockMode} isOfficialSetting={isOfficialSetting} />
         </div>
         <div className="lg:col-span-2">
           <h2 className="text-2xl font-bold font-serif text-slate-200 mb-4">Existing Adventures</h2>

@@ -1,5 +1,4 @@
 
-
 import type { NPC, Location, Faction, RollableTable, Item, Scene, Adventure, Article, PointOfInterest, PlayerCharacter } from '../types/index';
 import type { BatchAddData, AdventureForBatchAdd } from '../types/index';
 
@@ -15,46 +14,46 @@ export const generateNpc = (prompt: string, useGroundedSearch: boolean = false, 
   return aiRealmWeaver.generateNpc(prompt, useGroundedSearch, campaignContext);
 };
 
-export const generateLocation = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>> => {
+export const generateLocation = (prompt: string, useGroundedSearch: boolean = false, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>> => {
     if (isMockMode) {
         return mockService.generateLocation(prompt, campaignContext);
     }
-    return aiRealmWeaver.generateLocation(prompt, campaignContext);
+    return aiRealmWeaver.generateLocation(prompt, useGroundedSearch, campaignContext);
 };
 
-export const generateFaction = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<Faction, 'id' | 'leaderId' | 'memberIds'>> => {
+export const generateFaction = (prompt: string, useGroundedSearch: boolean = false, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<Faction, 'id' | 'leaderId' | 'memberIds'>> => {
     if (isMockMode) {
         return mockService.generateFaction(prompt, campaignContext);
     }
-    return aiRealmWeaver.generateFaction(prompt, campaignContext);
+    return aiRealmWeaver.generateFaction(prompt, useGroundedSearch, campaignContext);
 };
 
-export const generateItem = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<Item, 'id'>> => {
+export const generateItem = (prompt: string, useGroundedSearch: boolean = false, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<Item, 'id'>> => {
     if (isMockMode) {
         return mockService.generateItem(prompt, campaignContext);
     }
-    return aiRealmWeaver.generateItem(prompt, campaignContext);
+    return aiRealmWeaver.generateItem(prompt, useGroundedSearch, campaignContext);
 };
 
-export const generateScene = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<Scene, 'id' | 'locationId' | 'npcIds'>> => {
+export const generateScene = (prompt: string, useGroundedSearch: boolean = false, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<Scene, 'id' | 'locationId' | 'npcIds'>> => {
     if (isMockMode) {
         return mockService.generateScene(prompt, campaignContext);
     }
-    return aiRealmWeaver.generateScene(prompt, campaignContext);
+    return aiRealmWeaver.generateScene(prompt, useGroundedSearch, campaignContext);
 };
 
-export const generateAdventure = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<AdventureForBatchAdd> => {
+export const generateAdventure = (prompt: string, useGroundedSearch: boolean = false, isMockMode: boolean = false, campaignContext?: string): Promise<AdventureForBatchAdd> => {
     if (isMockMode) {
         return mockService.generateAdventure(prompt, campaignContext);
     }
-    return aiRealmWeaver.generateAdventure(prompt, campaignContext);
+    return aiRealmWeaver.generateAdventure(prompt, useGroundedSearch, campaignContext);
 };
 
-export const generateArticle = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds'>> => {
+export const generateArticle = (prompt: string, useGroundedSearch: boolean = false, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds'>> => {
     if (isMockMode) {
         return mockService.generateArticle(prompt, campaignContext);
     }
-    return aiRealmWeaver.generateArticle(prompt, campaignContext);
+    return aiRealmWeaver.generateArticle(prompt, useGroundedSearch, campaignContext);
 };
 
 export const generateNarration = (prompt: string, campaignContext?: string, useLiteModel: boolean = false, isMockMode: boolean = false): Promise<string> => {

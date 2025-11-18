@@ -11,10 +11,14 @@ import type { PlayerCharacter } from './PlayerCharacter';
 import type { Note } from './Note';
 import type { Encounter } from './Encounter';
 
+export type SettingType = 'custom' | 'official';
+
 export interface Campaign {
   id: string;
   title: string;
-  setting: string;
+  settingType: SettingType;
+  officialSetting?: string; // e.g., "Forgotten Realms", "Eberron"
+  setting: string; // User overrides or custom setting description
   articles: Article[];
   adventures: Adventure[];
   npcs: NPC[];
