@@ -15,6 +15,7 @@ type SelectedIds = {
     article: string | null;
     sessionLog: string | null;
     playerCharacter: string | null;
+    note: string | null;
 }
 
 interface CampaignSidebarProps {
@@ -22,7 +23,7 @@ interface CampaignSidebarProps {
     activeView: EditorView;
     onSelectView: (view: EditorView) => void;
     selectedIds: SelectedIds;
-    onSelect: (type: 'adventure' | 'scene' | 'npc' | 'location' | 'faction' | 'item' | 'article' | 'session-log' | 'player-character', id: string) => void;
+    onSelect: (type: 'adventure' | 'scene' | 'npc' | 'location' | 'faction' | 'item' | 'article' | 'session-log' | 'player-character' | 'note', id: string) => void;
     onShowGenerator: (type: GeneratorType) => void;
     onReorderScene: (adventureId: string, draggedSceneId: string, targetSceneId: string) => void;
 }
@@ -214,6 +215,41 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                                 expandedArticles={expandedArticles}
                                 toggleArticle={toggleArticle}
                             />
+                        ))}
+                    </div>
+                </div>
+
+                {/* Notes Section */}
+                <div className="space-y-1">
+                     <div className="flex items-center justify-between px-3 py-2 group">
+                        <button
+                          onClick={() => onSelectView('notes')}
+                          className={twMerge(
+                            'flex items-center gap-3 text-sm transition-colors w-full',
+                            activeView === 'notes' ? 'text-indigo-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
+                          )}
+                        >
+                          <Icons.Notes className="w-4 h-4" />
+                          <span>Campaign Notes</span>
+                        </button>
+                        <button onClick={() => onSelectView('notes')} className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100">
+                            <Icons.Plus className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <div className="pl-4 border-l border-slate-700 ml-5 space-y-0.5">
+                         {(campaign.notes || []).map(note => (
+                            <button
+                                key={note.id}
+                                onClick={() => onSelect('note', note.id)}
+                                className={twMerge(
+                                    'w-full text-left text-sm truncate px-2 py-1.5 rounded-md flex items-center transition-all duration-100',
+                                    selectedIds.note === note.id ? 'bg-slate-700 text-white' : 'hover:bg-slate-800 text-slate-400'
+                                )}
+                                title={note.title}
+                            >
+                                <Icons.Notes className="w-3 h-3 mr-2 flex-shrink-0"/>
+                                <span className="truncate">{note.title}</span>
+                            </button>
                         ))}
                     </div>
                 </div>

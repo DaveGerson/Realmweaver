@@ -13,3 +13,4 @@ export * from './SkillCheck';
 export * from './Evocation';
 export * from './SessionLog';
 export * from './PlayerCharacter';
+export * from './Note';

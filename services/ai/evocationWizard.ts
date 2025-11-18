@@ -1,7 +1,6 @@
 
-
 import { Type } from "@google/genai";
-import type { SkillCheck, BatchAddData, PlayerCharacter } from '../../types/index';
+import type { SkillCheck, BatchAddData, PlayerCharacter, AdventureForBatchAdd, Scene } from '../../types/index';
 import { npcSchema, locationSchema, factionSchema, itemSchema, adventureWithScenesSchema } from './realmWeaver';
 import { generateWithSchema, generateChatCompletion } from './core';
 
@@ -95,19 +94,20 @@ const campaignFillSchema = {
 };
 
 const postProcessResult = (result: BatchAddData): BatchAddData => {
-    // Post-process the result to add IDs to skill checks within scenes
+    // Post-process the result to add IDs to skill checks within scenes and sanitize data
     if (result.adventures) {
-        result.adventures.forEach((adventure: { scenes: { skillChecks: Omit<SkillCheck, 'id'>[] }[] }) => {
-            if (adventure.scenes && Array.isArray(adventure.scenes)) {
-                adventure.scenes.forEach(scene => {
-                    if (scene.skillChecks && Array.isArray(scene.skillChecks)) {
-                        scene.skillChecks = scene.skillChecks.map((sc: Omit<SkillCheck, 'id'>) => ({
-                            ...sc,
-                            id: crypto.randomUUID(),
-                        }));
-                    }
-                });
-            }
+        result.adventures.forEach((adventure) => {
+            // FIX: Ensure adventure.scenes is an array, as the AI might omit it.
+            adventure.scenes = adventure.scenes || [];
+            adventure.scenes.forEach((scene: Partial<Scene>) => {
+                // FIX: Ensure scene.skillChecks is an array and add IDs.
+                scene.skillChecks = (scene.skillChecks || []).map((sc: Omit<SkillCheck, 'id'>) => ({
+                    ...sc,
+                    id: crypto.randomUUID(),
+                }));
+                 // FIX: Ensure scene.npcIds is an array to prevent crashes.
+                scene.npcIds = scene.npcIds || [];
+            });
         });
     }
 

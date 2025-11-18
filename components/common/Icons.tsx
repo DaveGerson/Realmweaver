@@ -34,6 +34,7 @@ import {
   FileDown,
   BookCopy,
   UsersRound,
+  StickyNote,
 } from 'lucide-react';
 
 export const Icons = {
@@ -47,6 +48,7 @@ export const Icons = {
   Scenes: FileText,
   SessionLog: BookCopy,
   PlayerCharacters: UsersRound,
+  Notes: StickyNote,
   Plus,
   Trash: Trash2,
   ChevronDown,

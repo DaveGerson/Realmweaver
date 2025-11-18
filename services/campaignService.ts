@@ -12,17 +12,21 @@ import type {
     AdventureForBatchAdd, 
     SessionLog,
     PlayerCharacter,
-    BatchAddData
+    BatchAddData,
+    Note
 } from '../types/index';
 import { importCampaignFromJson } from './importExportService';
 import { parseCharacterSheetPdf } from './geminiService';
 
 type AppStatus = 'loading' | 'welcome' | 'selecting' | 'creating' | 'editing';
+export type SaveStatus = 'idle' | 'saved' | 'saving' | 'error';
 
 type CampaignState = {
   campaigns: Campaign[];
   activeCampaignId: string | null;
   appStatus: AppStatus;
+  saveStatus: SaveStatus;
+  lastSavedAt: string | null;
 };
 
 /**
@@ -30,12 +34,19 @@ type CampaignState = {
  * This factory pattern allows the main app to use a singleton instance
  * while enabling isolated instances for testing.
  */
-export function createCampaignStore() {
+export function createCampaignStore(config: { persist?: boolean } = {}) {
+    const shouldPersist = config.persist ?? true;
+    const AUTO_SAVE_DELAY_MS = 2000;
+
     let state: CampaignState = {
         campaigns: [],
         activeCampaignId: null,
         appStatus: 'loading',
+        saveStatus: 'idle',
+        lastSavedAt: null,
     };
+
+    let saveTimeout: any = null;
 
     const CAMPAIGNS_STORAGE_KEY = 'realmweaver-campaigns';
     const ACTIVE_CAMPAIGN_ID_KEY = 'realmweaver-active-campaign-id';
@@ -46,25 +57,61 @@ export function createCampaignStore() {
         listeners.forEach(listener => listener());
     };
 
-    const saveState = () => {
-        if (state.appStatus !== 'loading') {
-            try {
-                localStorage.setItem(CAMPAIGNS_STORAGE_KEY, JSON.stringify(state.campaigns));
-                if (state.activeCampaignId) {
-                    localStorage.setItem(ACTIVE_CAMPAIGN_ID_KEY, state.activeCampaignId);
-                } else {
-                    localStorage.removeItem(ACTIVE_CAMPAIGN_ID_KEY);
-                }
-            } catch (e) {
-                console.error("Failed to save state to localStorage", e);
+    // Internal update that changes state but DOES NOT trigger auto-save
+    // Used for updating 'saveStatus' or 'appStatus' without creating a save loop
+    const _internalUpdate = (updater: (draft: CampaignState) => void) => {
+        state = produce(state, updater);
+        notify();
+    };
+
+    const persistToStorage = () => {
+        if (!shouldPersist || state.appStatus === 'loading') {
+            return;
+        }
+        try {
+            localStorage.setItem(CAMPAIGNS_STORAGE_KEY, JSON.stringify(state.campaigns));
+            if (state.activeCampaignId) {
+                localStorage.setItem(ACTIVE_CAMPAIGN_ID_KEY, state.activeCampaignId);
+            } else {
+                localStorage.removeItem(ACTIVE_CAMPAIGN_ID_KEY);
             }
+            
+            // Update status to saved
+            _internalUpdate(draft => {
+                draft.saveStatus = 'saved';
+                draft.lastSavedAt = new Date().toISOString();
+            });
+            console.log("Campaign auto-saved successfully.");
+        } catch (e) {
+            console.error("Failed to save state to localStorage", e);
+            _internalUpdate(draft => {
+                draft.saveStatus = 'error';
+            });
         }
     };
 
+    const scheduleSave = () => {
+        if (!shouldPersist) return;
+
+        // Update status to saving immediately
+        _internalUpdate(draft => {
+            draft.saveStatus = 'saving';
+        });
+
+        // Debounce the actual write
+        if (saveTimeout) {
+            clearTimeout(saveTimeout);
+        }
+        saveTimeout = setTimeout(() => {
+            persistToStorage();
+        }, AUTO_SAVE_DELAY_MS);
+    };
+
+    // Public update that triggers the auto-save workflow
     const updateState = (updater: (draft: CampaignState) => void) => {
         state = produce(state, updater);
-        saveState();
         notify();
+        scheduleSave();
     };
 
     const getActiveCampaignFromState = (currentState: CampaignState) => {
@@ -73,7 +120,6 @@ export function createCampaignStore() {
     }
     
     // --- Relationship Management & Validation Helpers ---
-    // Note: These helpers directly mutate the draft object passed from an Immer producer.
 
     const _synchronizeNpcFactionLink = (draftCampaign: Campaign, npcId: string, oldFactionId?: string, newFactionId?: string) => {
         if (oldFactionId === newFactionId) return;
@@ -93,7 +139,6 @@ export function createCampaignStore() {
         while (currentId) {
             if (currentId === childId) return false; // Cycle detected
             const current = draftCampaign.locations.find(l => l.id === currentId);
-            // If we can't find the parent in the chain, it means it's a broken link, but not a cycle.
             if (!current) return true;
             currentId = current.parentLocationId;
         }
@@ -150,18 +195,30 @@ export function createCampaignStore() {
 
         // --- Initialization ---
         init() {
+            if (!shouldPersist) {
+                _internalUpdate(draft => { draft.appStatus = 'welcome'; });
+                return;
+            }
             const savedCampaigns = localStorage.getItem(CAMPAIGNS_STORAGE_KEY);
             const savedActiveId = localStorage.getItem(ACTIVE_CAMPAIGN_ID_KEY);
 
-            updateState(draft => {
+            _internalUpdate(draft => {
                 if (savedCampaigns) {
                     try {
-                        const campaignsData: Campaign[] = JSON.parse(savedCampaigns);
-                        draft.campaigns = campaignsData;
-                        if (savedActiveId && campaignsData.some(c => c.id === savedActiveId)) {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        const campaignsData: any[] = JSON.parse(savedCampaigns);
+                        // Migrate old data: ensure notes array exists
+                        draft.campaigns = campaignsData.map(c => ({
+                            ...c,
+                            notes: c.notes || [],
+                            sessionLogs: c.sessionLogs || [],
+                            playerCharacters: c.playerCharacters || []
+                        }));
+
+                        if (savedActiveId && draft.campaigns.some(c => c.id === savedActiveId)) {
                             draft.activeCampaignId = savedActiveId;
                             draft.appStatus = 'editing';
-                        } else if (campaignsData.length > 0) {
+                        } else if (draft.campaigns.length > 0) {
                             draft.appStatus = 'selecting';
                         } else {
                             draft.appStatus = 'welcome';
@@ -179,10 +236,15 @@ export function createCampaignStore() {
         },
 
         // --- Campaign Level Actions ---
-        saveCampaign() { console.log("Campaign state saved."); saveState(); },
+        saveCampaign() { 
+            // Manual save trigger (forces immediate save)
+            if (saveTimeout) clearTimeout(saveTimeout);
+            _internalUpdate(draft => { draft.saveStatus = 'saving'; });
+            setTimeout(persistToStorage, 0);
+        },
         createCampaign(title: string, setting: string) {
             updateState(draft => {
-                const newCampaign: Campaign = { id: crypto.randomUUID(), title, setting, articles: [], adventures: [], npcs: [], locations: [], factions: [], items: [], sessionLogs: [], playerCharacters: [] };
+                const newCampaign: Campaign = { id: crypto.randomUUID(), title, setting, articles: [], adventures: [], npcs: [], locations: [], factions: [], items: [], sessionLogs: [], playerCharacters: [], notes: [] };
                 draft.campaigns.push(newCampaign);
                 draft.activeCampaignId = newCampaign.id;
                 draft.appStatus = 'editing';
@@ -191,15 +253,29 @@ export function createCampaignStore() {
         deleteCampaign(id: string) {
             if (window.confirm("Are you sure you want to permanently delete this campaign?")) {
                 updateState(draft => {
+                    const initialCampaignCount = draft.campaigns.length;
                     draft.campaigns = draft.campaigns.filter(c => c.id !== id);
-                    if (draft.activeCampaignId === id) {
-                        draft.activeCampaignId = null;
-                        draft.appStatus = 'selecting';
+        
+                    // If a campaign was actually deleted
+                    if (draft.campaigns.length < initialCampaignCount) {
+                        if (draft.campaigns.length === 0) {
+                            // Last campaign was deleted, go to welcome screen
+                            draft.activeCampaignId = null;
+                            draft.appStatus = 'welcome';
+                        } else if (draft.activeCampaignId === id) {
+                            // Active campaign was deleted, but others remain, go to selector
+                            draft.activeCampaignId = null;
+                            draft.appStatus = 'selecting';
+                        }
                     }
                 });
             }
         },
-        selectCampaign(id: string) { updateState(draft => { draft.activeCampaignId = id; draft.appStatus = 'editing'; }); },
+        selectCampaign(id: string) { 
+            // Selection involves reading/UI changes mostly, but we track it via _internalUpdate to avoid marking "selecting" as a save-worthy event unless needed, 
+            // though saving activeCampaignId is good.
+            updateState(draft => { draft.activeCampaignId = id; draft.appStatus = 'editing'; }); 
+        },
         async importCampaign(file: File): Promise<string> {
             try {
                 const importedCampaign = await importCampaignFromJson(file);
@@ -207,6 +283,11 @@ export function createCampaignStore() {
                     if (draft.campaigns.some(c => c.id === importedCampaign.id)) {
                         importedCampaign.id = crypto.randomUUID();
                     }
+                    // Ensure compatibility
+                    importedCampaign.notes = importedCampaign.notes || [];
+                    importedCampaign.sessionLogs = importedCampaign.sessionLogs || [];
+                    importedCampaign.playerCharacters = importedCampaign.playerCharacters || [];
+                    
                     draft.campaigns.push(importedCampaign);
                     draft.activeCampaignId = null;
                     draft.appStatus = 'selecting';
@@ -223,9 +304,12 @@ export function createCampaignStore() {
                 if (campaign) Object.assign(campaign, updatedData);
             });
         },
-        startNewCampaignCreation() { updateState(draft => { draft.appStatus = 'creating'; }); },
-        switchToCampaignSelector() { updateState(draft => { draft.activeCampaignId = null; draft.appStatus = 'selecting'; }); },
-        prepareNewCampaign() { updateState(draft => { draft.activeCampaignId = null; draft.appStatus = 'creating'; }); },
+        startNewCampaignCreation() { _internalUpdate(draft => { draft.appStatus = 'creating'; }); },
+        switchToCampaignSelector() { 
+            // Switching is a navigational event, persist active ID change immediately
+            updateState(draft => { draft.activeCampaignId = null; draft.appStatus = 'selecting'; }); 
+        },
+        prepareNewCampaign() { _internalUpdate(draft => { draft.activeCampaignId = null; draft.appStatus = 'creating'; }); },
 
         // --- Entity Actions (Creators return the new ID for selection) ---
         createNpc(newNpcData: Omit<NPC, 'id'>) {
@@ -584,6 +668,36 @@ export function createCampaignStore() {
             });
         },
 
+        createNote(newNoteData: Omit<Note, 'id' | 'createdAt' | 'lastModified'>) {
+            const now = new Date().toISOString();
+            const newNote: Note = { ...newNoteData, id: crypto.randomUUID(), createdAt: now, lastModified: now };
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (campaign) {
+                    campaign.notes = [...(campaign.notes || []), newNote];
+                }
+            });
+            return newNote.id;
+        },
+        updateNote(id: string, updatedData: Partial<Note>) {
+             updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign || !campaign.notes) return;
+                const note = campaign.notes.find(n => n.id === id);
+                if (note) {
+                    Object.assign(note, { ...updatedData, lastModified: new Date().toISOString() });
+                }
+            });
+        },
+        deleteNote(id: string) {
+             updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (campaign) {
+                    campaign.notes = (campaign.notes || []).filter(n => n.id !== id);
+                }
+            });
+        },
+
         batchAddToCampaign(data: BatchAddData) {
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
@@ -662,4 +776,4 @@ export function createCampaignStore() {
     return service;
 }
 
-export const campaignService = createCampaignStore();
+export const campaignService = createCampaignStore({ persist: true });

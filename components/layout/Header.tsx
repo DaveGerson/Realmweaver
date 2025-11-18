@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Icons } from '../common/Icons';
 import type { Campaign } from '../../types/index';
+import type { SaveStatus } from '../../services/campaignService';
 
 interface HeaderProps {
   activeCampaign: Campaign | null;
@@ -14,6 +15,8 @@ interface HeaderProps {
   onCreateNew: () => void;
   onImportCampaign: (file: File) => void;
   onShowExportModal: () => void;
+  saveStatus?: SaveStatus;
+  lastSavedAt?: string | null;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
@@ -26,9 +29,10 @@ export const Header: React.FC<HeaderProps> = ({
   onSwitchCampaign,
   onCreateNew,
   onImportCampaign,
-  onShowExportModal
+  onShowExportModal,
+  saveStatus = 'saved',
+  lastSavedAt
 }) => {
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -43,14 +47,6 @@ export const Header: React.FC<HeaderProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSave = () => {
-    onSaveCampaign();
-    setSaveStatus('saved');
-    setTimeout(() => {
-      setSaveStatus('idle');
-    }, 2000);
-  };
-
   const handleImportClick = () => {
     importInputRef.current?.click();
   };
@@ -64,6 +60,11 @@ export const Header: React.FC<HeaderProps> = ({
       if(importInputRef.current) {
           importInputRef.current.value = "";
       }
+  };
+
+  const formatLastSaved = (isoDate: string | null | undefined) => {
+      if (!isoDate) return "Never";
+      return new Date(isoDate).toLocaleTimeString();
   };
 
   if (!activeCampaign) {
@@ -106,14 +107,33 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
         <div className="flex items-center gap-6">
-          <button
-            onClick={handleSave}
-            className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-indigo-500 rounded-md p-1 -m-1"
-            aria-label="Save Campaign"
+          {/* Auto-Save Indicator */}
+          <div 
+            className="flex items-center gap-2 text-sm text-slate-400 cursor-help" 
+            title={`Last saved: ${formatLastSaved(lastSavedAt)}`}
           >
-            <Icons.Save className={`w-5 h-5 ${saveStatus === 'saved' ? 'text-green-400' : 'text-indigo-400'}`} />
-            <span>{saveStatus === 'saved' ? 'Saved!' : 'Save Campaign'}</span>
-          </button>
+             {saveStatus === 'saving' && (
+                 <>
+                    <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-indigo-400">Saving...</span>
+                 </>
+             )}
+             {saveStatus === 'saved' && (
+                 <>
+                    <Icons.Save className="w-4 h-4 text-slate-500" />
+                    <span>Saved</span>
+                 </>
+             )}
+             {saveStatus === 'error' && (
+                 <button onClick={onSaveCampaign} className="flex items-center gap-2 text-red-400 hover:text-red-300">
+                    <Icons.X className="w-4 h-4" />
+                    <span>Save Failed (Retry)</span>
+                 </button>
+             )}
+          </div>
+
+          <div className="h-6 w-px bg-slate-700"></div>
+
           <button 
             onClick={onToggleWizard} 
             className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-indigo-500 rounded-md p-1 -m-1"

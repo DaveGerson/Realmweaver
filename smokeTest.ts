@@ -1,5 +1,3 @@
-
-
 import type { Campaign, NPC, Location, Item, Scene, Faction, BatchAddData, Article, PlayerCharacter } from './types/index';
 import { 
     generateNpc, 
@@ -42,7 +40,7 @@ const testServiceFunctions = async (isMockMode: boolean) => {
     success &&= testLog(!!(npc && npc.name), 'generateNpc: Success', 'generateNpc: Failed', npc);
     
     const location = await generateLocation('test location prompt', isMockMode);
-    success &&= testLog(!!(location && location.name && Array.isArray(location.pointsOfInterest)), 'generateLocation: Success', 'generateLocation: Failed', location);
+    success &&= testLog(!!(location && location.name && typeof location.secrets === 'string'), 'generateLocation: Success', 'generateLocation: Failed', location);
     
     const item = await generateItem('test item prompt', isMockMode);
     success &&= testLog(!!(item && item.name), 'generateItem: Success', 'generateItem: Failed', item);
@@ -83,8 +81,12 @@ const testServiceFunctions = async (isMockMode: boolean) => {
     const chatResponse = await generateChatResponse([{ role: 'user', text: 'test chat' }], undefined, isMockMode);
     success &&= testLog(typeof chatResponse === 'string' && chatResponse.length > 0, 'generateChatResponse: Success', 'generateChatResponse: Failed', chatResponse);
 
-    const parsedPdf = await parseCharacterSheetPdf('mock-base64-pdf', isMockMode);
-    success &&= testLog(!!(parsedPdf && parsedPdf.characterSocial.characterName === 'Elowyn'), 'parseCharacterSheetPdf: Success', 'parseCharacterSheetPdf: Failed', parsedPdf);
+    if (isMockMode) {
+      const parsedPdf = await parseCharacterSheetPdf('mock-base64-pdf', isMockMode);
+      success &&= testLog(!!(parsedPdf && parsedPdf.characterSocial.characterName === 'Elowyn'), 'parseCharacterSheetPdf: Success', 'parseCharacterSheetPdf: Failed', parsedPdf);
+    } else {
+      console.log('... Skipping parseCharacterSheetPdf test in non-mock mode (requires a real PDF file).');
+    }
 
   } catch (e) {
     console.error('❌ Service function test failed with error:', e);
@@ -97,8 +99,8 @@ const testServiceFunctions = async (isMockMode: boolean) => {
 const testCampaignHandlers = async (isMockMode: boolean) => {
     console.groupCollapsed('Smoke Test: State Logic & Relationships (Frontend Simulation)');
     
-    // Use an isolated instance of the campaign service for testing
-    const testService = createCampaignStore();
+    // Use an isolated, non-persisted instance of the campaign service for testing
+    const testService = createCampaignStore({ persist: false });
     testService.init = () => {
         testService._updateState(draft => {
             draft.campaigns = []; draft.activeCampaignId = null; draft.appStatus = 'welcome';
@@ -214,7 +216,7 @@ const testCampaignHandlers = async (isMockMode: boolean) => {
 
 const testImportExport = async () => {
     console.groupCollapsed('Smoke Test: Import/Export Cycle');
-    const testService = createCampaignStore();
+    const testService = createCampaignStore({ persist: false });
     testService.init = () => {
         testService._updateState(draft => {
             draft.campaigns = []; draft.activeCampaignId = null; draft.appStatus = 'welcome';
