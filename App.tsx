@@ -36,6 +36,7 @@ import { SessionLogDashboard } from './components/dashboards/SessionLogDashboard
 import { PlayerCharacterDashboard } from './components/dashboards/PlayerCharacterDashboard';
 import { NoteDashboard } from './components/dashboards/NoteDashboard';
 import { campaignService } from './services/campaignService';
+import { RealmChatWidget } from './components/RealmChat/RealmChatWidget';
 
 
 export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'notes' | 'combat' | 'relationships';
@@ -120,6 +121,39 @@ const App: React.FC = () => {
         reader.readAsDataURL(file);
     });
 };
+
+    // Generic handler for RealmChat
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleAddEntityFromChat = (type: string, data: any) => {
+        switch (type) {
+            case 'npc': 
+                const npcId = campaignService.createNpc(data);
+                handleSelect('npc', npcId);
+                break;
+            case 'location': 
+                const locId = campaignService.createLocation(data);
+                handleSelect('location', locId);
+                break;
+            case 'faction': 
+                const facId = campaignService.createFaction(data);
+                handleSelect('faction', facId);
+                break;
+            case 'item': 
+                const itemId = campaignService.createItem(data);
+                handleSelect('item', itemId);
+                break;
+            case 'article': 
+                const artId = campaignService.createArticle(data);
+                handleSelect('article', artId);
+                break;
+            case 'adventure':
+                const advId = campaignService.createFullAdventure(data);
+                handleSelect('adventure', advId);
+                break;
+            default:
+                console.warn("Unknown entity type from chat:", type);
+        }
+    };
 
   // --- Memos for selected items ---
   const selectedAdventure = useMemo(() => activeCampaign?.adventures.find(a => a.id === selectedAdventureId) || null, [activeCampaign, selectedAdventureId]);
@@ -457,6 +491,14 @@ const App: React.FC = () => {
                 <main className="flex-1 overflow-y-auto bg-slate-900 text-slate-100 relative">
                   {renderMainContent()}
                 </main>
+                
+                {/* Floating Widgets */}
+                <RealmChatWidget 
+                  campaign={activeCampaign} 
+                  onAddToCampaign={handleAddEntityFromChat} 
+                  isMockMode={isMockMode} 
+                />
+                
                 {isCoachOpen && <DmCoach campaign={activeCampaign} activeContext={currentContext} onClose={() => setIsCoachOpen(false)} isMockMode={isMockMode} />}
                 {isWizardOpen && <EvocationWizard 
                     campaign={activeCampaign} 

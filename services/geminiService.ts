@@ -1,10 +1,11 @@
 
-import type { NPC, Location, Faction, RollableTable, Item, Scene, Adventure, Article, PointOfInterest, PlayerCharacter } from '../types/index';
+import type { NPC, Location, Faction, RollableTable, Item, Scene, Adventure, Article, PointOfInterest, PlayerCharacter, RealmChatResponse, ChatMessage, DraftEntity, ModelTier } from '../types/index';
 import type { BatchAddData, AdventureForBatchAdd } from '../types/index';
 
 import * as aiRealmWeaver from './ai/realmWeaver';
 import * as aiDmCoach from './ai/dmCoach';
 import * as aiEvocationWizard from './ai/evocationWizard';
+import * as aiRealmChat from './ai/realmChat';
 import * as mockService from './ai/mockService';
 
 export const generateNpc = (prompt: string, useGroundedSearch: boolean = false, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<NPC, 'id' | 'factionId'>> => {
@@ -118,3 +119,17 @@ export const parseCharacterSheetPdf = (pdfBase64: string, isMockMode: boolean = 
     }
     return aiEvocationWizard.parseCharacterSheetPdf(pdfBase64, campaignContext);
 }
+
+export const chatWithRealmWeaver = (
+    history: ChatMessage[],
+    currentDrafts: DraftEntity[],
+    approvedEntitiesLog: string[],
+    campaignContext: string,
+    tier: ModelTier,
+    isMockMode: boolean = false
+): Promise<RealmChatResponse> => {
+    if (isMockMode) {
+        return mockService.chatWithRealmWeaver(history, currentDrafts, approvedEntitiesLog, campaignContext, tier);
+    }
+    return aiRealmChat.chatWithRealmWeaver(history, currentDrafts, approvedEntitiesLog, campaignContext, tier);
+};

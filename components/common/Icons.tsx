@@ -35,6 +35,10 @@ import {
   BookCopy,
   UsersRound,
   StickyNote,
+  MessageCircle,
+  Minimize2,
+  Maximize2,
+  CheckCircle2,
 } from 'lucide-react';
 
 export const Icons = {
@@ -70,6 +74,10 @@ export const Icons = {
   Link: Link2,
   FileUp,
   FileDown,
+  Chat: MessageCircle,
+  Minimize: Minimize2,
+  Maximize: Maximize2,
+  CheckCircle: CheckCircle2,
 };
 
 export const SceneIcon = ({ type, className }: { type: string, className?: string }) => {

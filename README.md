@@ -1,3 +1,4 @@
+
 # Welcome to RealmWeaver!
 
 <p align="center">
@@ -73,6 +74,17 @@ You can **drag and drop scenes** in the sidebar to easily reorder the flow of yo
 ### The Prep Document
 Tired of copying and pasting everything into a separate notes app? You don't have to.
 - Open an adventure and click on the **"Prep Document"** tab. RealmWeaver automatically compiles your entire adventure—scenes, relevant NPCs, and all—into a clean, copy-pasteable Markdown document perfect for your session notes.
+
+---
+
+## 💬 RealmChat: Your Creative Partner
+
+RealmChat is a powerful conversational assistant accessible via the chat icon in the bottom-right corner of the app.
+
+- **Draft Entities:** Chat with the AI to collaboratively create NPCs, Locations, Factions, Items, Adventures, and Lore Articles. As you chat, the AI builds a "Draft" of the entity.
+- **Interactive Editing:** Click on any draft to see it in full detail, edit it, and then "Approve" it to add it to your campaign.
+- **Guided Flows:** Ask the AI to help you create something, and it will guide you through the process, offering choices and suggestions.
+- **Performance Modes:** Choose between "Performance" (Flash-Lite), "Medium" (Flash), or "Quality" (Pro) to balance speed and reasoning depth.
 
 ---
 

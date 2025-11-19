@@ -1,5 +1,5 @@
 
-import type { NPC, Location, Faction, RollableTable, Item, Scene, SceneType, AdventureForBatchAdd, Article, PointOfInterest, PlayerCharacter } from '../../types/index';
+import type { NPC, Location, Faction, RollableTable, Item, Scene, SceneType, AdventureForBatchAdd, Article, PointOfInterest, PlayerCharacter, RealmChatResponse, ChatMessage, DraftEntity, ModelTier } from '../../types/index';
 import type { BatchAddData } from '../../types/index';
 
 // --- Mock Data ---
@@ -321,7 +321,6 @@ export const parseCharacterSheetPdf = async (pdfBase64: string, campaignContext?
     });
 };
 
-// FIX: Add missing mock implementation for generateChatResponse.
 export const generateChatResponse = async (history: { role: 'user' | 'model', text: string }[], campaignContext?: string, isMockMode?: boolean): Promise<string> => {
     console.log(`[MOCK MODE] Called generateChatResponse with history:`, history);
     logContext(campaignContext);
@@ -329,3 +328,45 @@ export const generateChatResponse = async (history: { role: 'user' | 'model', te
     const lastUserMessage = history.filter(h => h.role === 'user').pop();
     return Promise.resolve(`This is a mocked response to your message: "${lastUserMessage?.text || '...'}"`);
 };
+
+export const chatWithRealmWeaver = async (
+    history: ChatMessage[],
+    currentDrafts: DraftEntity[],
+    approvedEntitiesLog: string[],
+    campaignContext: string,
+    tier: ModelTier
+): Promise<RealmChatResponse> => {
+    console.log(`[MOCK MODE] Called chatWithRealmWeaver. Tier: ${tier}`);
+    logContext(campaignContext);
+    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+
+    // Simple mock logic to demonstrate draft creation
+    const lastUserMessage = history[history.length - 1].text.toLowerCase();
+    const newDrafts = [...currentDrafts];
+
+    if (lastUserMessage.includes('npc')) {
+        // Update or create NPC draft
+        const existingNpc = newDrafts.find(d => d.type === 'npc' && d.id === 'mock-draft-npc-1');
+        if (existingNpc) {
+            (existingNpc.data as any).name = "Updated Mock NPC";
+        } else {
+             newDrafts.push({
+                id: 'mock-draft-npc-1',
+                type: 'npc',
+                status: 'draft',
+                data: { name: "New Mock NPC", description: "A generated draft." }
+            });
+        }
+        return Promise.resolve({
+            message: "I've drafted an NPC for you. What do you think?",
+            suggestions: ["Make them stronger", "Give them a secret", "Looks good"],
+            draftEntities: newDrafts
+        });
+    }
+
+    return Promise.resolve({
+        message: `Mock response from RealmChat (${tier} mode). Try asking me to create an NPC.`,
+        suggestions: ["Create an NPC", "Describe a Tavern", "Generate a Plot Hook"],
+        draftEntities: newDrafts
+    });
+}

@@ -43,6 +43,8 @@ The project is organized into a modular structure to separate concerns and impro
 │   ├── CampaignSidebar.tsx
 │   ├── DmCoach.tsx         # Slide-out panel for live DM assistance (Session Weaver)
 │   ├── EvocationWizard.tsx # Modal for batch content generation
+│   ├── RealmChat/          # RealmChat feature components
+│   │   ├── RealmChatWidget.tsx
 │   ├── NpcEditor.tsx     # (and other editor components)
 │   ├── NpcGenerator.tsx  # (and other generator components)
 │   └── ...
@@ -54,12 +56,14 @@ The project is organized into a modular structure to separate concerns and impro
 │       ├── realmWeaver.ts  # Logic & schemas for world-building (NPCs, locations)
 │       ├── dmCoach.ts      # Logic & schemas for DM Coach tools (narration, improv)
 │       ├── evocationWizard.ts # Logic & schemas for batch generation
+│       ├── realmChat.ts    # Logic & schemas for RealmChat conversational agent
 │       └── mockService.ts  # Mock data and functions for offline/testing mode
 |
 └── types/                # TypeScript type definitions
     ├── index.ts          # Barrel file re-exporting all types
     ├── Campaign.ts
     ├── NPC.ts
+    ├── RealmChat.ts      # RealmChat specific types
     └── ...               # All other entity type definitions
 ```
 
@@ -132,6 +136,11 @@ The interaction with the Gemini API is the core of the application.
 - When "Mock Mode" is enabled, `geminiService.ts` diverts all calls to `mockService.ts`.
 - This allows for rapid UI development, testing, and offline use without making actual API calls. It returns hardcoded data with a simulated delay.
 
+### 5.4 RealmChat
+- **`realmChat.ts`:** Implements a conversational agent that returns a compound JSON object containing a text `message`, an array of `suggestions` (user quick replies), and an array of `draftEntities`.
+- This enables the AI to "chat" while simultaneously constructing structured data in the background.
+- Model selection (Flash Lite, Flash, Pro) is passed as a parameter to trade off speed vs. quality.
+
 ---
 
 ## 6. The Knowledge Graph & Session Weaver
@@ -164,6 +173,7 @@ This ensures the AI "knows" the web of relationships surrounding the party at an
 - **Editor Components (`NpcEditor.tsx`, etc.):** More complex components that display and allow editing of a single entity's data. They manage local form state for input fields and call `onUpdate` props to persist changes to the global state in `App.tsx`. They also feature the "AI-Assist" functionality for enhancing individual text fields.
 - **`DmCoach.tsx` (Session Weaver):** A stateful slide-out panel that functions as a separate mini-application. It takes the campaign as context but manages its own state for prompts, results, and the active tool.
 - **`EvocationWizard.tsx`:** A complex modal component for batch generation. It has two modes ('simple' and 'detailed') and manages a significant amount of its own state before passing the final, curated `BatchAddData` object to `App.tsx` for integration.
+- **`RealmChatWidget.tsx`:** A floating chat interface that allows conversational entity creation. It maintains a separate "Draft" state for entities being built in the chat before they are "Approved" and merged into the main campaign state.
 
 ---
 
