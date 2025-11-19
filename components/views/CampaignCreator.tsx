@@ -19,8 +19,8 @@ const OFFICIAL_SETTINGS = [
 
 export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampaign }) => {
   const [title, setTitle] = useState('');
-  const [settingType, setSettingType] = useState<SettingType>('custom');
-  const [officialSetting, setOfficialSetting] = useState(OFFICIAL_SETTINGS[0]);
+  const [settingType, setSettingType] = useState<SettingType>('official'); // Default to official
+  const [officialSetting, setOfficialSetting] = useState(OFFICIAL_SETTINGS[0]); // Default to Forgotten Realms
   const [settingDescription, setSettingDescription] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -61,23 +61,23 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampai
                       <input 
                         type="radio" 
                         name="settingType" 
-                        value="custom" 
-                        checked={settingType === 'custom'} 
-                        onChange={() => setSettingType('custom')}
-                        className="mr-2 text-indigo-500 focus:ring-indigo-500 bg-slate-800 border-slate-600"
-                      />
-                      <span className="text-sm text-slate-300">Custom World</span>
-                    </label>
-                    <label className="flex items-center cursor-pointer">
-                      <input 
-                        type="radio" 
-                        name="settingType" 
                         value="official" 
                         checked={settingType === 'official'} 
                         onChange={() => setSettingType('official')}
                          className="mr-2 text-indigo-500 focus:ring-indigo-500 bg-slate-800 border-slate-600"
                       />
                       <span className="text-sm text-slate-300">Official Setting</span>
+                    </label>
+                    <label className="flex items-center cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="settingType" 
+                        value="custom" 
+                        checked={settingType === 'custom'} 
+                        onChange={() => setSettingType('custom')}
+                        className="mr-2 text-indigo-500 focus:ring-indigo-500 bg-slate-800 border-slate-600"
+                      />
+                      <span className="text-sm text-slate-300">Custom World</span>
                     </label>
                   </div>
                 </div>

@@ -139,7 +139,7 @@ const testCampaignHandlers = async (isMockMode: boolean) => {
     
     try {
         // --- 1. Setup & Creation ---
-        testService.createCampaign('Full Lifecycle Test Campaign', 'A world for testing.');
+        testService.createCampaign('Full Lifecycle Test Campaign', 'A world for testing.', 'custom');
         success &&= testLog(testService.getState().campaigns.length === 1, '1a. Campaign Creation', 'createCampaign failed');
         
         testService.createCampaign('Official Test', 'Canon Lore', 'official', 'Forgotten Realms');
@@ -277,7 +277,7 @@ const testImportExport = async () => {
     let success = true;
 
     try {
-        testService.createCampaign('Export Test', 'A world to be exported');
+        testService.createCampaign('Export Test', 'A world to be exported', 'custom');
         testService.createNpc({ name: 'Export NPC', description: 'desc', traits: 'traits', backstory: 'bs', motivations: 'motive', secrets: 'secret', stats: 'stats', exampleQuote: 'quote', knowsPlayerHistory: [] });
         const originalCampaign = testService.getActiveCampaign();
         if (!originalCampaign) return testLog(false, '', 'Failed to get campaign for export');
