@@ -1,23 +1,24 @@
 
 import React from 'react';
-import type { Location } from '../../types/index';
+import type { Location, Faction } from '../../types/index';
 import { LocationGenerator } from '../generators/LocationGenerator';
 import { Icons } from '../common/Icons';
 
 interface LocationDashboardProps {
   locations: Location[];
+  factions?: Faction[];
   onLocationCreated: (data: Omit<Location, 'id'>) => void;
   onSelectLocation: (id: string) => void;
   isMockMode: boolean;
   isOfficialSetting?: boolean;
 }
 
-export const LocationDashboard: React.FC<LocationDashboardProps> = ({ locations, onLocationCreated, onSelectLocation, isMockMode, isOfficialSetting }) => {
+export const LocationDashboard: React.FC<LocationDashboardProps> = ({ locations, factions = [], onLocationCreated, onSelectLocation, isMockMode, isOfficialSetting }) => {
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-1">
-          <LocationGenerator onLocationCreated={onLocationCreated} isMockMode={isMockMode} isOfficialSetting={isOfficialSetting} />
+        <div className="lg:col-span-1 h-full">
+          <LocationGenerator onLocationCreated={onLocationCreated} isMockMode={isMockMode} isOfficialSetting={isOfficialSetting} allLocations={locations} factions={factions} />
         </div>
         <div className="lg:col-span-2">
           <h2 className="text-2xl font-bold font-serif text-slate-200 mb-4">Existing Locations</h2>

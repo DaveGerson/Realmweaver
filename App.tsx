@@ -278,20 +278,14 @@ const App: React.FC = () => {
   };
   
     const handleSelect = (type: 'adventure' | 'scene' | 'npc' | 'location' | 'faction' | 'item' | 'article' | 'session-log' | 'player-character' | 'note', id: string) => {
-        // FIX: The sidebar calls onSelect for 'adventure' then 'scene' in the same click handler.
-        // This can cause a race condition. This new logic makes scene selection robust by finding
-        // the parent adventure itself, ensuring the correct state is set atomically.
         if (type === 'scene') {
             const parentAdventure = activeCampaign?.adventures.find(adv => adv.scenes.some(s => s.id === id));
             if (parentAdventure) {
-                // We don't do a full reset here because we are navigating deeper.
-                // We just need to ensure the correct adventure and scene are selected.
                 setActiveView('adventures');
                 setSelectedAdventureId(parentAdventure.id);
                 setSelectedSceneId(id);
             }
         } else {
-            // For all other types, reset everything first for a clean state.
             resetSelections();
             switch(type) {
                 case 'adventure': setActiveView('adventures'); setSelectedAdventureId(id); break;
@@ -313,7 +307,6 @@ const App: React.FC = () => {
       // Render Generators
       if (activeGenerator === 'scene' && selectedAdventure) return <ContentWrapper title="Create New Scene" icon="Scenes"><SceneGenerator onSceneCreated={(s) => campaignService.createScene(selectedAdventure.id, s)} isMockMode={isMockMode} isOfficialSetting={isOfficialSetting} /></ContentWrapper>;
 
-      // FIX: Changed all onDelete handlers to call resetSelections() to ensure a clean transition back to the dashboard.
       // Render Editors & Dashboards - Editors take priority if an item is selected
       if (selectedPlayerCharacter) return <PlayerCharacterEditor pc={selectedPlayerCharacter} onUpdate={campaignService.updatePlayerCharacter} onDelete={(id) => { campaignService.deletePlayerCharacter(id); resetSelections(); }} />;
       if (selectedSessionLog) return <SessionLogEditor log={selectedSessionLog} onUpdate={campaignService.updateSessionLog} onDelete={(id) => { campaignService.deleteSessionLog(id); resetSelections(); }} />;
@@ -374,17 +367,17 @@ const App: React.FC = () => {
             setActiveView('notes');
             setSelectedNoteId(newId);
       }} onSelectNote={setSelectedNoteId} />;
-      if (activeView === 'npcs') return <NpcDashboard npcs={activeCampaign.npcs} onNpcCreated={(npcData) => {
+      if (activeView === 'npcs') return <NpcDashboard npcs={activeCampaign.npcs} factions={activeCampaign.factions} onNpcCreated={(npcData) => {
             const newId = campaignService.createNpc(npcData);
             setActiveView('npcs');
             setSelectedNpcId(newId);
         }} onSelectNpc={setSelectedNpcId} isMockMode={isMockMode} isOfficialSetting={isOfficialSetting} />;
-      if (activeView === 'locations') return <LocationDashboard locations={activeCampaign.locations} onLocationCreated={(locData) => {
+      if (activeView === 'locations') return <LocationDashboard locations={activeCampaign.locations} factions={activeCampaign.factions} onLocationCreated={(locData) => {
             const newId = campaignService.createLocation(locData);
             setActiveView('locations');
             setSelectedLocationId(newId);
         }} onSelectLocation={setSelectedLocationId} isMockMode={isMockMode} isOfficialSetting={isOfficialSetting} />;
-      if (activeView === 'factions') return <FactionDashboard factions={activeCampaign.factions} onFactionCreated={(facData) => {
+      if (activeView === 'factions') return <FactionDashboard factions={activeCampaign.factions} npcs={activeCampaign.npcs} onFactionCreated={(facData) => {
             const newId = campaignService.createFaction(facData);
             setActiveView('factions');
             setSelectedFactionId(newId);
@@ -394,7 +387,7 @@ const App: React.FC = () => {
             setActiveView('items');
             setSelectedItemId(newId);
         }} onSelectItem={setSelectedItemId} isMockMode={isMockMode} isOfficialSetting={isOfficialSetting} />;
-      if (activeView === 'lorebook') return <ArticleDashboard articles={activeCampaign.articles} onArticleCreated={(artData) => {
+      if (activeView === 'lorebook') return <ArticleDashboard articles={activeCampaign.articles} npcs={activeCampaign.npcs} locations={activeCampaign.locations} factions={activeCampaign.factions} onArticleCreated={(artData) => {
             const newId = campaignService.createArticle(artData);
             setActiveView('lorebook');
             setSelectedArticleId(newId);
@@ -412,8 +405,6 @@ const App: React.FC = () => {
 
       // Relationship Graph View
       if (activeView === 'relationships') {
-          // We cast the onNodeSelect handler types because RelationshipGraph is generic for "types"
-          // but handleSelect expects specific string literals.
           return <RelationshipGraph 
             campaign={activeCampaign} 
             onNodeSelect={(type, id) => handleSelect(type as any, id)} 
@@ -504,7 +495,6 @@ const App: React.FC = () => {
                     campaign={activeCampaign} 
                     onClose={() => setIsWizardOpen(false)} 
                     onAddToCampaign={(data) => {
-                        // FIX: Ensure a confirmation alert is shown after adding entities.
                         const count = Object.values(data).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
                         campaignService.batchAddToCampaign(data);
                         setIsWizardOpen(false);
@@ -524,7 +514,7 @@ const App: React.FC = () => {
             </>
           );
         }
-        return null; // or a loading spinner
+        return null;
       default:
         return <div>Unhandled App Status</div>;
     }

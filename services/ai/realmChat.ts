@@ -11,13 +11,6 @@ const draftEntitySchema = {
         id: { type: Type.STRING, description: "A unique ID for this draft entity (e.g., 'draft-1'). Maintain this ID across turns for the same entity." },
         type: { type: Type.STRING, enum: ['npc', 'location', 'faction', 'item', 'adventure', 'article'] },
         status: { type: Type.STRING, enum: ['draft'], description: "Always 'draft' when coming from the AI." },
-        // We define nullable fields for data to accommodate different types, 
-        // but in practice the AI should fill the one matching 'type'.
-        // Since 'oneOf' isn't fully supported in strict JSON mode for all models, we use a flattened structure or a generic 'data' object pattern.
-        // However, generateWithSchema requires specific schemas.
-        // We will use a simplified approach: The AI returns an object where it puts the data in a 'data' field which is an object.
-        // To make it strongly typed for the AI, we can try to define specific properties.
-        // A more robust way for Gemini JSON mode is to have separate fields for each type's data.
         npcData: npcSchema,
         locationData: locationSchema,
         factionData: factionSchema,
@@ -60,13 +53,25 @@ export const chatWithRealmWeaver = async (
     currentDrafts: DraftEntity[],
     approvedEntitiesLog: string[],
     campaignContext: string,
-    tier: ModelTier
+    tier: ModelTier,
+    focusedEntityType?: 'npc' | 'location' | 'faction' | 'item' | 'adventure' | 'article'
 ): Promise<RealmChatResponse> => {
     const modelName = mapTierToModel(tier);
     
+    let specificInstruction = "";
+    if (focusedEntityType) {
+        specificInstruction = `\n**FOCUSED MODE:** You are currently helping the user create a **${focusedEntityType.toUpperCase()}**. 
+        - Do NOT create other types of entities unless explicitly requested.
+        - Focus your questions and suggestions on filling out the details for this ${focusedEntityType}.
+        - Provide detailed, multi-line descriptions in your chat messages to inspire the user, offering 3 distinct options or paths when asking for details.
+        - Ensure you populate the \`draftEntities\` array with a ${focusedEntityType} object as soon as you have basic info, and update it in every subsequent turn.`;
+    }
+
     const systemInstruction = `You are RealmChat, an intelligent TTRPG world-building assistant. 
 Your goal is to help the Dungeon Master create new content for their campaign.
 You can create NPCs, Locations, Factions, Items, Adventures, and Lore Articles.
+
+${specificInstruction}
 
 **Behavior:**
 1.  **Conversational:** Chat naturally. If the user is vague, ask clarifying questions.
@@ -86,21 +91,11 @@ You can create NPCs, Locations, Factions, Items, Adventures, and Lore Articles.
     - ... (other data fields for other types).
 
 **Current Drafts:**
-${JSON.stringify(currentDrafts.map(d => ({ id: d.id, type: d.type, name: (d.data as any).name || (d.data as any).title })))}
+${JSON.stringify(currentDrafts.map(d => ({ id: d.id, type: d.type, data: d.data })))}
 
 **Approved/Created Log:**
 ${approvedEntitiesLog.join('\n')}
 `;
-
-    // Transform history for the API
-    // We only send text content to keep context manageable, but we need to inform the model of its own previous drafts if needed.
-    // Actually, sending the drafts back in the system prompt (as above) is often cleaner for state management.
-    // We will just send the text history.
-    
-    // We need to format the last user message to include the prompt.
-    // Since generateWithSchema handles single prompt interaction, we construct a "transcript" or pass messages.
-    // generateWithSchema is designed for single-turn generation usually.
-    // We will manually construct the prompt with history.
 
     const transcript = history.map(msg => `${msg.role === 'user' ? 'User' : 'RealmChat'}: ${msg.text}`).join('\n\n');
     const lastUserMessage = history[history.length - 1];
@@ -111,6 +106,7 @@ ${approvedEntitiesLog.join('\n')}
         const rawResponse: any = await generateWithSchema(prompt, realmChatResponseSchema, systemInstruction, {}, modelName, campaignContext);
         
         // Post-process to flatten the data structure for the app
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const processedDrafts: DraftEntity[] = (rawResponse.draftEntities || []).map((raw: any) => {
             let data = {};
             if (raw.type === 'npc') data = raw.npcData;

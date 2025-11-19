@@ -126,10 +126,11 @@ export const chatWithRealmWeaver = (
     approvedEntitiesLog: string[],
     campaignContext: string,
     tier: ModelTier,
-    isMockMode: boolean = false
+    isMockMode: boolean = false,
+    focusedEntityType?: 'npc' | 'location' | 'faction' | 'item' | 'adventure' | 'article'
 ): Promise<RealmChatResponse> => {
     if (isMockMode) {
-        return mockService.chatWithRealmWeaver(history, currentDrafts, approvedEntitiesLog, campaignContext, tier);
+        return mockService.chatWithRealmWeaver(history, currentDrafts, approvedEntitiesLog, campaignContext, tier, focusedEntityType);
     }
-    return aiRealmChat.chatWithRealmWeaver(history, currentDrafts, approvedEntitiesLog, campaignContext, tier);
+    return aiRealmChat.chatWithRealmWeaver(history, currentDrafts, approvedEntitiesLog, campaignContext, tier, focusedEntityType);
 };

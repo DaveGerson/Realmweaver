@@ -1,12 +1,20 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import type { Campaign, SceneType } from '../../types/index';
+import type { Campaign, SceneType, NPC, Location, Faction, Item, Adventure, AdventureForBatchAdd, Scene } from '../../types/index';
 import type { BatchAddData } from '../../types/index';
 import { generateCampaignFill, generateNpc, generateLocation, generateFaction, generateItem, generateAdventure, parseDocumentForEntities, generateChatResponse } from '../../services/geminiService';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { twMerge } from 'tailwind-merge';
 import { produce } from 'immer';
+
+// Editors
+import { NpcEditor } from '../editors/NpcEditor';
+import { LocationEditor } from '../editors/LocationEditor';
+import { FactionEditor } from '../editors/FactionEditor';
+import { ItemEditor } from '../editors/ItemEditor';
+import { AdventureEditor } from '../editors/AdventureEditor';
+import { ArticleEditor } from '../editors/ArticleEditor';
 
 interface EvocationWizardProps {
   campaign: Campaign;
@@ -17,6 +25,15 @@ interface EvocationWizardProps {
 
 type Mode = 'simple' | 'detailed' | 'ingest' | 'chat';
 type EntityType = 'npcs' | 'locations' | 'factions' | 'items'; // Adventures handled separately now
+
+// Extended types to include IDs for local editing state
+interface WizardStateData {
+    npcs: NPC[];
+    locations: Location[];
+    factions: Faction[];
+    adventures: Adventure[];
+    items: Item[];
+}
 
 type SimpleDetailedPrompt = {
     id: string;
@@ -92,8 +109,12 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
     const [isLoading, setIsLoading] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState('Evoking...');
     const [error, setError] = useState<string | null>(null);
-    const [generatedData, setGeneratedData] = useState<BatchAddData | null>(null);
+    const [generatedData, setGeneratedData] = useState<WizardStateData | null>(null);
     const [selection, setSelection] = useState<SelectionState | null>(null);
+
+    // Editing State
+    const [editingEntity, setEditingEntity] = useState<{ type: keyof WizardStateData, index: number } | null>(null);
+
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -105,13 +126,26 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
     };
 
     const processGeneratedData = (data: BatchAddData) => {
-        setGeneratedData(data);
+        // Hydrate with temporary IDs for editing
+        const hydratedData: WizardStateData = {
+            npcs: data.npcs.map(n => ({ ...n, id: crypto.randomUUID(), factionId: n.factionId, knowsPlayerHistory: [] })),
+            locations: data.locations.map(l => ({ ...l, id: crypto.randomUUID(), parentLocationId: l.parentLocationId, subLocationIds: [], loot: l.loot || [], connections: l.connections || [], pointsOfInterest: l.pointsOfInterest || [] })),
+            factions: data.factions.map(f => ({ ...f, id: crypto.randomUUID(), leaderId: undefined, memberIds: [] })),
+            items: data.items.map(i => ({ ...i, id: crypto.randomUUID() })),
+            adventures: data.adventures.map(a => ({ 
+                ...a, 
+                id: crypto.randomUUID(), 
+                scenes: (a.scenes || []).map(s => ({ ...s, id: crypto.randomUUID(), npcIds: s.npcIds || [], locationId: s.locationId })) as Scene[] 
+            })),
+        };
+
+        setGeneratedData(hydratedData);
         setSelection({
-            npcs: Array(data.npcs.length).fill(true),
-            locations: Array(data.locations.length).fill(true),
-            factions: Array(data.factions.length).fill(true),
-            adventures: Array(data.adventures.length).fill(true),
-            items: Array(data.items.length).fill(true),
+            npcs: Array(hydratedData.npcs.length).fill(true),
+            locations: Array(hydratedData.locations.length).fill(true),
+            factions: Array(hydratedData.factions.length).fill(true),
+            adventures: Array(hydratedData.adventures.length).fill(true),
+            items: Array(hydratedData.items.length).fill(true),
         });
     }
 
@@ -201,6 +235,28 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
         }));
     };
 
+    const handleUpdateEntity = (type: keyof WizardStateData, index: number, updates: any) => {
+        if (!generatedData) return;
+        setGeneratedData(produce(generatedData, draft => {
+            // @ts-ignore - Index signature access safety is assumed here
+            Object.assign(draft[type][index], updates);
+        }));
+    }
+    
+    const handleDeleteEntity = (type: keyof WizardStateData, index: number) => {
+         if (!generatedData || !selection) return;
+         setGeneratedData(produce(generatedData, draft => {
+            // @ts-ignore
+            draft[type].splice(index, 1);
+         }));
+         setSelection(produce(selection, draft => {
+            if (draft) {
+                 draft[type].splice(index, 1);
+            }
+         }));
+         setEditingEntity(null);
+    }
+
     const hasPrompts = 
         (mode === 'simple' && !!simplePrompt.trim()) ||
         (mode === 'detailed' && (
@@ -214,10 +270,16 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
         (mode === 'chat' && chatHistory.length > 0);
         
     const hasGeneratedData = generatedData && selection;
+    
+    // Combined lists for dropdowns in editors
+    const combinedNpcs = [...campaign.npcs, ...(generatedData?.npcs || [])];
+    const combinedLocations = [...campaign.locations, ...(generatedData?.locations || [])];
+    const combinedFactions = [...campaign.factions, ...(generatedData?.factions || [])];
+    const combinedArticles = [...campaign.articles]; // Articles not generated here yet
 
     return (
         <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm z-20 flex items-center justify-center p-4" aria-modal="true" role="dialog">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-5xl h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-300">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-5xl h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-300 relative">
                 <header className="flex items-center justify-between p-4 border-b border-slate-800 flex-shrink-0">
                     <div className="flex items-center gap-3">
                         <Icons.Wizard className="w-7 h-7 text-indigo-400" />
@@ -280,11 +342,11 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                             )}
                             {hasGeneratedData && (
                                 <div className="space-y-4 animate-in fade-in duration-300">
-                                    <ResultsSection title="NPCs" items={generatedData.npcs.map(i => i.name)} selection={selection.npcs} onSelect={(i, c) => handleSelectionChange('npcs', i, c)} />
-                                    <ResultsSection title="Locations" items={generatedData.locations.map(i => i.name)} selection={selection.locations} onSelect={(i, c) => handleSelectionChange('locations', i, c)} />
-                                    <ResultsSection title="Factions" items={generatedData.factions.map(i => i.name)} selection={selection.factions} onSelect={(i, c) => handleSelectionChange('factions', i, c)} />
-                                    <ResultsSection title="Items" items={generatedData.items.map(i => i.name)} selection={selection.items} onSelect={(i, c) => handleSelectionChange('items', i, c)} />
-                                    <ResultsSection title="Adventures" items={generatedData.adventures.map(i => i.title)} selection={selection.adventures} onSelect={(i, c) => handleSelectionChange('adventures', i, c)} />
+                                    <ResultsSection title="NPCs" items={generatedData.npcs} selection={selection.npcs} onSelect={(i, c) => handleSelectionChange('npcs', i, c)} onEdit={(i) => setEditingEntity({ type: 'npcs', index: i })} />
+                                    <ResultsSection title="Locations" items={generatedData.locations} selection={selection.locations} onSelect={(i, c) => handleSelectionChange('locations', i, c)} onEdit={(i) => setEditingEntity({ type: 'locations', index: i })} />
+                                    <ResultsSection title="Factions" items={generatedData.factions} selection={selection.factions} onSelect={(i, c) => handleSelectionChange('factions', i, c)} onEdit={(i) => setEditingEntity({ type: 'factions', index: i })} />
+                                    <ResultsSection title="Items" items={generatedData.items} selection={selection.items} onSelect={(i, c) => handleSelectionChange('items', i, c)} onEdit={(i) => setEditingEntity({ type: 'items', index: i })} />
+                                    <ResultsSection title="Adventures" items={generatedData.adventures} selection={selection.adventures} onSelect={(i, c) => handleSelectionChange('adventures', i, c)} onEdit={(i) => setEditingEntity({ type: 'adventures', index: i })} />
                                 </div>
                             )}
                         </div>
@@ -297,6 +359,64 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                         )}
                     </div>
                 </div>
+
+                {/* --- Editing Modal --- */}
+                {editingEntity && generatedData && (
+                    <div className="absolute inset-0 z-30 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+                         <div className="bg-slate-900 border border-slate-700 rounded-xl w-full h-full flex flex-col shadow-2xl relative overflow-hidden">
+                             <div className="absolute top-2 right-2 z-10 flex gap-2">
+                                <Button size="sm" onClick={() => setEditingEntity(null)} className="bg-green-600 hover:bg-green-500">
+                                    <Icons.CheckCircle className="w-4 h-4 mr-2" /> Done
+                                </Button>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-4 pt-12">
+                                {editingEntity.type === 'npcs' && (
+                                    <NpcEditor 
+                                        npc={generatedData.npcs[editingEntity.index]} 
+                                        factions={combinedFactions} 
+                                        onUpdate={(id, data) => handleUpdateEntity('npcs', editingEntity.index, data)} 
+                                        onDelete={() => handleDeleteEntity('npcs', editingEntity.index)} 
+                                        isMockMode={isMockMode} 
+                                    />
+                                )}
+                                {editingEntity.type === 'locations' && (
+                                    <LocationEditor 
+                                        location={generatedData.locations[editingEntity.index]} 
+                                        allLocations={combinedLocations}
+                                        allFactions={combinedFactions}
+                                        onUpdate={(id, data) => handleUpdateEntity('locations', editingEntity.index, data)} 
+                                        onDelete={() => handleDeleteEntity('locations', editingEntity.index)} 
+                                        isMockMode={isMockMode} 
+                                    />
+                                )}
+                                {editingEntity.type === 'factions' && (
+                                    <FactionEditor 
+                                        faction={generatedData.factions[editingEntity.index]} 
+                                        allNpcs={combinedNpcs}
+                                        onUpdate={(id, data) => handleUpdateEntity('factions', editingEntity.index, data)} 
+                                        onDelete={() => handleDeleteEntity('factions', editingEntity.index)} 
+                                        isMockMode={isMockMode} 
+                                    />
+                                )}
+                                {editingEntity.type === 'items' && (
+                                    <ItemEditor 
+                                        item={generatedData.items[editingEntity.index]} 
+                                        onUpdate={(id, data) => handleUpdateEntity('items', editingEntity.index, data)} 
+                                        onDelete={() => handleDeleteEntity('items', editingEntity.index)} 
+                                        isMockMode={isMockMode} 
+                                    />
+                                )}
+                                {editingEntity.type === 'adventures' && (
+                                    <AdventureEditor 
+                                        adventure={generatedData.adventures[editingEntity.index]} 
+                                        campaign={campaign}
+                                        onUpdate={(id, data) => handleUpdateEntity('adventures', editingEntity.index, data)} 
+                                    />
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -566,11 +686,12 @@ const AdventureDetailedSection: React.FC<AdventureDetailedSectionProps> = ({ ite
 
 interface ResultsSectionProps {
     title: string;
-    items: string[];
+    items: { name?: string, title?: string }[];
     selection: boolean[];
     onSelect: (index: number, isChecked: boolean) => void;
+    onEdit: (index: number) => void;
 }
-const ResultsSection: React.FC<ResultsSectionProps> = ({ title, items, selection, onSelect }) => {
+const ResultsSection: React.FC<ResultsSectionProps> = ({ title, items, selection, onSelect, onEdit }) => {
     const [isExpanded, setIsExpanded] = useState(true);
     if (items.length === 0) return null;
     return (
@@ -585,10 +706,15 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({ title, items, selection
             {isExpanded && (
                 <div className="bg-slate-950/30 border border-t-0 border-slate-800/50 rounded-b-md p-2 space-y-1">
                     {items.map((item, index) => (
-                        <label key={index} className="flex items-center text-sm text-slate-300 select-none p-1.5 rounded-md hover:bg-slate-800/50 transition-colors">
-                            <input type="checkbox" checked={selection[index]} onChange={(e) => onSelect(index, e.target.checked)} className="w-4 h-4 mr-3 bg-slate-800 border-slate-600 rounded text-indigo-600 focus:ring-indigo-500" />
-                            <span className="truncate" title={item}>{item}</span>
-                        </label>
+                        <div key={index} className="flex items-center justify-between p-1.5 rounded-md hover:bg-slate-800/50 transition-colors group">
+                            <label className="flex items-center text-sm text-slate-300 select-none flex-grow cursor-pointer">
+                                <input type="checkbox" checked={selection[index]} onChange={(e) => onSelect(index, e.target.checked)} className="w-4 h-4 mr-3 bg-slate-800 border-slate-600 rounded text-indigo-600 focus:ring-indigo-500" />
+                                <span className="truncate" title={item.name || item.title}>{item.name || item.title}</span>
+                            </label>
+                             <button onClick={() => onEdit(index)} className="p-1 text-slate-500 hover:text-white opacity-0 group-hover:opacity-100 transition-all" aria-label="Edit">
+                                <Icons.FileText className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
                     ))}
                 </div>
             )}

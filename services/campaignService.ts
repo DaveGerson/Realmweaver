@@ -10,7 +10,7 @@ import type {
     Scene, 
     Article, 
     AdventureForBatchAdd, 
-    SessionLog,
+    SessionLog, 
     PlayerCharacter,
     BatchAddData,
     Note,
@@ -243,7 +243,66 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         draft.appStatus = 'welcome';
                     }
                 } else {
-                    draft.appStatus = 'welcome';
+                    // Initialize with Default "Forgotten Realms" Campaign instead of Welcome Screen
+                    const defaultId = crypto.randomUUID();
+                    const harpersId = crypto.randomUUID();
+                    const elminsterId = crypto.randomUUID();
+                    const waterdeepId = crypto.randomUUID();
+
+                    const defaultCampaign: Campaign = {
+                        id: defaultId,
+                        title: "Forgotten Realms",
+                        settingType: "official",
+                        officialSetting: "Forgotten Realms",
+                        setting: "The world of Toril, specifically the continent of Faerûn. A land of magic, monsters, and ancient ruins. (Default Setting)",
+                        activeEncounter: { id: crypto.randomUUID(), round: 1, turnIndex: 0, combatants: [] },
+                        articles: [],
+                        adventures: [],
+                        sessionLogs: [],
+                        playerCharacters: [],
+                        notes: [],
+                        items: [],
+                        factions: [
+                            {
+                                id: harpersId,
+                                name: "The Harpers",
+                                description: "A semi-secret organization dedicated to preserving historical lore, maintaining the balance between nature and civilization, and defending the innocent from the forces of evil.",
+                                goals: "Gather information, oppose tyranny, protect the weak.",
+                                memberIds: [elminsterId]
+                            }
+                        ],
+                        npcs: [
+                            {
+                                id: elminsterId,
+                                name: "Elminster Aumar",
+                                description: "An old man with a long white beard, wearing tattered robes and a pointed hat. He smokes a pipe that produces colored smoke.",
+                                traits: "Wise, whimsical, mysterious, occasionally cantankerous.",
+                                exampleQuote: "Magic is not a tool to be used, but a fire to be tended.",
+                                backstory: "The Sage of Shadowdale, chosen of Mystra, and one of the most powerful wizards in Faerûn.",
+                                motivations: "To protect the Weave and nurture new heroes.",
+                                secrets: "He is tired of the endless cosmic threats but knows he cannot rest.",
+                                stats: "Archmage (CR 12+)",
+                                factionId: harpersId,
+                                knowsPlayerHistory: []
+                            }
+                        ],
+                        locations: [
+                            {
+                                id: waterdeepId,
+                                name: "Waterdeep",
+                                description: "The City of Splendors. A massive metropolis on the Sword Coast, governed by the masked Lords of Waterdeep.",
+                                secrets: "The Skullport lies beneath, a haven for smugglers and slavers.",
+                                subLocationIds: [],
+                                connections: [],
+                                pointsOfInterest: [],
+                                loot: []
+                            }
+                        ]
+                    };
+
+                    draft.campaigns = [defaultCampaign];
+                    draft.activeCampaignId = defaultId;
+                    draft.appStatus = 'editing';
                 }
             });
         },

@@ -1,22 +1,28 @@
 
 import React, { useState } from 'react';
-import type { Location } from '../../types/index';
+import type { Location, Faction } from '../../types/index';
 import { generateLocation } from '../../services/geminiService';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
+import { EntityChatGenerator } from './EntityChatGenerator';
+import { LocationEditor } from '../editors/LocationEditor';
+import { createDefaultLocation } from '../../utils/entityUtils';
 
 interface LocationGeneratorProps {
   onLocationCreated: (location: Omit<Location, 'id'>) => void;
   isMockMode: boolean;
   isOfficialSetting?: boolean;
+  allLocations?: Location[];
+  factions?: Faction[];
 }
 
-export const LocationGenerator: React.FC<LocationGeneratorProps> = ({ onLocationCreated, isMockMode, isOfficialSetting = false }) => {
+export const LocationGenerator: React.FC<LocationGeneratorProps> = ({ onLocationCreated, isMockMode, isOfficialSetting = false, allLocations = [], factions = [] }) => {
+  const [mode, setMode] = useState<'quick' | 'chat'>('quick');
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleGenerate = async () => {
+  const handleQuickGenerate = async () => {
     if (!prompt.trim()) {
       setError('Please enter a prompt.');
       return;
@@ -42,6 +48,41 @@ export const LocationGenerator: React.FC<LocationGeneratorProps> = ({ onLocation
     }
   };
   
+  if (mode === 'chat') {
+      return (
+          <div className="h-full flex flex-col">
+             <div className="mb-2 flex justify-between items-center">
+                <Button variant="ghost" size="sm" onClick={() => setMode('quick')}>
+                     <Icons.ChevronDown className="w-4 h-4 mr-2 rotate-90" /> Back to Quick Generator
+                </Button>
+                <h2 className="text-lg font-bold font-serif text-slate-100">Conversational Creator</h2>
+             </div>
+             <div className="flex-1 min-h-0">
+                 <EntityChatGenerator
+                    entityType="location"
+                    isMockMode={isMockMode}
+                    onEntityCreated={(data) => {
+                        const { id, ...locationData } = data;
+                        onLocationCreated(locationData);
+                        setMode('quick');
+                    }}
+                    initialData={createDefaultLocation()}
+                    renderPreview={(data, onUpdate) => (
+                        <LocationEditor 
+                            location={{...data, id: 'preview'}} 
+                            allLocations={allLocations}
+                            allFactions={factions}
+                            onUpdate={(_, updates) => onUpdate(updates)} 
+                            onDelete={() => {}} 
+                            isMockMode={isMockMode} 
+                        />
+                    )}
+                 />
+             </div>
+          </div>
+      );
+  }
+
   return (
     <div className="relative bg-slate-900 p-6 rounded-xl border border-slate-800 space-y-4 h-full flex flex-col">
       {isLoading && (
@@ -50,10 +91,16 @@ export const LocationGenerator: React.FC<LocationGeneratorProps> = ({ onLocation
           <p className="mt-4 text-md text-slate-300">Generating Location...</p>
         </div>
       )}
-      <div className="flex items-center gap-3">
-        <Icons.Wizard className="w-7 h-7 text-indigo-400" />
-        <h2 className="text-2xl font-bold font-serif text-slate-100">Location Generator</h2>
+      <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Icons.Wizard className="w-7 h-7 text-indigo-400" />
+            <h2 className="text-2xl font-bold font-serif text-slate-100">Location Generator</h2>
+          </div>
+          <Button variant="secondary" size="sm" onClick={() => setMode('chat')}>
+             <Icons.Chat className="w-4 h-4 mr-2" /> Create via Chat
+          </Button>
       </div>
+
       <p className="text-sm text-slate-400 flex-grow">
         Describe a location, and the AI will create a vivid description and hidden secrets.
         {isOfficialSetting && <span className="block mt-1 text-indigo-400 text-xs">Google Search enabled for canon accuracy.</span>}
@@ -67,7 +114,7 @@ export const LocationGenerator: React.FC<LocationGeneratorProps> = ({ onLocation
         disabled={isLoading}
       />
       {error && <p className="text-xs text-red-400">{error}</p>}
-      <Button onClick={handleGenerate} disabled={isLoading || !prompt.trim()} size="lg" className="w-full mt-auto">
+      <Button onClick={handleQuickGenerate} disabled={isLoading || !prompt.trim()} size="lg" className="w-full mt-auto">
         {isLoading ? 'Generating...' : 'Generate Location'}
       </Button>
     </div>
