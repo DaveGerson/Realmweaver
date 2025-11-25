@@ -42,14 +42,14 @@ export const AdventureGenerator: React.FC<AdventureGeneratorProps> = ({ onAdvent
 
   if (mode === 'chat') {
       return (
-          <div className="h-full flex flex-col">
-             <div className="mb-2 flex justify-between items-center">
+          <div className="absolute inset-0 z-20 bg-slate-950 p-6 flex flex-col animate-in fade-in zoom-in-95 duration-200">
+             <div className="mb-4 flex justify-between items-center flex-shrink-0">
                 <Button variant="ghost" size="sm" onClick={() => setMode('quick')}>
                      <Icons.ChevronDown className="w-4 h-4 mr-2 rotate-90" /> Back to Quick Generator
                 </Button>
                 <h2 className="text-lg font-bold font-serif text-slate-100">Conversational Creator</h2>
              </div>
-             <div className="flex-1 min-h-0">
+             <div className="flex-1 min-h-0 border border-slate-800 rounded-xl shadow-2xl overflow-hidden bg-slate-900">
                  <EntityChatGenerator
                     entityType="adventure"
                     isMockMode={isMockMode}
