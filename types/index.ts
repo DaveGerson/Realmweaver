@@ -16,3 +16,4 @@ export * from './PlayerCharacter';
 export * from './Note';
 export * from './Encounter';
 export * from './RealmChat';
+export * from './Graph';

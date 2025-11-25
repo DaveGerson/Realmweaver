@@ -1,20 +1,8 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import ReactFlow, {
-  Background,
-  Controls,
-  MiniMap,
-  useNodesState,
-  useEdgesState,
-  MarkerType,
-  type Node,
-  type Edge,
-  Position,
-} from 'reactflow';
-import dagre from 'dagre';
+import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
+import * as d3 from 'd3';
 import type { Campaign } from '../../types/index';
-import { Icons } from '../common/Icons';
-import { Button } from '../common/Button';
+import { EntityType, GraphNode, GraphLink } from '../../types/index';
 import { twMerge } from 'tailwind-merge';
 
 interface RelationshipGraphProps {
@@ -22,262 +10,278 @@ interface RelationshipGraphProps {
   onNodeSelect: (type: string, id: string) => void;
 }
 
-type EntityType = 'npc' | 'faction' | 'location' | 'scene' | 'article';
-
-const nodeWidth = 172;
-const nodeHeight = 36;
-
-// Helper to layout graph elements using Dagre
-const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'TB') => {
-  const dagreGraph = new dagre.graphlib.Graph();
-  dagreGraph.setDefaultEdgeLabel(() => ({}));
-
-  dagreGraph.setGraph({ rankdir: direction });
-
-  nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
-  });
-
-  edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
-  });
-
-  dagre.layout(dagreGraph);
-
-  const layoutedNodes = nodes.map((node) => {
-    const nodeWithPosition = dagreGraph.node(node.id);
-    node.targetPosition = direction === 'TB' ? Position.Top : Position.Left;
-    node.sourcePosition = direction === 'TB' ? Position.Bottom : Position.Right;
-
-    // We are shifting the dagre node position (anchor=center center) to the top left
-    // so it matches the React Flow node anchor point (top left).
-    node.position = {
-      x: nodeWithPosition.x - nodeWidth / 2,
-      y: nodeWithPosition.y - nodeHeight / 2,
-    };
-
-    return node;
-  });
-
-  return { nodes: layoutedNodes, edges };
+const TYPE_COLORS: Record<string, string> = {
+  [EntityType.NPC]: '#22c55e',      // Green-500
+  [EntityType.LOCATION]: '#f59e0b', // Amber-500
+  [EntityType.FACTION]: '#6366f1',  // Indigo-500
+  [EntityType.ITEM]: '#a855f7',     // Purple-500
+  [EntityType.ADVENTURE]: '#3b82f6',// Blue-500
+  [EntityType.SCENE]: '#ef4444',    // Red-500
+  [EntityType.ARTICLE]: '#06b6d4',  // Cyan-500
+  [EntityType.QUEST]: '#ec4899',    // Pink-500
+  [EntityType.EVENT]: '#eab308',    // Yellow-500
 };
 
 export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, onNodeSelect }) => {
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [filters, setFilters] = useState<Record<EntityType, boolean>>({
-      npc: true,
-      faction: true,
-      location: true,
-      scene: true,
-      article: true
+      [EntityType.NPC]: true,
+      [EntityType.FACTION]: true,
+      [EntityType.LOCATION]: true,
+      [EntityType.ADVENTURE]: true,
+      [EntityType.SCENE]: true,
+      [EntityType.ARTICLE]: true,
+      [EntityType.ITEM]: false,
+      [EntityType.QUEST]: false,
+      [EntityType.EVENT]: false,
   });
 
-  // --- Graph Construction ---
-  useEffect(() => {
-    const newNodes: Node[] = [];
-    const newEdges: Edge[] = [];
+  const { nodes, links } = useMemo(() => {
+      const nodes: GraphNode[] = [];
+      const links: GraphLink[] = [];
 
-    // 1. Factions (Top Level)
-    if (filters.faction) {
-        campaign.factions.forEach(faction => {
-            newNodes.push({
-                id: faction.id,
-                type: 'default',
-                style: { background: '#312e81', color: '#fff', border: '1px solid #6366f1', borderRadius: '4px', width: 170 }, // Indigo
-                data: { type: 'faction', id: faction.id, label: faction.name },
-                position: { x: 0, y: 0 },
-            });
-        });
-    }
+      // 1. Factions
+      if (filters[EntityType.FACTION]) {
+          campaign.factions.forEach(f => {
+              nodes.push({ id: f.id, group: EntityType.FACTION, name: f.name });
+          });
+      }
 
-    // 2. NPCs (Members of Factions)
-    if (filters.npc) {
-        campaign.npcs.forEach(npc => {
-            newNodes.push({
-                id: npc.id,
-                type: 'default',
-                style: { background: '#14532d', color: '#fff', border: '1px solid #22c55e', borderRadius: '50%', width: 100, height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', textAlign: 'center' }, // Green
-                data: { type: 'npc', id: npc.id, label: npc.name },
-                position: { x: 0, y: 0 },
-            });
+      // 2. NPCs
+      if (filters[EntityType.NPC]) {
+          campaign.npcs.forEach(n => {
+              nodes.push({ id: n.id, group: EntityType.NPC, name: n.name });
+              if (filters[EntityType.FACTION] && n.factionId) {
+                  links.push({ source: n.id, target: n.factionId });
+              }
+          });
+      }
 
-            if (filters.faction && npc.factionId) {
-                newEdges.push({
-                    id: `${npc.id}-${npc.factionId}`,
-                    source: npc.id,
-                    target: npc.factionId,
-                    label: 'Member',
-                    type: 'smoothstep',
-                    animated: true,
-                    style: { stroke: '#6366f1' },
-                    markerEnd: { type: MarkerType.ArrowClosed, color: '#6366f1' },
-                });
-            }
-        });
-    }
+      // 3. Locations
+      if (filters[EntityType.LOCATION]) {
+          campaign.locations.forEach(l => {
+              nodes.push({ id: l.id, group: EntityType.LOCATION, name: l.name });
+              if (filters[EntityType.LOCATION] && l.parentLocationId) {
+                  links.push({ source: l.id, target: l.parentLocationId });
+              }
+              if (filters[EntityType.FACTION] && l.controllingFactionId) {
+                  links.push({ source: l.id, target: l.controllingFactionId });
+              }
+              if (filters[EntityType.LOCATION] && l.connections) {
+                  l.connections.forEach(c => {
+                      // Only link if target exists
+                      if (campaign.locations.some(loc => loc.id === c.targetLocationId)) {
+                          links.push({ source: l.id, target: c.targetLocationId });
+                      }
+                  });
+              }
+          });
+      }
 
-    // 3. Locations (Hierarchy)
-    if (filters.location) {
-        campaign.locations.forEach(loc => {
-            newNodes.push({
-                id: loc.id,
-                type: 'input', // Use input for locations to allow many outputs (scenes)
-                style: { background: '#78350f', color: '#fff', border: '1px solid #f59e0b', borderRadius: '8px', width: 160 }, // Amber
-                data: { type: 'location', id: loc.id, label: loc.name },
-                position: { x: 0, y: 0 },
-            });
+      // 4. Adventures & Scenes
+      if (filters[EntityType.ADVENTURE]) {
+          campaign.adventures.forEach(a => {
+              nodes.push({ id: a.id, group: EntityType.ADVENTURE, name: a.title });
+              
+              if (filters[EntityType.SCENE]) {
+                  a.scenes.forEach(s => {
+                      nodes.push({ id: s.id, group: EntityType.SCENE, name: s.title });
+                      links.push({ source: a.id, target: s.id }); // Adventure -> Scene
 
-            if (loc.parentLocationId) {
-                 newEdges.push({
-                    id: `${loc.id}-${loc.parentLocationId}`,
-                    source: loc.id,
-                    target: loc.parentLocationId,
-                    label: 'Inside',
-                    type: 'smoothstep',
-                    style: { stroke: '#f59e0b' },
-                    markerEnd: { type: MarkerType.ArrowClosed, color: '#f59e0b' },
-                });
-            }
-            
-            // Spatial connections
-            loc.connections?.forEach(conn => {
-                 newEdges.push({
-                    id: `${loc.id}-${conn.targetLocationId}-conn`,
-                    source: loc.id,
-                    target: conn.targetLocationId,
-                    type: 'default',
-                    style: { stroke: '#f59e0b', strokeDasharray: 5 },
-                });
-            });
-        });
-    }
+                      if (filters[EntityType.LOCATION] && s.locationId) {
+                          links.push({ source: s.id, target: s.locationId });
+                      }
+                      if (filters[EntityType.NPC] && s.npcIds) {
+                          s.npcIds.forEach(nid => {
+                              links.push({ source: s.id, target: nid });
+                          });
+                      }
+                  });
+              }
+          });
+      }
 
-    // 4. Articles (Knowledge Graph)
-    if (filters.article) {
-        campaign.articles.forEach(art => {
-             newNodes.push({
-                id: art.id,
-                type: 'default',
-                style: { background: '#1e3a8a', color: '#93c5fd', border: '1px solid #3b82f6', width: 150 }, // Blue
-                data: { type: 'article', id: art.id, label: art.title },
-                position: { x: 0, y: 0 },
-            });
-            
-            if (art.parentArticleId) {
-                newEdges.push({
-                    id: `${art.id}-${art.parentArticleId}`,
-                    source: art.id,
-                    target: art.parentArticleId,
-                    type: 'smoothstep',
-                    style: { stroke: '#3b82f6' },
-                });
-            }
-        });
-    }
+      // 5. Articles
+      if (filters[EntityType.ARTICLE]) {
+          campaign.articles.forEach(a => {
+              nodes.push({ id: a.id, group: EntityType.ARTICLE, name: a.title });
+              if (filters[EntityType.ARTICLE] && a.parentArticleId) {
+                  links.push({ source: a.id, target: a.parentArticleId });
+              }
+              if (a.relatedEntityIds) {
+                  a.relatedEntityIds.forEach(rid => {
+                      // Check if target exists in current node set to avoid d3 errors
+                      // Note: This check is slightly expensive O(N^2) in naive impl, but map-based check would be better. 
+                      // D3 link force will fail if target doesn't exist.
+                      // However, since we filter nodes based on filters, we just need to know if the target entity type is enabled.
+                      // Simplification: We'll trust D3 to filter or we check existence.
+                      // Better to check if the ID matches any node we just added.
+                      // We will do a cleanup pass at the end.
+                      links.push({ source: a.id, target: rid });
+                  });
+              }
+          });
+      }
 
-    // 5. Scenes (The Events)
-    if (filters.scene) {
-        campaign.adventures.forEach(adv => {
-            adv.scenes.forEach(scene => {
-                newNodes.push({
-                    id: scene.id,
-                    type: 'output',
-                    style: { background: '#7f1d1d', color: '#fff', border: '1px solid #ef4444', transform: 'rotate(45deg)', width: 80, height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: '9px' }, // Red Diamond
-                    data: { type: 'scene', id: scene.id, label: scene.title, adventureId: adv.id }, // Pass Adventure ID too
-                    position: { x: 0, y: 0 },
-                });
+      // 6. Items
+      if (filters[EntityType.ITEM]) {
+          campaign.items.forEach(i => {
+              nodes.push({ id: i.id, group: EntityType.ITEM, name: i.name });
+          });
+      }
 
-                // Link Scene to Location
-                if (filters.location && scene.locationId) {
-                    newEdges.push({
-                        id: `${scene.id}-${scene.locationId}`,
-                        source: scene.locationId,
-                        target: scene.id,
-                        label: 'Setting',
-                        style: { stroke: '#ef4444' },
-                    });
-                }
+      // Filter links to ensure source/target both exist in nodes
+      const nodeIds = new Set(nodes.map(n => n.id));
+      const validLinks = links.filter(l => nodeIds.has(l.source as string) && nodeIds.has(l.target as string));
 
-                // Link NPCs to Scene
-                if (filters.npc && scene.npcIds) {
-                    scene.npcIds.forEach(npcId => {
-                        newEdges.push({
-                            id: `${npcId}-${scene.id}`,
-                            source: npcId,
-                            target: scene.id,
-                            style: { stroke: '#ef4444', strokeDasharray: 5 },
-                        });
-                    });
-                }
-            });
-        });
-    }
+      return { nodes, links: validLinks };
+  }, [campaign, filters]);
 
-    // Apply Layout
-    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(newNodes, newEdges);
+
+  const initializeGraph = useCallback(() => {
+    if (!svgRef.current || !containerRef.current) return;
     
-    setNodes(layoutedNodes);
-    setEdges(layoutedEdges);
+    const width = containerRef.current.clientWidth;
+    const height = containerRef.current.clientHeight;
 
-  }, [campaign, filters, setNodes, setEdges]);
+    // Clear previous
+    d3.select(svgRef.current).selectAll("*").remove();
 
-  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
-    const { type, id, adventureId } = node.data;
-    // Special handling for scenes which are nested in adventures
-    if (type === 'scene' && adventureId) {
-        // We need a way to tell the main app to open the adventure AND select the scene.
-        // Currently the sidebar supports this via 'scene' type logic.
-        onNodeSelect('scene', id);
-    } else {
-        onNodeSelect(type, id);
+    const svg = d3.select(svgRef.current)
+      .attr("viewBox", [0, 0, width, height])
+      .style("max-width", "100%")
+      .style("height", "100%")
+      .style("background-color", "#020617"); // slate-950
+
+    const g = svg.append("g");
+    
+    const zoom = d3.zoom<SVGSVGElement, unknown>()
+        .scaleExtent([0.1, 4])
+        .on("zoom", (event) => {
+            g.attr("transform", event.transform);
+        });
+    
+    svg.call(zoom);
+
+    // Create mutable copies for D3 to mutate
+    const simulationNodes = nodes.map(n => ({...n}));
+    const simulationLinks = links.map(l => ({...l}));
+
+    const simulation = d3.forceSimulation<GraphNode>(simulationNodes)
+      .force("link", d3.forceLink<GraphNode, GraphLink>(simulationLinks).id(d => d.id).distance(100))
+      .force("charge", d3.forceManyBody().strength(-300))
+      .force("center", d3.forceCenter(width / 2, height / 2))
+      .force("collide", d3.forceCollide(30));
+
+    const link = g.append("g")
+      .attr("stroke", "#475569") // slate-600
+      .attr("stroke-opacity", 0.6)
+      .selectAll("line")
+      .data(simulationLinks)
+      .join("line")
+      .attr("stroke-width", 1.5);
+
+    const node = g.append("g")
+      .selectAll("g")
+      .data(simulationNodes)
+      .join("g")
+      .call(d3.drag<SVGGElement, GraphNode>()
+        .on("start", dragstarted)
+        .on("drag", dragged)
+        .on("end", dragended));
+
+    // Node circles
+    node.append("circle")
+      .attr("r", 8)
+      .attr("fill", d => TYPE_COLORS[d.group] || '#94a3b8')
+      .attr("stroke", "#fff")
+      .attr("stroke-width", 1.5)
+      .style("cursor", "pointer")
+      .on("click", (event, d) => {
+        event.stopPropagation();
+        const typeMap: Record<string, string> = {
+            [EntityType.NPC]: 'npc',
+            [EntityType.LOCATION]: 'location',
+            [EntityType.FACTION]: 'faction',
+            [EntityType.ADVENTURE]: 'adventure',
+            [EntityType.SCENE]: 'scene', // Special handling usually needed for sidebar
+            [EntityType.ARTICLE]: 'article',
+            [EntityType.ITEM]: 'item'
+        };
+        const mappedType = typeMap[d.group];
+        if (mappedType) {
+            onNodeSelect(mappedType, d.id);
+        }
+      });
+
+    // Node labels
+    node.append("text")
+      .text(d => d.name)
+      .attr("x", 12)
+      .attr("y", 4)
+      .attr("fill", "#e2e8f0") // slate-200
+      .style("font-size", "10px")
+      .style("font-family", "sans-serif")
+      .style("pointer-events", "none")
+      .style("text-shadow", "2px 2px 4px #000"); // Shadow for readability
+
+    simulation.on("tick", () => {
+      link
+        .attr("x1", d => (d.source as GraphNode).x!)
+        .attr("y1", d => (d.source as GraphNode).y!)
+        .attr("x2", d => (d.target as GraphNode).x!)
+        .attr("y2", d => (d.target as GraphNode).y!);
+
+      node
+        .attr("transform", d => `translate(${d.x},${d.y})`);
+    });
+
+    function dragstarted(event: any, d: GraphNode) {
+      if (!event.active) simulation.alphaTarget(0.3).restart();
+      d.fx = d.x;
+      d.fy = d.y;
     }
-  }, [onNodeSelect]);
+
+    function dragged(event: any, d: GraphNode) {
+      d.fx = event.x;
+      d.fy = event.y;
+    }
+
+    function dragended(event: any, d: GraphNode) {
+      if (!event.active) simulation.alphaTarget(0);
+      d.fx = null;
+      d.fy = null;
+    }
+    
+    return () => simulation.stop();
+
+  }, [nodes, links, onNodeSelect]);
+
+  useEffect(() => {
+    const cleanup = initializeGraph();
+    return () => {
+      if (cleanup) cleanup();
+    }
+  }, [initializeGraph]);
 
   const toggleFilter = (type: EntityType) => {
       setFilters(prev => ({...prev, [type]: !prev[type]}));
   }
 
   return (
-    <div className="h-full w-full bg-slate-950 relative animate-in fade-in duration-500">
-        <div className="absolute top-4 left-4 z-10 bg-slate-900/80 backdrop-blur p-2 rounded-lg border border-slate-800 flex flex-col gap-2 shadow-xl">
+    <div className="w-full h-full rounded-lg overflow-hidden bg-slate-950 border border-slate-700 shadow-inner relative" ref={containerRef}>
+      <div className="absolute top-4 left-4 z-10 bg-slate-900/80 backdrop-blur p-2 rounded-lg border border-slate-800 flex flex-col gap-2 shadow-xl">
             <h3 className="text-xs font-bold text-slate-400 uppercase px-1">Graph Filters</h3>
-            <FilterToggle label="Factions" color="bg-indigo-600" active={filters.faction} onClick={() => toggleFilter('faction')} />
-            <FilterToggle label="NPCs" color="bg-green-600" active={filters.npc} onClick={() => toggleFilter('npc')} />
-            <FilterToggle label="Locations" color="bg-amber-600" active={filters.location} onClick={() => toggleFilter('location')} />
-            <FilterToggle label="Scenes" color="bg-red-600" active={filters.scene} onClick={() => toggleFilter('scene')} />
-            <FilterToggle label="Lore" color="bg-blue-600" active={filters.article} onClick={() => toggleFilter('article')} />
+            <FilterToggle label="Factions" color={TYPE_COLORS[EntityType.FACTION]} active={filters[EntityType.FACTION]} onClick={() => toggleFilter(EntityType.FACTION)} />
+            <FilterToggle label="NPCs" color={TYPE_COLORS[EntityType.NPC]} active={filters[EntityType.NPC]} onClick={() => toggleFilter(EntityType.NPC)} />
+            <FilterToggle label="Locations" color={TYPE_COLORS[EntityType.LOCATION]} active={filters[EntityType.LOCATION]} onClick={() => toggleFilter(EntityType.LOCATION)} />
+            <FilterToggle label="Adventures" color={TYPE_COLORS[EntityType.ADVENTURE]} active={filters[EntityType.ADVENTURE]} onClick={() => toggleFilter(EntityType.ADVENTURE)} />
+            <FilterToggle label="Scenes" color={TYPE_COLORS[EntityType.SCENE]} active={filters[EntityType.SCENE]} onClick={() => toggleFilter(EntityType.SCENE)} />
+            <FilterToggle label="Lore" color={TYPE_COLORS[EntityType.ARTICLE]} active={filters[EntityType.ARTICLE]} onClick={() => toggleFilter(EntityType.ARTICLE)} />
+            <FilterToggle label="Items" color={TYPE_COLORS[EntityType.ITEM]} active={filters[EntityType.ITEM]} onClick={() => toggleFilter(EntityType.ITEM)} />
         </div>
-        <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onNodeClick={onNodeClick}
-            fitView
-            attributionPosition="bottom-right"
-            minZoom={0.1}
-        >
-            <MiniMap 
-                nodeStrokeColor={(n) => {
-                    if (n.data.type === 'faction') return '#6366f1';
-                    if (n.data.type === 'npc') return '#22c55e';
-                    if (n.data.type === 'location') return '#f59e0b';
-                    if (n.data.type === 'scene') return '#ef4444';
-                    return '#3b82f6';
-                }}
-                nodeColor={(n) => {
-                    if (n.data.type === 'faction') return '#312e81';
-                    if (n.data.type === 'npc') return '#14532d';
-                    if (n.data.type === 'location') return '#78350f';
-                    if (n.data.type === 'scene') return '#7f1d1d';
-                    return '#1e3a8a';
-                }}
-                style={{ background: '#0f172a' }}
-            />
-            <Background color="#334155" gap={16} />
-            <Controls className="bg-slate-800 border-slate-700 fill-slate-200" />
-        </ReactFlow>
+      <svg ref={svgRef} className="w-full h-full"></svg>
     </div>
   );
 };
@@ -286,11 +290,11 @@ const FilterToggle = ({ label, color, active, onClick }: { label: string, color:
     <button 
         onClick={onClick}
         className={twMerge(
-            "flex items-center gap-2 px-2 py-1 rounded text-xs font-medium transition-all",
-            active ? "bg-slate-800 text-slate-200" : "bg-slate-900 text-slate-600 hover:text-slate-400"
+            "flex items-center gap-2 px-2 py-1 rounded text-xs font-medium transition-all w-full",
+            active ? "bg-slate-800 text-slate-200" : "bg-slate-950 text-slate-600 hover:text-slate-400"
         )}
     >
-        <div className={twMerge("w-2 h-2 rounded-full", active ? color : "bg-slate-700")} />
+        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: active ? color : '#334155' }} />
         {label}
     </button>
 );
