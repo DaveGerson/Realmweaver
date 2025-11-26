@@ -1,15 +1,19 @@
 
 import React, { useState, useEffect } from 'react';
-import type { Location, LocationConnection, PointOfInterest, PoiInteraction, LootItem, Faction } from '../../types/index';
+import type { Location, LocationConnection, PointOfInterest, PoiInteraction, LootItem, Faction, SessionLog, Article } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
 import { generateEnhancedText, generatePoiFromLoot } from '../../services/geminiService';
+import { EntityHistoryManager } from '../common/EntityHistoryManager';
+import { campaignService } from '../../services/campaignService';
 
 interface LocationEditorProps {
   location: Location;
   allLocations: Location[]; // To select a parent
   allFactions?: Faction[]; // To select controlling faction
+  sessionLogs?: SessionLog[];
+  articles?: Article[];
   onUpdate: (id: string, updatedData: Partial<Location>) => void;
   onDelete: (id: string) => void;
   isMockMode: boolean;
@@ -21,6 +25,8 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
   const [formData, setFormData] = useState(location);
   const [isGenerating, setIsGenerating] = useState<GenerationField | null>(null);
   const [generatingPoiFor, setGeneratingPoiFor] = useState<string | null>(null);
+
+  const campaign = campaignService.getState().campaigns.find(c => c.id === campaignService.getState().activeCampaignId)!;
 
   useEffect(() => {
     setFormData(location);
@@ -345,6 +351,16 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
             </div>
         </div>
 
+        <EntityHistoryManager 
+            subjectId={location.id}
+            subjectType="location"
+            campaign={campaign}
+            onUpdateEntity={(type, id, changes) => {
+                if (type === 'npc') campaignService.updateNpc(id, changes);
+                if (type === 'location') campaignService.updateLocation(id, changes);
+            }}
+        />
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-800">
             <div>
                 <label className="block text-sm font-medium text-slate-400 mb-1.5">Parent Location</label>
@@ -373,6 +389,7 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     </div>
   );
 };
+
 
 // --- Point of Interest Sub-Component ---
 interface PointOfInterestEditorProps {

@@ -224,6 +224,8 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                             notes: c.notes || [],
                             sessionLogs: c.sessionLogs || [],
                             playerCharacters: c.playerCharacters || [],
+                            npcs: (c.npcs || []).map((n: any) => ({...n, relationships: n.relationships || [], history: n.history || []})),
+                            locations: (c.locations || []).map((l: any) => ({...l, history: l.history || []})),
                             // Ensure activeEncounter is initialized if missing in older saves
                             activeEncounter: c.activeEncounter || { id: crypto.randomUUID(), round: 1, turnIndex: 0, combatants: [] }
                         }));
@@ -283,7 +285,9 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                                 secrets: "He is tired of the endless cosmic threats but knows he cannot rest.",
                                 stats: "Archmage (CR 12+)",
                                 factionId: harpersId,
-                                knowsPlayerHistory: []
+                                knowsPlayerHistory: [],
+                                relationships: [],
+                                history: []
                             }
                         ],
                         locations: [
@@ -295,7 +299,8 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                                 subLocationIds: [],
                                 connections: [],
                                 pointsOfInterest: [],
-                                loot: []
+                                loot: [],
+                                history: []
                             }
                         ]
                     };
@@ -376,6 +381,8 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     importedCampaign.notes = importedCampaign.notes || [];
                     importedCampaign.sessionLogs = importedCampaign.sessionLogs || [];
                     importedCampaign.playerCharacters = importedCampaign.playerCharacters || [];
+                    importedCampaign.npcs = (importedCampaign.npcs || []).map(n => ({...n, relationships: n.relationships || [], history: n.history || []}));
+                    importedCampaign.locations = (importedCampaign.locations || []).map(l => ({...l, history: l.history || []}));
                     importedCampaign.activeEncounter = importedCampaign.activeEncounter || { id: crypto.randomUUID(), round: 1, turnIndex: 0, combatants: [] };
                     
                     draft.campaigns.push(importedCampaign);
@@ -413,6 +420,10 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         // --- Entity Actions (Creators return the new ID for selection) ---
         createNpc(newNpcData: Omit<NPC, 'id'>) {
             const newNpc: NPC = { ...newNpcData, id: crypto.randomUUID() };
+            // Ensure new fields are present if not passed
+            if (!newNpc.relationships) newNpc.relationships = [];
+            if (!newNpc.history) newNpc.history = [];
+
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
                 if (campaign) {
@@ -466,6 +477,9 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
 
         createLocation(newLocationData: Omit<Location, 'id'>) {
             const newLocation: Location = { ...newLocationData, id: crypto.randomUUID() };
+            // Ensure history is initialized
+            if (!newLocation.history) newLocation.history = [];
+            
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
                 if(campaign) {
@@ -836,10 +850,24 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 const newFactions = data.factions.map(facData => ({ ...facData, id: crypto.randomUUID(), leaderId: undefined, memberIds: [] }));
                 newFactions.forEach(f => factionNameMap.set(f.name.toLowerCase(), f.id));
         
-                const newLocations = data.locations.map(locData => ({ ...locData, id: crypto.randomUUID(), subLocationIds: [], connections: locData.connections || [], pointsOfInterest: locData.pointsOfInterest || [], loot: locData.loot || [] }));
+                const newLocations = data.locations.map(locData => ({ 
+                    ...locData, 
+                    id: crypto.randomUUID(), 
+                    subLocationIds: [], 
+                    connections: locData.connections || [], 
+                    pointsOfInterest: locData.pointsOfInterest || [], 
+                    loot: locData.loot || [],
+                    history: locData.history || []
+                }));
                 newLocations.forEach(l => locationNameMap.set(l.name.toLowerCase(), l.id));
         
-                const newNpcs = data.npcs.map(npcData => ({ ...npcData, id: crypto.randomUUID(), knowsPlayerHistory: [] }));
+                const newNpcs = data.npcs.map(npcData => ({ 
+                    ...npcData, 
+                    id: crypto.randomUUID(), 
+                    knowsPlayerHistory: [],
+                    relationships: [],
+                    history: [] 
+                }));
                 newNpcs.forEach(n => npcNameMap.set(n.name.toLowerCase(), n.id));
                 
                 const newItems = data.items.map(itemData => ({ ...itemData, id: crypto.randomUUID() }));

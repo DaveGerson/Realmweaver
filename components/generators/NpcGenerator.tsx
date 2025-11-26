@@ -13,9 +13,10 @@ interface NpcGeneratorProps {
   isMockMode: boolean;
   isOfficialSetting?: boolean;
   factions?: Faction[];
+  allNpcs?: NPC[]; // New optional prop
 }
 
-export const NpcGenerator: React.FC<NpcGeneratorProps> = ({ onNpcCreated, isMockMode, isOfficialSetting = false, factions = [] }) => {
+export const NpcGenerator: React.FC<NpcGeneratorProps> = ({ onNpcCreated, isMockMode, isOfficialSetting = false, factions = [], allNpcs = [] }) => {
   const [mode, setMode] = useState<'quick' | 'chat'>('quick');
   const [prompt, setPrompt] = useState('');
   const [useGroundedSearch, setUseGroundedSearch] = useState(isOfficialSetting);
@@ -69,7 +70,8 @@ export const NpcGenerator: React.FC<NpcGeneratorProps> = ({ onNpcCreated, isMock
                         // We pass a dummy delete handler since we are in creation mode
                         <NpcEditor 
                             npc={{...data, id: 'preview'}} 
-                            factions={factions} 
+                            factions={factions}
+                            allNpcs={allNpcs}
                             onUpdate={(_, updates) => onUpdate(updates)} 
                             onDelete={() => {}} 
                             isMockMode={isMockMode} 

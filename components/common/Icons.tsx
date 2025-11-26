@@ -39,6 +39,8 @@ import {
   Minimize2,
   Maximize2,
   CheckCircle2,
+  Pencil,
+  FolderOpen,
 } from 'lucide-react';
 
 export const Icons = {
@@ -78,6 +80,8 @@ export const Icons = {
   Minimize: Minimize2,
   Maximize: Maximize2,
   CheckCircle: CheckCircle2,
+  Edit: Pencil,
+  FolderOpen: FolderOpen,
 };
 
 export const SceneIcon = ({ type, className }: { type: string, className?: string }) => {

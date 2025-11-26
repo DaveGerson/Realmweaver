@@ -128,7 +128,7 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
     const processGeneratedData = (data: BatchAddData) => {
         // Hydrate with temporary IDs for editing
         const hydratedData: WizardStateData = {
-            npcs: data.npcs.map(n => ({ ...n, id: crypto.randomUUID(), factionId: n.factionId, knowsPlayerHistory: [] })),
+            npcs: data.npcs.map(n => ({ ...n, id: crypto.randomUUID(), factionId: n.factionId, knowsPlayerHistory: [], relationships: [], history: [] })),
             locations: data.locations.map(l => ({ ...l, id: crypto.randomUUID(), parentLocationId: l.parentLocationId, subLocationIds: [], loot: l.loot || [], connections: l.connections || [], pointsOfInterest: l.pointsOfInterest || [] })),
             factions: data.factions.map(f => ({ ...f, id: crypto.randomUUID(), leaderId: undefined, memberIds: [] })),
             items: data.items.map(i => ({ ...i, id: crypto.randomUUID() })),
@@ -373,7 +373,9 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                                 {editingEntity.type === 'npcs' && (
                                     <NpcEditor 
                                         npc={generatedData.npcs[editingEntity.index]} 
-                                        factions={combinedFactions} 
+                                        factions={combinedFactions}
+                                        allNpcs={combinedNpcs}
+                                        playerCharacters={campaign.playerCharacters} 
                                         onUpdate={(id, data) => handleUpdateEntity('npcs', editingEntity.index, data)} 
                                         onDelete={() => handleDeleteEntity('npcs', editingEntity.index)} 
                                         isMockMode={isMockMode} 

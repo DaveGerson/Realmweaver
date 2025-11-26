@@ -1,17 +1,20 @@
 
 import React, { useState, useEffect } from 'react';
-import type { Article, ArticleCategory, NPC, Location, Faction } from '../../types/index';
+import type { Article, ArticleCategory } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
 import { generateEnhancedText } from '../../services/geminiService';
+import { EntityHistoryManager } from '../common/EntityHistoryManager';
+import { campaignService } from '../../services/campaignService';
 
 interface ArticleEditorProps {
   article: Article;
   allArticles: Article[];
-  allNpcs?: NPC[];
-  allLocations?: Location[];
-  allFactions?: Faction[];
+  // Optional props
+  allNpcs?: any[]; 
+  allLocations?: any[];
+  allFactions?: any[];
   onUpdate: (id: string, updatedData: Partial<Article>) => void;
   onDelete: (id: string) => void;
   isMockMode: boolean;
@@ -19,9 +22,14 @@ interface ArticleEditorProps {
 
 const categoryOptions: ArticleCategory[] = ['lore', 'history', 'cosmology'];
 
-export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticles, allNpcs = [], allLocations = [], allFactions = [], onUpdate, onDelete, isMockMode }) => {
+export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticles, onUpdate, onDelete, isMockMode }) => {
   const [formData, setFormData] = useState(article);
   const [isGenerating, setIsGenerating] = useState<keyof Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds' | 'category'> | null>(null);
+  const campaign = campaignService.getState().campaigns.find(c => c.id === campaignService.getState().activeCampaignId)!;
+
+  const allNpcs = campaign.npcs;
+  const allLocations = campaign.locations;
+  const allFactions = campaign.factions;
 
   useEffect(() => {
     setFormData(article);
@@ -158,6 +166,16 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
                 <p className="text-xs text-slate-500 italic text-center py-2">Create NPCs, Locations, or Factions to link them here.</p>
             )}
         </div>
+
+        <EntityHistoryManager 
+            subjectId={article.id}
+            subjectType="article"
+            campaign={campaign}
+            onUpdateEntity={(type, id, changes) => {
+                if (type === 'npc') campaignService.updateNpc(id, changes);
+                if (type === 'location') campaignService.updateLocation(id, changes);
+            }}
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>

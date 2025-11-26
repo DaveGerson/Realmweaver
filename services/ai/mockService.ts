@@ -15,7 +15,9 @@ const mockNpcData: Omit<NPC, 'id' | 'factionId'> = {
   knowsPlayerHistory: [
     { playerId: 'Faelan', details: 'Bjorn owes Faelan a life debt after being saved from a rockslide.' },
     { playerId: 'Lyra', details: 'Mistrusts Lyra due to her association with the Silent Hand, but respects her skills.' }
-  ]
+  ],
+  relationships: [],
+  history: []
 };
 
 const mockLocationData: Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'> = {
@@ -42,12 +44,16 @@ const mockLocationData: Omit<Location, 'id' | 'parentLocationId' | 'subLocationI
           ]
       }
   ],
+  history: [],
 };
 
 const mockFactionData: Omit<Faction, 'id' | 'leaderId' | 'memberIds'> = {
     name: "The Mocked Silent Hand",
     description: "A clandestine guild of spies and assassins operating in the city's shadows.",
-    goals: "To destabilize the current noble houses and seize political power from behind the scenes."
+    goals: "To destabilize the current noble houses and seize political power from behind the scenes.",
+    alignment: "Neutral Evil",
+    resources: "Network of safehouses, poison supplies, blackmail material.",
+    influence: "Strong ties to the criminal underworld and corrupt city officials."
 };
 
 const mockRollableTableData: RollableTable = {
@@ -100,12 +106,12 @@ const mockArticleData: Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds'>
 
 const mockComplexCampaignFillData: BatchAddData = {
     npcs: [
-        { name: "Elara", description: "A stoic warden of the woods.", traits: "Speaks to animals.", exampleQuote: "The forest remembers.", backstory: "Raised by wolves.", motivations: "Protect the ancient groves.", secrets: "Is part dryad.", stats: "Ranger", factionId: "The Emerald Enclave" },
-        { name: "Kaelen", description: "A shadowy figure in a dark cloak.", traits: "Never shows his face.", exampleQuote: "Knowledge is a sharper blade than any sword.", backstory: "A disgraced noble.", motivations: "To reclaim his birthright.", secrets: "Works for the Shadow Syndicate.", stats: "Assassin", factionId: "The Shadow Syndicate" },
+        { name: "Elara", description: "A stoic warden of the woods.", traits: "Speaks to animals.", exampleQuote: "The forest remembers.", backstory: "Raised by wolves.", motivations: "Protect the ancient groves.", secrets: "Is part dryad.", stats: "Ranger", factionId: "The Emerald Enclave", relationships: [], history: [] },
+        { name: "Kaelen", description: "A shadowy figure in a dark cloak.", traits: "Never shows his face.", exampleQuote: "Knowledge is a sharper blade than any sword.", backstory: "A disgraced noble.", motivations: "To reclaim his birthright.", secrets: "Works for the Shadow Syndicate.", stats: "Assassin", factionId: "The Shadow Syndicate", relationships: [], history: [] },
     ],
     locations: [
-        { name: "The Sunken Temple", description: "An ancient temple slowly being reclaimed by the sea.", secrets: "A hidden chamber lies behind the main altar.", parentLocationId: undefined, loot: [], connections: [], pointsOfInterest: [] },
-        { name: "The Tidal Chamber", description: "A chamber that floods with the high tide.", secrets: "The tide reveals glowing runes on the walls.", parentLocationId: "The Sunken Temple", loot: [], connections: [], pointsOfInterest: [] },
+        { name: "The Sunken Temple", description: "An ancient temple slowly being reclaimed by the sea.", secrets: "A hidden chamber lies behind the main altar.", parentLocationId: undefined, loot: [], connections: [], pointsOfInterest: [], history: [] },
+        { name: "The Tidal Chamber", description: "A chamber that floods with the high tide.", secrets: "The tide reveals glowing runes on the walls.", parentLocationId: "The Sunken Temple", loot: [], connections: [], pointsOfInterest: [], history: [] },
     ],
     factions: [
         { name: "The Emerald Enclave", description: "Guardians of the natural order.", goals: "To stop civilization's encroachment." },
@@ -341,38 +347,63 @@ export const chatWithRealmWeaver = async (
     logContext(campaignContext);
     await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
 
-    // Simulate updating a draft based on focused type
+    const lastMsg = history[history.length - 1].text.toLowerCase();
     const newDrafts = [...currentDrafts];
-    const targetType = focusedEntityType || 'npc';
-
+    
+    // 1. Focused Mode
     if (focusedEntityType) {
-        // Find existing draft or create new one
-        let draftIndex = newDrafts.findIndex(d => d.type === targetType);
-        if (draftIndex === -1) {
-            // @ts-ignore
-            newDrafts.push({
-                id: `mock-draft-${targetType}-1`,
-                type: targetType,
+        let draft = newDrafts.find(d => d.type === focusedEntityType);
+        if (!draft) {
+             // @ts-ignore
+            draft = {
+                id: `mock-draft-${focusedEntityType}-${Date.now()}`,
+                type: focusedEntityType,
                 status: 'draft',
-                data: { name: `Mocked ${targetType}`, description: "This description was generated in the chat." }
-            });
+                data: { name: `Mocked ${focusedEntityType}`, description: "Generated in focused mock chat." }
+            };
+            newDrafts.push(draft);
         } else {
-             // Update existing draft
-             const draft = newDrafts[draftIndex];
-             if (draft.data) {
-                 // @ts-ignore
-                 draft.data.description = (draft.data.description || "") + " (Updated by Chat)";
-             }
+             // Update existing
+             // @ts-ignore
+             draft.data.description = (draft.data.description || "") + " ...and more mock details.";
+        }
+        
+        return Promise.resolve({
+            message: `[Mock] I've updated the ${focusedEntityType} draft based on: "${lastMsg}". What else?`,
+            suggestions: ["Add a secret", "Change the name", "Finish it"],
+            draftEntities: newDrafts
+        });
+    }
+
+    // 2. General Chat Mode - Detect intent
+    let message = `[Mock] Interesting point about "${lastMsg}". I can help you create content for your campaign.`;
+    const suggestions = ["Tell me a rumor", "Create an NPC", "Describe a location"];
+
+    if (lastMsg.includes('create') || lastMsg.includes('make') || lastMsg.includes('draft')) {
+        if (lastMsg.includes('npc')) {
+             // @ts-ignore
+             newDrafts.push({
+                id: `mock-draft-npc-${Date.now()}`,
+                type: 'npc',
+                status: 'draft',
+                data: { name: "Mocked NPC", description: "Created via general mock chat." }
+            });
+            message = "[Mock] I've started a draft for that NPC. You can see it in the drafts bar above.";
+        } else if (lastMsg.includes('location')) {
+             // @ts-ignore
+             newDrafts.push({
+                id: `mock-draft-loc-${Date.now()}`,
+                type: 'location',
+                status: 'draft',
+                data: { name: "Mocked Location", description: "Created via general mock chat." }
+            });
+            message = "[Mock] Location draft started.";
         }
     }
 
     return Promise.resolve({
-        message: `[Mock Chat] I'm focusing on creating a ${targetType}. What details would you like to add?
-        
-1. Option A: A detail about their history.
-2. Option B: A detail about their appearance.
-3. Option C: A detail about their goals.`,
-        suggestions: ["Make them ancient", "Give them a scar", "They seek redemption"],
+        message,
+        suggestions,
         draftEntities: newDrafts
     });
 }

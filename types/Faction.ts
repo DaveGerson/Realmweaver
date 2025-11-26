@@ -1,3 +1,4 @@
+
 // types/Faction.ts
 export interface Faction {
   id: string;
@@ -6,4 +7,8 @@ export interface Faction {
   goals: string;
   leaderId?: string;
   memberIds: string[];
+  alignment?: string;
+  resources?: string;
+  influence?: string;
+  headquartersLocationId?: string;
 }

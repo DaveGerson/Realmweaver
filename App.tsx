@@ -20,7 +20,7 @@ import { PlayerCharacterEditor } from './components/editors/PlayerCharacterEdito
 import { NoteEditor } from './components/editors/NoteEditor';
 import { CampaignSettingEditor } from './components/editors/CampaignSettingEditor';
 import { CombatTracker } from './components/tools/CombatTracker';
-import { RelationshipGraph } from './components/visualizers/RelationshipGraph'; // Import the graph
+import { RelationshipGraph } from './components/visualizers/RelationshipGraph';
 import { ContentWrapper } from './components/layout/ContentWrapper';
 import { DmCoach } from './components/dialogs/DmCoach';
 import { EvocationWizard } from './components/dialogs/EvocationWizard';
@@ -122,7 +122,7 @@ const App: React.FC = () => {
     });
 };
 
-    // Generic handler for RealmChat
+    // Generic handler for RealmChat additions
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleAddEntityFromChat = (type: string, data: any) => {
         switch (type) {
@@ -152,6 +152,33 @@ const App: React.FC = () => {
                 break;
             default:
                 console.warn("Unknown entity type from chat:", type);
+        }
+    };
+
+    // Generic handler for RealmChat updates
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleUpdateEntityFromChat = (type: string, id: string, data: any) => {
+        switch (type) {
+            case 'npc': 
+                campaignService.updateNpc(id, data);
+                break;
+            case 'location': 
+                campaignService.updateLocation(id, data);
+                break;
+            case 'faction': 
+                campaignService.updateFaction(id, data);
+                break;
+            case 'item': 
+                campaignService.updateItem(id, data);
+                break;
+            case 'article': 
+                campaignService.updateArticle(id, data);
+                break;
+            case 'adventure':
+                campaignService.updateAdventure(id, data);
+                break;
+            default:
+                console.warn("Unknown entity type update from chat:", type);
         }
     };
 
@@ -309,14 +336,62 @@ const App: React.FC = () => {
 
       // Render Editors & Dashboards - Editors take priority if an item is selected
       if (selectedPlayerCharacter) return <PlayerCharacterEditor pc={selectedPlayerCharacter} onUpdate={campaignService.updatePlayerCharacter} onDelete={(id) => { campaignService.deletePlayerCharacter(id); resetSelections(); }} />;
-      if (selectedSessionLog) return <SessionLogEditor log={selectedSessionLog} onUpdate={campaignService.updateSessionLog} onDelete={(id) => { campaignService.deleteSessionLog(id); resetSelections(); }} />;
+      
+      if (selectedSessionLog) return (
+        <SessionLogEditor 
+            log={selectedSessionLog} 
+            onUpdate={campaignService.updateSessionLog} 
+            onDelete={(id) => { campaignService.deleteSessionLog(id); resetSelections(); }} 
+        />
+      );
+      
       if (selectedNote) return <NoteEditor note={selectedNote} onUpdate={campaignService.updateNote} onDelete={(id) => { campaignService.deleteNote(id); resetSelections(); }} isMockMode={isMockMode} />;
       if (selectedScene && selectedAdventure) return <SceneEditor scene={selectedScene} allNpcs={activeCampaign.npcs} allLocations={activeCampaign.locations} onUpdate={(id, data) => campaignService.updateScene(selectedAdventure.id, id, data)} onDelete={(id) => { campaignService.deleteScene(selectedAdventure.id, id); setSelectedSceneId(null); }} isMockMode={isMockMode} isActiveScene={activeCampaign.activeSceneId === selectedScene.id} onSetActive={campaignService.setActiveScene} />;
       if (selectedAdventure) return <AdventureEditor adventure={selectedAdventure} campaign={activeCampaign} onUpdate={campaignService.updateAdventure} />;
-      if (selectedArticle) return <ArticleEditor article={selectedArticle} allArticles={activeCampaign.articles} allNpcs={activeCampaign.npcs} allLocations={activeCampaign.locations} allFactions={activeCampaign.factions} onUpdate={campaignService.updateArticle} onDelete={(id) => { campaignService.deleteArticle(id); resetSelections(); }} isMockMode={isMockMode} />;
-      if (selectedNpc) return <NpcEditor npc={selectedNpc} factions={activeCampaign.factions} onUpdate={campaignService.updateNpc} onDelete={(id) => { campaignService.deleteNpc(id); resetSelections(); }} isMockMode={isMockMode} />;
-      if (selectedLocation) return <LocationEditor location={selectedLocation} allLocations={activeCampaign.locations} allFactions={activeCampaign.factions} onUpdate={campaignService.updateLocation} onDelete={(id) => { campaignService.deleteLocation(id); resetSelections(); }} isMockMode={isMockMode} />;
-      if (selectedFaction) return <FactionEditor faction={selectedFaction} allNpcs={activeCampaign.npcs} onUpdate={campaignService.updateFaction} onDelete={(id) => { campaignService.deleteFaction(id); resetSelections(); }} isMockMode={isMockMode} />;
+      
+      if (selectedArticle) return (
+        <ArticleEditor 
+            article={selectedArticle} 
+            allArticles={activeCampaign.articles} 
+            onUpdate={campaignService.updateArticle} 
+            onDelete={(id) => { campaignService.deleteArticle(id); resetSelections(); }} 
+            isMockMode={isMockMode} 
+        />
+      );
+      
+      if (selectedNpc) return (
+        <NpcEditor 
+            npc={selectedNpc} 
+            factions={activeCampaign.factions} 
+            allNpcs={activeCampaign.npcs} 
+            playerCharacters={activeCampaign.playerCharacters} 
+            onUpdate={campaignService.updateNpc} 
+            onDelete={(id) => { campaignService.deleteNpc(id); resetSelections(); }} 
+            isMockMode={isMockMode} 
+        />
+      );
+      
+      if (selectedLocation) return (
+        <LocationEditor 
+            location={selectedLocation} 
+            allLocations={activeCampaign.locations} 
+            allFactions={activeCampaign.factions} 
+            onUpdate={campaignService.updateLocation} 
+            onDelete={(id) => { campaignService.deleteLocation(id); resetSelections(); }} 
+            isMockMode={isMockMode} 
+        />
+      );
+      
+      if (selectedFaction) return (
+        <FactionEditor 
+            faction={selectedFaction} 
+            allNpcs={activeCampaign.npcs} 
+            allLocations={activeCampaign.locations}
+            onUpdate={campaignService.updateFaction} 
+            onDelete={(id) => { campaignService.deleteFaction(id); resetSelections(); }} 
+            isMockMode={isMockMode} 
+        />
+      );
       if (selectedItem) return <ItemEditor item={selectedItem} onUpdate={campaignService.updateItem} onDelete={(id) => { campaignService.deleteItem(id); resetSelections(); }} isMockMode={isMockMode} />;
 
       // If no specific item is selected, show the corresponding dashboard
@@ -377,7 +452,7 @@ const App: React.FC = () => {
             setActiveView('locations');
             setSelectedLocationId(newId);
         }} onSelectLocation={setSelectedLocationId} isMockMode={isMockMode} isOfficialSetting={isOfficialSetting} />;
-      if (activeView === 'factions') return <FactionDashboard factions={activeCampaign.factions} npcs={activeCampaign.npcs} onFactionCreated={(facData) => {
+      if (activeView === 'factions') return <FactionDashboard factions={activeCampaign.factions} npcs={activeCampaign.npcs} locations={activeCampaign.locations} onFactionCreated={(facData) => {
             const newId = campaignService.createFaction(facData);
             setActiveView('factions');
             setSelectedFactionId(newId);
@@ -486,7 +561,8 @@ const App: React.FC = () => {
                 {/* Floating Widgets */}
                 <RealmChatWidget 
                   campaign={activeCampaign} 
-                  onAddToCampaign={handleAddEntityFromChat} 
+                  onAddToCampaign={handleAddEntityFromChat}
+                  onUpdateCampaign={handleUpdateEntityFromChat}
                   isMockMode={isMockMode} 
                 />
                 

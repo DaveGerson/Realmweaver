@@ -12,6 +12,8 @@ export const createDefaultNpc = (): NPC => ({
   stats: '',
   exampleQuote: '',
   knowsPlayerHistory: [],
+  relationships: [],
+  history: [],
 });
 
 export const createDefaultLocation = (): Location => ({
@@ -23,6 +25,7 @@ export const createDefaultLocation = (): Location => ({
   connections: [],
   pointsOfInterest: [],
   loot: [],
+  history: [],
 });
 
 export const createDefaultFaction = (): Faction => ({
@@ -30,6 +33,9 @@ export const createDefaultFaction = (): Faction => ({
   name: 'New Faction',
   description: '',
   goals: '',
+  alignment: '',
+  resources: '',
+  influence: '',
   memberIds: [],
 });
 

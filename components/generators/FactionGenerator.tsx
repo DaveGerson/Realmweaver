@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import type { Faction, NPC } from '../../types/index';
+import type { Faction, NPC, Location } from '../../types/index';
 import { generateFaction } from '../../services/geminiService';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
@@ -13,9 +13,10 @@ interface FactionGeneratorProps {
   isMockMode: boolean;
   isOfficialSetting?: boolean;
   npcs?: NPC[];
+  allLocations?: Location[];
 }
 
-export const FactionGenerator: React.FC<FactionGeneratorProps> = ({ onFactionCreated, isMockMode, isOfficialSetting = false, npcs = [] }) => {
+export const FactionGenerator: React.FC<FactionGeneratorProps> = ({ onFactionCreated, isMockMode, isOfficialSetting = false, npcs = [], allLocations = [] }) => {
   const [mode, setMode] = useState<'quick' | 'chat'>('quick');
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -67,6 +68,7 @@ export const FactionGenerator: React.FC<FactionGeneratorProps> = ({ onFactionCre
                         <FactionEditor 
                             faction={{...data, id: 'preview'}} 
                             allNpcs={npcs}
+                            allLocations={allLocations}
                             onUpdate={(_, updates) => onUpdate(updates)} 
                             onDelete={() => {}} 
                             isMockMode={isMockMode} 

@@ -3,15 +3,19 @@ import React, { useState, useEffect } from 'react';
 import type { SessionLog } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
+import { EntityHistoryManager } from '../common/EntityHistoryManager';
+import { campaignService } from '../../services/campaignService';
 
 interface SessionLogEditorProps {
   log: SessionLog;
+  // Other props kept for compatibility but unused directly here
   onUpdate: (id: string, updatedData: Partial<SessionLog>) => void;
   onDelete: (id: string) => void;
 }
 
 export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdate, onDelete }) => {
   const [formData, setFormData] = useState(log);
+  const campaign = campaignService.getState().campaigns.find(c => c.id === campaignService.getState().activeCampaignId)!;
 
   useEffect(() => {
     setFormData(log);
@@ -95,6 +99,17 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
             <label className="block text-sm font-medium text-slate-400 mb-1.5">New Loose Ends & Plot Hooks</label>
             <textarea name="looseEnds" value={formData.looseEnds} onChange={handleChange} onBlur={handleBlur} rows={5} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none resize-y placeholder:text-slate-600" placeholder="- What will the villain do in response?&#10;- Who owns the mysterious key they found?" />
         </div>
+
+        <EntityHistoryManager 
+            subjectId={log.id}
+            subjectType="session"
+            campaign={campaign}
+            onUpdateEntity={(type, id, changes) => {
+                if (type === 'npc') campaignService.updateNpc(id, changes);
+                if (type === 'location') campaignService.updateLocation(id, changes);
+            }}
+        />
+
       </div>
     </div>
   );

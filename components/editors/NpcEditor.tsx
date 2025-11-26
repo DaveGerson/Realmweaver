@@ -1,22 +1,32 @@
 
 import React, { useState, useEffect } from 'react';
-import type { NPC, Faction } from '../../types/index';
+import type { NPC, Faction, EntityRelationship, PlayerCharacter } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
 import { generateEnhancedText } from '../../services/geminiService';
+import { EntityHistoryManager } from '../common/EntityHistoryManager';
+import { campaignService } from '../../services/campaignService'; // Import store for access to full state
 
 interface NpcEditorProps {
   npc: NPC;
   factions: Faction[];
+  allNpcs?: NPC[];
+  playerCharacters?: PlayerCharacter[];
+  // sessionLogs and articles are no longer needed directly as props if we access via store, but kept for prop compatibility if needed
+  sessionLogs?: any[]; 
+  articles?: any[];
   onUpdate: (id: string, updatedData: Partial<NPC>) => void;
   onDelete: (id: string) => void;
   isMockMode: boolean;
 }
 
-export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, onUpdate, onDelete, isMockMode }) => {
+export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [], playerCharacters = [], onUpdate, onDelete, isMockMode }) => {
   const [formData, setFormData] = useState(npc);
-  const [isGenerating, setIsGenerating] = useState<keyof Omit<NPC, 'id' | 'factionId' | 'knowsPlayerHistory'> | null>(null);
+  const [isGenerating, setIsGenerating] = useState<keyof Omit<NPC, 'id' | 'factionId' | 'knowsPlayerHistory' | 'relationships' | 'history'> | null>(null);
+
+  // We need access to the full campaign for the HistoryManager to resolve links
+  const campaign = campaignService.getState().campaigns.find(c => c.id === campaignService.getState().activeCampaignId)!;
 
   useEffect(() => {
     setFormData(npc);
@@ -28,7 +38,6 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, onUpdate, o
   };
   
   const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    // Check if data actually changed before calling onUpdate
     if (formData[e.target.name as keyof NPC] !== npc[e.target.name as keyof NPC]) {
         onUpdate(npc.id, { [e.target.name]: e.target.value });
     }
@@ -47,7 +56,7 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, onUpdate, o
     }
   }
 
-  const handleAiGenerate = async (field: keyof Omit<NPC, 'id' | 'factionId' | 'knowsPlayerHistory'>) => {
+  const handleAiGenerate = async (field: keyof Omit<NPC, 'id' | 'factionId' | 'knowsPlayerHistory' | 'relationships' | 'history'>) => {
     setIsGenerating(field);
     const npcContext = `NPC Name: ${formData.name}\nDescription: ${formData.description || 'Not specified'}\nTraits: ${formData.traits || 'Not specified'}`;
     const prompt = `Based on the following NPC info, generate a compelling "${field}":\n\n${npcContext}`;
@@ -64,28 +73,34 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, onUpdate, o
     }
   };
 
-  // --- Player History Handlers ---
-  const handleHistoryChange = (index: number, field: 'playerId' | 'details', value: string) => {
-    const newHistory = [...(formData.knowsPlayerHistory || [])];
-    newHistory[index] = { ...newHistory[index], [field]: value };
-    setFormData(prev => ({ ...prev, knowsPlayerHistory: newHistory }));
+  // --- Relationship Handlers ---
+  const handleAddRelationship = () => {
+      const newRel: EntityRelationship = { id: crypto.randomUUID(), targetId: '', relationType: '', description: '' };
+      const newRelationships = [...(formData.relationships || []), newRel];
+      setFormData(prev => ({...prev, relationships: newRelationships}));
+      onUpdate(npc.id, { relationships: newRelationships });
   };
 
-  const handleHistoryBlur = () => {
-    onUpdate(npc.id, { knowsPlayerHistory: formData.knowsPlayerHistory });
+  const handleRelationshipChange = (index: number, field: keyof EntityRelationship, value: string) => {
+      const newRelationships = [...(formData.relationships || [])];
+      newRelationships[index] = { ...newRelationships[index], [field]: value };
+      setFormData(prev => ({...prev, relationships: newRelationships}));
   };
 
-  const handleAddHistory = () => {
-    const newHistory = [...(formData.knowsPlayerHistory || []), { playerId: '', details: '' }];
-    setFormData(prev => ({ ...prev, knowsPlayerHistory: newHistory }));
-    onUpdate(npc.id, { knowsPlayerHistory: newHistory });
+  const handleRelationshipBlur = () => {
+      onUpdate(npc.id, { relationships: formData.relationships });
   };
 
-  const handleDeleteHistory = (index: number) => {
-    const newHistory = (formData.knowsPlayerHistory || []).filter((_, i) => i !== index);
-    setFormData(prev => ({ ...prev, knowsPlayerHistory: newHistory }));
-    onUpdate(npc.id, { knowsPlayerHistory: newHistory });
+  const handleDeleteRelationship = (index: number) => {
+      const newRelationships = (formData.relationships || []).filter((_, i) => i !== index);
+      setFormData(prev => ({...prev, relationships: newRelationships}));
+      onUpdate(npc.id, { relationships: newRelationships });
   };
+
+  const possibleTargets = [
+      ...playerCharacters.map(pc => ({ id: pc.id, name: `${pc.characterSocial.characterName} (PC)` })),
+      ...allNpcs.filter(n => n.id !== npc.id).map(n => ({ id: n.id, name: n.name }))
+  ];
 
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
@@ -224,45 +239,67 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, onUpdate, o
           isGenerating={isGenerating === 'stats'}
         />
         
-        {/* Player History */}
+        {/* Relationships Section */}
         <div>
-          <div className="flex justify-between items-center mb-1.5">
-            <label className="block text-sm font-medium text-slate-400">Player History & Relationships</label>
-            <Button size="sm" variant="ghost" onClick={handleAddHistory}>
-              <Icons.Plus className="w-3 h-3 mr-1.5" /> Add History
-            </Button>
-          </div>
-          <div className="space-y-2">
-            {formData.knowsPlayerHistory?.map((history, index) => (
-              <div key={index} className="flex items-start gap-2 bg-slate-950/50 p-2 rounded-md border border-slate-800/50">
-                <div className="flex-grow space-y-2">
-                  <input
-                    type="text"
-                    placeholder="Player Name/Alias"
-                    value={history.playerId}
-                    onChange={(e) => handleHistoryChange(index, 'playerId', e.target.value)}
-                    onBlur={handleHistoryBlur}
-                    className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-                  <textarea
-                    placeholder="Details about their relationship, shared history, secrets, etc."
-                    value={history.details}
-                    onChange={(e) => handleHistoryChange(index, 'details', e.target.value)}
-                    onBlur={handleHistoryBlur}
-                    rows={2}
-                    className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500 resize-y"
-                  />
-                </div>
-                <button onClick={() => handleDeleteHistory(index)} className="text-slate-500 hover:text-red-400 p-1 rounded transition-colors mt-1">
-                  <Icons.Trash className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-            {(!formData.knowsPlayerHistory || formData.knowsPlayerHistory.length === 0) && (
-              <p className="text-xs text-slate-500 italic px-2 py-1">No specific history with players recorded.</p>
-            )}
-          </div>
+            <div className="flex justify-between items-center mb-1.5">
+                <label className="block text-sm font-medium text-slate-400">Relationships</label>
+                <Button size="sm" variant="ghost" onClick={handleAddRelationship}>
+                    <Icons.Plus className="w-3 h-3 mr-1.5" /> Add Relationship
+                </Button>
+            </div>
+            <div className="space-y-2">
+                {(formData.relationships || []).map((rel, index) => (
+                    <div key={rel.id} className="flex items-start gap-2 bg-slate-950/50 p-2 rounded-md border border-slate-800/50">
+                        <div className="flex flex-col gap-2 w-full">
+                            <div className="flex gap-2">
+                                <select 
+                                    value={rel.targetId}
+                                    onChange={(e) => handleRelationshipChange(index, 'targetId', e.target.value)}
+                                    onBlur={handleRelationshipBlur}
+                                    className="w-1/2 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500"
+                                >
+                                    <option value="">-- Select Target --</option>
+                                    {possibleTargets.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                </select>
+                                <input 
+                                    type="text" 
+                                    placeholder="Type (e.g. Rival)" 
+                                    value={rel.relationType}
+                                    onChange={(e) => handleRelationshipChange(index, 'relationType', e.target.value)}
+                                    onBlur={handleRelationshipBlur}
+                                    className="w-1/2 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500"
+                                />
+                            </div>
+                            <textarea
+                                placeholder="Details about the relationship..."
+                                value={rel.description}
+                                onChange={(e) => handleRelationshipChange(index, 'description', e.target.value)}
+                                onBlur={handleRelationshipBlur}
+                                rows={1}
+                                className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500 resize-y"
+                            />
+                        </div>
+                        <button onClick={() => handleDeleteRelationship(index)} className="text-slate-500 hover:text-red-400 p-1 rounded transition-colors">
+                            <Icons.Trash className="w-4 h-4" />
+                        </button>
+                    </div>
+                ))}
+                {(!formData.relationships || formData.relationships.length === 0) && (
+                    <p className="text-xs text-slate-500 italic px-2 py-1">No relationships defined.</p>
+                )}
+            </div>
         </div>
+
+        {/* History Manager */}
+        <EntityHistoryManager 
+            subjectId={npc.id}
+            subjectType="npc"
+            campaign={campaign}
+            onUpdateEntity={(type, id, changes) => {
+                if (type === 'npc') campaignService.updateNpc(id, changes);
+                if (type === 'location') campaignService.updateLocation(id, changes);
+            }}
+        />
 
       </div>
     </div>

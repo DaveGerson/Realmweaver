@@ -35,8 +35,11 @@ export const factionSchema = {
         name: { type: Type.STRING, description: "The name of the faction or organization." },
         description: { type: Type.STRING, description: "A summary of the faction's purpose, public image, and typical members." },
         goals: { type: Type.STRING, description: "The faction's primary short-term and long-term objectives." },
+        alignment: { type: Type.STRING, description: "The general moral and ethical alignment of the faction (e.g., Lawful Neutral, Chaotic Good)." },
+        resources: { type: Type.STRING, description: "The assets, wealth, and tools at the faction's disposal (e.g., 'Vast gold reserves', 'Network of safehouses', 'Magical artifacts')." },
+        influence: { type: Type.STRING, description: "Where the faction holds power and how they exert it (e.g., 'Controls the city watch', 'Respected by the common folk', 'Feared in the underworld')." },
     },
-    required: ['name', 'description', 'goals'],
+    required: ['name', 'description', 'goals', 'alignment', 'resources', 'influence'],
 };
 
 export const itemSchema = {
@@ -147,7 +150,7 @@ export const generateNpc = async (prompt: string, useGroundedSearch: boolean = f
 - **stats:** A TTRPG-agnostic suggestion for their capabilities (e.g., "Use 'Guard' stats, but add a poison dagger attack.").`;
   const configOverrides = useGroundedSearch ? { tools: [{googleSearch: {}}] } : {};
   const generatedData = await generateWithSchema(prompt, npcSchema, instructions, configOverrides, 'gemini-2.5-flash', campaignContext);
-  return { ...generatedData, knowsPlayerHistory: [] }; // The AI doesn't generate this field, so return an empty array.
+  return { ...generatedData, knowsPlayerHistory: [], relationships: [], history: [] }; // The AI doesn't generate these fields yet, so return empty arrays.
 };
 
 export const generateLocation = async (prompt: string, useGroundedSearch: boolean = false, campaignContext?: string): Promise<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>> => {
@@ -165,7 +168,10 @@ export const generateFaction = async (prompt: string, useGroundedSearch: boolean
 
 - **name:** The name of the faction or organization.
 - **description:** A summary of the faction's purpose, public image, and a typical members.
-- **goals:** The faction's primary objectives. Make these actionable and clear, providing potential plot hooks for the GM.`;
+- **goals:** The faction's primary objectives. Make these actionable and clear, providing potential plot hooks for the GM.
+- **alignment:** The general moral alignment (e.g. Neutral Good, Lawful Evil).
+- **resources:** What resources they command (wealth, magic, information, soldiers).
+- **influence:** Where and how they exert power.`;
   const configOverrides = useGroundedSearch ? { tools: [{googleSearch: {}}] } : {};
   return generateWithSchema(prompt, factionSchema, instructions, configOverrides, 'gemini-2.5-flash', campaignContext);
 };

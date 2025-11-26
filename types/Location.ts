@@ -1,5 +1,7 @@
 
 // types/Location.ts
+import type { HistoryEntry } from './NPC';
+
 export interface LocationConnection {
   id: string;
   targetLocationId: string;
@@ -38,4 +40,5 @@ export interface Location {
   connections?: LocationConnection[];
   pointsOfInterest?: PointOfInterest[];
   controllingFactionId?: string; // The faction that controls or influences this area
+  history: HistoryEntry[];
 }

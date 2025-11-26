@@ -17,6 +17,7 @@ import {
     parseDocumentForEntities,
     generateChatResponse,
     parseCharacterSheetPdf,
+    chatWithRealmWeaver,
 } from './services/geminiService';
 import { createCampaignStore } from './services/campaignService';
 
@@ -113,6 +114,52 @@ const testServiceFunctions = async (isMockMode: boolean) => {
   console.groupEnd();
   return success;
 };
+
+const testRealmChat = async (isMockMode: boolean) => {
+    console.groupCollapsed('Smoke Test: RealmChat');
+    let success = true;
+    try {
+        // 1. General Chat
+        const generalResponse = await chatWithRealmWeaver(
+            [{ id: '1', role: 'user', text: 'Hello', timestamp: Date.now() }],
+            [],
+            [],
+            'Mock Context',
+            'medium',
+            isMockMode
+        );
+        success &&= testLog(!!(generalResponse.message), 'General Chat Response: Success', 'General Chat Response: Failed', generalResponse);
+
+        // 2. General Chat with Intent
+        const intentResponse = await chatWithRealmWeaver(
+            [{ id: '2', role: 'user', text: 'Create an NPC', timestamp: Date.now() }],
+            [],
+            [],
+            'Mock Context',
+            'medium',
+            isMockMode
+        );
+        success &&= testLog(intentResponse.draftEntities.length > 0, 'Intent Draft Creation: Success', 'Intent Draft Creation: Failed (No draft created)', intentResponse);
+
+        // 3. Focused Chat
+        const focusedResponse = await chatWithRealmWeaver(
+            [{ id: '3', role: 'user', text: 'Make it scary', timestamp: Date.now() }],
+            [],
+            [],
+            'Mock Context',
+            'medium',
+            isMockMode,
+            'npc'
+        );
+        success &&= testLog(focusedResponse.draftEntities.some(d => d.type === 'npc'), 'Focused Draft Creation: Success', 'Focused Draft Creation: Failed', focusedResponse);
+
+    } catch (e) {
+        console.error('❌ RealmChat test failed with error:', e);
+        success = false;
+    }
+    console.groupEnd();
+    return success;
+}
 
 const testCampaignHandlers = async (isMockMode: boolean) => {
     console.groupCollapsed('Smoke Test: State Logic & Relationships (Frontend Simulation)');
@@ -278,7 +325,7 @@ const testImportExport = async () => {
 
     try {
         testService.createCampaign('Export Test', 'A world to be exported', 'custom');
-        testService.createNpc({ name: 'Export NPC', description: 'desc', traits: 'traits', backstory: 'bs', motivations: 'motive', secrets: 'secret', stats: 'stats', exampleQuote: 'quote', knowsPlayerHistory: [] });
+        testService.createNpc({ name: 'Export NPC', description: 'desc', traits: 'traits', backstory: 'bs', motivations: 'motive', secrets: 'secret', stats: 'stats', exampleQuote: 'quote', knowsPlayerHistory: [], relationships: [], history: [] });
         const originalCampaign = testService.getActiveCampaign();
         if (!originalCampaign) return testLog(false, '', 'Failed to get campaign for export');
 
@@ -309,9 +356,10 @@ export const runSmokeTests = async (isMockMode: boolean) => {
   localStorage.removeItem('realmweaver-active-campaign-id');
   console.log(`%c🚀 Running application smoke tests... (Mock Mode: ${isMockMode})`, 'color: #7c3aed; font-size: 1.2em; font-weight: bold;');
   const servicesOk = await testServiceFunctions(isMockMode);
+  const realmChatOk = await testRealmChat(isMockMode);
   const handlersOk = await testCampaignHandlers(isMockMode);
   const importExportOk = await testImportExport();
-  if (servicesOk && handlersOk && importExportOk) {
+  if (servicesOk && realmChatOk && handlersOk && importExportOk) {
     console.log('%c✅ All smoke tests passed.', 'color: #10b981; font-size: 1.2em; font-weight: bold;');
   } else {
     console.log('%c❌ Some smoke tests failed. Check console for details.', 'color: #ef4444; font-size: 1.2em; font-weight: bold;');
