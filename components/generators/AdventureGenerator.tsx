@@ -61,7 +61,7 @@ export const AdventureGenerator: React.FC<AdventureGeneratorProps> = ({ onAdvent
                     initialData={createDefaultAdventure()}
                     renderPreview={(data, onUpdate) => {
                          // Create a minimal mock campaign for the preview to avoid crashing
-                        const mockCampaign: Campaign = { id: 'preview', title: 'Preview', setting: '', settingType: 'custom', articles: [], adventures: [], npcs: [], locations: [], factions: [], items: [], sessionLogs: [], playerCharacters: [], notes: [] };
+                        const mockCampaign: Campaign = { id: 'preview', title: 'Preview', setting: '', settingType: 'custom', articles: [], adventures: [], npcs: [], locations: [], factions: [], items: [], sessionLogs: [], playerCharacters: [], notes: [], plots: [] };
                         return (
                             <AdventureEditor 
                                 adventure={{...data, id: 'preview'}} 

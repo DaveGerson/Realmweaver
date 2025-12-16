@@ -1,5 +1,5 @@
 
-import type { NPC, Location, Faction, Item, Article, Adventure, Scene } from '../types/index';
+import type { NPC, Location, Faction, Item, Article, Adventure, Scene, SessionLog, Plot } from '../types/index';
 
 export const createDefaultNpc = (): NPC => ({
   id: '',
@@ -73,4 +73,27 @@ export const createDefaultScene = (): Scene => ({
     skillChecks: [],
     rewards: '',
     npcIds: [],
+});
+
+export const createDefaultSession = (): SessionLog => ({
+    id: '',
+    title: 'New Session',
+    status: 'planned',
+    sessionDate: new Date().toISOString(),
+    adventureId: undefined,
+    plannedSceneIds: [],
+    prepNotes: '',
+    runningNotes: '',
+    structuredNotes: [],
+    recap: '',
+    notableEvents: '',
+    looseEnds: ''
+});
+
+export const createDefaultPlot = (): Plot => ({
+    id: '',
+    title: 'New Plot Arc',
+    description: '',
+    status: 'active',
+    relatedEntityIds: []
 });

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useSyncExternalStore } from 'react';
-import type { Campaign, Adventure, NPC, Location, Faction, Item, Scene, Article, SessionLog, PlayerCharacter, Note } from './types/index';
+import type { Campaign, Adventure, Scene } from './types/index';
 import { WelcomeScreen } from './components/views/WelcomeScreen';
 import { CampaignCreator } from './components/views/CampaignCreator';
 import { CampaignSelector } from './components/views/CampaignSelector';
@@ -17,7 +17,7 @@ import { SceneEditor } from './components/editors/SceneEditor';
 import { ArticleEditor } from './components/editors/ArticleEditor';
 import { SessionLogEditor } from './components/editors/SessionLogEditor';
 import { PlayerCharacterEditor } from './components/editors/PlayerCharacterEditor';
-import { NoteEditor } from './components/editors/NoteEditor';
+import { PlotEditor } from './components/editors/PlotEditor';
 import { CampaignSettingEditor } from './components/editors/CampaignSettingEditor';
 import { CombatTracker } from './components/tools/CombatTracker';
 import { RelationshipGraph } from './components/visualizers/RelationshipGraph';
@@ -34,12 +34,12 @@ import { ItemDashboard } from './components/dashboards/ItemDashboard';
 import { ArticleDashboard } from './components/dashboards/ArticleDashboard';
 import { SessionLogDashboard } from './components/dashboards/SessionLogDashboard';
 import { PlayerCharacterDashboard } from './components/dashboards/PlayerCharacterDashboard';
-import { NoteDashboard } from './components/dashboards/NoteDashboard';
+import { PlotDashboard } from './components/dashboards/PlotDashboard';
 import { campaignService } from './services/campaignService';
 import { RealmChatWidget } from './components/RealmChat/RealmChatWidget';
 
 
-export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'notes' | 'combat' | 'relationships';
+export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'combat' | 'relationships';
 export type GeneratorType = 'npc' | 'location' | 'faction' | 'item' | 'scene' | 'article';
 
 const App: React.FC = () => {
@@ -63,7 +63,7 @@ const App: React.FC = () => {
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   const [selectedSessionLogId, setSelectedSessionLogId] = useState<string | null>(null);
   const [selectedPlayerCharacterId, setSelectedPlayerCharacterId] = useState<string | null>(null);
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [selectedPlotId, setSelectedPlotId] = useState<string | null>(null);
   
   const [isCoachOpen, setIsCoachOpen] = useState(false);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
@@ -87,7 +87,7 @@ const App: React.FC = () => {
     setSelectedArticleId(null);
     setSelectedSessionLogId(null);
     setSelectedPlayerCharacterId(null);
-    setSelectedNoteId(null);
+    setSelectedPlotId(null);
     setActiveGenerator(null);
   };
 
@@ -192,23 +192,53 @@ const App: React.FC = () => {
   const selectedArticle = useMemo(() => activeCampaign?.articles.find(a => a.id === selectedArticleId) || null, [activeCampaign, selectedArticleId]);
   const selectedSessionLog = useMemo(() => activeCampaign?.sessionLogs?.find(s => s.id === selectedSessionLogId) || null, [activeCampaign, selectedSessionLogId]);
   const selectedPlayerCharacter = useMemo(() => activeCampaign?.playerCharacters?.find(p => p.id === selectedPlayerCharacterId) || null, [activeCampaign, selectedPlayerCharacterId]);
-  const selectedNote = useMemo(() => activeCampaign?.notes?.find(n => n.id === selectedNoteId) || null, [activeCampaign, selectedNoteId]);
+  const selectedPlot = useMemo(() => activeCampaign?.plots?.find(n => n.id === selectedPlotId) || null, [activeCampaign, selectedPlotId]);
   
   // --- Context Construction for Session Weaver ---
   const currentContext = useMemo(() => {
       if (!activeCampaign) return '';
       let context = `Campaign: ${activeCampaign.title}\n`;
       
+      // 1. Setting Context
       if (activeCampaign.settingType === 'official' && activeCampaign.officialSetting) {
-          context += `Official Setting: ${activeCampaign.officialSetting} (Use Google Search to ensure canon accuracy).\n`;
+          context += `Official Setting: ${activeCampaign.officialSetting}.\n`;
           if (activeCampaign.setting) {
-            context += `Supplemental Lore/Overrides (Takes precedence): ${activeCampaign.setting}\n\n`;
+            context += `Supplemental Lore: ${activeCampaign.setting}\n\n`;
           }
       } else {
           context += `Setting: ${activeCampaign.setting}\n\n`;
       }
 
-      // Helper to append related lore to context
+      // 2. ACTIVE SESSION CONTEXT (Priority High)
+      const activeSession = activeCampaign.sessionLogs?.find(s => s.status === 'active');
+      if (activeSession) {
+          context += `--- ACTIVE SESSION IN PROGRESS: "${activeSession.title}" ---\n`;
+          if (activeSession.prepNotes) context += `DM Prep Notes: ${activeSession.prepNotes}\n`;
+          if (activeSession.runningNotes) context += `Current Session Notes: ${activeSession.runningNotes}\n`;
+          
+          // Inject Active Adventure Context
+          if (activeSession.adventureId) {
+              const adv = activeCampaign.adventures.find(a => a.id === activeSession.adventureId);
+              if (adv) {
+                  context += `Current Adventure: "${adv.title}" (Theme: ${adv.theme})\n`;
+                  if (adv.hook) context += `Adventure Hook: ${adv.hook}\n`;
+              }
+          }
+          
+          // Find previously completed session for continuity
+          const pastSessions = activeCampaign.sessionLogs
+            .filter(s => s.status === 'completed')
+            .sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime());
+          
+          if (pastSessions.length > 0) {
+              context += `PREVIOUS SESSION RECAP (${pastSessions[0].title}): ${pastSessions[0].recap}\n`;
+              if (pastSessions[0].looseEnds) context += `UNRESOLVED THREADS: ${pastSessions[0].looseEnds}\n`;
+          }
+          
+          context += `\n`;
+      }
+
+      // 3. Helper to append related lore to context
       const appendRelatedLore = (entityId: string) => {
           const relatedArticles = activeCampaign.articles.filter(a => a.relatedEntityIds?.includes(entityId));
           if (relatedArticles.length > 0) {
@@ -220,7 +250,7 @@ const App: React.FC = () => {
           }
       };
 
-      // 1. ACTIVE SESSION STATE (Primary Context)
+      // 4. ACTIVE SCENE STATE (Manual Scene Selection Override)
       if (activeCampaign.activeSceneId) {
          let activeScene: Scene | undefined;
          let activeAdventure: Adventure | undefined;
@@ -235,9 +265,9 @@ const App: React.FC = () => {
          }
          
          if (activeScene && activeAdventure) {
-             context += `--- CURRENT SESSION STATUS ---\n`;
-             context += `The party is actively playing the scene "${activeScene.title}" in the adventure "${activeAdventure.title}".\n`;
-             context += `Scene Type: ${activeScene.type}\n`;
+             context += `--- CURRENT SCENE ---\n`;
+             context += `Scene: "${activeScene.title}" (Adventure: "${activeAdventure.title}")\n`;
+             context += `Type: ${activeScene.type}\n`;
              if (activeScene.readAloudText) context += `Description: "${activeScene.readAloudText}"\n`;
              if (activeScene.gmNotes) context += `GM Notes: ${activeScene.gmNotes}\n`;
              
@@ -260,21 +290,7 @@ const App: React.FC = () => {
          }
       }
 
-      // 2. CAMPAIGN NOTES (Secondary Context)
-      if (activeCampaign.notes.length > 0) {
-          context += `--- RECENT CAMPAIGN NOTES ---\n`;
-          // Include top 5 most recently modified notes to fit in context window
-          const recentNotes = [...activeCampaign.notes]
-              .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime())
-              .slice(0, 5);
-          
-          recentNotes.forEach(n => {
-              context += `[Note: ${n.title}]: ${n.content.substring(0, 200)}${n.content.length > 200 ? '...' : ''}\n`;
-          });
-          context += `\n`;
-      }
-
-      // 3. CURRENT EDITOR SELECTION (User Focus)
+      // 5. CURRENT USER FOCUS (Editor Selection)
       // If the user is viewing something *different* than the active scene, give context on that too.
       let selectionContext = '';
       if (selectedScene && selectedAdventure && selectedScene.id !== activeCampaign.activeSceneId) {
@@ -286,9 +302,6 @@ const App: React.FC = () => {
       } else if (selectedNpc) {
           selectionContext += `USER IS VIEWING NPC: "${selectedNpc.name}"\n`;
           if (selectedNpc.traits) selectionContext += `Traits: ${selectedNpc.traits}\n`;
-      } else if (selectedFaction) {
-           selectionContext += `USER IS VIEWING FACTION: "${selectedFaction.name}"\n`;
-           if (selectedFaction.goals) selectionContext += `Goals: ${selectedFaction.goals}\n`;
       }
 
       if (selectionContext) {
@@ -296,7 +309,7 @@ const App: React.FC = () => {
       }
 
       return context;
-  }, [activeCampaign, activeCampaign?.activeSceneId, activeCampaign?.notes, selectedScene, selectedAdventure, selectedLocation, selectedNpc, selectedFaction]);
+  }, [activeCampaign, activeCampaign?.activeSceneId, activeCampaign?.sessionLogs, selectedScene, selectedAdventure, selectedLocation, selectedNpc, selectedFaction]);
 
 
   const handleSelectView = (view: EditorView) => {
@@ -304,7 +317,7 @@ const App: React.FC = () => {
     resetSelections();
   };
   
-    const handleSelect = (type: 'adventure' | 'scene' | 'npc' | 'location' | 'faction' | 'item' | 'article' | 'session-log' | 'player-character' | 'note', id: string) => {
+    const handleSelect = (type: 'adventure' | 'scene' | 'npc' | 'location' | 'faction' | 'item' | 'article' | 'session-log' | 'player-character' | 'plot', id: string) => {
         if (type === 'scene') {
             const parentAdventure = activeCampaign?.adventures.find(adv => adv.scenes.some(s => s.id === id));
             if (parentAdventure) {
@@ -323,7 +336,7 @@ const App: React.FC = () => {
                 case 'article': setActiveView('lorebook'); setSelectedArticleId(id); break;
                 case 'session-log': setActiveView('session-logs'); setSelectedSessionLogId(id); break;
                 case 'player-character': setActiveView('player-characters'); setSelectedPlayerCharacterId(id); break;
-                case 'note': setActiveView('notes'); setSelectedNoteId(id); break;
+                case 'plot': setActiveView('plots'); setSelectedPlotId(id); break;
             }
         }
     };
@@ -345,7 +358,7 @@ const App: React.FC = () => {
         />
       );
       
-      if (selectedNote) return <NoteEditor note={selectedNote} onUpdate={campaignService.updateNote} onDelete={(id) => { campaignService.deleteNote(id); resetSelections(); }} isMockMode={isMockMode} />;
+      if (selectedPlot) return <PlotEditor plot={selectedPlot} onUpdate={campaignService.updatePlot} onDelete={(id) => { campaignService.deletePlot(id); resetSelections(); }} isMockMode={isMockMode} />;
       if (selectedScene && selectedAdventure) return <SceneEditor scene={selectedScene} allNpcs={activeCampaign.npcs} allLocations={activeCampaign.locations} onUpdate={(id, data) => campaignService.updateScene(selectedAdventure.id, id, data)} onDelete={(id) => { campaignService.deleteScene(selectedAdventure.id, id); setSelectedSceneId(null); }} isMockMode={isMockMode} isActiveScene={activeCampaign.activeSceneId === selectedScene.id} onSetActive={campaignService.setActiveScene} />;
       if (selectedAdventure) return <AdventureEditor adventure={selectedAdventure} campaign={activeCampaign} onUpdate={campaignService.updateAdventure} />;
       
@@ -437,11 +450,11 @@ const App: React.FC = () => {
             setActiveView('session-logs');
             setSelectedSessionLogId(newId);
         }} onSelectSessionLog={setSelectedSessionLogId} />;
-      if (activeView === 'notes') return <NoteDashboard notes={activeCampaign.notes || []} onNoteCreated={(noteData) => {
-            const newId = campaignService.createNote(noteData);
-            setActiveView('notes');
-            setSelectedNoteId(newId);
-      }} onSelectNote={setSelectedNoteId} />;
+      if (activeView === 'plots') return <PlotDashboard plots={activeCampaign.plots || []} onPlotCreated={(noteData) => {
+            const newId = campaignService.createPlot(noteData);
+            setActiveView('plots');
+            setSelectedPlotId(newId);
+      }} onSelectPlot={setSelectedPlotId} />;
       if (activeView === 'npcs') return <NpcDashboard npcs={activeCampaign.npcs} factions={activeCampaign.factions} onNpcCreated={(npcData) => {
             const newId = campaignService.createNpc(npcData);
             setActiveView('npcs');
@@ -540,7 +553,7 @@ const App: React.FC = () => {
                       article: selectedArticleId,
                       sessionLog: selectedSessionLogId,
                       playerCharacter: selectedPlayerCharacterId,
-                      note: selectedNoteId
+                      plot: selectedPlotId
                   }}
                   onSelect={handleSelect}
                   onShowGenerator={(type) => {

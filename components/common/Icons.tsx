@@ -41,6 +41,11 @@ import {
   CheckCircle2,
   Pencil,
   FolderOpen,
+  Calendar,
+  Play,
+  Target,
+  ListTodo,
+  Minus,
 } from 'lucide-react';
 
 export const Icons = {
@@ -82,6 +87,13 @@ export const Icons = {
   CheckCircle: CheckCircle2,
   Edit: Pencil,
   FolderOpen: FolderOpen,
+  Calendar,
+  Play,
+  BookCopy,
+  Plot: Target,
+  Target: Target,
+  List: ListTodo,
+  Minus,
 };
 
 export const SceneIcon = ({ type, className }: { type: string, className?: string }) => {

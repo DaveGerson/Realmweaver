@@ -17,7 +17,9 @@ const mockNpcData: Omit<NPC, 'id' | 'factionId'> = {
     { playerId: 'Lyra', details: 'Mistrusts Lyra due to her association with the Silent Hand, but respects her skills.' }
   ],
   relationships: [],
-  history: []
+  history: [
+      { id: 'h1', summary: 'Saved the party from a rockslide', referenceType: 'session', referenceId: 's1' }
+  ]
 };
 
 const mockLocationData: Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'> = {

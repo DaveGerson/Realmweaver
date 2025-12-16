@@ -13,9 +13,10 @@ import type {
     SessionLog, 
     PlayerCharacter,
     BatchAddData,
-    Note,
+    Plot,
     Encounter,
-    SettingType
+    SettingType,
+    Note
 } from '../types/index';
 import { importCampaignFromJson } from './importExportService';
 import { parseCharacterSheetPdf } from './geminiService';
@@ -217,12 +218,13 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     try {
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         const campaignsData: any[] = JSON.parse(savedCampaigns);
-                        // Migrate old data: ensure notes array exists
+                        // Migrate old data: ensure arrays exists
                         draft.campaigns = campaignsData.map(c => ({
                             ...c,
                             settingType: c.settingType || 'custom',
+                            plots: c.plots || [],
                             notes: c.notes || [],
-                            sessionLogs: c.sessionLogs || [],
+                            sessionLogs: (c.sessionLogs || []).map((l: any) => ({...l, structuredNotes: l.structuredNotes || [] })),
                             playerCharacters: c.playerCharacters || [],
                             npcs: (c.npcs || []).map((n: any) => ({...n, relationships: n.relationships || [], history: n.history || []})),
                             locations: (c.locations || []).map((l: any) => ({...l, history: l.history || []})),
@@ -262,6 +264,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         adventures: [],
                         sessionLogs: [],
                         playerCharacters: [],
+                        plots: [],
                         notes: [],
                         items: [],
                         factions: [
@@ -335,6 +338,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     items: [], 
                     sessionLogs: [], 
                     playerCharacters: [], 
+                    plots: [],
                     notes: [],
                     activeEncounter: { id: crypto.randomUUID(), round: 1, turnIndex: 0, combatants: [] }
                 };
@@ -378,8 +382,9 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     }
                     // Ensure compatibility
                     importedCampaign.settingType = importedCampaign.settingType || 'custom';
+                    importedCampaign.plots = importedCampaign.plots || [];
                     importedCampaign.notes = importedCampaign.notes || [];
-                    importedCampaign.sessionLogs = importedCampaign.sessionLogs || [];
+                    importedCampaign.sessionLogs = (importedCampaign.sessionLogs || []).map((l: any) => ({...l, structuredNotes: l.structuredNotes || [] }));
                     importedCampaign.playerCharacters = importedCampaign.playerCharacters || [];
                     importedCampaign.npcs = (importedCampaign.npcs || []).map(n => ({...n, relationships: n.relationships || [], history: n.history || []}));
                     importedCampaign.locations = (importedCampaign.locations || []).map(l => ({...l, history: l.history || []}));
@@ -737,6 +742,8 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         
         createSessionLog(newLogData: Omit<SessionLog, 'id'>) {
             const newLog: SessionLog = { ...newLogData, id: crypto.randomUUID() };
+            // Ensure compatibility
+            if (!newLog.structuredNotes) newLog.structuredNotes = [];
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
                 if (campaign) {
@@ -795,9 +802,42 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             });
         },
 
+        createPlot(newPlotData: Omit<Plot, 'id'>) {
+            const newPlot: Plot = { ...newPlotData, id: crypto.randomUUID() };
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (campaign) {
+                    campaign.plots = [...(campaign.plots || []), newPlot];
+                }
+            });
+            return newPlot.id;
+        },
+        updatePlot(id: string, updatedData: Partial<Plot>) {
+             updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign || !campaign.plots) return;
+                const plot = campaign.plots.find(n => n.id === id);
+                if (plot) {
+                    Object.assign(plot, updatedData);
+                }
+            });
+        },
+        deletePlot(id: string) {
+             updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (campaign) {
+                    campaign.plots = (campaign.plots || []).filter(n => n.id !== id);
+                }
+            });
+        },
+
         createNote(newNoteData: Omit<Note, 'id' | 'createdAt' | 'lastModified'>) {
-            const now = new Date().toISOString();
-            const newNote: Note = { ...newNoteData, id: crypto.randomUUID(), createdAt: now, lastModified: now };
+            const newNote: Note = {
+                ...newNoteData,
+                id: crypto.randomUUID(),
+                createdAt: new Date().toISOString(),
+                lastModified: new Date().toISOString()
+            };
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
                 if (campaign) {
@@ -807,7 +847,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             return newNote.id;
         },
         updateNote(id: string, updatedData: Partial<Note>) {
-             updateState(draft => {
+            updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
                 if (!campaign || !campaign.notes) return;
                 const note = campaign.notes.find(n => n.id === id);
@@ -817,7 +857,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             });
         },
         deleteNote(id: string) {
-             updateState(draft => {
+            updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
                 if (campaign) {
                     campaign.notes = (campaign.notes || []).filter(n => n.id !== id);

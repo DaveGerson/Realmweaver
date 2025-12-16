@@ -1,9 +1,36 @@
+
 // types/SessionLog.ts
+
+export type SessionStatus = 'planned' | 'active' | 'completed';
+
+export interface SessionLogEntry {
+  id: string;
+  timestamp: string; // ISO string
+  content: string;
+  taggedEntityIds: string[];
+}
+
 export interface SessionLog {
   id: string;
   title: string;
-  sessionDate: string; // ISO string format for dates.
-  recap: string; // What happened during the session.
-  notableEvents: string; // Bullet points of key moments.
-  looseEnds: string; // Plot hooks or unresolved threads from the session.
+  status: SessionStatus;
+  
+  // Scheduling
+  sessionDate: string; 
+  
+  // Planning Context
+  adventureId?: string; 
+  plannedSceneIds: string[]; 
+  prepNotes: string; 
+  
+  // Execution - Unstructured
+  runningNotes: string; 
+  
+  // Execution - Structured
+  structuredNotes: SessionLogEntry[];
+
+  // Post-Session
+  recap: string; 
+  notableEvents: string; 
+  looseEnds: string; 
 }
