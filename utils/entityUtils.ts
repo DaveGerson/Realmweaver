@@ -85,6 +85,7 @@ export const createDefaultSession = (): SessionLog => ({
     prepNotes: '',
     runningNotes: '',
     structuredNotes: [],
+    relatedPlotIds: [],
     recap: '',
     notableEvents: '',
     looseEnds: ''

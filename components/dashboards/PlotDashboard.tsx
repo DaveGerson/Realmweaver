@@ -98,7 +98,13 @@ export const PlotDashboard: React.FC<PlotDashboardProps> = ({ plots, onPlotCreat
   );
 };
 
-const PlotCard = ({ plot, onClick, compact }: { plot: Plot, onClick: () => void, compact?: boolean }) => (
+interface PlotCardProps {
+    plot: Plot;
+    onClick: () => void;
+    compact?: boolean;
+}
+
+const PlotCard: React.FC<PlotCardProps> = ({ plot, onClick, compact }) => (
     <button 
         onClick={onClick}
         className={`w-full bg-slate-900/50 border border-slate-800 p-4 rounded-lg hover:bg-slate-800 hover:border-indigo-500/50 transition-all text-left flex flex-col group relative ${compact ? 'py-3' : 'h-32'}`}

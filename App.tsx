@@ -355,6 +355,7 @@ const App: React.FC = () => {
             log={selectedSessionLog} 
             onUpdate={campaignService.updateSessionLog} 
             onDelete={(id) => { campaignService.deleteSessionLog(id); resetSelections(); }} 
+            isMockMode={isMockMode}
         />
       );
       
@@ -584,7 +585,7 @@ const App: React.FC = () => {
                     campaign={activeCampaign} 
                     onClose={() => setIsWizardOpen(false)} 
                     onAddToCampaign={(data) => {
-                        const count = Object.values(data).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
+                        const count = Object.values(data).reduce((sum: number, arr: any) => sum + (Array.isArray(arr) ? arr.length : 0), 0) as number;
                         campaignService.batchAddToCampaign(data);
                         setIsWizardOpen(false);
                         if (count > 0) {

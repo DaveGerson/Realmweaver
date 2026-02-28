@@ -1,3 +1,4 @@
+
 import { Type } from "@google/genai";
 import type { RollableTable } from '../../types/index';
 import { generateText, generateWithSchema } from './core';
@@ -22,6 +23,28 @@ const rollableTableSchema = {
     },
   },
   required: ['title', 'dieType', 'entries'],
+};
+
+export const sessionAnalysisSchema = {
+  type: Type.OBJECT,
+  properties: {
+    entries: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          content: { type: Type.STRING, description: "A concise, single-sentence summary of a specific event or beat found in the notes." },
+          relatedEntityNames: { 
+              type: Type.ARRAY, 
+              items: { type: Type.STRING }, 
+              description: "Names of known entities (NPCs, Locations, Factions) mentioned or involved in this event." 
+          }
+        },
+        required: ['content', 'relatedEntityNames']
+      }
+    }
+  },
+  required: ['entries']
 };
 
 // --- Generator Functions ---
@@ -59,4 +82,18 @@ export const generateEnhancedText = (prompt: string, campaignContext?: string): 
 
 Request: "${prompt}"`;
     return generateText(fullPrompt, modelName, campaignContext);
+}
+
+export const analyzeSessionNotes = async (notes: string, knownEntityNames: string[], campaignContext?: string): Promise<{entries: {content: string, relatedEntityNames: string[]}[]}> => {
+    const modelName = 'gemini-2.5-flash';
+    const instructions = `You are an expert Game Master's assistant. Your task is to process raw session notes into structured log entries.
+    
+    1. Break the notes down into distinct events.
+    2. Summarize each event clearly and concisely.
+    3. Identify if any of the following known entities are mentioned in the event:
+    ${JSON.stringify(knownEntityNames)}
+    
+    Only list entities from the provided list in the 'relatedEntityNames' field.`;
+    
+    return generateWithSchema(notes, sessionAnalysisSchema, instructions, {}, modelName, campaignContext);
 }

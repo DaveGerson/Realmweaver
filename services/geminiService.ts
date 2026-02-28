@@ -134,3 +134,10 @@ export const chatWithRealmWeaver = (
     }
     return aiRealmChat.chatWithRealmWeaver(history, currentDrafts, approvedEntitiesLog, campaignContext, tier, focusedEntityType);
 };
+
+export const analyzeSessionNotes = (notes: string, knownEntityNames: string[], campaignContext?: string, isMockMode: boolean = false): Promise<{entries: {content: string, relatedEntityNames: string[]}[]}> => {
+    if (isMockMode) {
+        return mockService.analyzeSessionNotes(notes, knownEntityNames, campaignContext);
+    }
+    return aiDmCoach.analyzeSessionNotes(notes, knownEntityNames, campaignContext);
+}

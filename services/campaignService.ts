@@ -224,7 +224,11 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                             settingType: c.settingType || 'custom',
                             plots: c.plots || [],
                             notes: c.notes || [],
-                            sessionLogs: (c.sessionLogs || []).map((l: any) => ({...l, structuredNotes: l.structuredNotes || [] })),
+                            sessionLogs: (c.sessionLogs || []).map((l: any) => ({
+                                ...l, 
+                                structuredNotes: l.structuredNotes || [],
+                                relatedPlotIds: l.relatedPlotIds || []
+                            })),
                             playerCharacters: c.playerCharacters || [],
                             npcs: (c.npcs || []).map((n: any) => ({...n, relationships: n.relationships || [], history: n.history || []})),
                             locations: (c.locations || []).map((l: any) => ({...l, history: l.history || []})),
@@ -247,47 +251,145 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         draft.appStatus = 'welcome';
                     }
                 } else {
-                    // Initialize with Default "Forgotten Realms" Campaign instead of Welcome Screen
-                    const defaultId = crypto.randomUUID();
-                    const harpersId = crypto.randomUUID();
-                    const elminsterId = crypto.randomUUID();
-                    const waterdeepId = crypto.randomUUID();
+                    // Initialize with "The Night Before Wintermas" Campaign
+                    const wintermasId = crypto.randomUUID();
+                    
+                    // Factions
+                    const happyJoyId = crypto.randomUUID();
+                    const santaFactionId = crypto.randomUUID();
 
-                    const defaultCampaign: Campaign = {
-                        id: defaultId,
-                        title: "Forgotten Realms",
-                        settingType: "official",
-                        officialSetting: "Forgotten Realms",
-                        setting: "The world of Toril, specifically the continent of Faerûn. A land of magic, monsters, and ancient ruins. (Default Setting)",
+                    // NPCs
+                    const quentinId = crypto.randomUUID();
+                    const frostyId = crypto.randomUUID();
+                    const daveGrinchId = crypto.randomUUID();
+                    const santaId = crypto.randomUUID();
+                    
+                    // Locations
+                    const frostholdId = crypto.randomUUID();
+                    const northPoleId = crypto.randomUUID();
+                    const grottoId = crypto.randomUUID();
+                    const domeId = crypto.randomUUID();
+
+                    // Items
+                    const crownId = crypto.randomUUID();
+                    const statueId = crypto.randomUUID();
+
+                    // Adventure & Scenes
+                    const advId = crypto.randomUUID();
+                    const scene1Id = crypto.randomUUID();
+                    const scene2Id = crypto.randomUUID();
+                    const scene3Id = crypto.randomUUID();
+                    const scene4Id = crypto.randomUUID();
+                    const scene5Id = crypto.randomUUID();
+
+                    const wintermasCampaign: Campaign = {
+                        id: wintermasId,
+                        title: "The Night Before Wintermas",
+                        settingType: "custom",
+                        setting: "A dark, cynical fantasy world where 'Wintermas' is celebrated, but the dangers are real. Children are tough, the countryside is full of monsters, and a 'morally suspect' corporation named HappyJoy Toy and Tobacco Company wants to eliminate the competition: Santa Claus. Santa himself is possessed by an Eldritch entity.",
                         activeEncounter: { id: crypto.randomUUID(), round: 1, turnIndex: 0, combatants: [] },
                         articles: [],
-                        adventures: [],
-                        sessionLogs: [],
-                        playerCharacters: [],
                         plots: [],
                         notes: [],
-                        items: [],
+                        sessionLogs: [
+                            {
+                                id: crypto.randomUUID(),
+                                title: "Session 1: The Job Interview",
+                                status: "planned",
+                                sessionDate: new Date().toISOString(),
+                                adventureId: advId,
+                                plannedSceneIds: [scene1Id],
+                                prepNotes: "Intro: Players are huddled in the archway of the HappyJoy tower in Frosthold. It's the night before Wintermas. Wind is howling.\nGoal: Get hired by Quentin Happyjoy Junior to infiltrate the North Pole.\nKey Info: Santa is the target. 250g upfront, 750g on completion. Kill Santa or steal his distribution means.\nTransport: Teleportation by corporate mages. Return via enchanted snowglobe.",
+                                runningNotes: "",
+                                structuredNotes: [],
+                                relatedPlotIds: [],
+                                recap: "",
+                                notableEvents: "",
+                                looseEnds: ""
+                            }
+                        ],
+                        playerCharacters: [],
                         factions: [
                             {
-                                id: harpersId,
-                                name: "The Harpers",
-                                description: "A semi-secret organization dedicated to preserving historical lore, maintaining the balance between nature and civilization, and defending the innocent from the forces of evil.",
-                                goals: "Gather information, oppose tyranny, protect the weak.",
-                                memberIds: [elminsterId]
+                                id: happyJoyId,
+                                name: "HappyJoy Toy and Tobacco Company",
+                                description: "A morally suspect toy company based in Frosthold. They produce dubiously virtuous products like 'teddy bears that really smoke'.",
+                                goals: "Eliminate Santa Claus to secure a monopoly on Wintermas gifts.",
+                                alignment: "Lawful Evil",
+                                resources: "Vast wealth, corporate mages, team of gnomes.",
+                                influence: "Major employer in the Northern Region.",
+                                memberIds: [quentinId],
+                                headquartersLocationId: frostholdId
+                            },
+                            {
+                                id: santaFactionId,
+                                name: "The Workshop (Corrupted)",
+                                description: "Santa's operation at the North Pole. Currently corrupted by an Old One entity possessing Santa.",
+                                goals: "Prepare for the arrival of the Old One into this world.",
+                                alignment: "Chaotic Evil",
+                                resources: "Infinite manufacturing capability, mind-controlled gnomes, magical constructs.",
+                                influence: "Global gift distribution network.",
+                                memberIds: [santaId, frostyId],
+                                headquartersLocationId: domeId
                             }
                         ],
                         npcs: [
                             {
-                                id: elminsterId,
-                                name: "Elminster Aumar",
-                                description: "An old man with a long white beard, wearing tattered robes and a pointed hat. He smokes a pipe that produces colored smoke.",
-                                traits: "Wise, whimsical, mysterious, occasionally cantankerous.",
-                                exampleQuote: "Magic is not a tool to be used, but a fire to be tended.",
-                                backstory: "The Sage of Shadowdale, chosen of Mystra, and one of the most powerful wizards in Faerûn.",
-                                motivations: "To protect the Weave and nurture new heroes.",
-                                secrets: "He is tired of the endless cosmic threats but knows he cannot rest.",
-                                stats: "Archmage (CR 12+)",
-                                factionId: harpersId,
+                                id: quentinId,
+                                name: "Quentin Happyjoy Junior",
+                                description: "The greyest man you have ever seen. Corporate businessman before his time. Sits behind a dark mahogany desk with a magical Newton's Cradle.",
+                                traits: "Unimpressed, speaks in corporate buzzwords ('KPIs'), skirts over the topic of murder.",
+                                exampleQuote: "We need you to thoroughly achieve your KPIs regarding the competition.",
+                                backstory: "Founder's son, desperate to prove himself by taking out the biggest rival in the industry.",
+                                motivations: "Profit, market dominance, pleasing the board.",
+                                secrets: "He knows the mission is likely suicide; none of the previous scouts returned.",
+                                stats: "Commoner (Non-combatant)",
+                                factionId: happyJoyId,
+                                knowsPlayerHistory: [],
+                                relationships: [],
+                                history: []
+                            },
+                            {
+                                id: frostyId,
+                                name: "Frosty the Snowman",
+                                description: "Large construct made of snow. Coal eyes, carrot nose, three blue gems on chest. Arms carved along sides.",
+                                traits: "Initially friendly but menacing. Encourages players to leave to 'save the magic'. Goes berserk if allies die.",
+                                exampleQuote: "Wintermas isn't until tomorrow! You'll have to wait for your presents!",
+                                backstory: "Guardian of the North Pole entrance.",
+                                motivations: "Protect the entrance to the crevasse.",
+                                secrets: "Weak to fire. Has a 'Chilling Ray' attack.",
+                                stats: "Large Construct (CR 5). Multiattack, Chilling Ray, Snow Meld.",
+                                factionId: santaFactionId,
+                                knowsPlayerHistory: [],
+                                relationships: [],
+                                history: []
+                            },
+                            {
+                                id: daveGrinchId,
+                                name: "Dave Grinch",
+                                description: "Wild-eyed gnome with bright green hair. Found in a cage in the Holding Cells.",
+                                traits: "Half-mad, irrational, hates Christmas/Wintermas passionately.",
+                                exampleQuote: "I hate the joy! It's just not right!",
+                                backstory: "His tribe of Ice Gnomes (natural artificers) went missing. He tracked them here and was imprisoned.",
+                                motivations: "Free his tribe, kill Santa.",
+                                secrets: "Knows the solution to the Cookie Puzzle (The Moon cookie allows passage).",
+                                stats: "Gnome (Non-combatant). Dies in one hit.",
+                                factionId: undefined, // Prisoner
+                                knowsPlayerHistory: [],
+                                relationships: [],
+                                history: []
+                            },
+                            {
+                                id: santaId,
+                                name: "Santa Claus (The Host)",
+                                description: "Very fat, very tall man wearing a crown and large bulky robes. Possessed by an Old One.",
+                                traits: "Jolly voice but says terrifying things. attempts to possess players mentally.",
+                                exampleQuote: "You have interrupted the plan. We prepare for my arrival.",
+                                backstory: "The ancient figure of Wintermas, now a puppet for an eldritch horror.",
+                                motivations: "Complete the ritual to bring the Old One fully into the world.",
+                                secrets: "The Crown of Domination controls him. Knocking it off breaks the possession.",
+                                stats: "Large Humanoid (CR 9). Legendary Actions. Crown of Domination ability.",
+                                factionId: santaFactionId,
                                 knowsPlayerHistory: [],
                                 relationships: [],
                                 history: []
@@ -295,21 +397,143 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         ],
                         locations: [
                             {
-                                id: waterdeepId,
-                                name: "Waterdeep",
-                                description: "The City of Splendors. A massive metropolis on the Sword Coast, governed by the masked Lords of Waterdeep.",
-                                secrets: "The Skullport lies beneath, a haven for smugglers and slavers.",
+                                id: frostholdId,
+                                name: "Frosthold",
+                                description: "A circular walled town atop a hill. Tough town with a tough reputation. People work hard processing bone and ivory. Currently celebrating Wintermas.",
+                                secrets: "The town is unusually happy today due to the holiday, masking the grim reality of daily life.",
                                 subLocationIds: [],
                                 connections: [],
-                                pointsOfInterest: [],
+                                loot: [],
+                                history: [],
+                                pointsOfInterest: [
+                                    { id: crypto.randomUUID(), name: "HappyJoy HQ", passivePerceptionDC: 10, description: "A tall, narrow 5-storey tower. A brass sign reads 'HappyJoy Toy and Tobacco Company'.", investigationChecks: [], interactions: [] },
+                                    { id: crypto.randomUUID(), name: "The Legitimate Business Tavern", passivePerceptionDC: 12, description: "A single-storey building acting as a fence for stolen items.", investigationChecks: [], interactions: [] }
+                                ]
+                            },
+                            {
+                                id: northPoleId,
+                                name: "The North Pole",
+                                description: "A desolate icy plain. A huge cliff of ice stretches hundreds of metres up. A jagged crevasse cuts into the face.",
+                                secrets: "Patrolled by flying Paindeer and strewn with candy mines along the top.",
+                                subLocationIds: [grottoId],
+                                connections: [],
                                 loot: [],
                                 history: []
+                            },
+                            {
+                                id: grottoId,
+                                name: "Santa's Grotto",
+                                description: "A beautiful cavern lit with warm golden light. Candy cane picket fences, gingerbread houses, and a giant Wintermas tree.",
+                                secrets: "Everything is slightly corrupt; gingerbread is mouldy, a creeping sense of something sinister.",
+                                parentLocationId: northPoleId,
+                                subLocationIds: [domeId],
+                                connections: [],
+                                loot: [],
+                                history: [],
+                                pointsOfInterest: [
+                                    { id: crypto.randomUUID(), name: "Santa's Cookie Lab", passivePerceptionDC: 10, description: "Smells of sugar and cinnamon. Contains strange machinery and magical dusts.", investigationChecks: [], interactions: [] },
+                                    { id: crypto.randomUUID(), name: "Ho Ho Holding Cells", passivePerceptionDC: 10, description: "Locked door with candy cane bars. Contains Dave Grinch.", investigationChecks: [], interactions: [] },
+                                    { id: crypto.randomUUID(), name: "Paindeer Stables", passivePerceptionDC: 12, description: "Smells of chocolate and hay. Contains sleeping Paindeer and a magical statue.", investigationChecks: [], interactions: [] }
+                                ]
+                            },
+                            {
+                                id: domeId,
+                                name: "Santa's Workshop (The Dome)",
+                                description: "A giant stone dome, half a mile in diameter. Enchanted roof shows stars. Rows of stone altars where gnomes work with frozen smiles.",
+                                secrets: "The gnomes are mind-controlled. The central plinth holds Santa and the portal.",
+                                parentLocationId: grottoId,
+                                subLocationIds: [],
+                                connections: [],
+                                loot: [],
+                                history: []
+                            }
+                        ],
+                        items: [
+                            {
+                                id: crownId,
+                                name: "Crown of Domination",
+                                description: "A simple spiked design cut from dark stone. Surprisingly light.",
+                                rarity: "legendary",
+                                properties: "Allows the wearer to dominate the mind of creatures. Cursed: The item's creator influences the wearer. Requires attunement."
+                            },
+                            {
+                                id: statueId,
+                                name: "Wondrous Statue (Rudolf)",
+                                description: "A small statue of a Paindeer with a ruby nose.",
+                                rarity: "rare",
+                                properties: "Once per day as a bonus action, summon Rudolf to cast a ray of red light (4d10 radiant damage)."
+                            }
+                        ],
+                        adventures: [
+                            {
+                                id: advId,
+                                title: "The Night Before Wintermas",
+                                level: 5,
+                                hook: "Hired by a morally suspect toy company to infiltrate the North Pole and kill Santa.",
+                                theme: "Dark Comedy, Holiday, Dungeon Crawl",
+                                scenes: [
+                                    {
+                                        id: scene1Id,
+                                        title: "Reception & Briefing",
+                                        type: "social",
+                                        readAloudText: "You’re huddled in the large stone archway of a tall and narrow 5-storey tower. A discrete brass sign on the door advertises… HappyJoy Toy and Tobacco Company. Your interview is in 5 minutes.",
+                                        gmNotes: "Introduce Quentin Happyjoy. He gives the quest: Infiltrate, steal/disable distribution, kill Santa. Pay: 250g now, 750g later. Give players the Snowglobe for return transport.",
+                                        skillChecks: [],
+                                        rewards: "250gp per player.",
+                                        npcIds: [quentinId],
+                                        locationId: frostholdId
+                                    },
+                                    {
+                                        id: scene2Id,
+                                        title: "The Approach (Frosty)",
+                                        type: "combat",
+                                        readAloudText: "You land in a flash of light on an icy plain. 50 figures stand in neat rows before the crevasse. Snowmen. The largest one shifts, turning coal eyes towards you.",
+                                        gmNotes: "Frosty tries to turn them away. If they persist, he attacks. Two animated snowmen sidekicks are hidden nearby (DC18 Perception).",
+                                        skillChecks: [{ id: crypto.randomUUID(), skill: "Perception", dc: 18, description: "Spot the animated snowman sidekicks." }],
+                                        rewards: "",
+                                        npcIds: [frostyId],
+                                        locationId: northPoleId
+                                    },
+                                    {
+                                        id: scene3Id,
+                                        title: "Cavern of Christmas Lights",
+                                        type: "exploration",
+                                        readAloudText: "A long passage tapering to a point. Ethereal Wintermas lanterns float about. A deep rumbling sound echoes as the ice walls slowly move closer together.",
+                                        gmNotes: "Race against time. The walls are closing. Paindeer fly overhead. Run as a skill challenge or timed combat.",
+                                        skillChecks: [{ id: crypto.randomUUID(), skill: "Athletics", dc: 14, description: "Sprint through the closing gap." }],
+                                        rewards: "",
+                                        npcIds: [],
+                                        locationId: northPoleId
+                                    },
+                                    {
+                                        id: scene4Id,
+                                        title: "The Grotto Investigation",
+                                        type: "puzzle",
+                                        readAloudText: "A central square dominated by a Wintermas tree. Paths lead to the Cookie Lab, Holding Cells, and Stables. A shimmering portal stands in the center.",
+                                        gmNotes: "Players must solve the Cookie Puzzle to enter the portal. Clues are with Dave Grinch in the cells. Looting the stables yields the Rudolf statue.",
+                                        skillChecks: [{ id: crypto.randomUUID(), skill: "Investigation", dc: 15, description: "Find the hidden key to the cells." }],
+                                        rewards: "Wondrous Statue (Rudolf).",
+                                        npcIds: [daveGrinchId],
+                                        locationId: grottoId
+                                    },
+                                    {
+                                        id: scene5Id,
+                                        title: "Showdown at the Workshop",
+                                        type: "combat",
+                                        readAloudText: "A huge stone dome. Rows of entranced gnomes. On the central plinth, Santa wheels around. 'Ho Ho Ho... Wintermas isn't until tomorrow!'",
+                                        gmNotes: "Santa tries to possess players (DC 15 Cha). When Santa falls, the Old One's Avatar emerges from the crown. Players can fight it or accept its offer of power.",
+                                        skillChecks: [],
+                                        rewards: "Crown of Domination (Cursed).",
+                                        npcIds: [santaId],
+                                        locationId: domeId
+                                    }
+                                ]
                             }
                         ]
                     };
 
-                    draft.campaigns = [defaultCampaign];
-                    draft.activeCampaignId = defaultId;
+                    draft.campaigns = [wintermasCampaign];
+                    draft.activeCampaignId = wintermasId;
                     draft.appStatus = 'editing';
                 }
             });
@@ -384,7 +608,11 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     importedCampaign.settingType = importedCampaign.settingType || 'custom';
                     importedCampaign.plots = importedCampaign.plots || [];
                     importedCampaign.notes = importedCampaign.notes || [];
-                    importedCampaign.sessionLogs = (importedCampaign.sessionLogs || []).map((l: any) => ({...l, structuredNotes: l.structuredNotes || [] }));
+                    importedCampaign.sessionLogs = (importedCampaign.sessionLogs || []).map((l: any) => ({
+                        ...l, 
+                        structuredNotes: l.structuredNotes || [],
+                        relatedPlotIds: l.relatedPlotIds || []
+                    }));
                     importedCampaign.playerCharacters = importedCampaign.playerCharacters || [];
                     importedCampaign.npcs = (importedCampaign.npcs || []).map(n => ({...n, relationships: n.relationships || [], history: n.history || []}));
                     importedCampaign.locations = (importedCampaign.locations || []).map(l => ({...l, history: l.history || []}));
@@ -744,6 +972,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             const newLog: SessionLog = { ...newLogData, id: crypto.randomUUID() };
             // Ensure compatibility
             if (!newLog.structuredNotes) newLog.structuredNotes = [];
+            if (!newLog.relatedPlotIds) newLog.relatedPlotIds = [];
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
                 if (campaign) {

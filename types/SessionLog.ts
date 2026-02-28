@@ -23,6 +23,9 @@ export interface SessionLog {
   plannedSceneIds: string[]; 
   prepNotes: string; 
   
+  // Plot Tracking
+  relatedPlotIds: string[]; // IDs of plots advanced in this session
+
   // Execution - Unstructured
   runningNotes: string; 
   

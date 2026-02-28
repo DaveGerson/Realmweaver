@@ -183,6 +183,8 @@ const testCampaignHandlers = async (isMockMode: boolean) => {
     const findArticleByTitle = (title: string) => getActiveCampaign()?.articles.find(e => e.title === title);
     const findPcByName = (name: string) => getActiveCampaign()?.playerCharacters.find(e => e.characterSocial.characterName === name);
     const findNoteByTitle = (title: string) => getActiveCampaign()?.notes.find(e => e.title === title);
+    const findPlotByTitle = (title: string) => getActiveCampaign()?.plots.find(e => e.title === title);
+    const findSessionByTitle = (title: string) => getActiveCampaign()?.sessionLogs.find(e => e.title === title);
     
     try {
         // --- 1. Setup & Creation ---
@@ -207,11 +209,15 @@ const testCampaignHandlers = async (isMockMode: boolean) => {
         const itemId = testService.createItem({ name: 'Test Item', description: 'Desc', rarity: 'common', properties: 'Props' });
         const noteId = testService.createNote({ title: 'Test Note', content: 'Note Content', tags: [] });
         const pcId = testService.createPlayerCharacter({ playerName: 'TestPlayer', characterSocial: { characterName: 'TestPC' } as any, characterStatistics: { classes: { charClass: 'Fighter', level: 1 } } as any });
+        const plotId = testService.createPlot({ title: 'Test Plot', description: 'Plot Desc', status: 'active', relatedEntityIds: [] });
+        const sessionId = testService.createSessionLog({ title: 'Test Session', sessionDate: new Date().toISOString(), status: 'planned', plannedSceneIds: [], prepNotes: '', runningNotes: '', structuredNotes: [], relatedPlotIds: [], recap: '', notableEvents: '', looseEnds: '' });
 
         success &&= testLog(!!findArticleByTitle('Test Article'), '2a. Article Creation', 'Article creation failed');
         success &&= testLog(!!getActiveCampaign()?.items.find(i => i.id === itemId), '2b. Item Creation', 'Item creation failed');
         success &&= testLog(!!findNoteByTitle('Test Note'), '2c. Note Creation', 'Note creation failed');
         success &&= testLog(!!findPcByName('TestPC'), '2d. Player Character Creation', 'PC creation failed');
+        success &&= testLog(!!findPlotByTitle('Test Plot'), '2e. Plot Creation', 'Plot creation failed');
+        success &&= testLog(!!findSessionByTitle('Test Session'), '2f. Session Log Creation', 'Session Log creation failed');
         
         // --- 3. Link Verification (from Batch Add) ---
         let elara = findNpcByName('Elara');
@@ -254,6 +260,16 @@ const testCampaignHandlers = async (isMockMode: boolean) => {
         testService.updateEncounter(encounter);
         success &&= testLog(getActiveCampaign()?.activeEncounter?.round === 2, '4f. Encounter Update', 'Encounter update failed');
 
+        // Plot & Session Updates
+        testService.updatePlot(plotId, { status: 'resolved' });
+        const updatedPlot = findPlotByTitle('Test Plot');
+        success &&= testLog(updatedPlot?.status === 'resolved', '4g. Plot Update', 'Plot update failed');
+
+        testService.updateSessionLog(sessionId, { status: 'active', runningNotes: 'Notes...' });
+        const updatedSession = findSessionByTitle('Test Session');
+        success &&= testLog(updatedSession?.status === 'active' && updatedSession.runningNotes === 'Notes...', '4h. Session Update', 'Session update failed');
+
+
         if (sunkenTemple && tidalChamber) {
             const parentIdBefore = sunkenTemple.parentLocationId;
             
@@ -278,7 +294,7 @@ const testCampaignHandlers = async (isMockMode: boolean) => {
             
             success &&= testLog(
                 stateWasUnchanged && correctErrorWasLogged,
-                '4g. Location Circular Dependency Prevention',
+                '4i. Location Circular Dependency Prevention',
                 `Location circular dependency prevention failed. State changed: ${!stateWasUnchanged}, Error logged: ${correctErrorWasLogged}`
             );
         }
@@ -303,6 +319,12 @@ const testCampaignHandlers = async (isMockMode: boolean) => {
 
         if (pcId) testService.deletePlayerCharacter(pcId);
         success &&= testLog(!findPcByName('TestPC'), '5g. Player Character Deletion', 'PC was not deleted');
+
+        if (plotId) testService.deletePlot(plotId);
+        success &&= testLog(!findPlotByTitle('Test Plot'), '5h. Plot Deletion', 'Plot was not deleted');
+
+        if (sessionId) testService.deleteSessionLog(sessionId);
+        success &&= testLog(!findSessionByTitle('Test Session'), '5i. Session Log Deletion', 'Session Log was not deleted');
 
     } catch(e) {
         console.error('❌ State handler test failed with error:', e);

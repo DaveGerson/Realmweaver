@@ -409,3 +409,15 @@ export const chatWithRealmWeaver = async (
         draftEntities: newDrafts
     });
 }
+
+export const analyzeSessionNotes = async (notes: string, knownEntityNames: string[], campaignContext?: string, isMockMode?: boolean): Promise<{entries: {content: string, relatedEntityNames: string[]}[]}> => {
+    console.log(`[MOCK MODE] Called analyzeSessionNotes with notes length: ${notes.length}`);
+    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    return Promise.resolve({
+        entries: [
+            { content: "The party entered the dungeon and fought three goblins.", relatedEntityNames: [] },
+            { content: "They found a hidden chest containing a strange map.", relatedEntityNames: [] },
+            { content: "Elara spoke with the ghost of the previous guardian.", relatedEntityNames: ["Elara"] }
+        ]
+    });
+}
