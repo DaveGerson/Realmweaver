@@ -210,7 +210,7 @@ const testCampaignHandlers = async (isMockMode: boolean) => {
         const noteId = testService.createNote({ title: 'Test Note', content: 'Note Content', tags: [] });
         const pcId = testService.createPlayerCharacter({ playerName: 'TestPlayer', characterSocial: { characterName: 'TestPC' } as any, characterStatistics: { classes: { charClass: 'Fighter', level: 1 } } as any });
         const plotId = testService.createPlot({ title: 'Test Plot', description: 'Plot Desc', status: 'active', relatedEntityIds: [] });
-        const sessionId = testService.createSessionLog({ title: 'Test Session', sessionDate: new Date().toISOString(), status: 'planned', plannedSceneIds: [], prepNotes: '', runningNotes: '', structuredNotes: [], relatedPlotIds: [], recap: '', notableEvents: '', looseEnds: '' });
+        const sessionId = testService.createSessionLog({ title: 'Test Session', sessionDate: new Date().toISOString(), status: 'planned', plannedSceneIds: [], prepNotes: '', runningNotes: '', structuredNotes: [], relatedPlotIds: [], recap: '', notableEvents: '', looseEnds: '', encounterLog: [] });
 
         success &&= testLog(!!findArticleByTitle('Test Article'), '2a. Article Creation', 'Article creation failed');
         success &&= testLog(!!getActiveCampaign()?.items.find(i => i.id === itemId), '2b. Item Creation', 'Item creation failed');

@@ -1,5 +1,6 @@
 
 // types/SessionLog.ts
+import type { Encounter } from './Encounter';
 
 export type SessionStatus = 'planned' | 'active' | 'completed';
 
@@ -32,8 +33,11 @@ export interface SessionLog {
   // Execution - Structured
   structuredNotes: SessionLogEntry[];
 
+  // Combat History
+  encounterLog: Encounter[]; // Archived encounters from this session
+
   // Post-Session
-  recap: string; 
-  notableEvents: string; 
-  looseEnds: string; 
+  recap: string;
+  notableEvents: string;
+  looseEnds: string;
 }

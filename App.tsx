@@ -37,9 +37,10 @@ import { PlayerCharacterDashboard } from './components/dashboards/PlayerCharacte
 import { PlotDashboard } from './components/dashboards/PlotDashboard';
 import { campaignService } from './services/campaignService';
 import { RealmChatWidget } from './components/RealmChat/RealmChatWidget';
+import { SessionRunner } from './components/views/SessionRunner';
 
 
-export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'combat' | 'relationships';
+export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'combat' | 'relationships' | 'session-runner';
 export type GeneratorType = 'npc' | 'location' | 'faction' | 'item' | 'scene' | 'article';
 
 const App: React.FC = () => {
@@ -341,8 +342,36 @@ const App: React.FC = () => {
         }
     };
 
+  const handleGoLive = (sessionLogId: string) => {
+      campaignService.goLive(sessionLogId);
+      setActiveView('session-runner');
+      resetSelections();
+  };
+
+  const handleEndSession = () => {
+      campaignService.endSession();
+      setActiveView('session-logs');
+      resetSelections();
+  };
+
   const renderMainContent = () => {
       if (!activeCampaign) return null;
+
+      // Session Runner takes priority when active
+      if (activeView === 'session-runner' && activeCampaign.activeSessionId) {
+          const activeSessionLog = activeCampaign.sessionLogs?.find(s => s.id === activeCampaign.activeSessionId);
+          if (activeSessionLog) {
+              return (
+                  <SessionRunner
+                      campaign={activeCampaign}
+                      sessionLog={activeSessionLog}
+                      isMockMode={isMockMode}
+                      onEndSession={handleEndSession}
+                      onOpenCoach={() => setIsCoachOpen(true)}
+                  />
+              );
+          }
+      }
 
       // Render Generators
       if (activeGenerator === 'scene' && selectedAdventure) return <ContentWrapper title="Create New Scene" icon="Scenes"><SceneGenerator onSceneCreated={(s) => campaignService.createScene(selectedAdventure.id, s)} isMockMode={isMockMode} isOfficialSetting={isOfficialSetting} /></ContentWrapper>;
@@ -351,11 +380,12 @@ const App: React.FC = () => {
       if (selectedPlayerCharacter) return <PlayerCharacterEditor pc={selectedPlayerCharacter} onUpdate={campaignService.updatePlayerCharacter} onDelete={(id) => { campaignService.deletePlayerCharacter(id); resetSelections(); }} />;
       
       if (selectedSessionLog) return (
-        <SessionLogEditor 
-            log={selectedSessionLog} 
-            onUpdate={campaignService.updateSessionLog} 
-            onDelete={(id) => { campaignService.deleteSessionLog(id); resetSelections(); }} 
+        <SessionLogEditor
+            log={selectedSessionLog}
+            onUpdate={campaignService.updateSessionLog}
+            onDelete={(id) => { campaignService.deleteSessionLog(id); resetSelections(); }}
             isMockMode={isMockMode}
+            onGoLive={handleGoLive}
         />
       );
       

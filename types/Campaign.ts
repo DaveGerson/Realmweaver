@@ -32,4 +32,5 @@ export interface Campaign {
   notes: Note[];
   activeEncounter?: Encounter;
   activeSceneId?: string; // The ID of the scene currently being played in the session
+  activeSessionId?: string; // The ID of the currently live session (Session Runner)
 }

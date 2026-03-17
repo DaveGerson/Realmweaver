@@ -15,6 +15,7 @@ interface SessionLogEditorProps {
   onUpdate: (id: string, updatedData: Partial<SessionLog>) => void;
   onDelete: (id: string) => void;
   isMockMode: boolean;
+  onGoLive?: (sessionLogId: string) => void;
 }
 
 // Audio Context & Processor Types for TypeScript
@@ -24,7 +25,7 @@ declare global {
   }
 }
 
-export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdate, onDelete, isMockMode }) => {
+export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdate, onDelete, isMockMode, onGoLive }) => {
   const [formData, setFormData] = useState(log);
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState<'structured' | 'scratchpad'>('structured');
@@ -418,8 +419,20 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
             )}
 
             {formData.status === 'planned' && (
-                <Button onClick={handleStartSession} className="bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/20">
-                    <Icons.Play className="w-4 h-4 mr-2" /> Start Session
+                <>
+                    <Button onClick={handleStartSession} className="bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/20">
+                        <Icons.Play className="w-4 h-4 mr-2" /> Start Session
+                    </Button>
+                    {onGoLive && (
+                        <Button onClick={() => onGoLive(log.id)} className="bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-900/20">
+                            <Icons.Live className="w-4 h-4 mr-2" /> Go Live
+                        </Button>
+                    )}
+                </>
+            )}
+            {formData.status === 'active' && onGoLive && (
+                <Button onClick={() => onGoLive(log.id)} className="bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-900/20">
+                    <Icons.Live className="w-4 h-4 mr-2" /> Session Runner
                 </Button>
             )}
             {formData.status === 'active' && (

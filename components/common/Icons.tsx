@@ -46,6 +46,13 @@ import {
   Target,
   ListTodo,
   Minus,
+  Square,
+  SkipForward,
+  Mic,
+  MicOff,
+  Clock,
+  ChevronRight,
+  Radio,
 } from 'lucide-react';
 
 export const Icons = {
@@ -94,6 +101,13 @@ export const Icons = {
   Target: Target,
   List: ListTodo,
   Minus,
+  Stop: Square,
+  SkipForward,
+  Mic,
+  MicOff,
+  Clock,
+  ChevronRight,
+  Live: Radio,
 };
 
 export const SceneIcon = ({ type, className }: { type: string, className?: string }) => {
