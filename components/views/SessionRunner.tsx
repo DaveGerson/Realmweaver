@@ -423,13 +423,22 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                                         NPCs Present
                                     </h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                        {activeSceneNpcs.map(npc => (
-                                            <div key={npc.id} className="bg-slate-900/50 rounded-md p-3">
-                                                <p className="text-white font-semibold text-sm">{npc.name}</p>
-                                                {npc.traits && <p className="text-slate-400 text-xs mt-1">{npc.traits}</p>}
-                                                {npc.motivations && <p className="text-slate-500 text-xs mt-1 italic">{npc.motivations}</p>}
-                                            </div>
-                                        ))}
+                                        {activeSceneNpcs.map(npc => {
+                                            const faction = npc.factionId ? campaign.factions.find(f => f.id === npc.factionId) : null;
+                                            return (
+                                                <div key={npc.id} className="bg-slate-900/50 rounded-md p-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-white font-semibold text-sm">{npc.name}</p>
+                                                        {faction && (
+                                                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 uppercase font-bold">{faction.name}</span>
+                                                        )}
+                                                    </div>
+                                                    {npc.traits && <p className="text-slate-400 text-xs mt-1">{npc.traits}</p>}
+                                                    {npc.motivations && <p className="text-slate-500 text-xs mt-1 italic">{npc.motivations}</p>}
+                                                    {npc.exampleQuote && <p className="text-amber-400/70 text-xs mt-1 italic">"{npc.exampleQuote}"</p>}
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}

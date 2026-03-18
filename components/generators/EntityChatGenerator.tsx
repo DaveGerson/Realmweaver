@@ -12,14 +12,16 @@ interface EntityChatGeneratorProps {
   renderPreview: (data: any, onUpdate: (data: any) => void) => React.ReactNode;
   initialData: any;
   isMockMode: boolean;
+  campaignContext?: string;
 }
 
-export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({ 
-    entityType, 
-    onEntityCreated, 
-    renderPreview, 
+export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
+    entityType,
+    onEntityCreated,
+    renderPreview,
     initialData,
-    isMockMode 
+    isMockMode,
+    campaignContext
 }) => {
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -82,7 +84,7 @@ export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
         data: draftData
     };
 
-    const context = `User is using the "Create via Chat" tool for a specific ${entityType}.`;
+    const context = `${campaignContext || ''}\nUser is using the "Create via Chat" tool for a specific ${entityType}.`;
 
     try {
       const response = await chatWithRealmWeaver(

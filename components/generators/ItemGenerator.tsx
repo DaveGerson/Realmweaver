@@ -12,9 +12,10 @@ interface ItemGeneratorProps {
   onItemCreated: (item: Omit<Item, 'id'>) => void;
   isMockMode: boolean;
   isOfficialSetting?: boolean;
+  campaignContext?: string;
 }
 
-export const ItemGenerator: React.FC<ItemGeneratorProps> = ({ onItemCreated, isMockMode, isOfficialSetting = false }) => {
+export const ItemGenerator: React.FC<ItemGeneratorProps> = ({ onItemCreated, isMockMode, isOfficialSetting = false, campaignContext }) => {
   const [mode, setMode] = useState<'quick' | 'chat'>('quick');
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -28,7 +29,7 @@ export const ItemGenerator: React.FC<ItemGeneratorProps> = ({ onItemCreated, isM
     setIsLoading(true);
     setError(null);
     try {
-      const itemData = await generateItem(prompt, isOfficialSetting, isMockMode);
+      const itemData = await generateItem(prompt, isOfficialSetting, isMockMode, campaignContext);
       onItemCreated(itemData);
       setPrompt('');
     } catch (err) {
@@ -51,6 +52,7 @@ export const ItemGenerator: React.FC<ItemGeneratorProps> = ({ onItemCreated, isM
                  <EntityChatGenerator
                     entityType="item"
                     isMockMode={isMockMode}
+                    campaignContext={campaignContext}
                     onEntityCreated={(data) => {
                         const { id, ...itemData } = data;
                         onItemCreated(itemData);

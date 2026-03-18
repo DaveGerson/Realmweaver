@@ -14,9 +14,10 @@ interface LocationGeneratorProps {
   isOfficialSetting?: boolean;
   allLocations?: Location[];
   factions?: Faction[];
+  campaignContext?: string;
 }
 
-export const LocationGenerator: React.FC<LocationGeneratorProps> = ({ onLocationCreated, isMockMode, isOfficialSetting = false, allLocations = [], factions = [] }) => {
+export const LocationGenerator: React.FC<LocationGeneratorProps> = ({ onLocationCreated, isMockMode, isOfficialSetting = false, allLocations = [], factions = [], campaignContext }) => {
   const [mode, setMode] = useState<'quick' | 'chat'>('quick');
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -30,7 +31,7 @@ export const LocationGenerator: React.FC<LocationGeneratorProps> = ({ onLocation
     setIsLoading(true);
     setError(null);
     try {
-      const locationData = await generateLocation(prompt, isOfficialSetting, isMockMode);
+      const locationData = await generateLocation(prompt, isOfficialSetting, isMockMode, campaignContext);
       const newLocation: Omit<Location, 'id'> = {
           ...locationData,
           parentLocationId: undefined,
@@ -61,6 +62,7 @@ export const LocationGenerator: React.FC<LocationGeneratorProps> = ({ onLocation
                  <EntityChatGenerator
                     entityType="location"
                     isMockMode={isMockMode}
+                    campaignContext={campaignContext}
                     onEntityCreated={(data) => {
                         const { id, ...locationData } = data;
                         onLocationCreated(locationData);
