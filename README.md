@@ -1,116 +1,356 @@
 
-# Welcome to RealmWeaver!
+# RealmWeaver
 
 <p align="center">
   <img src="https://storage.googleapis.com/aistudio-ux-team-bucket/apps/lu-lp/logo.png" alt="RealmWeaver Logo" width="150">
 </p>
 
-<h2 align="center">Your AI-powered companion for crafting unforgettable D&D campaigns.</h2>
+<h3 align="center">The AI-native campaign cockpit for tabletop RPG Game Masters.</h3>
 
-Tired of juggling scattered notes, struggling with writer's block, or losing track of your world's details? RealmWeaver is here to be your ultimate Dungeon Master's assistant. It's a smart, creative tool that helps you build rich, interconnected worlds, craft compelling stories, and even assists you *during* your game sessions.
-
----
-
-## 🚀 Getting Started: Weaving Your First Campaign
-
-Starting your next grand adventure is just a few clicks away.
-
-### Step 1: The Welcome Screen
-When you first launch the app, you'll be greeted by the welcome screen. Simply click **"Create New Campaign"** to begin.
-
-### Step 2: The Campaign Creator
-This is where you plant the seed for your world.
-- **Campaign Title:** Give your campaign a name, like "The Sundered Crown" or "Echoes of the Void."
-- **World Setting:** Provide a high-level description of your world. This is important! The AI will use this description as context for everything it generates later. The more detail you provide here, the more consistent your world will feel.
-
-Click **"Weave Campaign"**, and you'll be taken to the main editor interface.
-
-### Step 3: The Main Interface
-The editor is divided into a few key areas:
-- **Campaign Sidebar (Left):** This is your campaign's table of contents. It's where you'll find all your NPCs, locations, adventures, and items, neatly organized.
-- **Main Editor (Center):** This is your primary workspace. It's where you'll edit the details of your world and use the AI to generate new content.
-- **Header (Top):** From here, you can access powerful tools like the DM Coach and Evocation Wizard.
+<p align="center">
+  Build worlds. Craft stories. Run sessions. All with AI at your side.
+</p>
 
 ---
 
-## 🌎 Building Your World, One Piece at a Time
+## What is RealmWeaver?
 
-RealmWeaver helps you create the core components of your campaign setting.
+RealmWeaver is a single-page application for tabletop RPG Game Masters who want to create, manage, and run campaigns with AI assistance. It combines deep world-building tools, real-time session support, and conversational AI into one unified experience — replacing the juggle of scattered notes, wikis, and generator sites.
 
-### Generating an NPC
-Let's bring a character to life.
-1.  In the sidebar, hover over "NPCs" and click the **`+`** icon that appears.
-2.  The main view will now show the NPC Generator. In the text box, describe the character you have in mind. Be descriptive!
-    -   *Good prompt example:* `"A grizzled old ranger who has lost his wolf companion and now runs a lonely tavern at the edge of the wilds."*
-3.  **Pro Tip:** Want to generate a character from official D&D lore, like Elminster or Strahd? Check the **"Generate from existing lore"** box.
-4.  Click **"Create NPC"**. The AI will generate a fully-detailed character, complete with a description, personality, backstory, secrets, and more. The new NPC will appear in the sidebar, and their editor will open automatically.
+**Key capabilities:**
 
-### Editing an Entity & AI-Assist
-Once an entity is created, you can edit every detail. But what if you get stuck?
-- **✨ AI-Assist:** Notice the little **sparkle icon** next to most text boxes? If you're struggling to write a backstory or come up with a personality trait, just click the **"Generate"** button! The AI will write it for you, using the information you've already provided as context.
-
-You can generate Locations, Factions, and Items using the same simple process! As your world grows, you can link entities together, such as assigning an NPC to a faction or setting a location as a sub-location of another (e.g., "The Dragon's Lair" inside the "Volcanic Peaks").
+- **AI-Powered World Building** — Generate NPCs, locations, factions, items, scenes, adventures, articles, and plots with contextual AI that knows your world
+- **Session Cockpit** — Run games from a unified session runner with scene management, combat tracking, voice notes, and DM coaching
+- **RealmChat** — A conversational AI assistant for collaborative entity drafting through natural dialogue
+- **DM Coach** — In-session tools for narration, improvisation, and rollable table generation
+- **Evocation Wizard** — Batch-generate entire regions of connected content in one shot
+- **Relationship Graph** — Visualize entity connections with interactive D3/React Flow graphs
+- **Plot Tracking** — Track storylines across sessions so nothing falls through the cracks
+- **Import/Export** — JSON and Obsidian markdown formats, plus PDF character sheet parsing
+- **Offline-Ready** — Full mock mode for development and testing without API calls
 
 ---
 
-## 📖 Crafting Your Story: Adventures & Scenes
+## Quick Start
 
-A world is just a stage; adventures are the play.
+### Prerequisites
 
-### Adventures and Scenes
-In RealmWeaver, an **Adventure** is like a folder for your story arc. Inside, you create **Scenes**, which are the individual encounters or story beats.
+- Node.js 18+
+- A Google Gemini API key (optional — mock mode works without one)
 
-1.  **Create an Adventure:** Click the `+` next to "Adventures" in the sidebar to create a new story arc. Give it a title and a target level for your players.
-2.  **Generate a Scene:** Click the `+` that appears when you hover over your new adventure. This is where you can generate the core of your gameplay.
-    -   *Good prompt example:* `"The players must negotiate with a suspicious and vain red dragon who is hoarding a stolen artifact they need."*
-3.  Click **"Create Scene"**. The AI will generate a complete scene structure, including:
-    -   **Read-Aloud Text:** Evocative text to read directly to your players.
-    -   **GM Notes:** Your secret notes on the scene's goals, character motivations, and potential outcomes.
-    -   **Skill Checks:** Relevant skill checks the players might make.
-    -   **Rewards:** Ideas for loot, gold, or other rewards.
+### Installation
 
-You can **drag and drop scenes** in the sidebar to easily reorder the flow of your adventure!
+```bash
+git clone <repository-url>
+cd Realmweaver
+npm install
+```
 
-### The Prep Document
-Tired of copying and pasting everything into a separate notes app? You don't have to.
-- Open an adventure and click on the **"Prep Document"** tab. RealmWeaver automatically compiles your entire adventure—scenes, relevant NPCs, and all—into a clean, copy-pasteable Markdown document perfect for your session notes.
+### Configuration
 
----
+Create a `.env.local` file in the project root:
 
-## 💬 RealmChat: Your Creative Partner
+```env
+GEMINI_API_KEY=your_api_key_here
+```
 
-RealmChat is a powerful conversational assistant accessible via the chat icon in the bottom-right corner of the app.
+### Running
 
-- **Draft Entities:** Chat with the AI to collaboratively create NPCs, Locations, Factions, Items, Adventures, and Lore Articles. As you chat, the AI builds a "Draft" of the entity.
-- **Interactive Editing:** Click on any draft to see it in full detail, edit it, and then "Approve" it to add it to your campaign.
-- **Guided Flows:** Ask the AI to help you create something, and it will guide you through the process, offering choices and suggestions.
-- **Performance Modes:** Choose between "Performance" (Flash-Lite), "Medium" (Flash), or "Quality" (Pro) to balance speed and reasoning depth.
+```bash
+npm run dev      # Development server → http://localhost:3000
+npm run build    # Production build
+npm run preview  # Preview production build
+```
 
----
-
-## 🎲 Your In-Session Assistant: The DM Coach
-
-Players have a knack for doing the unexpected. When they go off-script, the DM Coach has your back. Access it from the header at the top of the screen.
-
-- **Narrator:** Need to describe a location on the fly? Type "Describe a bustling fantasy marketplace" and get beautiful, read-aloud text instantly.
-- **Improviser:** Did your players just try to adopt the goblin you planned for them to fight? Type that in and get instant, creative ideas for consequences and future plot hooks.
-- **Rollable Table:** Need a quick table for random tavern patrons or items in a wizard's pocket? The coach can whip one up for you in seconds.
-- **Low-Latency Mode:** Need a super-fast response during a session? Flick this toggle on to use a faster AI model, perfect for in-the-moment improvisation.
+Toggle **Mock Mode** in the header to use the app without an API key — all AI features return sample data.
 
 ---
 
-## 🧙‍♂️ Supercharge Your World: The Evocation Wizard
+## Tech Stack
 
-Need to generate a lot of content at once? The Evocation Wizard is your tool for massive, one-shot world-building.
+| Layer | Technology | Version |
+|-------|-----------|---------|
+| **Framework** | React | 19.2.0 |
+| **Language** | TypeScript | 5.8.2 |
+| **Build** | Vite | 6.2.0 |
+| **AI** | Google Gemini (@google/genai) | 1.25.0 |
+| **State** | Custom store + Immer | 10.1.3 |
+| **Styling** | Tailwind CSS (CDN) | Latest |
+| **Icons** | Lucide React | 0.546.0 |
+| **Graphs** | React Flow + Dagre + D3 | 11.10.1 / 0.8.5 / 7.8.5 |
+| **Utilities** | tailwind-merge | 3.3.1 |
 
-- **Simple Mode:** Just give it a core theme, like *"A gothic-horror city plagued by a mysterious vampire curse."* The Wizard will generate a whole set of related NPCs, locations, factions, and even a starting adventure to get you going!
-- **Detailed Mode:** For more control, add multiple specific prompts for exactly what you want to create, all at once.
-
-After generation, you can review everything the Wizard created and select which pieces you want to add directly to your campaign. It's the fastest way to flesh out a new region or idea.
+**AI Models:**
+- **Primary:** `gemini-2.5-flash` — fast generation for most content
+- **Quality:** `gemini-2.5-pro` — deeper reasoning for complex generation
+- Thinking budgets: Pro 32K tokens, Flash 24K tokens
 
 ---
 
-### A Note on Mock Mode
-In the header, you'll see a "Mock Mode" toggle. This lets you test all of the app's features using pre-written sample data instead of the AI. It's a great way to get a feel for the workflow without using the AI.
+## Architecture Overview
 
-Happy weaving, Dungeon Master!
+### High-Level Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                        React SPA (Vite)                          │
+├──────────────┬───────────────────────────────┬───────────────────┤
+│              │                               │                   │
+│  Components  │    State Management           │   AI Services     │
+│              │                               │                   │
+│  Dashboards  │  campaignService.ts           │  geminiService.ts │
+│  Generators  │  ┌─────────────────────┐      │  (facade)         │
+│  Editors     │  │ Factory Store       │      │       │           │
+│  Dialogs     │  │ + Immer             │      │       ▼           │
+│  Tools       │  │ + Debounced Save    │      │  ai/core.ts       │
+│  RealmChat   │  │ + localStorage      │      │  ai/realmWeaver   │
+│              │  └─────────────────────┘      │  ai/dmCoach       │
+│              │                               │  ai/realmChat     │
+│              │  useSyncExternalStore()        │  ai/evocation     │
+│              │  for React binding             │  ai/mockService   │
+│              │                               │                   │
+├──────────────┴───────────────────────────────┴───────────────────┤
+│                     Gemini API / Mock Service                     │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Data Flow
+
+```
+User Action → Component → campaignService method → Immer update →
+debounced localStorage save → Notify subscribers → React re-render
+```
+
+### Three-Layer Service Architecture
+
+```
+Component Layer (React)
+        ↓
+geminiService.ts (facade — routes to mock or real AI based on mode)
+        ↓
+ai/realmWeaver.ts │ ai/dmCoach.ts │ ai/realmChat.ts │ ai/evocationWizard.ts
+        ↓
+ai/core.ts (Gemini API wrapper: generateWithSchema, generateText, generateChatCompletion)
+```
+
+### Project Structure
+
+All application code lives at the **project root** — there is no `src/` directory.
+
+```
+Realmweaver/
+├── App.tsx                        # Root component, view routing, state wiring
+├── index.tsx                      # React entry point
+├── index.html                     # HTML template (Tailwind CDN, import maps)
+├── vite.config.ts                 # Vite config (port 3000, path aliases)
+├── smokeTest.ts                   # Built-in smoke test suite
+│
+├── components/
+│   ├── common/                    # Button, Icons, Textarea, EntityHistoryManager
+│   ├── layout/                    # Header, CampaignSidebar, ContentWrapper
+│   ├── views/                     # WelcomeScreen, CampaignCreator, CampaignSelector, SessionRunner
+│   ├── dashboards/                # List views: NPC, Location, Faction, Item, Adventure, Article, etc.
+│   ├── generators/                # AI creation forms: NPC, Location, Faction, Item, Scene, etc.
+│   ├── editors/                   # Detail editors: NPC, Location, Faction, Item, Adventure, etc.
+│   ├── dialogs/                   # DmCoach, EvocationWizard, ExportModal
+│   ├── tools/                     # CombatTracker
+│   ├── visualizers/               # RelationshipGraph (D3-based)
+│   └── RealmChat/                 # RealmChatWidget (floating assistant)
+│
+├── services/
+│   ├── campaignService.ts         # Central state store (factory + Immer + localStorage)
+│   ├── geminiService.ts           # AI service facade (mock mode switching)
+│   ├── importExportService.ts     # Import/export (JSON, Obsidian)
+│   └── ai/                        # AI modules
+│       ├── core.ts                # Gemini API wrapper
+│       ├── realmWeaver.ts         # Entity generation
+│       ├── dmCoach.ts             # Session assistance
+│       ├── realmChat.ts           # Conversational AI
+│       ├── evocationWizard.ts     # Batch generation & document parsing
+│       └── mockService.ts         # Mock data for testing
+│
+├── types/                         # TypeScript interfaces (barrel-exported via index.ts)
+│   ├── Campaign.ts, NPC.ts, Location.ts, Faction.ts, Item.ts,
+│   ├── Adventure.ts, Scene.ts, Article.ts, SessionLog.ts,
+│   ├── PlayerCharacter.ts, Plot.ts, Note.ts, Encounter.ts,
+│   ├── RealmChat.ts, Evocation.ts, Graph.ts, RollableTable.ts, etc.
+│
+└── utils/
+    └── entityUtils.ts             # Default entity factories and helpers
+```
+
+### State Management
+
+The app uses a **factory-based external store** (`createCampaignStore`) with React's `useSyncExternalStore` for binding:
+
+- **Immer** handles immutable state updates
+- **Debounced auto-save** (2s) persists to `localStorage`
+- **Relationship syncing** — linking an NPC to a faction automatically updates both sides
+- **Cascade deletion** — removing entities cleans up references across the graph
+- **Cycle detection** — location parent-child hierarchies are validated
+
+### Entity Model
+
+The `Campaign` type holds arrays of all entity types:
+
+| Entity | Description |
+|--------|-------------|
+| **NPC** | Characters with personality, backstory, secrets, faction links |
+| **Location** | Places with hierarchy (parent/child), connections, points of interest |
+| **Faction** | Organizations with goals, relationships, NPC membership |
+| **Item** | Artifacts, equipment, treasures |
+| **Adventure** | Story arcs containing ordered scenes |
+| **Scene** | Encounters within adventures — read-aloud text, GM notes, skill checks |
+| **Article** | Lore entries linked to any entities |
+| **Session Log** | Session records with notes, recaps, voice transcription |
+| **Player Character** | PC data imported from PDF character sheets or manual entry |
+| **Plot** | Cross-session storyline threads with status tracking |
+| **Note** | Quick freeform notes |
+| **Encounter** | Combat tracking (initiative, HP, combatants) |
+
+---
+
+## Features in Detail
+
+### AI Generation
+
+Every entity type can be generated from a natural language prompt. The AI uses your campaign's setting, existing entities, and relationships as context to maintain consistency. Generation supports:
+
+- **Schema-enforced output** — AI returns structured JSON matching your type definitions
+- **Campaign context injection** — every AI call receives relevant campaign data
+- **Grounded search** — NPC generation can use Google Search for well-known characters
+- **Multi-model support** — choose between Flash (fast) and Pro (quality)
+
+### RealmChat
+
+A floating conversational assistant for collaborative entity creation:
+- Natural dialogue → AI builds draft entities in the background
+- Review, edit, and approve drafts before adding to your campaign
+- Model tier selection (performance/medium/quality)
+
+### DM Coach
+
+Three in-session tools accessible from the header:
+- **Narrator** — generate read-aloud descriptive text
+- **Improviser** — get consequences and plot hooks for unexpected player actions
+- **Rollable Tables** — generate custom random tables on any theme
+
+### Evocation Wizard
+
+Four batch generation modes:
+- **Simple** — single theme generates a full set of related entities
+- **Detailed** — multiple specific prompts for fine control
+- **Ingest** — parse existing documents for entities
+- **Chat** — iterative conversational batch generation
+
+### Session Runner
+
+Unified view for running live sessions with scene management, combat tracking, voice notes, and integrated DM tools.
+
+### Combat Tracker
+
+Initiative tracking, HP management, and encounter management integrated into the session flow.
+
+### Relationship Graph
+
+Interactive D3/React Flow visualization showing how NPCs, factions, locations, and other entities connect across your campaign.
+
+---
+
+## Roadmap
+
+RealmWeaver's roadmap is organized into phased delivery. See `UX_OVERHAUL_PLAN.md` for the full product strategy and `TODO.md` for detailed technical tasks.
+
+### Phase 0: Session Cockpit (P0 — In Progress)
+Complete the unified session runner — dice roller, quick tools panel, running log with auto-event capture, one-click "Go Live", tablet-responsive layout.
+
+### Phase 1: Fast World-to-Session Pipeline (P1)
+Contextual "Generate Here" buttons, global search (Cmd+K), session prep wizard, quick entity card popovers, inline scene builder.
+
+### Phase 2: Fun & Friction-Free Interface (P2)
+Conversational generation as default, rich dashboard cards, tabbed editor layouts, dark fantasy visual polish, keyboard shortcuts.
+
+### Phase 3: Plot Coherence & World Intelligence (P2)
+Enhanced plot timeline, continuity checker, world evolution engine (post-session state propagation), smart tiered context window, relationship intelligence.
+
+### Phase 4: Note-Taking Reduction (P1)
+Always-on voice log in session runner, smart note structuring, post-session auto-recap, event-driven auto-capture from combat/scene transitions.
+
+### Phase 5: Collaboration & Sharing (P1)
+Cloud sync with user accounts, player portal (free accounts), GM secrets system, shared world wiki, session recap sharing.
+
+### Phase 6: Maps & Spatial Worldbuilding (P2)
+Interactive world maps with location pins, battle maps with token placement, location hierarchy visualization.
+
+### Phase 7: Onboarding & Growth (P3)
+First campaign wizard, contextual feature discovery, template campaigns, community content hub, multi-system support (Pathfinder, Fate, PbtA).
+
+### Phase 8: Advanced AI (P3)
+AI world simulation between sessions, adaptive difficulty engine, player behavior prediction, content style matching, cross-campaign intelligence.
+
+### Priority Matrix
+
+| Phase | Impact | Effort | Priority |
+|-------|--------|--------|----------|
+| 0: Session Cockpit | Very High | Medium | **P0** |
+| 1: World-to-Session Pipeline | High | Medium | **P1** |
+| 4: Note-Taking Reduction | High | Medium | **P1** |
+| 5: Collaboration & Sharing | Very High | Very High | **P1** |
+| 3: Plot Coherence | High | Medium | **P2** |
+| 2: Fun Interface | Medium | Medium | **P2** |
+| 6: Maps | High | High | **P2** |
+| 7: Onboarding & Growth | Medium | Low-Med | **P3** |
+| 8: Advanced AI | High | High | **P3** |
+
+---
+
+## Development
+
+### Scripts
+
+```bash
+npm run dev      # Vite dev server on port 3000
+npm run build    # Production build
+npm run preview  # Preview production build
+npm test         # Run Vitest
+```
+
+### Key Conventions
+
+- **No `src/` directory** — all code lives at the project root
+- **Import alias** — `@/` maps to project root (`@/components/common/Button`)
+- **Icons** — always import from `@/components/common/Icons.tsx`, never directly from `lucide-react`
+- **Types** — import from `@/types/index` barrel export
+- **Named exports only** — no default exports
+- **AI facade** — all AI calls go through `geminiService.ts`, never call `ai/` modules directly
+- **Mock mode** — every AI function must have a mock implementation
+- **Campaign context** — always pass to AI functions for consistency
+
+### Testing
+
+- **Built-in smoke tests** (`smokeTest.ts`) — validates service functions, entity CRUD, relationships, and import/export
+- **Mock mode** — enables full app testing without API calls
+- **Vitest** — configured but primarily used for future unit testing
+
+### Design System
+
+- **Theme:** Dark fantasy — stone grays (`stone-800`, `stone-900`) + amber accents (`amber-400`, `amber-600`)
+- **Fonts:** Roboto (body), Merriweather (headings)
+- **Radius:** `rounded-lg` for cards, `rounded-md` for inputs
+- **Tailwind via CDN** — no build-time config, classes applied inline
+
+---
+
+## Contributing
+
+1. Read `CLAUDE.md` for comprehensive developer patterns and conventions
+2. Check `TODO.md` and `UX_OVERHAUL_PLAN.md` for planned work
+3. Use mock mode for development — toggle in the header
+4. Follow existing code patterns (named exports, service facade, Immer updates)
+5. Ensure new AI functions have mock implementations
+
+---
+
+## License
+
+Proprietary. All rights reserved.
