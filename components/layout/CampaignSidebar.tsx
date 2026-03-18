@@ -181,10 +181,34 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
             </div>
             <nav className="flex-1 p-2 space-y-1 overflow-y-auto custom-scrollbar">
                 
+                {/* --- Active Session Runner Banner --- */}
+                {campaign.activeSessionId && (() => {
+                    const activeSession = campaign.sessionLogs?.find(s => s.id === campaign.activeSessionId);
+                    return activeSession ? (
+                        <div className="mb-4">
+                            <button
+                                onClick={() => onSelectView('session-runner' as EditorView)}
+                                className={twMerge(
+                                    'w-full flex items-center gap-3 px-3 py-3 text-sm rounded-lg transition-colors border',
+                                    activeView === 'session-runner'
+                                        ? 'bg-amber-900/30 text-amber-200 border-amber-700/50'
+                                        : 'bg-amber-900/20 text-amber-300 border-amber-800/40 hover:bg-amber-900/30'
+                                )}
+                            >
+                                <Icons.Play className="w-4 h-4 text-red-400 animate-pulse" />
+                                <div className="text-left min-w-0">
+                                    <div className="font-semibold truncate">{activeSession.title}</div>
+                                    <div className="text-xs text-amber-400/70">Session Live</div>
+                                </div>
+                            </button>
+                        </div>
+                    ) : null;
+                })()}
+
                 {/* --- Bucket 1: Campaign State (Maintenance & History) --- */}
                 <div className="mb-6">
                     <NavHeader label="Campaign State" />
-                    
+
                     <div className="space-y-1">
                         <NavItem
                             label="Session Timeline"

@@ -23,6 +23,8 @@ export interface Combatant {
  */
 export interface Encounter {
   id: string;
+  sessionId?: string; // Links this encounter to a specific session
+  sceneId?: string; // Links this encounter to the scene it originated from
   round: number;
   turnIndex: number; // Index of the currently active combatant in the sorted list
   combatants: Combatant[];

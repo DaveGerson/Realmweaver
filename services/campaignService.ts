@@ -305,7 +305,8 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                                 relatedPlotIds: [],
                                 recap: "",
                                 notableEvents: "",
-                                looseEnds: ""
+                                looseEnds: "",
+                                encounterLog: []
                             }
                         ],
                         playerCharacters: [],
@@ -481,7 +482,8 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                                         skillChecks: [],
                                         rewards: "250gp per player.",
                                         npcIds: [quentinId],
-                                        locationId: frostholdId
+                                        locationId: frostholdId,
+                                        status: 'planned'
                                     },
                                     {
                                         id: scene2Id,
@@ -492,7 +494,8 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                                         skillChecks: [{ id: crypto.randomUUID(), skill: "Perception", dc: 18, description: "Spot the animated snowman sidekicks." }],
                                         rewards: "",
                                         npcIds: [frostyId],
-                                        locationId: northPoleId
+                                        locationId: northPoleId,
+                                        status: 'planned'
                                     },
                                     {
                                         id: scene3Id,
@@ -503,7 +506,8 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                                         skillChecks: [{ id: crypto.randomUUID(), skill: "Athletics", dc: 14, description: "Sprint through the closing gap." }],
                                         rewards: "",
                                         npcIds: [],
-                                        locationId: northPoleId
+                                        locationId: northPoleId,
+                                        status: 'planned'
                                     },
                                     {
                                         id: scene4Id,
@@ -514,7 +518,8 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                                         skillChecks: [{ id: crypto.randomUUID(), skill: "Investigation", dc: 15, description: "Find the hidden key to the cells." }],
                                         rewards: "Wondrous Statue (Rudolf).",
                                         npcIds: [daveGrinchId],
-                                        locationId: grottoId
+                                        locationId: grottoId,
+                                        status: 'planned'
                                     },
                                     {
                                         id: scene5Id,
@@ -525,7 +530,8 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                                         skillChecks: [],
                                         rewards: "Crown of Domination (Cursed).",
                                         npcIds: [santaId],
-                                        locationId: domeId
+                                        locationId: domeId,
+                                        status: 'planned'
                                     }
                                 ]
                             }
@@ -1100,6 +1106,149 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 if (campaign) {
                     campaign.activeEncounter = updatedEncounter;
                 }
+            });
+        },
+
+        // --- Session Runner Methods ---
+
+        /**
+         * Starts a live session: sets the campaign's activeSessionId,
+         * marks the session log as 'active', and activates the first planned scene.
+         */
+        goLive(sessionLogId: string) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign) return;
+
+                // Deactivate any currently active session
+                campaign.sessionLogs?.forEach(log => {
+                    if (log.status === 'active') log.status = 'planned';
+                });
+
+                const session = campaign.sessionLogs?.find(s => s.id === sessionLogId);
+                if (!session) return;
+
+                session.status = 'active';
+                campaign.activeSessionId = sessionLogId;
+
+                // Activate the first planned scene if adventure is linked
+                if (session.adventureId && session.plannedSceneIds.length > 0) {
+                    campaign.activeSceneId = session.plannedSceneIds[0];
+                    // Set scene statuses
+                    const adventure = campaign.adventures.find(a => a.id === session.adventureId);
+                    if (adventure) {
+                        adventure.scenes.forEach(scene => {
+                            if (session.plannedSceneIds.includes(scene.id)) {
+                                if (scene.id === session.plannedSceneIds[0]) {
+                                    scene.status = 'in-progress';
+                                } else {
+                                    scene.status = scene.status === 'completed' ? 'completed' : 'planned';
+                                }
+                            }
+                        });
+                    }
+                }
+            });
+        },
+
+        /**
+         * Advances to the next scene in the active session.
+         * Marks the current scene as 'completed' and the next as 'in-progress'.
+         */
+        advanceScene() {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign || !campaign.activeSessionId) return;
+
+                const session = campaign.sessionLogs?.find(s => s.id === campaign.activeSessionId);
+                if (!session || !session.adventureId) return;
+
+                const adventure = campaign.adventures.find(a => a.id === session.adventureId);
+                if (!adventure) return;
+
+                const currentIndex = session.plannedSceneIds.indexOf(campaign.activeSceneId || '');
+                if (currentIndex === -1) return;
+
+                // Mark current scene completed
+                const currentScene = adventure.scenes.find(s => s.id === session.plannedSceneIds[currentIndex]);
+                if (currentScene) currentScene.status = 'completed';
+
+                // Advance to next scene
+                const nextIndex = currentIndex + 1;
+                if (nextIndex < session.plannedSceneIds.length) {
+                    const nextSceneId = session.plannedSceneIds[nextIndex];
+                    campaign.activeSceneId = nextSceneId;
+                    const nextScene = adventure.scenes.find(s => s.id === nextSceneId);
+                    if (nextScene) nextScene.status = 'in-progress';
+                } else {
+                    // No more scenes — clear active scene
+                    campaign.activeSceneId = undefined;
+                }
+            });
+        },
+
+        /**
+         * Sets a specific scene's status during a live session.
+         */
+        setSceneStatus(adventureId: string, sceneId: string, status: 'planned' | 'in-progress' | 'completed') {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign) return;
+                const adventure = campaign.adventures.find(a => a.id === adventureId);
+                if (!adventure) return;
+                const scene = adventure.scenes.find(s => s.id === sceneId);
+                if (scene) scene.status = status;
+            });
+        },
+
+        /**
+         * Ends the active session: archives active encounter to session log,
+         * marks session as completed, clears active state.
+         */
+        endSession() {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign || !campaign.activeSessionId) return;
+
+                const session = campaign.sessionLogs?.find(s => s.id === campaign.activeSessionId);
+                if (session) {
+                    session.status = 'completed';
+
+                    // Archive the active encounter if one exists
+                    if (campaign.activeEncounter) {
+                        if (!session.encounterLog) session.encounterLog = [];
+                        session.encounterLog.push({
+                            ...campaign.activeEncounter,
+                            sessionId: session.id,
+                        });
+                        campaign.activeEncounter = undefined;
+                    }
+                }
+
+                // Clear active session state
+                campaign.activeSessionId = undefined;
+                campaign.activeSceneId = undefined;
+            });
+        },
+
+        /**
+         * Adds a structured note entry to the active session's running log.
+         */
+        addSessionRunnerNote(content: string, taggedEntityIds: string[] = []) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign || !campaign.activeSessionId) return;
+
+                const session = campaign.sessionLogs?.find(s => s.id === campaign.activeSessionId);
+                if (!session) return;
+
+                if (!session.structuredNotes) session.structuredNotes = [];
+                session.structuredNotes.push({
+                    id: crypto.randomUUID(),
+                    timestamp: new Date().toISOString(),
+                    content,
+                    taggedEntityIds,
+                });
             });
         },
 

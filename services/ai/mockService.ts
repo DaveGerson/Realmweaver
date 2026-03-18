@@ -83,7 +83,8 @@ const mockSceneData: Omit<Scene, 'id' | 'locationId' | 'npcIds'> = {
     readAloudText: "The rustling in the bushes suddenly erupts as three small, green-skinned figures with wicked, sharp-toothed grins leap out, brandishing crude spears and rusty shortswords. 'Give us yer shinies!' one of them screeches.",
     gmNotes: "This is a simple ambush. The goblins are not very bright and will flee if two of them are defeated. They are primarily interested in stealing food and any easily visible valuables.",
     skillChecks: [{ id: "mock-sc-1", skill: "Perception", dc: 14, description: "To notice the goblins hiding in the bushes before they attack." }],
-    rewards: "15 gold pieces, a half-eaten loaf of bread, and a shiny rock."
+    rewards: "15 gold pieces, a half-eaten loaf of bread, and a shiny rock.",
+    status: 'planned'
 };
 
 const mockAdventureData: AdventureForBatchAdd = {
@@ -134,7 +135,8 @@ const mockComplexCampaignFillData: BatchAddData = {
                     skillChecks: [{ id: "mock-sc-wiz-1", skill: "Nature", dc: 14, description: "To understand the tidal patterns and estimate they have about 3 hours." }],
                     rewards: "Guidance from Elara.",
                     npcIds: ["Elara"],
-                    locationId: "The Sunken Temple"
+                    locationId: "The Sunken Temple",
+                    status: 'planned'
                 },
                 {
                     title: "The Tidal Chamber Puzzle",
@@ -144,7 +146,8 @@ const mockComplexCampaignFillData: BatchAddData = {
                     skillChecks: [{ id: "mock-sc-wiz-2", skill: "Arcana", dc: 16, description: "To decipher the runes and solve the puzzle." }],
                     rewards: "Access to the artifact.",
                     npcIds: ["Kaelen"],
-                    locationId: "The Tidal Chamber"
+                    locationId: "The Tidal Chamber",
+                    status: 'planned'
                 }
             ]
         }

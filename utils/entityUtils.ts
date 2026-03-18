@@ -68,6 +68,7 @@ export const createDefaultScene = (): Scene => ({
     id: '',
     title: 'New Scene',
     type: 'social',
+    status: 'planned',
     readAloudText: '',
     gmNotes: '',
     skillChecks: [],
@@ -86,6 +87,7 @@ export const createDefaultSession = (): SessionLog => ({
     runningNotes: '',
     structuredNotes: [],
     relatedPlotIds: [],
+    encounterLog: [],
     recap: '',
     notableEvents: '',
     looseEnds: ''
