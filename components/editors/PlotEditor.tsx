@@ -141,9 +141,9 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, onUpdate, onDelete
                 <div className="max-h-40 overflow-y-auto custom-scrollbar grid grid-cols-1 md:grid-cols-3 gap-2">
                     {allEntities.map(entity => (
                         <label key={entity.id} className="flex items-center gap-2 p-1.5 rounded hover:bg-slate-800 cursor-pointer transition-colors">
-                            <input 
-                                type="checkbox" 
-                                checked={formData.relatedEntityIds.includes(entity.id)} 
+                            <input
+                                type="checkbox"
+                                checked={(formData.relatedEntityIds || []).includes(entity.id)}
                                 onChange={() => handleEntityToggle(entity.id)}
                                 className="rounded border-slate-600 bg-slate-900 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-slate-900"
                             />

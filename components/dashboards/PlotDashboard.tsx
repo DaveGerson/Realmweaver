@@ -117,7 +117,7 @@ const PlotCard: React.FC<PlotCardProps> = ({ plot, onClick, compact }) => (
             <p className="text-sm text-slate-400 line-clamp-2 flex-grow">{plot.description || <span className="italic opacity-50">No description...</span>}</p>
         )}
         <div className="mt-2 flex gap-2 overflow-hidden">
-            {plot.relatedEntityIds.length > 0 && (
+            {(plot.relatedEntityIds || []).length > 0 && (
                 <span className="text-[10px] bg-indigo-900/30 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/20">
                     {plot.relatedEntityIds.length} Linked Entities
                 </span>

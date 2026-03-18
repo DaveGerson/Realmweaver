@@ -180,11 +180,16 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
 
         if (oldParentId) {
             const oldParent = draftCampaign.articles.find(a => a.id === oldParentId);
-            if (oldParent) oldParent.subArticleIds = oldParent.subArticleIds.filter(id => id !== articleId);
+            if (oldParent) {
+                oldParent.subArticleIds = (oldParent.subArticleIds || []).filter(id => id !== articleId);
+            }
         }
         if (newParentId) {
             const newParent = draftCampaign.articles.find(a => a.id === newParentId);
-            if (newParent && !newParent.subArticleIds.includes(articleId)) newParent.subArticleIds.push(articleId);
+            if (newParent) {
+                if (!newParent.subArticleIds) newParent.subArticleIds = [];
+                if (!newParent.subArticleIds.includes(articleId)) newParent.subArticleIds.push(articleId);
+            }
         }
     };
 
@@ -225,10 +230,19 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         draft.campaigns = campaignsData.map(c => ({
                             ...c,
                             settingType: c.settingType || 'custom',
-                            plots: c.plots || [],
+                            plots: (c.plots || []).map((p: any) => ({
+                                ...p,
+                                title: p.title || p.name || 'Untitled Plot',
+                                relatedEntityIds: p.relatedEntityIds || p.keyNpcIds || [],
+                            })),
                             notes: c.notes || [],
+                            articles: (c.articles || []).map((a: any) => ({
+                                ...a,
+                                subArticleIds: a.subArticleIds || [],
+                                relatedEntityIds: a.relatedEntityIds || [],
+                            })),
                             sessionLogs: (c.sessionLogs || []).map((l: any) => ({
-                                ...l, 
+                                ...l,
                                 structuredNotes: l.structuredNotes || [],
                                 relatedPlotIds: l.relatedPlotIds || []
                             })),
@@ -316,41 +330,35 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         articles: [
                             {
                                 id: crypto.randomUUID(),
-                                name: "The War of Mortal and Fairy",
                                 title: "The War of Mortal and Fairy",
                                 category: "history",
                                 content: "Nine centuries ago, mortals waged war against the fey armies of the Cold Prince, who ruled all of Dolmenwood under an eternal cloak of frost and snow. The mortal armies were ultimately victorious, and the Cold Prince was exiled into his dominion in Fairy. But the threat of his return has never fully faded \u2014 every winter, the magic that banishes him weakens, and frigid winds whisper of his desire to reclaim the mortal world.\n\nAmong the heroes of the war was Sir Chyde, a near-mythical knight who slew the fairy giant Butter-for-Bones with a fabled sword. His tomb, built beside the standing stones where he first met his forbidden love, became a site of pilgrimage \u2014 until the Church sealed it when fey influence began creeping in from the other side.",
-                                tags: [],
+                                subArticleIds: [],
                                 relatedEntityIds: []
                             },
                             {
                                 id: crypto.randomUUID(),
-                                name: "The Standing Stones of Dolmenwood",
                                 title: "The Standing Stones of Dolmenwood",
                                 category: "lore",
                                 content: "The standing stones \u2014 known locally as 'Whything Stones' \u2014 are ancient markers of ley line intersections throughout the Dolmenwood forest. Rune-etched and mossy, they thrum with magical energy that can be felt by those attuned to the arcane.\n\nThe Drune, a secretive cult of arcanists, jealously guard these stone circles. Common folk avoid the stones after dark, fearful of the Drune's reputation for kidnapping and human sacrifice. The stones serve as focal points for powerful rituals and are said to thin the boundary between the mortal world and the realm of Fairy.",
-                                tags: [],
+                                subArticleIds: [],
                                 relatedEntityIds: []
                             }
                         ],
                         plots: [
                             {
                                 id: plotForbiddenLoveId,
-                                name: "The Forbidden Love",
+                                title: "The Forbidden Love",
                                 description: "The centuries-old love story between Sir Chyde and Princess Snowfall-at-Dusk. The knight's spirit lingers in his tomb, bound by the magical ring that connects their souls. The princess waits in her tower prison in Fairy, holding a perpetual wedding feast for the day her love arrives.",
                                 status: "active",
-                                sessions: [],
-                                keyNpcIds: [sirChydeId, princessId],
-                                notes: ""
+                                relatedEntityIds: [sirChydeId, princessId]
                             },
                             {
                                 id: plotColdPrinceId,
-                                name: "The Cold Prince's Shadow",
+                                title: "The Cold Prince's Shadow",
                                 description: "The banished fairy lord who once ruled all Dolmenwood under eternal winter. Though exiled, the Cold Prince's threat lingers \u2014 every year the magic weakening, frigid winds whispering of his return. The discovery of a doorway between worlds in Sir Chyde's tomb could be exactly what the Cold Prince needs to reclaim his dominion.",
                                 status: "active",
-                                sessions: [],
-                                keyNpcIds: [],
-                                notes: ""
+                                relatedEntityIds: []
                             }
                         ],
                         sessionLogs: [
@@ -1183,7 +1191,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 _synchronizeArticleHierarchy(campaign, id, articleToDelete.parentArticleId, undefined);
         
                 // Un-parent all children
-                articleToDelete.subArticleIds.forEach(childId => {
+                (articleToDelete.subArticleIds || []).forEach(childId => {
                     const child = campaign.articles.find(c => c.id === childId);
                     if (child) child.parentArticleId = undefined;
                 });
