@@ -76,7 +76,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
     return true;
   });
 
-  const subArticles = allArticles.filter(a => article.subArticleIds.includes(a.id));
+  const subArticles = allArticles.filter(a => (article.subArticleIds || []).includes(a.id));
 
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
