@@ -75,7 +75,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <header className="flex items-center justify-between p-3 border-b border-slate-800 bg-slate-900 flex-shrink-0">
+      <header className="flex items-center justify-between p-3 border-b border-slate-800 bg-slate-900 flex-shrink-0 relative z-[60]">
         <div className="flex items-center gap-2 md:gap-4">
           {onToggleSidebar && (
             <button
@@ -96,7 +96,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <Icons.ChevronDown className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isMenuOpen ? 'rotate-180' : ''}`} />
               </button>
               {isMenuOpen && (
-                  <div className="absolute top-full mt-2 w-60 bg-slate-800 border border-slate-700 rounded-md shadow-lg z-20 animate-in fade-in duration-150">
+                  <div className="absolute top-full mt-2 w-60 bg-slate-800 border border-slate-700 rounded-md shadow-lg z-[60] animate-in fade-in duration-150">
                       <div className="p-1">
                           <button onClick={() => { onSwitchCampaign(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded-md transition-colors">
                               <Icons.Campaign className="w-4 h-4" /> Switch Campaign
