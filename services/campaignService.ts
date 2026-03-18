@@ -19,7 +19,8 @@ import type {
     Encounter,
     SettingType,
     Note,
-    DiceRoll
+    DiceRoll,
+    PlotSessionStatus
 } from '../types/index';
 import { importCampaignFromJson } from './importExportService';
 import { parseCharacterSheetPdf } from './geminiService';
@@ -1603,6 +1604,18 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 if (!session) return;
                 if (!session.diceRolls) session.diceRolls = [];
                 session.diceRolls.push(roll);
+
+                // Also add to structuredNotes so dice rolls appear in the running log timeline
+                if (!session.structuredNotes) session.structuredNotes = [];
+                const noteLabel = roll.note ? `${roll.note}: ` : '';
+                session.structuredNotes.push({
+                    id: crypto.randomUUID(),
+                    timestamp: roll.timestamp || new Date().toISOString(),
+                    content: `${noteLabel}${roll.formula} → [${roll.results.join(', ')}] = ${roll.total}`,
+                    taggedEntityIds: [],
+                    type: 'dice-roll',
+                    isImportant: false,
+                });
             });
         },
 
@@ -1624,6 +1637,20 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     type: type || 'manual',
                     isImportant: false,
                 });
+            });
+        },
+
+        /**
+         * Updates a plot's session-level progression status (advanced/stalled/unchanged).
+         */
+        updatePlotProgression(plotId: string, status: PlotSessionStatus) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign || !campaign.activeSessionId) return;
+                const session = campaign.sessionLogs?.find(s => s.id === campaign.activeSessionId);
+                if (!session) return;
+                if (!session.plotProgressions) session.plotProgressions = {};
+                session.plotProgressions[plotId] = status;
             });
         },
 

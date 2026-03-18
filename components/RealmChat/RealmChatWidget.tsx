@@ -5,6 +5,7 @@ import { Button } from '../common/Button';
 import type { Campaign, ChatMessage, DraftEntity, ModelTier, NPC, Location, Faction, Item, Adventure, Article } from '../../types/index';
 import { chatWithRealmWeaver } from '../../services/geminiService';
 import { twMerge } from 'tailwind-merge';
+import { buildCampaignContext } from '../../utils/entityUtils';
 
 // Editors
 import { NpcEditor } from '../editors/NpcEditor';
@@ -65,7 +66,7 @@ export const RealmChatWidget: React.FC<RealmChatWidgetProps> = ({ campaign, onAd
     setInput('');
     setIsLoading(true);
 
-    const context = `Title: ${campaign.title}\nSetting: ${campaign.setting}`;
+    const context = buildCampaignContext(campaign);
 
     try {
       const response = await chatWithRealmWeaver(

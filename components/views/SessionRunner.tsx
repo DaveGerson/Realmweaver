@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
-import type { Campaign, Scene, SessionLog, NPC, Combatant, CombatantType, Encounter } from '../../types';
+import type { Campaign, Scene, SessionLog, NPC, Combatant, CombatantType, Encounter, PlotSessionStatus } from '../../types';
 import { Icons, SceneIcon } from '../common/Icons';
 import { twMerge } from 'tailwind-merge';
 import { campaignService } from '../../services/campaignService';
@@ -8,7 +8,13 @@ import { DiceRoller } from '../tools/DiceRoller';
 import { CombatTracker } from '../tools/CombatTracker';
 import { generateNpc } from '../../services/geminiService';
 
-type PlotSessionStatus = 'advanced' | 'stalled' | 'unchanged';
+/** Try to extract HP from a freeform NPC stats string. Returns null if not found. */
+const parseHpFromStats = (stats: string | undefined): number | null => {
+    if (!stats) return null;
+    // Match patterns like "HP: 52", "Hit Points 52", "HP 52/52", "hp:52", "HP - 45"
+    const match = stats.match(/(?:hp|hit\s*points)\s*[:=\-–—]?\s*(\d+)/i);
+    return match ? parseInt(match[1], 10) : null;
+};
 
 const NOTE_TAG_OPTIONS = ['Combat', 'NPC', 'Decision', 'Loot', 'Discovery'] as const;
 
@@ -71,8 +77,8 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
     const [npcGenerating, setNpcGenerating] = useState(false);
     const [npcError, setNpcError] = useState<string | null>(null);
 
-    // Plot session status tracking (local only)
-    const [plotSessionStatus, setPlotSessionStatus] = useState<Record<string, PlotSessionStatus>>({});
+    // Plot session status tracking (persisted on sessionLog)
+    const plotSessionStatus = sessionLog.plotProgressions || {};
 
     const adventure = useMemo(() =>
         sessionLog.adventureId
@@ -157,15 +163,18 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
         if (!encounter || encounter.combatants.length === 0) {
             // Auto-populate combatants from active scene NPCs + player characters
             const autoCombatants: Combatant[] = [
-                ...activeSceneNpcs.map(npc => ({
-                    id: crypto.randomUUID(),
-                    name: npc.name,
-                    type: 'npc' as CombatantType,
-                    initiative: 0,
-                    hp: 10,
-                    maxHp: 10,
-                    notes: npc.traits || ''
-                })),
+                ...activeSceneNpcs.map(npc => {
+                    const parsedHp = parseHpFromStats(npc.stats);
+                    return {
+                        id: crypto.randomUUID(),
+                        name: npc.name,
+                        type: 'npc' as CombatantType,
+                        initiative: 0,
+                        hp: parsedHp ?? 10,
+                        maxHp: parsedHp ?? 10,
+                        notes: npc.traits || '',
+                    };
+                }),
                 ...(campaign.playerCharacters || []).map(pc => ({
                     id: crypto.randomUUID(),
                     name: pc.characterSocial.characterName,
@@ -173,7 +182,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                     initiative: 0,
                     hp: 20,
                     maxHp: 20,
-                    notes: ''
+                    notes: '',
                 }))
             ];
 
@@ -219,17 +228,15 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
         }
     }, [npcPrompt, isMockMode, campaign.title, campaign.setting, activeScene, adventure]);
 
-    // Plot status cycling
+    // Plot status cycling (persisted via campaignService)
     const cyclePlotStatus = useCallback((plotId: string) => {
-        setPlotSessionStatus(prev => {
-            const current = prev[plotId] || 'unchanged';
-            const next: PlotSessionStatus =
-                current === 'unchanged' ? 'advanced' :
-                current === 'advanced' ? 'stalled' :
-                'unchanged';
-            return { ...prev, [plotId]: next };
-        });
-    }, []);
+        const current = plotSessionStatus[plotId] || 'unchanged';
+        const next: PlotSessionStatus =
+            current === 'unchanged' ? 'advanced' :
+            current === 'advanced' ? 'stalled' :
+            'unchanged';
+        campaignService.updatePlotProgression(plotId, next);
+    }, [plotSessionStatus]);
 
     const sceneStatusIcon = (scene: Scene) => {
         switch (scene.status) {
@@ -416,13 +423,22 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                                         NPCs Present
                                     </h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                        {activeSceneNpcs.map(npc => (
-                                            <div key={npc.id} className="bg-slate-900/50 rounded-md p-3">
-                                                <p className="text-white font-semibold text-sm">{npc.name}</p>
-                                                {npc.traits && <p className="text-slate-400 text-xs mt-1">{npc.traits}</p>}
-                                                {npc.motivations && <p className="text-slate-500 text-xs mt-1 italic">{npc.motivations}</p>}
-                                            </div>
-                                        ))}
+                                        {activeSceneNpcs.map(npc => {
+                                            const faction = npc.factionId ? campaign.factions.find(f => f.id === npc.factionId) : null;
+                                            return (
+                                                <div key={npc.id} className="bg-slate-900/50 rounded-md p-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-white font-semibold text-sm">{npc.name}</p>
+                                                        {faction && (
+                                                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 uppercase font-bold">{faction.name}</span>
+                                                        )}
+                                                    </div>
+                                                    {npc.traits && <p className="text-slate-400 text-xs mt-1">{npc.traits}</p>}
+                                                    {npc.motivations && <p className="text-slate-500 text-xs mt-1 italic">{npc.motivations}</p>}
+                                                    {npc.exampleQuote && <p className="text-amber-400/70 text-xs mt-1 italic">"{npc.exampleQuote}"</p>}
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}

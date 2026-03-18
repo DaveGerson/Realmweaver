@@ -9,9 +9,10 @@ interface SceneGeneratorProps {
   onSceneCreated: (scene: Omit<Scene, 'id'>) => void;
   isMockMode: boolean;
   isOfficialSetting?: boolean;
+  campaignContext?: string;
 }
 
-export const SceneGenerator: React.FC<SceneGeneratorProps> = ({ onSceneCreated, isMockMode, isOfficialSetting = false }) => {
+export const SceneGenerator: React.FC<SceneGeneratorProps> = ({ onSceneCreated, isMockMode, isOfficialSetting = false, campaignContext }) => {
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +25,7 @@ export const SceneGenerator: React.FC<SceneGeneratorProps> = ({ onSceneCreated, 
     setIsLoading(true);
     setError(null);
     try {
-      const sceneData = await generateScene(prompt, isOfficialSetting, isMockMode);
+      const sceneData = await generateScene(prompt, isOfficialSetting, isMockMode, campaignContext);
       const newScene: Omit<Scene, 'id'> = {
           ...sceneData,
           locationId: undefined,

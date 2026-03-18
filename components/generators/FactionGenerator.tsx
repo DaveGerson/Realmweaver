@@ -14,9 +14,10 @@ interface FactionGeneratorProps {
   isOfficialSetting?: boolean;
   npcs?: NPC[];
   allLocations?: Location[];
+  campaignContext?: string;
 }
 
-export const FactionGenerator: React.FC<FactionGeneratorProps> = ({ onFactionCreated, isMockMode, isOfficialSetting = false, npcs = [], allLocations = [] }) => {
+export const FactionGenerator: React.FC<FactionGeneratorProps> = ({ onFactionCreated, isMockMode, isOfficialSetting = false, npcs = [], allLocations = [], campaignContext }) => {
   const [mode, setMode] = useState<'quick' | 'chat'>('quick');
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -30,7 +31,7 @@ export const FactionGenerator: React.FC<FactionGeneratorProps> = ({ onFactionCre
     setIsLoading(true);
     setError(null);
     try {
-      const factionData = await generateFaction(prompt, isOfficialSetting, isMockMode);
+      const factionData = await generateFaction(prompt, isOfficialSetting, isMockMode, campaignContext);
       const newFaction: Omit<Faction, 'id'> = {
           ...factionData,
           leaderId: undefined,
@@ -58,6 +59,7 @@ export const FactionGenerator: React.FC<FactionGeneratorProps> = ({ onFactionCre
                  <EntityChatGenerator
                     entityType="faction"
                     isMockMode={isMockMode}
+                    campaignContext={campaignContext}
                     onEntityCreated={(data) => {
                         const { id, ...factionData } = data;
                         onFactionCreated(factionData);

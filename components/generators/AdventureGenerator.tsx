@@ -14,9 +14,10 @@ interface AdventureGeneratorProps {
   onAdventureCreated: (adventureData: AdventureForBatchAdd) => void;
   isMockMode: boolean;
   isOfficialSetting?: boolean;
+  campaignContext?: string;
 }
 
-export const AdventureGenerator: React.FC<AdventureGeneratorProps> = ({ onAdventureCreated, isMockMode, isOfficialSetting = false }) => {
+export const AdventureGenerator: React.FC<AdventureGeneratorProps> = ({ onAdventureCreated, isMockMode, isOfficialSetting = false, campaignContext }) => {
   const [mode, setMode] = useState<'quick' | 'chat'>('quick');
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -30,7 +31,7 @@ export const AdventureGenerator: React.FC<AdventureGeneratorProps> = ({ onAdvent
     setIsLoading(true);
     setError(null);
     try {
-      const adventureData = await generateAdventure(prompt, isOfficialSetting, isMockMode);
+      const adventureData = await generateAdventure(prompt, isOfficialSetting, isMockMode, campaignContext);
       onAdventureCreated(adventureData);
       setPrompt('');
     } catch (err) {
@@ -53,6 +54,7 @@ export const AdventureGenerator: React.FC<AdventureGeneratorProps> = ({ onAdvent
                  <EntityChatGenerator
                     entityType="adventure"
                     isMockMode={isMockMode}
+                    campaignContext={campaignContext}
                     onEntityCreated={(data) => {
                         const { id, ...advData } = data;
                         onAdventureCreated(advData);

@@ -177,13 +177,13 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
     const link = g.append("g")
       .attr("stroke", "#475569") // slate-600
       .attr("stroke-opacity", 0.6)
-      .selectAll("line")
+      .selectAll<SVGLineElement, GraphLink>("line")
       .data(simulationLinks)
       .join("line")
       .attr("stroke-width", 1.5);
 
     const node = g.append("g")
-      .selectAll("g")
+      .selectAll<SVGGElement, GraphNode>("g")
       .data(simulationNodes)
       .join("g")
       .call(d3.drag<SVGGElement, GraphNode>()
@@ -194,11 +194,11 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
     // Node circles
     node.append("circle")
       .attr("r", 8)
-      .attr("fill", d => TYPE_COLORS[d.group] || '#94a3b8')
+      .attr("fill", (d: GraphNode) => TYPE_COLORS[d.group] || '#94a3b8')
       .attr("stroke", "#fff")
       .attr("stroke-width", 1.5)
       .style("cursor", "pointer")
-      .on("click", (event, d) => {
+      .on("click", (event: MouseEvent, d: GraphNode) => {
         event.stopPropagation();
         const typeMap: Record<string, string> = {
             [EntityType.NPC]: 'npc',
@@ -217,7 +217,7 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
 
     // Node labels
     node.append("text")
-      .text(d => d.name)
+      .text((d: GraphNode) => d.name)
       .attr("x", 12)
       .attr("y", 4)
       .attr("fill", "#e2e8f0") // slate-200
@@ -228,13 +228,13 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
 
     simulation.on("tick", () => {
       link
-        .attr("x1", d => (d.source as GraphNode).x!)
-        .attr("y1", d => (d.source as GraphNode).y!)
-        .attr("x2", d => (d.target as GraphNode).x!)
-        .attr("y2", d => (d.target as GraphNode).y!);
+        .attr("x1", (d: GraphLink) => ((d.source as GraphNode).x ?? 0))
+        .attr("y1", (d: GraphLink) => ((d.source as GraphNode).y ?? 0))
+        .attr("x2", (d: GraphLink) => ((d.target as GraphNode).x ?? 0))
+        .attr("y2", (d: GraphLink) => ((d.target as GraphNode).y ?? 0));
 
       node
-        .attr("transform", d => `translate(${d.x},${d.y})`);
+        .attr("transform", (d: GraphNode) => `translate(${d.x},${d.y})`);
     });
 
     function dragstarted(event: any, d: GraphNode) {

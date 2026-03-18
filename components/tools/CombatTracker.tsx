@@ -320,15 +320,19 @@ const AddCombatantMenu: React.FC<{
                                     {pc.characterSocial.characterName}
                                 </button>
                             ))}
-                            {npcs.map(npc => (
-                                <button 
-                                    key={npc.id}
-                                    onClick={() => onAdd(npc.name, 'npc', 10, 0)} // Default HP/Init for now
-                                    className="w-full text-left px-2 py-1.5 rounded hover:bg-slate-700 text-sm text-green-300 truncate"
-                                >
-                                    {npc.name}
-                                </button>
-                            ))}
+                            {npcs.map(npc => {
+                                const hpMatch = npc.stats?.match(/(?:hp|hit\s*points)\s*[:=\-–—]?\s*(\d+)/i);
+                                const hp = hpMatch ? parseInt(hpMatch[1], 10) : 10;
+                                return (
+                                    <button
+                                        key={npc.id}
+                                        onClick={() => onAdd(npc.name, 'npc', hp, 0)}
+                                        className="w-full text-left px-2 py-1.5 rounded hover:bg-slate-700 text-sm text-green-300 truncate"
+                                    >
+                                        {npc.name}{hpMatch ? ` (${hp} HP)` : ''}
+                                    </button>
+                                );
+                            })}
                              {pcs.length === 0 && npcs.length === 0 && <p className="text-xs text-slate-600 italic">No campaign characters found.</p>}
                         </div>
                     )}

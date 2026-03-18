@@ -13,10 +13,11 @@ interface NpcGeneratorProps {
   isMockMode: boolean;
   isOfficialSetting?: boolean;
   factions?: Faction[];
-  allNpcs?: NPC[]; // New optional prop
+  allNpcs?: NPC[];
+  campaignContext?: string;
 }
 
-export const NpcGenerator: React.FC<NpcGeneratorProps> = ({ onNpcCreated, isMockMode, isOfficialSetting = false, factions = [], allNpcs = [] }) => {
+export const NpcGenerator: React.FC<NpcGeneratorProps> = ({ onNpcCreated, isMockMode, isOfficialSetting = false, factions = [], allNpcs = [], campaignContext }) => {
   const [mode, setMode] = useState<'quick' | 'chat'>('quick');
   const [prompt, setPrompt] = useState('');
   const [useGroundedSearch, setUseGroundedSearch] = useState(isOfficialSetting);
@@ -32,7 +33,7 @@ export const NpcGenerator: React.FC<NpcGeneratorProps> = ({ onNpcCreated, isMock
     setError(null);
     try {
       const shouldSearch = isOfficialSetting || useGroundedSearch;
-      const npcData = await generateNpc(prompt, shouldSearch, isMockMode);
+      const npcData = await generateNpc(prompt, shouldSearch, isMockMode, campaignContext);
       const newNpc: Omit<NPC, 'id'> = {
           ...npcData,
           factionId: undefined
@@ -59,6 +60,7 @@ export const NpcGenerator: React.FC<NpcGeneratorProps> = ({ onNpcCreated, isMock
                  <EntityChatGenerator
                     entityType="npc"
                     isMockMode={isMockMode}
+                    campaignContext={campaignContext}
                     onEntityCreated={(data) => {
                         // Clean up data before saving
                         const { id, ...npcData } = data;

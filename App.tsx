@@ -38,6 +38,7 @@ import { PlotDashboard } from './components/dashboards/PlotDashboard';
 import { campaignService } from './services/campaignService';
 import { RealmChatWidget } from './components/RealmChat/RealmChatWidget';
 import { SessionRunner } from './components/views/SessionRunner';
+import { buildCampaignContext } from './utils/entityUtils';
 
 
 export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'combat' | 'relationships' | 'session-runner';
@@ -78,6 +79,7 @@ const App: FC = () => {
 
   const activeCampaign = useMemo(() => campaigns.find(c => c.id === activeCampaignId), [campaigns, activeCampaignId]);
   const isOfficialSetting = activeCampaign?.settingType === 'official';
+  const campaignContext = useMemo(() => activeCampaign ? buildCampaignContext(activeCampaign) : undefined, [activeCampaign]);
 
   const resetSelections = () => {
     setSelectedNpcId(null);
@@ -377,7 +379,7 @@ const App: FC = () => {
       }
 
       // Render Generators
-      if (activeGenerator === 'scene' && selectedAdventure) return <ContentWrapper title="Create New Scene" icon="Scenes"><SceneGenerator onSceneCreated={(s) => campaignService.createScene(selectedAdventure.id, s)} isMockMode={isMockMode} isOfficialSetting={isOfficialSetting} /></ContentWrapper>;
+      if (activeGenerator === 'scene' && selectedAdventure) return <ContentWrapper title="Create New Scene" icon="Scenes"><SceneGenerator onSceneCreated={(s) => campaignService.createScene(selectedAdventure.id, s)} isMockMode={isMockMode} isOfficialSetting={isOfficialSetting} campaignContext={campaignContext} /></ContentWrapper>;
 
       // Render Editors & Dashboards - Editors take priority if an item is selected
       if (selectedPlayerCharacter) return <PlayerCharacterEditor pc={selectedPlayerCharacter} onUpdate={campaignService.updatePlayerCharacter} onDelete={(id) => { campaignService.deletePlayerCharacter(id); resetSelections(); }} />;
@@ -457,6 +459,7 @@ const App: FC = () => {
                     }}
                     isMockMode={isMockMode}
                     isOfficialSetting={isOfficialSetting}
+                    campaignContext={campaignContext}
                 />;
       }
       if (activeView === 'player-characters') return <PlayerCharacterDashboard 
@@ -493,27 +496,27 @@ const App: FC = () => {
             const newId = campaignService.createNpc(npcData);
             setActiveView('npcs');
             setSelectedNpcId(newId);
-        }} onSelectNpc={setSelectedNpcId} isMockMode={isMockMode} isOfficialSetting={isOfficialSetting} />;
+        }} onSelectNpc={setSelectedNpcId} isMockMode={isMockMode} isOfficialSetting={isOfficialSetting} campaignContext={campaignContext} />;
       if (activeView === 'locations') return <LocationDashboard locations={activeCampaign.locations} factions={activeCampaign.factions} onLocationCreated={(locData) => {
             const newId = campaignService.createLocation(locData);
             setActiveView('locations');
             setSelectedLocationId(newId);
-        }} onSelectLocation={setSelectedLocationId} isMockMode={isMockMode} isOfficialSetting={isOfficialSetting} />;
+        }} onSelectLocation={setSelectedLocationId} isMockMode={isMockMode} isOfficialSetting={isOfficialSetting} campaignContext={campaignContext} />;
       if (activeView === 'factions') return <FactionDashboard factions={activeCampaign.factions} npcs={activeCampaign.npcs} locations={activeCampaign.locations} onFactionCreated={(facData) => {
             const newId = campaignService.createFaction(facData);
             setActiveView('factions');
             setSelectedFactionId(newId);
-        }} onSelectFaction={setSelectedFactionId} isMockMode={isMockMode} isOfficialSetting={isOfficialSetting} />;
+        }} onSelectFaction={setSelectedFactionId} isMockMode={isMockMode} isOfficialSetting={isOfficialSetting} campaignContext={campaignContext} />;
       if (activeView === 'items') return <ItemDashboard items={activeCampaign.items} onItemCreated={(itemData) => {
             const newId = campaignService.createItem(itemData);
             setActiveView('items');
             setSelectedItemId(newId);
-        }} onSelectItem={setSelectedItemId} isMockMode={isMockMode} isOfficialSetting={isOfficialSetting} />;
+        }} onSelectItem={setSelectedItemId} isMockMode={isMockMode} isOfficialSetting={isOfficialSetting} campaignContext={campaignContext} />;
       if (activeView === 'lorebook') return <ArticleDashboard articles={activeCampaign.articles} npcs={activeCampaign.npcs} locations={activeCampaign.locations} factions={activeCampaign.factions} onArticleCreated={(artData) => {
             const newId = campaignService.createArticle(artData);
             setActiveView('lorebook');
             setSelectedArticleId(newId);
-        }} onSelectArticle={setSelectedArticleId} isMockMode={isMockMode} isOfficialSetting={isOfficialSetting} />;
+        }} onSelectArticle={setSelectedArticleId} isMockMode={isMockMode} isOfficialSetting={isOfficialSetting} campaignContext={campaignContext} />;
 
       // Combat Tracker View
       if (activeView === 'combat') {
@@ -630,7 +633,7 @@ const App: FC = () => {
                   isMockMode={isMockMode} 
                 />
                 
-                {isCoachOpen && <DmCoach campaign={activeCampaign} activeContext={currentContext} onClose={() => setIsCoachOpen(false)} isMockMode={isMockMode} />}
+                {isCoachOpen && <DmCoach campaign={activeCampaign} activeContext={currentContext} onClose={() => setIsCoachOpen(false)} onSendToNotes={(content) => campaignService.addAutoEvent('coach-used', content)} isMockMode={isMockMode} />}
                 {isWizardOpen && <EvocationWizard 
                     campaign={activeCampaign} 
                     onClose={() => setIsWizardOpen(false)} 

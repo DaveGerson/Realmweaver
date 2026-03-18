@@ -16,9 +16,10 @@ interface ArticleGeneratorProps {
   npcs?: NPC[];
   locations?: Location[];
   factions?: Faction[];
+  campaignContext?: string;
 }
 
-export const ArticleGenerator: React.FC<ArticleGeneratorProps> = ({ onArticleCreated, isMockMode, isOfficialSetting = false, allArticles = [], npcs = [], locations = [], factions = [] }) => {
+export const ArticleGenerator: React.FC<ArticleGeneratorProps> = ({ onArticleCreated, isMockMode, isOfficialSetting = false, allArticles = [], npcs = [], locations = [], factions = [], campaignContext }) => {
   const [mode, setMode] = useState<'quick' | 'chat'>('quick');
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -32,7 +33,7 @@ export const ArticleGenerator: React.FC<ArticleGeneratorProps> = ({ onArticleCre
     setIsLoading(true);
     setError(null);
     try {
-      const articleData = await generateArticle(prompt, isOfficialSetting, isMockMode);
+      const articleData = await generateArticle(prompt, isOfficialSetting, isMockMode, campaignContext);
       const newArticle: Omit<Article, 'id'> = {
           ...articleData,
           parentArticleId: undefined,
@@ -60,6 +61,7 @@ export const ArticleGenerator: React.FC<ArticleGeneratorProps> = ({ onArticleCre
                  <EntityChatGenerator
                     entityType="article"
                     isMockMode={isMockMode}
+                    campaignContext={campaignContext}
                     onEntityCreated={(data) => {
                         const { id, ...articleData } = data;
                         onArticleCreated(articleData);

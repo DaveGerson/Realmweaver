@@ -13,10 +13,11 @@ interface DmCoachProps {
   campaign: Campaign;
   activeContext?: string;
   onClose: () => void;
+  onSendToNotes?: (content: string) => void;
   isMockMode: boolean;
 }
 
-export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClose, isMockMode }) => {
+export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClose, onSendToNotes, isMockMode }) => {
     const [activeTool, setActiveTool] = useState<CoachTool>('narrate');
     const [prompt, setPrompt] = useState('');
     const [result, setResult] = useState<string | RollableTable | null>(null);
@@ -169,9 +170,9 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClo
                 {result && (
                     <div className="mt-6">
                         {typeof result === 'string' ? (
-                            <TextResultDisplay text={result} />
+                            <TextResultDisplay text={result} onSendToNotes={onSendToNotes} toolLabel={currentTool.title} />
                         ) : (
-                            <RollableTableDisplay table={result} />
+                            <RollableTableDisplay table={result} onSendToNotes={onSendToNotes} />
                         )}
                     </div>
                 )}
@@ -182,8 +183,9 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClo
 
 // --- Sub-components for DMCoach ---
 
-const TextResultDisplay = ({ text }: { text: string }) => {
+const TextResultDisplay = ({ text, onSendToNotes, toolLabel }: { text: string; onSendToNotes?: (content: string) => void; toolLabel?: string }) => {
     const [hasCopied, setHasCopied] = useState(false);
+    const [hasSent, setHasSent] = useState(false);
 
     const handleCopyToClipboard = () => {
         navigator.clipboard.writeText(text);
@@ -191,22 +193,43 @@ const TextResultDisplay = ({ text }: { text: string }) => {
         setTimeout(() => setHasCopied(false), 2000);
     };
 
+    const handleSendToNotes = () => {
+        if (!onSendToNotes) return;
+        const prefix = toolLabel ? `[${toolLabel}] ` : '[Coach] ';
+        onSendToNotes(prefix + text);
+        setHasSent(true);
+        setTimeout(() => setHasSent(false), 2000);
+    };
+
     return (
         <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 relative">
-            <button 
-                onClick={handleCopyToClipboard}
-                className="absolute top-2 right-2 p-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
-                aria-label="Copy to clipboard"
-            >
-                {hasCopied ? <Check className="w-4 h-4 text-green-400" /> : <Clipboard className="w-4 h-4" />}
-            </button>
+            <div className="absolute top-2 right-2 flex gap-1">
+                {onSendToNotes && (
+                    <button
+                        onClick={handleSendToNotes}
+                        className="p-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                        aria-label="Send to session notes"
+                        title="Send to session notes"
+                    >
+                        {hasSent ? <Check className="w-4 h-4 text-green-400" /> : <Icons.FileText className="w-4 h-4" />}
+                    </button>
+                )}
+                <button
+                    onClick={handleCopyToClipboard}
+                    className="p-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                    aria-label="Copy to clipboard"
+                >
+                    {hasCopied ? <Check className="w-4 h-4 text-green-400" /> : <Clipboard className="w-4 h-4" />}
+                </button>
+            </div>
             <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{text}</p>
         </div>
     );
 };
 
-const RollableTableDisplay = ({ table }: { table: RollableTable }) => {
+const RollableTableDisplay = ({ table, onSendToNotes }: { table: RollableTable; onSendToNotes?: (content: string) => void }) => {
     const [rollResult, setRollResult] = useState<{ roll: number; result: string } | null>(null);
+    const [hasSent, setHasSent] = useState(false);
 
     const handleRoll = () => {
         const die = table.dieType.toLowerCase();
@@ -248,11 +271,25 @@ const RollableTableDisplay = ({ table }: { table: RollableTable }) => {
                     ))}
                 </tbody>
             </table>
-            <div className="pt-2">
-                <Button onClick={handleRoll} className="w-full">
+            <div className="pt-2 flex gap-2">
+                <Button onClick={handleRoll} className="flex-1">
                     <Icons.Dice className="w-4 h-4 mr-2" />
                     Roll on Table
                 </Button>
+                {onSendToNotes && (
+                    <Button
+                        variant="secondary"
+                        onClick={() => {
+                            const tableText = `[Table] ${table.title} (${table.dieType}): ${table.entries.map(e => `${e.range}. ${e.result}`).join('; ')}`;
+                            onSendToNotes(tableText);
+                            setHasSent(true);
+                            setTimeout(() => setHasSent(false), 2000);
+                        }}
+                        title="Send to session notes"
+                    >
+                        {hasSent ? <Check className="w-4 h-4" /> : <Icons.FileText className="w-4 h-4" />}
+                    </Button>
+                )}
             </div>
             {rollResult && (
                 <div className="mt-4 p-3 bg-indigo-900/30 border border-indigo-500/30 rounded-lg text-center animate-in fade-in duration-300">
