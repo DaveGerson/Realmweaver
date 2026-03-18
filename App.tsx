@@ -630,7 +630,7 @@ const App: FC = () => {
                   isMockMode={isMockMode} 
                 />
                 
-                {isCoachOpen && <DmCoach campaign={activeCampaign} activeContext={currentContext} onClose={() => setIsCoachOpen(false)} isMockMode={isMockMode} />}
+                {isCoachOpen && <DmCoach campaign={activeCampaign} activeContext={currentContext} onClose={() => setIsCoachOpen(false)} onSendToNotes={(content) => campaignService.addAutoEvent('coach-used', content)} isMockMode={isMockMode} />}
                 {isWizardOpen && <EvocationWizard 
                     campaign={activeCampaign} 
                     onClose={() => setIsWizardOpen(false)} 

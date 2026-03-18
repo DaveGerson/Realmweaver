@@ -5,6 +5,8 @@ import type { DiceRoll } from './DiceRoll';
 
 export type SessionStatus = 'planned' | 'active' | 'completed';
 
+export type PlotSessionStatus = 'advanced' | 'stalled' | 'unchanged';
+
 export type SessionLogEntryType = 'manual' | 'scene-transition' | 'combat' | 'npc-created' | 'dice-roll' | 'coach-used';
 
 export interface SessionLogEntry {
@@ -32,6 +34,7 @@ export interface SessionLog {
   
   // Plot Tracking
   relatedPlotIds: string[]; // IDs of plots advanced in this session
+  plotProgressions?: Record<string, PlotSessionStatus>; // Per-plot status for this session
 
   // Execution - Unstructured
   runningNotes: string; 
