@@ -46,6 +46,7 @@ import {
   Target,
   ListTodo,
   Minus,
+  Menu,
 } from 'lucide-react';
 
 export const Icons = {
@@ -94,6 +95,7 @@ export const Icons = {
   Target: Target,
   List: ListTodo,
   Minus,
+  Menu,
 };
 
 export const SceneIcon = ({ type, className }: { type: string, className?: string }) => {
