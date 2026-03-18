@@ -107,6 +107,17 @@ export const generateChatCompletion = async (
         contents[0].parts[0].text = `${contextInstruction}${contents[0].parts[0].text}`;
     }
 
+    // Gemini requires the conversation to end with a user message (no assistant prefill).
+    // Strip any trailing model messages so the API call succeeds.
+    while (contents.length > 0 && contents[contents.length - 1].role === 'model') {
+        contents.pop();
+    }
+
+    // Safety: if stripping left us with nothing, create a minimal user prompt
+    if (contents.length === 0) {
+        contents.push({ role: 'user', parts: [{ text: `${contextInstruction}Continue.` }] });
+    }
+
     const response = await getAI().models.generateContent({
         model: modelName,
         contents: contents,

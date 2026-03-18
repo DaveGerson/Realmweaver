@@ -1,2 +1,2 @@
-// This file is redundant and has been deprecated. All type imports should now
-// resolve directly from the `./types/index.ts` barrel file. This file can be safely deleted.
+// Re-export everything from the types barrel so both `types` and `types/index` imports work.
+export * from './types/index';
