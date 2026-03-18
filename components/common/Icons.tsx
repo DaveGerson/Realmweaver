@@ -54,6 +54,11 @@ import {
   ChevronRight,
   Radio,
   Menu,
+  UserPlus,
+  ArrowUpCircle,
+  PauseCircle,
+  CircleDot,
+  Loader2,
 } from 'lucide-react';
 
 export const Icons = {
@@ -110,6 +115,11 @@ export const Icons = {
   ChevronRight,
   Live: Radio,
   Menu,
+  UserPlus,
+  Advanced: ArrowUpCircle,
+  Stalled: PauseCircle,
+  Unchanged: CircleDot,
+  Loader: Loader2,
 };
 
 export const SceneIcon = ({ type, className }: { type: string, className?: string }) => {
