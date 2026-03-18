@@ -1,16 +1,18 @@
 
 import { produce } from 'immer';
-import type { 
-    Campaign, 
-    Adventure, 
-    NPC, 
-    Location, 
-    Faction, 
-    Item, 
-    Scene, 
-    Article, 
-    AdventureForBatchAdd, 
-    SessionLog, 
+import type {
+    Campaign,
+    Adventure,
+    NPC,
+    Location,
+    Faction,
+    Item,
+    Scene,
+    Article,
+    AdventureForBatchAdd,
+    SessionLog,
+    SessionLogEntry,
+    SessionLogEntryType,
     PlayerCharacter,
     BatchAddData,
     Plot,
@@ -1181,6 +1183,18 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     campaign.activeSceneId = nextSceneId;
                     const nextScene = adventure.scenes.find(s => s.id === nextSceneId);
                     if (nextScene) nextScene.status = 'in-progress';
+
+                    // Auto-log scene transition
+                    const nextSceneName = nextScene?.title || 'Unknown';
+                    if (!session.structuredNotes) session.structuredNotes = [];
+                    session.structuredNotes.push({
+                        id: crypto.randomUUID(),
+                        timestamp: new Date().toISOString(),
+                        content: `Scene transition: moved to "${nextSceneName}"`,
+                        taggedEntityIds: [],
+                        type: 'scene-transition',
+                        isImportant: false,
+                    });
                 } else {
                     // No more scenes — clear active scene
                     campaign.activeSceneId = undefined;
@@ -1199,6 +1213,22 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 if (!adventure) return;
                 const scene = adventure.scenes.find(s => s.id === sceneId);
                 if (scene) scene.status = status;
+
+                // Auto-log scene completion
+                if (status === 'completed' && campaign.activeSessionId) {
+                    const session = campaign.sessionLogs?.find(s => s.id === campaign.activeSessionId);
+                    if (session) {
+                        if (!session.structuredNotes) session.structuredNotes = [];
+                        session.structuredNotes.push({
+                            id: crypto.randomUUID(),
+                            timestamp: new Date().toISOString(),
+                            content: `Scene completed: "${scene.title}"`,
+                            taggedEntityIds: [],
+                            type: 'scene-transition',
+                            isImportant: false,
+                        });
+                    }
+                }
             });
         },
 
@@ -1235,7 +1265,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         /**
          * Adds a structured note entry to the active session's running log.
          */
-        addSessionRunnerNote(content: string, taggedEntityIds: string[] = []) {
+        addSessionRunnerNote(content: string, taggedEntityIds: string[] = [], type: SessionLogEntryType = 'manual', tags: string[] = []) {
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
                 if (!campaign || !campaign.activeSessionId) return;
@@ -1249,6 +1279,9 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     timestamp: new Date().toISOString(),
                     content,
                     taggedEntityIds,
+                    type,
+                    tags: tags.length > 0 ? tags : undefined,
+                    isImportant: false,
                 });
             });
         },
@@ -1261,6 +1294,41 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 if (!session) return;
                 if (!session.diceRolls) session.diceRolls = [];
                 session.diceRolls.push(roll);
+            });
+        },
+
+        /**
+         * Adds an auto-generated event entry to the active session's running log.
+         */
+        addAutoEvent(type: SessionLogEntryType, content: string) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign || !campaign.activeSessionId) return;
+                const session = campaign.sessionLogs?.find(s => s.id === campaign.activeSessionId);
+                if (!session) return;
+                if (!session.structuredNotes) session.structuredNotes = [];
+                session.structuredNotes.push({
+                    id: crypto.randomUUID(),
+                    timestamp: new Date().toISOString(),
+                    content,
+                    taggedEntityIds: [],
+                    type: type || 'manual',
+                    isImportant: false,
+                });
+            });
+        },
+
+        /**
+         * Toggles the isImportant flag on a session log note.
+         */
+        toggleNoteImportance(noteId: string) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign || !campaign.activeSessionId) return;
+                const session = campaign.sessionLogs?.find(s => s.id === campaign.activeSessionId);
+                if (!session || !session.structuredNotes) return;
+                const note = session.structuredNotes.find(n => n.id === noteId);
+                if (note) note.isImportant = !note.isImportant;
             });
         },
 

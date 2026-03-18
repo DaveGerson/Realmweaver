@@ -55,6 +55,8 @@ import {
   Radio,
   Menu,
   Hash,
+  Star,
+  Filter,
 } from 'lucide-react';
 
 export const Icons = {
@@ -112,6 +114,8 @@ export const Icons = {
   Live: Radio,
   Menu,
   Hash,
+  Star,
+  Filter,
 };
 
 export const SceneIcon = ({ type, className }: { type: string, className?: string }) => {

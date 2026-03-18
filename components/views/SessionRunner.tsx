@@ -1,11 +1,41 @@
 
 import React, { useState, useMemo } from 'react';
-import type { Campaign, Scene, Adventure, SessionLog, NPC, Location } from '../../types/index';
+import type { Campaign, Scene, Adventure, SessionLog, SessionLogEntry, SessionLogEntryType, NPC, Location } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { SceneIcon } from '../common/Icons';
 import { twMerge } from 'tailwind-merge';
 import { campaignService } from '../../services/campaignService';
 import { DiceRoller } from '../tools/DiceRoller';
+
+const NOTE_TAG_OPTIONS = ['Combat', 'NPC', 'Decision', 'Loot', 'Discovery'] as const;
+
+const ENTRY_TYPE_STYLES: Record<string, { text: string; border: string; icon: React.ReactNode }> = {
+    'scene-transition': {
+        text: 'text-blue-300',
+        border: 'border-l-2 border-l-blue-500 pl-2',
+        icon: <Icons.Scenes className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />,
+    },
+    'combat': {
+        text: 'text-red-300',
+        border: 'border-l-2 border-l-red-500 pl-2',
+        icon: <Icons.Combat className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />,
+    },
+    'npc-created': {
+        text: 'text-green-300',
+        border: 'border-l-2 border-l-green-500 pl-2',
+        icon: <Icons.NPCs className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />,
+    },
+    'dice-roll': {
+        text: 'text-amber-300',
+        border: 'border-l-2 border-l-amber-500 pl-2',
+        icon: <Icons.Dice className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />,
+    },
+    'coach-used': {
+        text: 'text-indigo-300',
+        border: 'border-l-2 border-l-indigo-500 pl-2',
+        icon: <Icons.Coach className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />,
+    },
+};
 
 interface SessionRunnerProps {
     campaign: Campaign;
@@ -23,6 +53,8 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
     onOpenCoach,
 }) => {
     const [noteInput, setNoteInput] = useState('');
+    const [noteTags, setNoteTags] = useState<string[]>([]);
+    const [showImportantOnly, setShowImportantOnly] = useState(false);
     const [showEndConfirm, setShowEndConfirm] = useState(false);
     const [showDiceRoller, setShowDiceRoller] = useState(false);
 
@@ -66,9 +98,20 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
 
     const handleAddNote = () => {
         if (!noteInput.trim()) return;
-        campaignService.addSessionRunnerNote(noteInput.trim());
+        campaignService.addSessionRunnerNote(noteInput.trim(), [], 'manual', noteTags);
         setNoteInput('');
+        setNoteTags([]);
     };
+
+    const toggleTag = (tag: string) => {
+        setNoteTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+    };
+
+    const filteredNotes = useMemo(() => {
+        const notes = sessionLog.structuredNotes || [];
+        if (!showImportantOnly) return notes;
+        return notes.filter(n => n.isImportant);
+    }, [sessionLog.structuredNotes, showImportantOnly]);
 
     const handleAdvanceScene = () => {
         campaignService.advanceScene();
@@ -349,40 +392,107 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
             </div>
 
             {/* Bottom: Running Log */}
-            <div className="h-48 flex-shrink-0 bg-slate-900 border-t border-slate-700 flex flex-col">
+            <div className="h-56 flex-shrink-0 bg-slate-900 border-t border-slate-700 flex flex-col">
                 <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800">
                     <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Running Log</h2>
-                    <span className="text-xs text-slate-600">{sessionLog.structuredNotes?.length || 0} entries</span>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => setShowImportantOnly(prev => !prev)}
+                            className={twMerge(
+                                "flex items-center gap-1 text-xs px-2 py-0.5 rounded-md transition-colors",
+                                showImportantOnly
+                                    ? "bg-amber-900/40 text-amber-400 border border-amber-700/50"
+                                    : "text-slate-500 hover:text-slate-400"
+                            )}
+                        >
+                            <Icons.Star className="w-3 h-3" />
+                            {showImportantOnly ? 'Important Only' : 'Show All'}
+                        </button>
+                        <span className="text-xs text-slate-600">{sessionLog.structuredNotes?.length || 0} entries</span>
+                    </div>
                 </div>
                 <div className="flex-1 overflow-y-auto px-4 py-2 space-y-1">
-                    {(sessionLog.structuredNotes || []).map(note => (
-                        <div key={note.id} className="flex items-start gap-2 text-sm">
-                            <span className="text-slate-600 text-xs font-mono flex-shrink-0">
-                                {new Date(note.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                            <span className="text-slate-300">{note.content}</span>
-                        </div>
-                    ))}
-                    {(!sessionLog.structuredNotes || sessionLog.structuredNotes.length === 0) && (
-                        <p className="text-xs text-slate-600 italic">No notes yet. Add notes below.</p>
+                    {filteredNotes.map(note => {
+                        const typeStyle = note.type && note.type !== 'manual' ? ENTRY_TYPE_STYLES[note.type] : null;
+                        return (
+                            <div
+                                key={note.id}
+                                className={twMerge(
+                                    "flex items-start gap-2 text-sm py-0.5 group",
+                                    typeStyle?.border
+                                )}
+                            >
+                                <span className="text-slate-600 text-xs font-mono flex-shrink-0 mt-0.5">
+                                    {new Date(note.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                {typeStyle?.icon}
+                                <span className={twMerge("flex-1", typeStyle?.text || "text-slate-300")}>
+                                    {note.content}
+                                </span>
+                                {note.tags && note.tags.length > 0 && (
+                                    <div className="flex gap-1 flex-shrink-0">
+                                        {note.tags.map(tag => (
+                                            <span key={tag} className="text-xs px-1.5 py-0.5 rounded bg-slate-700 text-slate-400">{tag}</span>
+                                        ))}
+                                    </div>
+                                )}
+                                <button
+                                    onClick={() => campaignService.toggleNoteImportance(note.id)}
+                                    className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    title={note.isImportant ? 'Unmark important' : 'Mark important'}
+                                >
+                                    <Icons.Star
+                                        className={twMerge(
+                                            "w-3.5 h-3.5 transition-colors",
+                                            note.isImportant
+                                                ? "text-amber-400 fill-amber-400"
+                                                : "text-slate-600 hover:text-slate-400"
+                                        )}
+                                    />
+                                </button>
+                            </div>
+                        );
+                    })}
+                    {filteredNotes.length === 0 && (
+                        <p className="text-xs text-slate-600 italic">
+                            {showImportantOnly ? 'No important notes. Star a note to mark it important.' : 'No notes yet. Add notes below.'}
+                        </p>
                     )}
                 </div>
-                <div className="px-4 py-2 border-t border-slate-800 flex gap-2">
-                    <input
-                        type="text"
-                        value={noteInput}
-                        onChange={(e) => setNoteInput(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddNote(); }}
-                        placeholder="Add a quick note..."
-                        className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                    />
-                    <button
-                        onClick={handleAddNote}
-                        disabled={!noteInput.trim()}
-                        className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm transition-colors"
-                    >
-                        Add
-                    </button>
+                <div className="px-4 py-2 border-t border-slate-800 space-y-2">
+                    <div className="flex gap-1">
+                        {NOTE_TAG_OPTIONS.map(tag => (
+                            <button
+                                key={tag}
+                                onClick={() => toggleTag(tag)}
+                                className={twMerge(
+                                    "text-xs px-2 py-0.5 rounded-md transition-colors border",
+                                    noteTags.includes(tag)
+                                        ? "bg-indigo-900/40 text-indigo-300 border-indigo-600/50"
+                                        : "bg-slate-800 text-slate-500 border-slate-700 hover:text-slate-400 hover:border-slate-600"
+                                )}
+                            >
+                                {tag}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            value={noteInput}
+                            onChange={(e) => setNoteInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleAddNote(); }}
+                            placeholder="Add a quick note..."
+                            className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                        />
+                        <button
+                            onClick={handleAddNote}
+                            disabled={!noteInput.trim()}
+                            className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm transition-colors"
+                        >
+                            Add
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
