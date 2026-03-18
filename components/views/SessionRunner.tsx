@@ -1,8 +1,7 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
-import type { Campaign, Scene, Adventure, SessionLog, SessionLogEntry, SessionLogEntryType, NPC, Location, Combatant, CombatantType, Encounter } from '../../types/index';
-import { Icons } from '../common/Icons';
-import { SceneIcon } from '../common/Icons';
+import type { Campaign, Scene, SessionLog, NPC, Combatant, CombatantType, Encounter } from '../../types';
+import { Icons, SceneIcon } from '../common/Icons';
 import { twMerge } from 'tailwind-merge';
 import { campaignService } from '../../services/campaignService';
 import { DiceRoller } from '../tools/DiceRoller';
@@ -179,8 +178,8 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
             ];
 
             const newEncounter: Encounter = {
-                id: encounter?.id || crypto.randomUUID(),
-                round: 1,
+                id: encounter ? encounter.id : crypto.randomUUID(),
+                round: encounter ? encounter.round : 1,
                 turnIndex: 0,
                 combatants: autoCombatants,
                 sessionId: sessionLog.id,
@@ -308,7 +307,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                 <div className="w-56 flex-shrink-0 bg-slate-900 border-r border-slate-800 overflow-y-auto p-3">
                     <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Scenes</h2>
                     <div className="space-y-1">
-                        {plannedScenes.map((scene, index) => (
+                        {plannedScenes.map((scene) => (
                             <button
                                 key={scene.id}
                                 onClick={() => handleSelectScene(scene.id)}
@@ -556,7 +555,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                         {sessionLog.relatedPlotIds.length > 0 ? (
                             <div className="space-y-2">
                                 {sessionLog.relatedPlotIds.map(plotId => {
-                                    const plot = campaign.plots?.find(p => p.id === plotId);
+                                    const plot = campaign.plots.find(p => p.id === plotId);
                                     const status = plotSessionStatus[plotId] || 'unchanged';
                                     return plot ? (
                                         <button
@@ -592,7 +591,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
             </div>
 
             {/* Bottom: Running Log */}
-            <div className="h-56 flex-shrink-0 bg-slate-900 border-t border-slate-700 flex flex-col">
+            <div className="h-48 md:h-56 flex-shrink-0 bg-slate-900 border-t border-slate-700 flex flex-col">
                 <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800">
                     <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Running Log</h2>
                     <div className="flex items-center gap-3">

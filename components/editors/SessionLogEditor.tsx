@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import type { SessionLog, SessionLogEntry } from '../../types/index';
+import type { SessionLog, SessionLogEntry } from '../../types';
 import { Icons, SceneIcon } from '../common/Icons';
 import { Button } from '../common/Button';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
@@ -190,7 +190,7 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
 
           setIsLiveConnected(true); // Set UI state immediately
 
-          const sessionPromise = ai.live.connect({
+          sessionPromiseRef.current = ai.live.connect({
               model: 'gemini-2.5-flash-native-audio-preview-09-2025',
               config: {
                   responseModalities: [Modality.AUDIO], 
@@ -265,7 +265,7 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
               }
           });
           
-          sessionPromiseRef.current = sessionPromise;
+
 
       } catch (err) {
           console.error("Failed to start Live session", err);
@@ -395,7 +395,7 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
                             setFormData(prev => ({...prev, sessionDate: val}));
                             onUpdate(log.id, { sessionDate: val });
                         }}
-                        className="bg-transparent text-slate-400 outline-none hover:text-white transition-colors"
+                        className="bg-transparent text-slate-400 outline-none hover:text-white focus:text-white transition-colors"
                       />
                   </div>
               </div>
