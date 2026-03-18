@@ -1131,6 +1131,11 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 session.status = 'active';
                 campaign.activeSessionId = sessionLogId;
 
+                // Set session date if not already set
+                if (!session.sessionDate || session.sessionDate === '') {
+                    session.sessionDate = new Date().toISOString();
+                }
+
                 // Activate the first planned scene if adventure is linked
                 if (session.adventureId && session.plannedSceneIds.length > 0) {
                     campaign.activeSceneId = session.plannedSceneIds[0];
@@ -1148,6 +1153,15 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         });
                     }
                 }
+
+                // Log session start event
+                if (!session.structuredNotes) session.structuredNotes = [];
+                session.structuredNotes.push({
+                    id: crypto.randomUUID(),
+                    timestamp: new Date().toISOString(),
+                    content: `Session started: "${session.title}"`,
+                    taggedEntityIds: [],
+                });
             });
         },
 

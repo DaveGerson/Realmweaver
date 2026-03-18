@@ -23,6 +23,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
 }) => {
     const [noteInput, setNoteInput] = useState('');
     const [showEndConfirm, setShowEndConfirm] = useState(false);
+    const [showRecap, setShowRecap] = useState(true);
 
     const adventure = useMemo(() =>
         sessionLog.adventureId
@@ -175,6 +176,26 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                 <div className="flex-1 overflow-y-auto p-6">
                     {activeScene ? (
                         <div className="max-w-3xl mx-auto space-y-6">
+                            {/* Previously... Recap Banner */}
+                            {showRecap && previousSession?.recap && (
+                                <div className="bg-indigo-900/20 border border-indigo-800/40 rounded-lg p-4 relative">
+                                    <button
+                                        onClick={() => setShowRecap(false)}
+                                        className="absolute top-2 right-2 text-slate-500 hover:text-slate-300"
+                                    >
+                                        <Icons.X className="w-4 h-4" />
+                                    </button>
+                                    <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2">Previously...</h3>
+                                    <p className="text-sm text-indigo-200 leading-relaxed">{previousSession.recap}</p>
+                                    {previousSession.looseEnds && (
+                                        <div className="mt-2 pt-2 border-t border-indigo-800/30">
+                                            <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">Unresolved Threads</h4>
+                                            <p className="text-xs text-amber-200">{previousSession.looseEnds}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             {/* Scene Title */}
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
@@ -311,29 +332,36 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                         </button>
                     </div>
 
+                    {/* Active Plots */}
+                    <div className="p-3 border-t border-slate-800">
+                        <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2">
+                            <Icons.Plot className="w-3 h-3 inline mr-1" />
+                            Active Plots
+                        </h3>
+                        {sessionLog.relatedPlotIds.length > 0 ? (
+                            <div className="space-y-2">
+                                {sessionLog.relatedPlotIds.map(plotId => {
+                                    const plot = campaign.plots?.find(p => p.id === plotId);
+                                    return plot ? (
+                                        <div key={plot.id} className="border-l-2 border-amber-600/50 pl-2.5 py-1">
+                                            <p className="text-sm text-amber-200 font-medium">{plot.title}</p>
+                                            {plot.description && (
+                                                <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{plot.description.substring(0, 120)}{plot.description.length > 120 ? '...' : ''}</p>
+                                            )}
+                                        </div>
+                                    ) : null;
+                                })}
+                            </div>
+                        ) : (
+                            <p className="text-xs text-slate-600 italic">No plots linked to this session</p>
+                        )}
+                    </div>
+
                     {/* Prep Notes */}
                     {sessionLog.prepNotes && (
                         <div className="p-3 border-t border-slate-800">
                             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Prep Notes</h3>
                             <p className="text-xs text-slate-400 leading-relaxed whitespace-pre-wrap">{sessionLog.prepNotes}</p>
-                        </div>
-                    )}
-
-                    {/* Active Plots */}
-                    {sessionLog.relatedPlotIds.length > 0 && (
-                        <div className="p-3 border-t border-slate-800">
-                            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Active Plots</h3>
-                            <div className="space-y-1">
-                                {sessionLog.relatedPlotIds.map(plotId => {
-                                    const plot = campaign.plots?.find(p => p.id === plotId);
-                                    return plot ? (
-                                        <div key={plot.id} className="text-xs text-slate-300 flex items-center gap-1.5">
-                                            <Icons.Plot className="w-3 h-3 text-amber-500" />
-                                            {plot.title}
-                                        </div>
-                                    ) : null;
-                                })}
-                            </div>
                         </div>
                     )}
                 </div>
