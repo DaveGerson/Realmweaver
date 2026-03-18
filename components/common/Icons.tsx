@@ -57,6 +57,11 @@ import {
   Hash,
   Star,
   Filter,
+  UserPlus,
+  ArrowUpCircle,
+  PauseCircle,
+  CircleDot,
+  Loader2,
 } from 'lucide-react';
 
 export const Icons = {
@@ -116,6 +121,11 @@ export const Icons = {
   Hash,
   Star,
   Filter,
+  UserPlus,
+  Advanced: ArrowUpCircle,
+  Stalled: PauseCircle,
+  Unchanged: CircleDot,
+  Loader: Loader2,
 };
 
 export const SceneIcon = ({ type, className }: { type: string, className?: string }) => {

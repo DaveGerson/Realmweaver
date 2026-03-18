@@ -1,11 +1,15 @@
 
-import React, { useState, useMemo } from 'react';
-import type { Campaign, Scene, Adventure, SessionLog, SessionLogEntry, SessionLogEntryType, NPC, Location } from '../../types/index';
+import React, { useState, useMemo, useCallback } from 'react';
+import type { Campaign, Scene, Adventure, SessionLog, SessionLogEntry, SessionLogEntryType, NPC, Location, Combatant, CombatantType, Encounter } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { SceneIcon } from '../common/Icons';
 import { twMerge } from 'tailwind-merge';
 import { campaignService } from '../../services/campaignService';
 import { DiceRoller } from '../tools/DiceRoller';
+import { CombatTracker } from '../tools/CombatTracker';
+import { generateNpc } from '../../services/geminiService';
+
+type PlotSessionStatus = 'advanced' | 'stalled' | 'unchanged';
 
 const NOTE_TAG_OPTIONS = ['Combat', 'NPC', 'Decision', 'Loot', 'Discovery'] as const;
 
@@ -57,6 +61,18 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
     const [showImportantOnly, setShowImportantOnly] = useState(false);
     const [showEndConfirm, setShowEndConfirm] = useState(false);
     const [showDiceRoller, setShowDiceRoller] = useState(false);
+
+    // Combat Tracker slide-out state
+    const [showCombatPanel, setShowCombatPanel] = useState(false);
+
+    // Quick NPC generator state
+    const [showQuickNpc, setShowQuickNpc] = useState(false);
+    const [npcPrompt, setNpcPrompt] = useState('');
+    const [npcGenerating, setNpcGenerating] = useState(false);
+    const [npcError, setNpcError] = useState<string | null>(null);
+
+    // Plot session status tracking (local only)
+    const [plotSessionStatus, setPlotSessionStatus] = useState<Record<string, PlotSessionStatus>>({});
 
     const adventure = useMemo(() =>
         sessionLog.adventureId
@@ -135,11 +151,117 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
         onEndSession();
     };
 
+    // Combat Tracker: open panel and auto-populate if needed
+    const handleOpenCombat = useCallback(() => {
+        const encounter = campaign.activeEncounter;
+        if (!encounter || encounter.combatants.length === 0) {
+            // Auto-populate combatants from active scene NPCs + player characters
+            const autoCombatants: Combatant[] = [
+                ...activeSceneNpcs.map(npc => ({
+                    id: crypto.randomUUID(),
+                    name: npc.name,
+                    type: 'npc' as CombatantType,
+                    initiative: 0,
+                    hp: 10,
+                    maxHp: 10,
+                    notes: npc.traits || ''
+                })),
+                ...(campaign.playerCharacters || []).map(pc => ({
+                    id: crypto.randomUUID(),
+                    name: pc.characterSocial.characterName,
+                    type: 'pc' as CombatantType,
+                    initiative: 0,
+                    hp: 20,
+                    maxHp: 20,
+                    notes: ''
+                }))
+            ];
+
+            const newEncounter: Encounter = {
+                id: encounter?.id || crypto.randomUUID(),
+                round: 1,
+                turnIndex: 0,
+                combatants: autoCombatants,
+                sessionId: sessionLog.id,
+                sceneId: campaign.activeSceneId || undefined,
+            };
+            campaignService.updateEncounter(newEncounter);
+        }
+        setShowCombatPanel(true);
+    }, [activeSceneNpcs, campaign.activeEncounter, campaign.playerCharacters, campaign.activeSceneId, sessionLog.id]);
+
+    const handleUpdateEncounter = useCallback((updatedEncounter: Encounter) => {
+        campaignService.updateEncounter(updatedEncounter);
+    }, []);
+
+    // Quick NPC generation
+    const handleGenerateQuickNpc = useCallback(async () => {
+        if (!npcPrompt.trim()) return;
+        setNpcGenerating(true);
+        setNpcError(null);
+        try {
+            const campaignContext = `Campaign: ${campaign.title}\nSetting: ${campaign.setting}`;
+            const npcData = await generateNpc(npcPrompt.trim(), false, isMockMode, campaignContext);
+            const newNpcId = campaignService.createNpc(npcData);
+
+            // Auto-link to current scene if there is one
+            if (activeScene && adventure) {
+                const updatedNpcIds = [...activeScene.npcIds, newNpcId];
+                campaignService.updateScene(adventure.id, activeScene.id, { npcIds: updatedNpcIds });
+            }
+
+            setNpcPrompt('');
+            setShowQuickNpc(false);
+        } catch (err) {
+            setNpcError(err instanceof Error ? err.message : 'Generation failed');
+        } finally {
+            setNpcGenerating(false);
+        }
+    }, [npcPrompt, isMockMode, campaign.title, campaign.setting, activeScene, adventure]);
+
+    // Plot status cycling
+    const cyclePlotStatus = useCallback((plotId: string) => {
+        setPlotSessionStatus(prev => {
+            const current = prev[plotId] || 'unchanged';
+            const next: PlotSessionStatus =
+                current === 'unchanged' ? 'advanced' :
+                current === 'advanced' ? 'stalled' :
+                'unchanged';
+            return { ...prev, [plotId]: next };
+        });
+    }, []);
+
     const sceneStatusIcon = (scene: Scene) => {
         switch (scene.status) {
             case 'completed': return <Icons.CheckCircle className="w-4 h-4 text-green-400" />;
             case 'in-progress': return <Icons.Play className="w-4 h-4 text-amber-400" />;
             default: return <div className="w-4 h-4 rounded-full border border-slate-500" />;
+        }
+    };
+
+    const plotStatusBadge = (status: PlotSessionStatus) => {
+        switch (status) {
+            case 'advanced':
+                return (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400 text-[10px] font-bold uppercase">
+                        <Icons.Advanced className="w-3 h-3" />
+                        Advanced
+                    </span>
+                );
+            case 'stalled':
+                return (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[10px] font-bold uppercase">
+                        <Icons.Stalled className="w-3 h-3" />
+                        Stalled
+                    </span>
+                );
+            default:
+                return (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-slate-700 text-slate-400 text-[10px] font-bold uppercase">
+                        <Icons.Unchanged className="w-3 h-3" />
+                        Unchanged
+                    </span>
+                );
         }
     };
 
@@ -323,7 +445,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                 </div>
 
                 {/* Right: Quick Tools Panel */}
-                <div className="w-64 flex-shrink-0 bg-slate-900 border-l border-slate-800 flex flex-col">
+                <div className="w-64 flex-shrink-0 bg-slate-900 border-l border-slate-800 flex flex-col overflow-y-auto">
                     <div className="p-3 border-b border-slate-800">
                         <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Quick Tools</h2>
                     </div>
@@ -338,14 +460,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                         </button>
                         <button
                             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm transition-colors"
-                            onClick={() => {
-                                if (campaign.activeSceneId && adventure) {
-                                    const scene = adventure.scenes.find(s => s.id === campaign.activeSceneId);
-                                    if (scene?.type === 'combat') {
-                                        // TODO: auto-populate combat from scene NPCs
-                                    }
-                                }
-                            }}
+                            onClick={handleOpenCombat}
                         >
                             <Icons.Combat className="w-4 h-4 text-red-400" />
                             Combat Tracker
@@ -361,7 +476,55 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                         {showDiceRoller && (
                             <DiceRoller onLogRoll={(roll) => campaignService.addDiceRollToSession(roll)} />
                         )}
+                        <button
+                            onClick={() => setShowQuickNpc(!showQuickNpc)}
+                            className={twMerge(
+                                "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
+                                showQuickNpc
+                                    ? "bg-emerald-900/40 text-emerald-300 border border-emerald-700/50"
+                                    : "bg-slate-800 hover:bg-slate-700 text-slate-200"
+                            )}
+                        >
+                            <Icons.UserPlus className="w-4 h-4 text-emerald-400" />
+                            Quick NPC
+                        </button>
                     </div>
+
+                    {/* Quick NPC Inline Form */}
+                    {showQuickNpc && (
+                        <div className="px-3 pb-3 space-y-2">
+                            <input
+                                type="text"
+                                value={npcPrompt}
+                                onChange={(e) => setNpcPrompt(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter' && !npcGenerating) handleGenerateQuickNpc(); }}
+                                placeholder="A suspicious merchant..."
+                                disabled={npcGenerating}
+                                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 disabled:opacity-50"
+                                autoFocus
+                            />
+                            <button
+                                onClick={handleGenerateQuickNpc}
+                                disabled={!npcPrompt.trim() || npcGenerating}
+                                className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm transition-colors"
+                            >
+                                {npcGenerating ? (
+                                    <>
+                                        <Icons.Loader className="w-4 h-4 animate-spin" />
+                                        Generating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Icons.Sparkles className="w-4 h-4" />
+                                        Generate
+                                    </>
+                                )}
+                            </button>
+                            {npcError && (
+                                <p className="text-xs text-red-400">{npcError}</p>
+                            )}
+                        </div>
+                    )}
 
                     {/* Prep Notes */}
                     {sessionLog.prepNotes && (
@@ -371,18 +534,29 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                         </div>
                     )}
 
-                    {/* Active Plots */}
+                    {/* Active Plots with Status Tracker */}
                     {sessionLog.relatedPlotIds.length > 0 && (
                         <div className="p-3 border-t border-slate-800">
                             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Active Plots</h3>
-                            <div className="space-y-1">
+                            <div className="space-y-2">
                                 {sessionLog.relatedPlotIds.map(plotId => {
                                     const plot = campaign.plots?.find(p => p.id === plotId);
+                                    const status = plotSessionStatus[plotId] || 'unchanged';
                                     return plot ? (
-                                        <div key={plot.id} className="text-xs text-slate-300 flex items-center gap-1.5">
-                                            <Icons.Plot className="w-3 h-3 text-amber-500" />
-                                            {plot.title}
-                                        </div>
+                                        <button
+                                            key={plot.id}
+                                            onClick={() => cyclePlotStatus(plot.id)}
+                                            className="w-full text-left bg-slate-800/50 hover:bg-slate-800 rounded-lg p-2 transition-colors group"
+                                        >
+                                            <div className="flex items-center gap-1.5 mb-1">
+                                                <Icons.Plot className="w-3 h-3 text-amber-500 flex-shrink-0" />
+                                                <span className="text-xs text-slate-300 truncate">{plot.title}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                {plotStatusBadge(status)}
+                                                <span className="text-[10px] text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity">click to change</span>
+                                            </div>
+                                        </button>
                                     ) : null;
                                 })}
                             </div>
@@ -495,6 +669,42 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                     </div>
                 </div>
             </div>
+
+            {/* Combat Tracker Slide-out Panel */}
+            {showCombatPanel && (
+                <>
+                    {/* Backdrop */}
+                    <div
+                        className="fixed inset-0 bg-black/50 z-40"
+                        onClick={() => setShowCombatPanel(false)}
+                    />
+                    {/* Panel */}
+                    <div className="fixed right-0 top-0 bottom-0 w-[500px] bg-slate-900 border-l border-slate-700 z-50 shadow-2xl flex flex-col">
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+                            <div className="flex items-center gap-2">
+                                <Icons.Combat className="w-5 h-5 text-red-400" />
+                                <h2 className="text-lg font-bold text-white font-serif">Combat Tracker</h2>
+                            </div>
+                            <button
+                                onClick={() => setShowCombatPanel(false)}
+                                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                            >
+                                <Icons.X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                            {campaign.activeEncounter && (
+                                <CombatTracker
+                                    encounter={campaign.activeEncounter}
+                                    onUpdate={handleUpdateEncounter}
+                                    campaignNpcs={campaign.npcs}
+                                    campaignPcs={campaign.playerCharacters || []}
+                                />
+                            )}
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 };
