@@ -1,7 +1,19 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Lazy initialization to avoid errors when API key is not set
+let ai: GoogleGenAI | null = null;
+
+const getAI = () => {
+    if (!ai) {
+        const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            throw new Error("Gemini API key is not configured. Please set GEMINI_API_KEY in your .env file or enable Mock Mode.");
+        }
+        ai = new GoogleGenAI({ apiKey });
+    }
+    return ai;
+};
 
 export const generateWithSchema = async (prompt: string, schema: object, instructions: string, configOverrides: object = {}, modelName: string, campaignContext?: string) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -48,7 +60,7 @@ export const generateWithSchema = async (prompt: string, schema: object, instruc
         contents = `${instructions}\n\n${contextInstruction}Prompt: "${prompt}"`;
     }
 
-    const response = await ai.models.generateContent({
+    const response = await getAI().models.generateContent({
         model: modelName,
         contents: contents,
         config,
@@ -70,7 +82,7 @@ export const generateText = async (fullPrompt: string, modelName: string, campai
         ? `Reference the following existing campaign information for context and consistency:\n<campaign_context>\n${campaignContext}\n</campaign_context>\n\n`
         : '';
         
-    const response = await ai.models.generateContent({
+    const response = await getAI().models.generateContent({
         model: modelName,
         contents: `${contextInstruction}${fullPrompt}`,
     });
@@ -95,7 +107,7 @@ export const generateChatCompletion = async (
         contents[0].parts[0].text = `${contextInstruction}${contents[0].parts[0].text}`;
     }
 
-    const response = await ai.models.generateContent({
+    const response = await getAI().models.generateContent({
         model: modelName,
         contents: contents,
         config: {

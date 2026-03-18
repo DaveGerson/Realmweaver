@@ -175,7 +175,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
     const topLevelArticles = campaign.articles.filter(a => !a.parentArticleId);
 
     return (
-        <aside className="w-72 bg-slate-900 flex-shrink-0 flex flex-col border-r border-slate-800">
+        <aside className="w-full h-full bg-slate-900 flex-shrink-0 flex flex-col border-r border-slate-800">
             <div className="p-4 border-b border-slate-800">
                 <h2 className="text-lg font-semibold font-serif truncate" title={campaign.title}>{campaign.title}</h2>
             </div>

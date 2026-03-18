@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useMemo, useSyncExternalStore } from 'react';
-import type { Campaign, Adventure, Scene } from './types/index';
+import React, { FC, useState, useEffect, useMemo, useSyncExternalStore } from 'react';
+import type { Adventure, Scene } from './types/index';
 import { WelcomeScreen } from './components/views/WelcomeScreen';
 import { CampaignCreator } from './components/views/CampaignCreator';
 import { CampaignSelector } from './components/views/CampaignSelector';
@@ -43,12 +43,12 @@ import { SessionRunner } from './components/views/SessionRunner';
 export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'combat' | 'relationships' | 'session-runner';
 export type GeneratorType = 'npc' | 'location' | 'faction' | 'item' | 'scene' | 'article';
 
-const App: React.FC = () => {
+const App: FC = () => {
   const { campaigns, activeCampaignId, appStatus, saveStatus, lastSavedAt } = useSyncExternalStore(
     campaignService.subscribe,
     campaignService.getState
   );
-  
+
   const [isMockMode, setIsMockMode] = useState(true);
   
   // UI-specific state that remains in the component
@@ -69,10 +69,11 @@ const App: React.FC = () => {
   const [isCoachOpen, setIsCoachOpen] = useState(false);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
 
   useEffect(() => {
-    runSmokeTests(isMockMode);
+    runSmokeTests(isMockMode).catch(err => console.error('Smoke tests failed:', err));
   }, [isMockMode]);
 
   const activeCampaign = useMemo(() => campaigns.find(c => c.id === activeCampaignId), [campaigns, activeCampaignId]);
@@ -316,6 +317,7 @@ const App: React.FC = () => {
   const handleSelectView = (view: EditorView) => {
     setActiveView(view);
     resetSelections();
+    setIsSidebarOpen(false);
   };
   
     const handleSelect = (type: 'adventure' | 'scene' | 'npc' | 'location' | 'faction' | 'item' | 'article' | 'session-log' | 'player-character' | 'plot', id: string) => {
@@ -340,6 +342,7 @@ const App: React.FC = () => {
                 case 'plot': setActiveView('plots'); setSelectedPlotId(id); break;
             }
         }
+        setIsSidebarOpen(false);
     };
 
   const handleGoLive = (sessionLogId: string) => {
@@ -566,39 +569,56 @@ const App: React.FC = () => {
                 onCreateNew={campaignService.startNewCampaignCreation}
                 onImportCampaign={handleImportCampaign}
                 onShowExportModal={() => setIsExportModalOpen(true)}
+                onToggleSidebar={() => setIsSidebarOpen(p => !p)}
                 saveStatus={saveStatus}
                 lastSavedAt={lastSavedAt}
               />
-              <div className="flex-1 flex overflow-hidden">
-                <CampaignSidebar 
-                  campaign={activeCampaign} 
-                  activeView={activeView} 
-                  onSelectView={handleSelectView}
-                  selectedIds={{
-                      adventure: selectedAdventureId,
-                      scene: selectedSceneId,
-                      npc: selectedNpcId,
-                      location: selectedLocationId,
-                      faction: selectedFactionId,
-                      item: selectedItemId,
-                      article: selectedArticleId,
-                      sessionLog: selectedSessionLogId,
-                      playerCharacter: selectedPlayerCharacterId,
-                      plot: selectedPlotId
-                  }}
-                  onSelect={handleSelect}
-                  onShowGenerator={(type) => {
-                    if (type === 'scene') {
-                      if (!selectedAdventureId) {
-                        alert("Please select an adventure first to add a scene to it.");
-                        return;
+              <div className="flex-1 flex overflow-hidden relative">
+                {/* Mobile Sidebar Overlay */}
+                {isSidebarOpen && (
+                  <div
+                    className="fixed inset-0 bg-black/50 z-40 md:hidden"
+                    onClick={() => setIsSidebarOpen(false)}
+                  />
+                )}
+
+                {/* Sidebar Container */}
+                <div className={`
+                  fixed inset-y-0 left-0 z-50 w-72 bg-slate-900 border-r border-slate-800 transform transition-transform duration-200 ease-in-out
+                  md:relative md:translate-x-0
+                  ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+                `}>
+                  <CampaignSidebar
+                    campaign={activeCampaign}
+                    activeView={activeView}
+                    onSelectView={handleSelectView}
+                    selectedIds={{
+                        adventure: selectedAdventureId,
+                        scene: selectedSceneId,
+                        npc: selectedNpcId,
+                        location: selectedLocationId,
+                        faction: selectedFactionId,
+                        item: selectedItemId,
+                        article: selectedArticleId,
+                        sessionLog: selectedSessionLogId,
+                        playerCharacter: selectedPlayerCharacterId,
+                        plot: selectedPlotId
+                    }}
+                    onSelect={handleSelect}
+                    onShowGenerator={(type) => {
+                      if (type === 'scene') {
+                        if (!selectedAdventureId) {
+                          alert("Please select an adventure first to add a scene to it.");
+                          return;
+                        }
                       }
-                    }
-                    setActiveGenerator(type);
-                  }}
-                  onReorderScene={campaignService.reorderScene}
-                />
-                <main className="flex-1 overflow-y-auto bg-slate-900 text-slate-100 relative">
+                      setActiveGenerator(type);
+                    }}
+                    onReorderScene={campaignService.reorderScene}
+                  />
+                </div>
+
+                <main className="flex-1 overflow-y-auto bg-slate-900 text-slate-100 relative w-full">
                   {renderMainContent()}
                 </main>
                 
