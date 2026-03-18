@@ -420,13 +420,50 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
 
             {formData.status === 'planned' && (
                 <>
+                    {/* Pre-flight Checklist */}
+                    <div className="flex items-center gap-3 mr-4">
+                        <div className="flex items-center gap-1.5 text-xs">
+                            {formData.adventureId ? (
+                                <Icons.CheckCircle className="w-3.5 h-3.5 text-green-400" />
+                            ) : (
+                                <Icons.Help className="w-3.5 h-3.5 text-amber-400" />
+                            )}
+                            <span className={formData.adventureId ? 'text-green-400' : 'text-amber-400'}>Adventure</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs">
+                            {(formData.plannedSceneIds?.length || 0) > 0 ? (
+                                <Icons.CheckCircle className="w-3.5 h-3.5 text-green-400" />
+                            ) : (
+                                <Icons.Help className="w-3.5 h-3.5 text-amber-400" />
+                            )}
+                            <span className={(formData.plannedSceneIds?.length || 0) > 0 ? 'text-green-400' : 'text-amber-400'}>
+                                Scenes ({formData.plannedSceneIds?.length || 0})
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs">
+                            {(formData.relatedPlotIds?.length || 0) > 0 ? (
+                                <Icons.CheckCircle className="w-3.5 h-3.5 text-green-400" />
+                            ) : (
+                                <Icons.Help className="w-3.5 h-3.5 text-slate-500" />
+                            )}
+                            <span className={(formData.relatedPlotIds?.length || 0) > 0 ? 'text-green-400' : 'text-slate-500'}>
+                                Plots
+                            </span>
+                        </div>
+                    </div>
+
                     <Button onClick={handleStartSession} className="bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/20">
                         <Icons.Play className="w-4 h-4 mr-2" /> Start Session
                     </Button>
                     {onGoLive && (
-                        <Button onClick={() => onGoLive(log.id)} className="bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-900/20">
-                            <Icons.Live className="w-4 h-4 mr-2" /> Go Live
-                        </Button>
+                        <div className="flex flex-col items-center">
+                            <Button onClick={() => onGoLive(log.id)} className="bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-900/40 ring-2 ring-amber-500/20">
+                                <Icons.Live className="w-4 h-4 mr-2" /> Go Live
+                            </Button>
+                            {!formData.adventureId && (
+                                <span className="text-xs text-amber-400/70 mt-1">(No adventure linked)</span>
+                            )}
+                        </div>
                     )}
                 </>
             )}

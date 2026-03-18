@@ -61,6 +61,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
     const [showImportantOnly, setShowImportantOnly] = useState(false);
     const [showEndConfirm, setShowEndConfirm] = useState(false);
     const [showDiceRoller, setShowDiceRoller] = useState(false);
+    const [showRecap, setShowRecap] = useState(true);
 
     // Combat Tracker slide-out state
     const [showCombatPanel, setShowCombatPanel] = useState(false);
@@ -342,6 +343,26 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                 <div className="flex-1 overflow-y-auto p-6">
                     {activeScene ? (
                         <div className="max-w-3xl mx-auto space-y-6">
+                            {/* Previously... Recap Banner */}
+                            {showRecap && previousSession?.recap && (
+                                <div className="bg-indigo-900/20 border border-indigo-800/40 rounded-lg p-4 relative">
+                                    <button
+                                        onClick={() => setShowRecap(false)}
+                                        className="absolute top-2 right-2 text-slate-500 hover:text-slate-300"
+                                    >
+                                        <Icons.X className="w-4 h-4" />
+                                    </button>
+                                    <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2">Previously...</h3>
+                                    <p className="text-sm text-indigo-200 leading-relaxed">{previousSession.recap}</p>
+                                    {previousSession.looseEnds && (
+                                        <div className="mt-2 pt-2 border-t border-indigo-800/30">
+                                            <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">Unresolved Threads</h4>
+                                            <p className="text-xs text-amber-200">{previousSession.looseEnds}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             {/* Scene Title */}
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
@@ -526,18 +547,13 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                         </div>
                     )}
 
-                    {/* Prep Notes */}
-                    {sessionLog.prepNotes && (
-                        <div className="p-3 border-t border-slate-800">
-                            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Prep Notes</h3>
-                            <p className="text-xs text-slate-400 leading-relaxed whitespace-pre-wrap">{sessionLog.prepNotes}</p>
-                        </div>
-                    )}
-
-                    {/* Active Plots with Status Tracker */}
-                    {sessionLog.relatedPlotIds.length > 0 && (
-                        <div className="p-3 border-t border-slate-800">
-                            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Active Plots</h3>
+                    {/* Active Plots */}
+                    <div className="p-3 border-t border-slate-800">
+                        <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2">
+                            <Icons.Plot className="w-3 h-3 inline mr-1" />
+                            Active Plots
+                        </h3>
+                        {sessionLog.relatedPlotIds.length > 0 ? (
                             <div className="space-y-2">
                                 {sessionLog.relatedPlotIds.map(plotId => {
                                     const plot = campaign.plots?.find(p => p.id === plotId);
@@ -546,13 +562,13 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                                         <button
                                             key={plot.id}
                                             onClick={() => cyclePlotStatus(plot.id)}
-                                            className="w-full text-left bg-slate-800/50 hover:bg-slate-800 rounded-lg p-2 transition-colors group"
+                                            className="w-full text-left border-l-2 border-amber-600/50 pl-2.5 py-1 hover:bg-slate-800/50 rounded-r transition-colors group"
                                         >
-                                            <div className="flex items-center gap-1.5 mb-1">
-                                                <Icons.Plot className="w-3 h-3 text-amber-500 flex-shrink-0" />
-                                                <span className="text-xs text-slate-300 truncate">{plot.title}</span>
-                                            </div>
-                                            <div className="flex items-center justify-between">
+                                            <p className="text-sm text-amber-200 font-medium">{plot.title}</p>
+                                            {plot.description && (
+                                                <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{plot.description.substring(0, 120)}{plot.description.length > 120 ? '...' : ''}</p>
+                                            )}
+                                            <div className="flex items-center justify-between mt-1">
                                                 {plotStatusBadge(status)}
                                                 <span className="text-[10px] text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity">click to change</span>
                                             </div>
@@ -560,6 +576,16 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                                     ) : null;
                                 })}
                             </div>
+                        ) : (
+                            <p className="text-xs text-slate-600 italic">No plots linked to this session</p>
+                        )}
+                    </div>
+
+                    {/* Prep Notes */}
+                    {sessionLog.prepNotes && (
+                        <div className="p-3 border-t border-slate-800">
+                            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Prep Notes</h3>
+                            <p className="text-xs text-slate-400 leading-relaxed whitespace-pre-wrap">{sessionLog.prepNotes}</p>
                         </div>
                     )}
                 </div>
