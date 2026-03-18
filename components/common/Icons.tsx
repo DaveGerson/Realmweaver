@@ -54,6 +54,7 @@ import {
   ChevronRight,
   Radio,
   Menu,
+  Hash,
 } from 'lucide-react';
 
 export const Icons = {
@@ -110,6 +111,7 @@ export const Icons = {
   ChevronRight,
   Live: Radio,
   Menu,
+  Hash,
 };
 
 export const SceneIcon = ({ type, className }: { type: string, className?: string }) => {

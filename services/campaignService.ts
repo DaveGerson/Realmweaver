@@ -16,7 +16,8 @@ import type {
     Plot,
     Encounter,
     SettingType,
-    Note
+    Note,
+    DiceRoll
 } from '../types/index';
 import { importCampaignFromJson } from './importExportService';
 import { parseCharacterSheetPdf } from './geminiService';
@@ -1249,6 +1250,17 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     content,
                     taggedEntityIds,
                 });
+            });
+        },
+
+        addDiceRollToSession(roll: DiceRoll) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign || !campaign.activeSessionId) return;
+                const session = campaign.sessionLogs?.find(s => s.id === campaign.activeSessionId);
+                if (!session) return;
+                if (!session.diceRolls) session.diceRolls = [];
+                session.diceRolls.push(roll);
             });
         },
 

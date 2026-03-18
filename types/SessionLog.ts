@@ -1,6 +1,7 @@
 
 // types/SessionLog.ts
 import type { Encounter } from './Encounter';
+import type { DiceRoll } from './DiceRoll';
 
 export type SessionStatus = 'planned' | 'active' | 'completed';
 
@@ -35,6 +36,9 @@ export interface SessionLog {
 
   // Combat History
   encounterLog: Encounter[]; // Archived encounters from this session
+
+  // Dice Rolls
+  diceRolls?: DiceRoll[];
 
   // Post-Session
   recap: string;

@@ -5,6 +5,7 @@ import { Icons } from '../common/Icons';
 import { SceneIcon } from '../common/Icons';
 import { twMerge } from 'tailwind-merge';
 import { campaignService } from '../../services/campaignService';
+import { DiceRoller } from '../tools/DiceRoller';
 
 interface SessionRunnerProps {
     campaign: Campaign;
@@ -23,6 +24,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
 }) => {
     const [noteInput, setNoteInput] = useState('');
     const [showEndConfirm, setShowEndConfirm] = useState(false);
+    const [showDiceRoller, setShowDiceRoller] = useState(false);
 
     const adventure = useMemo(() =>
         sessionLog.adventureId
@@ -305,10 +307,17 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                             <Icons.Combat className="w-4 h-4 text-red-400" />
                             Combat Tracker
                         </button>
-                        <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm transition-colors">
+                        <button
+                            onClick={() => setShowDiceRoller(p => !p)}
+                            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm transition-colors"
+                        >
                             <Icons.Dice className="w-4 h-4 text-amber-400" />
-                            Dice / Tables
+                            Dice Roller
+                            <Icons.ChevronDown className={twMerge("w-3 h-3 ml-auto text-slate-500 transition-transform", showDiceRoller && "rotate-180")} />
                         </button>
+                        {showDiceRoller && (
+                            <DiceRoller onLogRoll={(roll) => campaignService.addDiceRollToSession(roll)} />
+                        )}
                     </div>
 
                     {/* Prep Notes */}

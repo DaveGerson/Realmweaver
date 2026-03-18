@@ -18,3 +18,4 @@ export * from './Encounter';
 export * from './RealmChat';
 export * from './Graph';
 export * from './Note';
+export * from './DiceRoll';
