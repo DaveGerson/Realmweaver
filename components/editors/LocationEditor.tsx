@@ -231,7 +231,7 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
       <header className="flex justify-between items-start">
         <div className="space-y-2">
-            <div className="flex items-center gap-3 text-indigo-400">
+            <div className="flex items-center gap-3 text-amber-400">
               <Icons.Locations className="w-8 h-8" />
               <h1 className="text-3xl font-bold font-serif text-slate-100">Location Editor</h1>
             </div>
@@ -245,7 +245,7 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
       <div className="space-y-6 bg-slate-900/50 p-6 rounded-xl border border-slate-800/50">
         <div>
           <label className="block text-sm font-medium text-slate-400 mb-1.5">Location Name</label>
-          <input type="text" name="name" value={formData.name} onChange={handleChange} onBlur={handleBlur} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-600"/>
+          <input type="text" name="name" value={formData.name} onChange={handleChange} onBlur={handleBlur} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600"/>
         </div>
 
         <AiTextarea label="Description" name="description" value={formData.description} onChange={handleChange} onBlur={handleBlur} rows={5} onAiGenerate={() => handleAiGenerate('description')} isGenerating={isGenerating === 'description'} />
@@ -270,13 +270,13 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                   value={item.description}
                   onChange={(e) => handleLootItemChange(item.id, 'description', e.target.value)}
                   onBlur={handleLootBlur}
-                  className="flex-grow bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="flex-grow bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500"
                 />
                 <select
                   value={item.pointOfInterestId || 'none'}
                   onChange={(e) => handleLootItemChange(item.id, 'pointOfInterestId', e.target.value)}
                   onBlur={handleLootBlur}
-                  className="w-1/3 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-1/3 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500"
                 >
                   <option value="none">-- General Location --</option>
                   {(formData.pointsOfInterest || []).map(poi => (
@@ -286,7 +286,7 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                 <button 
                   onClick={() => handleGeneratePoi(item)} 
                   disabled={generatingPoiFor === item.id || !item.description}
-                  className="text-indigo-400 hover:text-indigo-300 p-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed group relative"
+                  className="text-amber-400 hover:text-amber-300 p-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed group relative"
                   aria-label="Generate Point of Interest from loot"
                 >
                   {generatingPoiFor === item.id ? <Icons.Sparkles className="w-4 h-4 animate-spin" /> : <Icons.Sparkles className="w-4 h-4" />}
@@ -338,9 +338,9 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                 {(formData.connections || []).map((conn) => (
                     <div key={conn.id} className="flex items-center gap-2 bg-slate-950/50 p-2 rounded-md border border-slate-800/50">
                         <Icons.Link className="w-4 h-4 text-slate-500 flex-shrink-0" />
-                        <input type="text" placeholder="Description of connection" value={conn.description} onChange={(e) => handleConnectionChange(conn.id, 'description', e.target.value)} onBlur={handleConnectionsBlur} className="w-1/2 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500" />
+                        <input type="text" placeholder="Description of connection" value={conn.description} onChange={(e) => handleConnectionChange(conn.id, 'description', e.target.value)} onBlur={handleConnectionsBlur} className="w-1/2 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500" />
                         <span className="text-slate-500">→</span>
-                        <select value={conn.targetLocationId} onChange={(e) => handleConnectionChange(conn.id, 'targetLocationId', e.target.value)} onBlur={handleConnectionsBlur} className="flex-grow bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500">
+                        <select value={conn.targetLocationId} onChange={(e) => handleConnectionChange(conn.id, 'targetLocationId', e.target.value)} onBlur={handleConnectionsBlur} className="flex-grow bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500">
                             <option value="">-- Select Target --</option>
                             {possibleConnectionTargets.map(loc => (<option key={loc.id} value={loc.id}>{loc.name}</option>))}
                         </select>
@@ -364,14 +364,14 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-800">
             <div>
                 <label className="block text-sm font-medium text-slate-400 mb-1.5">Parent Location</label>
-                <select name="parentLocationId" value={formData.parentLocationId || "none"} onChange={handleParentChange} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all">
+                <select name="parentLocationId" value={formData.parentLocationId || "none"} onChange={handleParentChange} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all">
                     <option value="none">-- None --</option>
                     {possibleParents.map(loc => (<option key={loc.id} value={loc.id}>{loc.name}</option>))}
                 </select>
             </div>
              <div>
                 <label className="block text-sm font-medium text-slate-400 mb-1.5">Controlling Faction</label>
-                <select name="controllingFactionId" value={formData.controllingFactionId || "none"} onChange={handleFactionChange} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all">
+                <select name="controllingFactionId" value={formData.controllingFactionId || "none"} onChange={handleFactionChange} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all">
                     <option value="none">-- None --</option>
                     {allFactions.map(f => (<option key={f.id} value={f.id}>{f.name}</option>))}
                 </select>
@@ -410,7 +410,7 @@ const PointOfInterestEditor: React.FC<PointOfInterestEditorProps> = ({ poi, onDe
             <header className="flex items-center justify-between p-2 bg-slate-800/30 rounded-t-lg">
                 <button onClick={() => setIsExpanded(p => !p)} className="flex items-center gap-2 flex-grow text-left">
                     <Icons.ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
-                    <Icons.Puzzle className="w-4 h-4 text-indigo-400" />
+                    <Icons.Puzzle className="w-4 h-4 text-amber-400" />
                     <span className="font-semibold text-slate-200">{poi.name}</span>
                 </button>
                 <div className="flex items-center gap-2">
@@ -423,16 +423,16 @@ const PointOfInterestEditor: React.FC<PointOfInterestEditorProps> = ({ poi, onDe
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="md:col-span-2">
                             <label className="block text-xs font-medium text-slate-400 mb-1">Name</label>
-                            <input type="text" value={poi.name} onChange={e => onChange(poi.id, 'name', e.target.value)} onBlur={onBlur} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500" />
+                            <input type="text" value={poi.name} onChange={e => onChange(poi.id, 'name', e.target.value)} onBlur={onBlur} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500" />
                         </div>
                         <div>
                             <label className="block text-xs font-medium text-slate-400 mb-1">Passive Perception</label>
-                            <input type="number" value={poi.passivePerceptionDC} onChange={e => onChange(poi.id, 'passivePerceptionDC', parseInt(e.target.value) || 10)} onBlur={onBlur} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500" />
+                            <input type="number" value={poi.passivePerceptionDC} onChange={e => onChange(poi.id, 'passivePerceptionDC', parseInt(e.target.value) || 10)} onBlur={onBlur} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500" />
                         </div>
                     </div>
                     <div>
                         <label className="block text-xs font-medium text-slate-400 mb-1">Description (Read-Aloud)</label>
-                        <textarea value={poi.description} onChange={e => onChange(poi.id, 'description', e.target.value)} onBlur={onBlur} rows={3} placeholder="What players notice if they meet the passive perception DC." className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500 resize-y" />
+                        <textarea value={poi.description} onChange={e => onChange(poi.id, 'description', e.target.value)} onBlur={onBlur} rows={3} placeholder="What players notice if they meet the passive perception DC." className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500 resize-y" />
                     </div>
                     
                     <PoiSubSection
@@ -486,10 +486,10 @@ const PoiSubSection: React.FC<PoiSubSectionProps> = ({ title, items, onAdd, onDe
             {items.map(item => (
                 <div key={item.id} className="bg-slate-900/50 p-2 rounded-md border border-slate-700/50 space-y-1.5">
                     <div className="flex items-start gap-2">
-                        <textarea value={item.description} onChange={e => onChange(item.id, 'description', e.target.value)} onBlur={onBlur} rows={2} placeholder={descriptionPlaceholder} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm resize-y outline-none focus:ring-1 focus:ring-indigo-500" />
+                        <textarea value={item.description} onChange={e => onChange(item.id, 'description', e.target.value)} onBlur={onBlur} rows={2} placeholder={descriptionPlaceholder} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm resize-y outline-none focus:ring-1 focus:ring-amber-500" />
                         <button onClick={() => onDelete(item.id)} className="p-1 text-slate-500 hover:text-red-400 mt-1"><Icons.Trash className="w-3.5 h-3.5" /></button>
                     </div>
-                    <textarea value={item.outcome} onChange={e => onChange(item.id, 'outcome', e.target.value)} onBlur={onBlur} rows={2} placeholder={outcomePlaceholder} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm resize-y outline-none focus:ring-1 focus:ring-indigo-500" />
+                    <textarea value={item.outcome} onChange={e => onChange(item.id, 'outcome', e.target.value)} onBlur={onBlur} rows={2} placeholder={outcomePlaceholder} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm resize-y outline-none focus:ring-1 focus:ring-amber-500" />
                 </div>
             ))}
             {items.length === 0 && <p className="text-xs text-slate-600 italic px-2 py-1">{emptyText}</p>}

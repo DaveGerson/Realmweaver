@@ -392,17 +392,17 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                         <div className="max-w-3xl mx-auto space-y-6">
                             {/* Previously... Recap Banner */}
                             {showRecap && previousSession?.recap && (
-                                <div className="bg-indigo-900/20 border border-indigo-800/40 rounded-lg p-4 relative">
+                                <div className="bg-stone-800/40 border border-stone-700/40 rounded-lg p-4 relative">
                                     <button
                                         onClick={() => setShowRecap(false)}
                                         className="absolute top-2 right-2 text-slate-500 hover:text-slate-300"
                                     >
                                         <Icons.X className="w-4 h-4" />
                                     </button>
-                                    <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2">Previously...</h3>
-                                    <p className="text-sm text-indigo-200 leading-relaxed">{previousSession.recap}</p>
+                                    <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2">Previously...</h3>
+                                    <p className="text-sm text-slate-300 leading-relaxed">{previousSession.recap}</p>
                                     {previousSession.looseEnds && (
-                                        <div className="mt-2 pt-2 border-t border-indigo-800/30">
+                                        <div className="mt-2 pt-2 border-t border-stone-700/30">
                                             <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">Unresolved Threads</h4>
                                             <p className="text-xs text-amber-200">{previousSession.looseEnds}</p>
                                         </div>
@@ -471,7 +471,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                                                     <div className="flex items-center gap-2">
                                                         <p className="text-white font-semibold text-sm">{npc.name}</p>
                                                         {faction && (
-                                                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 uppercase font-bold">{faction.name}</span>
+                                                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 uppercase font-bold">{faction.name}</span>
                                                         )}
                                                     </div>
                                                     {npc.traits && <p className="text-slate-400 text-xs mt-1">{npc.traits}</p>}
@@ -832,7 +832,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                                 className={twMerge(
                                     "text-xs px-2 py-0.5 rounded-md transition-colors border",
                                     noteTags.includes(tag)
-                                        ? "bg-indigo-900/40 text-indigo-300 border-indigo-600/50"
+                                        ? "bg-amber-900/40 text-amber-300 border-amber-600/50"
                                         : "bg-slate-800 text-slate-500 border-slate-700 hover:text-slate-400 hover:border-slate-600"
                                 )}
                             >
@@ -847,12 +847,12 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                             onChange={(e) => setNoteInput(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Enter') handleAddNote(); }}
                             placeholder="Add a quick note..."
-                            className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                            className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
                         />
                         <button
                             onClick={handleAddNote}
                             disabled={!noteInput.trim()}
-                            className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm transition-colors"
+                            className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm transition-colors"
                         >
                             Add
                         </button>

@@ -15,7 +15,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ onClose, onExportJson,
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl animate-in fade-in zoom-in-95 duration-300 relative">
         <header className="flex items-center justify-between p-4 border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <Icons.FileDown className="w-6 h-6 text-indigo-400" />
+            <Icons.FileDown className="w-6 h-6 text-amber-400" />
             <h2 className="text-lg font-bold font-serif">Export Campaign</h2>
           </div>
           <button onClick={onClose} className="p-1 rounded-md hover:bg-slate-800 text-slate-400 hover:text-white transition-colors" aria-label="Close">
@@ -47,10 +47,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({ onClose, onExportJson,
 const ExportOption: React.FC<{ icon: React.ElementType, title: string, description: string, onClick: () => void }> = ({ icon: Icon, title, description, onClick }) => (
     <button
         onClick={onClick}
-        className="p-6 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 rounded-lg text-left transition-all hover:border-indigo-500/50 hover:ring-2 hover:ring-indigo-500/20"
+        className="p-6 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 rounded-lg text-left transition-all hover:border-amber-500/50 hover:ring-2 hover:ring-amber-500/20"
     >
         <div className="flex items-center gap-4">
-            <Icon className="w-8 h-8 text-indigo-400 flex-shrink-0" />
+            <Icon className="w-8 h-8 text-amber-400 flex-shrink-0" />
             <div>
                 <h3 className="font-semibold text-slate-100">{title}</h3>
                 <p className="text-sm text-slate-400 mt-1">{description}</p>

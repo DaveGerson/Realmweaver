@@ -27,17 +27,18 @@ export const ItemDashboard: React.FC<ItemDashboardProps> = ({ items, onItemCreat
               <button
                 key={item.id}
                 onClick={() => onSelectItem(item.id)}
-                className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 text-left hover:bg-slate-800 hover:border-indigo-600/50 transition-all space-y-2"
+                className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 border-l-4 border-l-sky-500 text-left hover:bg-slate-800 hover:border-slate-700 hover:border-l-sky-400 transition-all space-y-2"
               >
-                <h3 className="font-semibold text-indigo-400">{item.name}</h3>
+                <h3 className="font-semibold text-sky-400">{item.name}</h3>
                 <p className="text-sm text-slate-400 line-clamp-2">{item.description}</p>
                 <span className="text-xs bg-slate-700 text-slate-300 rounded-full px-2 py-0.5 capitalize">{item.rarity}</span>
               </button>
             ))}
             {items.length === 0 && (
-                <div className="md:col-span-2 text-center py-10 text-slate-500">
-                    <Icons.Items className="w-12 h-12 mx-auto mb-2" />
-                    <p>No items created yet. Use the generator to forge some magical artifacts!</p>
+                <div className="md:col-span-2 text-center py-16">
+                    <Icons.Items className="w-16 h-16 mx-auto mb-4 text-slate-700" />
+                    <p className="text-lg font-serif text-slate-400 mb-2">Every hero needs the right tools for the quest</p>
+                    <p className="text-sm text-slate-600">Use the generator to forge magical artifacts, cursed relics, and mundane gear.</p>
                 </div>
             )}
           </div>

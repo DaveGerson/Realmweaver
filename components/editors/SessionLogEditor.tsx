@@ -369,7 +369,7 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
       <header className="flex justify-between items-center mb-6 flex-shrink-0">
         <div className="space-y-1">
             <div className="flex items-center gap-3">
-              <Icons.SessionLog className={`w-8 h-8 ${formData.status === 'active' ? 'text-green-400' : 'text-indigo-400'}`} />
+              <Icons.SessionLog className={`w-8 h-8 ${formData.status === 'active' ? 'text-green-400' : 'text-amber-400'}`} />
               <div>
                   <input
                     type="text"
@@ -377,12 +377,12 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
                     value={formData.title}
                     onChange={handleChange}
                     onBlur={handleBlur}
-                    className="bg-transparent text-3xl font-bold font-serif text-slate-100 outline-none focus:border-b border-indigo-500 placeholder:text-slate-600 w-full"
+                    className="bg-transparent text-3xl font-bold font-serif text-slate-100 outline-none focus:border-b border-amber-500 placeholder:text-slate-600 w-full"
                   />
                   <div className="flex items-center gap-3 text-xs">
                       <span className={`uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
                           formData.status === 'active' ? 'bg-green-900 text-green-300' : 
-                          formData.status === 'planned' ? 'bg-indigo-900 text-indigo-300' : 'bg-slate-800 text-slate-400'
+                          formData.status === 'planned' ? 'bg-amber-900 text-amber-300' : 'bg-slate-800 text-slate-400'
                       }`}>
                           {formData.status === 'active' ? 'Session Active' : formData.status}
                       </span>
@@ -502,7 +502,7 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
                             setFormData(prev => ({...prev, adventureId: e.target.value}));
                             onUpdate(log.id, { adventureId: e.target.value });
                         }}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 outline-none mb-4"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-amber-500 outline-none mb-4"
                     >
                         <option value="">-- Independent Session --</option>
                         {campaign.adventures.map(adv => (
@@ -520,10 +520,10 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
                                             type="checkbox" 
                                             checked={formData.plannedSceneIds?.includes(scene.id)} 
                                             onChange={() => handleSceneToggle(scene.id)}
-                                            className="rounded border-slate-600 bg-slate-800 text-indigo-600 focus:ring-indigo-500 mr-3"
+                                            className="rounded border-slate-600 bg-slate-800 text-amber-600 focus:ring-amber-500 mr-3"
                                         />
                                         <SceneIcon type={scene.type} className="text-slate-500" />
-                                        <span className={`text-sm ${formData.plannedSceneIds?.includes(scene.id) ? 'text-indigo-300 font-medium' : 'text-slate-400'}`}>
+                                        <span className={`text-sm ${formData.plannedSceneIds?.includes(scene.id) ? 'text-amber-300 font-medium' : 'text-slate-400'}`}>
                                             {scene.title}
                                         </span>
                                     </label>
@@ -543,10 +543,10 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
                                     type="checkbox" 
                                     checked={formData.relatedPlotIds?.includes(plot.id)} 
                                     onChange={() => handlePlotToggle(plot.id)}
-                                    className="rounded border-slate-600 bg-slate-800 text-indigo-600 focus:ring-indigo-500 mr-3"
+                                    className="rounded border-slate-600 bg-slate-800 text-amber-600 focus:ring-amber-500 mr-3"
                                 />
-                                <Icons.Plot className="w-4 h-4 text-indigo-400 mr-2" />
-                                <span className={`text-sm ${formData.relatedPlotIds?.includes(plot.id) ? 'text-indigo-300 font-medium' : 'text-slate-400'}`}>
+                                <Icons.Plot className="w-4 h-4 text-amber-400 mr-2" />
+                                <span className={`text-sm ${formData.relatedPlotIds?.includes(plot.id) ? 'text-amber-300 font-medium' : 'text-slate-400'}`}>
                                     {plot.title}
                                 </span>
                             </label>
@@ -573,18 +573,18 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
           <div className="w-2/3 flex flex-col space-y-6 overflow-y-auto custom-scrollbar pr-2">
               
               {/* Notes Tabs */}
-              <div className={`flex-grow flex flex-col transition-all ${formData.status === 'active' ? 'bg-indigo-900/10 border-indigo-500/30' : 'bg-slate-900/50 border-slate-800/50'} p-4 rounded-xl border h-[500px]`}>
+              <div className={`flex-grow flex flex-col transition-all ${formData.status === 'active' ? 'bg-amber-900/10 border-amber-500/30' : 'bg-slate-900/50 border-slate-800/50'} p-4 rounded-xl border h-[500px]`}>
                   <div className="flex justify-between items-center mb-4">
                       <div className="flex space-x-4">
                           <button 
                             onClick={() => setActiveTab('structured')}
-                            className={twMerge("text-sm font-bold pb-1 border-b-2 transition-colors", activeTab === 'structured' ? "border-indigo-500 text-indigo-300" : "border-transparent text-slate-500 hover:text-slate-300")}
+                            className={twMerge("text-sm font-bold pb-1 border-b-2 transition-colors", activeTab === 'structured' ? "border-amber-500 text-amber-300" : "border-transparent text-slate-500 hover:text-slate-300")}
                           >
                               Log Entries
                           </button>
                           <button 
                             onClick={() => setActiveTab('scratchpad')}
-                            className={twMerge("text-sm font-bold pb-1 border-b-2 transition-colors", activeTab === 'scratchpad' ? "border-indigo-500 text-indigo-300" : "border-transparent text-slate-500 hover:text-slate-300")}
+                            className={twMerge("text-sm font-bold pb-1 border-b-2 transition-colors", activeTab === 'scratchpad' ? "border-amber-500 text-amber-300" : "border-transparent text-slate-500 hover:text-slate-300")}
                           >
                               Scratchpad
                           </button>
@@ -599,7 +599,7 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
                             value={formData.runningNotes + (liveTranscript ? `\n\n[Live Transcription]: ${liveTranscript}` : "")}
                             onChange={handleChange}
                             onBlur={handleBlur}
-                            className="w-full h-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 outline-none resize-none placeholder:text-slate-600 font-mono leading-relaxed pb-12"
+                            className="w-full h-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-amber-500 outline-none resize-none placeholder:text-slate-600 font-mono leading-relaxed pb-12"
                             placeholder="Freeform text area for quick, unstructured notes..."
                         />
                         {isLiveConnected && (
@@ -625,21 +625,21 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
                                     onChange={e => setNewNoteContent(e.target.value)}
                                     onKeyDown={e => e.key === 'Enter' && handleAddNote()}
                                     placeholder="Log an event..."
-                                    className="flex-grow bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 outline-none"
+                                    className="flex-grow bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-amber-500 outline-none"
                                   />
                                   <Button size="sm" onClick={handleAddNote} disabled={!newNoteContent.trim()}>Add</Button>
                               </div>
                               <div className="flex flex-wrap gap-2 items-center">
                                   <span className="text-xs text-slate-500 uppercase font-bold">Tag:</span>
                                   <select 
-                                    className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-slate-300 outline-none focus:border-indigo-500 max-w-[150px]"
+                                    className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-slate-300 outline-none focus:border-amber-500 max-w-[150px]"
                                     onChange={(e) => { if(e.target.value) toggleNoteTag(e.target.value); e.target.value = ""; }}
                                   >
                                       <option value="">Select Entity...</option>
                                       {possibleTags.map(t => <option key={t.id} value={t.id}>{t.name} ({t.type})</option>)}
                                   </select>
                                   {newNoteTags.map(tagId => (
-                                      <span key={tagId} className="flex items-center gap-1 bg-indigo-900/50 text-indigo-300 text-xs px-2 py-0.5 rounded-full border border-indigo-500/30">
+                                      <span key={tagId} className="flex items-center gap-1 bg-amber-900/50 text-amber-300 text-xs px-2 py-0.5 rounded-full border border-amber-500/30">
                                           {getEntityName(tagId)}
                                           <button onClick={() => toggleNoteTag(tagId)} className="hover:text-white"><Icons.X className="w-3 h-3" /></button>
                                       </span>
@@ -696,7 +696,7 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
                         onChange={handleChange} 
                         onBlur={handleBlur} 
                         rows={3} 
-                        className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 outline-none resize-y placeholder:text-slate-600"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-amber-500 outline-none resize-y placeholder:text-slate-600"
                         placeholder="What needs to be resolved next time?"
                     />
                   </div>

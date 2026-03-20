@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import type { Campaign, Article } from '../../types/index';
 import { Icons, SceneIcon } from '../common/Icons';
 import type { EditorView, GeneratorType } from '../../App';
@@ -96,6 +96,28 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
     const [expandedViews, setExpandedViews] = useState<Partial<Record<EditorView, boolean>>>({
         npcs: true,
     });
+    const [filterText, setFilterText] = useState('');
+    const [debouncedFilter, setDebouncedFilter] = useState('');
+    const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const handleFilterChange = useCallback((value: string) => {
+        setFilterText(value);
+        if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
+        filterTimerRef.current = setTimeout(() => {
+            setDebouncedFilter(value.toLowerCase().trim());
+        }, 100);
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
+        };
+    }, []);
+
+    const matchesFilter = useCallback((name: string) => {
+        if (!debouncedFilter) return true;
+        return name.toLowerCase().includes(debouncedFilter);
+    }, [debouncedFilter]);
 
     const toggleAdventure = (adventureId: string) => {
         setExpandedAdventures(prev => ({ ...prev, [adventureId]: !prev[adventureId] }));
@@ -129,14 +151,14 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
         e.dataTransfer.dropEffect = 'move';
         const target = (e.target as HTMLElement).closest('button');
         if (target) {
-            target.classList.add('border-t-2', 'border-indigo-500', '-mt-0.5');
+            target.classList.add('border-t-2', 'border-amber-500', '-mt-0.5');
         }
     };
 
     const handleDragLeave = (e: React.DragEvent) => {
         const target = (e.target as HTMLElement).closest('button');
         if (target) {
-            target.classList.remove('border-t-2', 'border-indigo-500', '-mt-0.5');
+            target.classList.remove('border-t-2', 'border-amber-500', '-mt-0.5');
         }
     };
 
@@ -154,7 +176,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
 
     const handleDragEnd = (e: React.DragEvent) => {
         (e.target as HTMLElement).classList.remove('opacity-50');
-        document.querySelectorAll('.border-indigo-500').forEach(el => el.classList.remove('border-t-2', 'border-indigo-500', '-mt-0.5'));
+        document.querySelectorAll('.border-amber-500').forEach(el => el.classList.remove('border-t-2', 'border-amber-500', '-mt-0.5'));
     };
 
 
@@ -173,6 +195,29 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
     ];
     
     const topLevelArticles = campaign.articles.filter(a => !a.parentArticleId);
+
+    // --- Filtered lists for search ---
+    const filteredSessionLogs = (campaign.sessionLogs || [])
+        .filter(s => matchesFilter(s.title))
+        .sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime());
+    const filteredPlayerCharacters = (campaign.playerCharacters || []).filter(pc => matchesFilter(pc.characterSocial.characterName));
+    const filteredPlots = (campaign.plots || []).filter(p => matchesFilter(p.title));
+    const filteredAdventures = campaign.adventures.filter(a => {
+        if (matchesFilter(a.title)) return true;
+        return a.scenes.some(s => matchesFilter(s.title));
+    });
+    const filteredTopLevelArticles = debouncedFilter
+        ? campaign.articles.filter(a => matchesFilter(a.title))
+        : topLevelArticles;
+    const filteredEntityGroups = entityGroups.map(group => ({
+        ...group,
+        items: group.items.filter(item => matchesFilter(item.name)),
+    }));
+
+    // Determine if entire buckets should be hidden
+    const hasCampaignStateItems = !debouncedFilter || filteredSessionLogs.length > 0 || filteredPlayerCharacters.length > 0 || filteredPlots.length > 0;
+    const hasStorylineItems = !debouncedFilter || filteredAdventures.length > 0;
+    const hasWorldPlanningItems = !debouncedFilter || filteredTopLevelArticles.length > 0 || filteredEntityGroups.some(g => g.items.length > 0);
 
     return (
         <aside className="w-full h-full bg-slate-900 flex-shrink-0 flex flex-col border-r border-slate-800">
@@ -205,10 +250,34 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                     ) : null;
                 })()}
 
+                {/* --- Search/Filter --- */}
+                <div className="mb-3 px-1">
+                    <div className="relative">
+                        <Icons.Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+                        <input
+                            type="text"
+                            value={filterText}
+                            onChange={(e) => handleFilterChange(e.target.value)}
+                            placeholder="Filter entities..."
+                            className="w-full bg-slate-800 border border-slate-700 rounded-md pl-8 pr-7 py-1.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-500 focus:border-slate-500"
+                        />
+                        {filterText && (
+                            <button
+                                onClick={() => { setFilterText(''); setDebouncedFilter(''); }}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                            >
+                                <Icons.X className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                    </div>
+                </div>
+
                 {/* --- Bucket 1: Campaign State (Maintenance & History) --- */}
+                {hasCampaignStateItems && (
                 <div className="mb-6">
                     <NavHeader label="Campaign State" />
 
+                    {(!debouncedFilter || filteredSessionLogs.length > 0) && (
                     <div className="space-y-1">
                         <NavItem
                             label="Session Timeline"
@@ -217,7 +286,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                             onClick={() => onSelectView('session-logs')}
                         />
                         <div className="pl-4 border-l border-slate-700 ml-5 space-y-1">
-                            {(campaign.sessionLogs || []).sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime()).slice(0, 5).map(log => (
+                            {filteredSessionLogs.slice(0, debouncedFilter ? undefined : 5).map(log => (
                                 <button
                                     key={log.id}
                                     onClick={() => onSelect('session-log', log.id)}
@@ -230,19 +299,21 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                                     {log.title}
                                 </button>
                             ))}
-                            {(campaign.sessionLogs || []).length > 5 && (
+                            {!debouncedFilter && (campaign.sessionLogs || []).length > 5 && (
                                 <button onClick={() => onSelectView('session-logs')} className="text-xs text-slate-500 hover:text-slate-300 pl-2">View all logs...</button>
                             )}
                         </div>
                     </div>
+                    )}
 
+                    {(!debouncedFilter || filteredPlayerCharacters.length > 0) && (
                     <div className="space-y-1 mt-1">
                         <div className="flex items-center justify-between px-3 py-2 group">
                             <button
                             onClick={() => onSelectView('player-characters')}
                             className={twMerge(
                                 'flex items-center gap-3 text-sm transition-colors w-full',
-                                activeView === 'player-characters' ? 'text-indigo-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
+                                activeView === 'player-characters' ? 'text-amber-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
                             )}
                             >
                             <Icons.PlayerCharacters className="w-4 h-4" />
@@ -253,7 +324,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                             </button>
                         </div>
                         <div className="pl-4 border-l border-slate-700 ml-5 space-y-1">
-                            {(campaign.playerCharacters || []).map(pc => (
+                            {filteredPlayerCharacters.map(pc => (
                                 <button
                                     key={pc.id}
                                     onClick={() => onSelect('player-character', pc.id)}
@@ -268,21 +339,25 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                             ))}
                         </div>
                     </div>
+                    )}
 
+                    {!debouncedFilter && (
                     <NavItem
                         label="Combat Tracker"
                         icon="Combat"
                         active={activeView === 'combat'}
                         onClick={() => onSelectView('combat')}
                     />
+                    )}
 
+                    {(!debouncedFilter || filteredPlots.length > 0) && (
                     <div className="space-y-1 mt-1">
                         <div className="flex items-center justify-between px-3 py-2 group">
                             <button
                             onClick={() => onSelectView('plots')}
                             className={twMerge(
                                 'flex items-center gap-3 text-sm transition-colors w-full',
-                                activeView === 'plots' ? 'text-indigo-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
+                                activeView === 'plots' ? 'text-amber-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
                             )}
                             >
                             <Icons.Plot className="w-4 h-4" />
@@ -293,7 +368,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                             </button>
                         </div>
                         <div className="pl-4 border-l border-slate-700 ml-5 space-y-0.5">
-                            {(campaign.plots || []).map(plot => (
+                            {filteredPlots.map(plot => (
                                 <button
                                     key={plot.id}
                                     onClick={() => onSelect('plot', plot.id)}
@@ -309,19 +384,24 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                             ))}
                         </div>
                     </div>
+                    )}
 
+                    {!debouncedFilter && (
                     <NavItem
                         label="World Graph"
                         icon="Coach"
                         active={activeView === 'relationships'}
                         onClick={() => onSelectView('relationships')}
                     />
+                    )}
                 </div>
+                )}
 
                 {/* --- Bucket 2: Storylines --- */}
+                {hasStorylineItems && (
                 <div className="mb-6">
                     <NavHeader label="Storylines" />
-                    
+
                     {/* Adventures */}
                     <div className="space-y-1">
                         <div className="flex items-center justify-between px-3 py-2 group">
@@ -329,7 +409,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                             onClick={() => onSelectView('adventures')}
                             className={twMerge(
                                 'flex items-center gap-3 text-sm transition-colors w-full',
-                                activeView === 'adventures' ? 'text-indigo-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
+                                activeView === 'adventures' ? 'text-amber-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
                             )}
                             >
                             <Icons.Adventures className="w-4 h-4" />
@@ -340,7 +420,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                             </button>
                         </div>
                         <div className="pl-4 border-l border-slate-700 ml-5 space-y-1">
-                            {campaign.adventures.map(adventure => (
+                            {filteredAdventures.map(adventure => (
                                 <div key={adventure.id}>
                                     <div className="flex items-center justify-between group">
                                         <button onClick={() => toggleAdventure(adventure.id)} className="p-1 -ml-3 mr-1 text-slate-500 hover:text-slate-300">
@@ -360,9 +440,9 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                                             <Icons.Plus className="w-4 h-4" />
                                         </button>
                                     </div>
-                                    {expandedAdventures[adventure.id] && (
+                                    {(expandedAdventures[adventure.id] || !!debouncedFilter) && (
                                         <div className="pl-5 mt-1 pt-1 border-l border-slate-700 ml-2 space-y-0.5">
-                                            {adventure.scenes.map(scene => (
+                                            {adventure.scenes.filter(s => matchesFilter(s.title) || matchesFilter(adventure.title)).map(scene => (
                                                 <button
                                                     key={scene.id}
                                                     draggable="true"
@@ -389,26 +469,31 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                         </div>
                     </div>
                 </div>
+                )}
 
                 {/* --- Bucket 3: World Planning (Future & Static) --- */}
+                {hasWorldPlanningItems && (
                 <div className="mb-6">
                     <NavHeader label="World Planning" />
-                    
+
                     {/* Setting & Lore */}
+                    {!debouncedFilter && (
                     <NavItem
                         label="Setting Overview"
                         icon="Setting"
                         active={activeView === 'setting'}
                         onClick={() => onSelectView('setting')}
                     />
-                    
+                    )}
+
+                    {(!debouncedFilter || filteredTopLevelArticles.length > 0) && (
                     <div className="space-y-1">
                         <div className="flex items-center justify-between px-3 py-2 group">
                             <button
                                 onClick={() => onSelectView('lorebook')}
                                 className={twMerge(
                                     'flex items-center gap-3 text-sm transition-colors w-full',
-                                    activeView === 'lorebook' ? 'text-indigo-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
+                                    activeView === 'lorebook' ? 'text-amber-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
                                 )}
                             >
                                 <Icons.FileCode className="w-4 h-4" />
@@ -419,24 +504,41 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                             </button>
                         </div>
                         <div className="pl-4 border-l border-slate-700 ml-5 space-y-0.5">
-                            {topLevelArticles.map(article => (
-                                <ArticleTreeItem
-                                    key={article.id}
-                                    article={article}
-                                    allArticles={campaign.articles}
-                                    selectedId={selectedIds.article}
-                                    onSelect={(id) => onSelect('article', id)}
-                                    expandedArticles={expandedArticles}
-                                    toggleArticle={toggleArticle}
-                                />
+                            {filteredTopLevelArticles.map(article => (
+                                debouncedFilter ? (
+                                    <button
+                                        key={article.id}
+                                        onClick={() => onSelect('article', article.id)}
+                                        className={twMerge(
+                                            'w-full text-left text-sm truncate px-2 py-1.5 rounded-md flex items-center transition-all duration-100 min-w-0',
+                                            selectedIds.article === article.id ? 'bg-slate-700 text-white' : 'hover:bg-slate-800 text-slate-400'
+                                        )}
+                                        title={article.title}
+                                    >
+                                        <Icons.Scenes className="w-4 h-4 mr-2 flex-shrink-0"/>
+                                        <span className="truncate">{article.title}</span>
+                                    </button>
+                                ) : (
+                                    <ArticleTreeItem
+                                        key={article.id}
+                                        article={article}
+                                        allArticles={campaign.articles}
+                                        selectedId={selectedIds.article}
+                                        onSelect={(id) => onSelect('article', id)}
+                                        expandedArticles={expandedArticles}
+                                        toggleArticle={toggleArticle}
+                                    />
+                                )
                             ))}
                         </div>
                     </div>
+                    )}
 
                     {/* Entities */}
-                    {entityGroups.map(group => {
+                    {filteredEntityGroups.map(group => {
+                        if (debouncedFilter && group.items.length === 0) return null;
                         const Icon = Icons[group.icon];
-                        const isExpanded = isViewExpanded(group.view);
+                        const isExpanded = debouncedFilter ? true : isViewExpanded(group.view);
                         return (
                             <div key={group.view} className="space-y-1">
                                 <div className="flex items-center justify-between group">
@@ -444,7 +546,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                                         onClick={() => { onSelectView(group.view); toggleView(group.view); }}
                                         className={twMerge(
                                             'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors',
-                                            activeView === group.view ? 'bg-indigo-600/20 text-indigo-300' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                                            activeView === group.view ? 'bg-amber-600/20 text-amber-300' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
                                         )}
                                     >
                                         <Icon className="w-4 h-4" /> <span>{group.label}</span>
@@ -475,6 +577,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                         );
                     })}
                 </div>
+                )}
             </nav>
         </aside>
     );
@@ -486,7 +589,7 @@ const NavHeader = ({ label }: { label: string }) => <h3 className="px-3 pt-4 pb-
 const NavItem = ({ icon, label, active, onClick }: { icon: keyof typeof Icons, label: string, active: boolean, onClick: () => void }) => {
   const Icon = Icons[icon];
   return (
-    <button onClick={onClick} className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${active ? 'bg-indigo-600/20 text-indigo-300' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}>
+    <button onClick={onClick} className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${active ? 'bg-amber-600/20 text-amber-300' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}>
       <Icon className="w-4 h-4" /> <span>{label}</span>
     </button>
   );

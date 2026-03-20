@@ -29,16 +29,17 @@ export const FactionDashboard: React.FC<FactionDashboardProps> = ({ factions, np
               <button
                 key={faction.id}
                 onClick={() => onSelectFaction(faction.id)}
-                className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 text-left hover:bg-slate-800 hover:border-indigo-600/50 transition-all space-y-2"
+                className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 border-l-4 border-l-violet-500 text-left hover:bg-slate-800 hover:border-slate-700 hover:border-l-violet-400 transition-all space-y-2"
               >
-                <h3 className="font-semibold text-indigo-400">{faction.name}</h3>
+                <h3 className="font-semibold text-violet-400">{faction.name}</h3>
                 <p className="text-sm text-slate-400 line-clamp-2">{faction.description}</p>
               </button>
             ))}
             {factions.length === 0 && (
-                <div className="md:col-span-2 text-center py-10 text-slate-500">
-                    <Icons.Factions className="w-12 h-12 mx-auto mb-2" />
-                    <p>No factions created yet. Use the generator to create organizations for your world!</p>
+                <div className="md:col-span-2 text-center py-16">
+                    <Icons.Factions className="w-16 h-16 mx-auto mb-4 text-slate-700" />
+                    <p className="text-lg font-serif text-slate-400 mb-2">Power structures shape every world</p>
+                    <p className="text-sm text-slate-600">Use the generator to forge guilds, cults, and noble houses.</p>
                 </div>
             )}
           </div>

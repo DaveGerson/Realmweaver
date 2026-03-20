@@ -26,17 +26,18 @@ export const PlayerCharacterDashboard: React.FC<PlayerCharacterDashboardProps> =
               <button 
                 key={pc.id} 
                 onClick={() => onSelectPlayerCharacter(pc.id)}
-                className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 text-left hover:bg-slate-800 hover:border-indigo-600/50 transition-all space-y-2"
+                className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 border-l-4 border-l-teal-500 text-left hover:bg-slate-800 hover:border-slate-700 hover:border-l-teal-400 transition-all space-y-2"
               >
-                <h3 className="font-semibold text-indigo-400">{pc.characterSocial.characterName}</h3>
+                <h3 className="font-semibold text-teal-400">{pc.characterSocial.characterName}</h3>
                 <p className="text-sm text-slate-400">{pc.characterStatistics.classes.charClass} {pc.characterStatistics.classes.level} / {pc.characterSocial.species}</p>
                  <p className="text-xs text-slate-500">Player: {pc.playerName}</p>
               </button>
             ))}
             {(!playerCharacters || playerCharacters.length === 0) && (
-                <div className="md:col-span-2 text-center py-10 text-slate-500">
-                    <Icons.PlayerCharacters className="w-12 h-12 mx-auto mb-2" />
-                    <p>No player characters added yet. Import a character sheet to get started!</p>
+                <div className="md:col-span-2 text-center py-16">
+                    <Icons.PlayerCharacters className="w-16 h-16 mx-auto mb-4 text-slate-700" />
+                    <p className="text-lg font-serif text-slate-400 mb-2">Your adventuring party awaits assembly</p>
+                    <p className="text-sm text-slate-600">Import character sheets to track your players' heroes.</p>
                 </div>
             )}
           </div>

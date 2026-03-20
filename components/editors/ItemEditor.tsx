@@ -67,7 +67,7 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onUpdate, onDelete
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
       <header className="flex justify-between items-start">
         <div className="space-y-2">
-            <div className="flex items-center gap-3 text-indigo-400">
+            <div className="flex items-center gap-3 text-amber-400">
               <Icons.Items className="w-8 h-8" />
               <h1 className="text-3xl font-bold font-serif text-slate-100">Item Editor</h1>
             </div>
@@ -88,7 +88,7 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onUpdate, onDelete
                 value={formData.name}
                 onChange={handleChange}
                 onBlur={handleBlur}
-                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-600"
+                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600"
               />
             </div>
             <div>
@@ -97,7 +97,7 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onUpdate, onDelete
                     name="rarity"
                     value={formData.rarity}
                     onChange={handleSelectChange}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all capitalize"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all capitalize"
                 >
                     {rarityOptions.map(r => (
                         <option key={r} value={r} className="capitalize">{r}</option>
