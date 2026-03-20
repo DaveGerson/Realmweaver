@@ -413,6 +413,26 @@ export const chatWithRealmWeaver = async (
     });
 }
 
+export const generateSessionRecap = async (
+    sessionNotes: string,
+    plotSummaries: string,
+    campaignContext?: string
+): Promise<{ recap: string; looseEnds: string[]; playerFacingRecap: string }> => {
+    console.log(`[MOCK MODE] Called generateSessionRecap with notes length: ${sessionNotes.length}`);
+    logContext(campaignContext);
+    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY * 2));
+    return Promise.resolve({
+        recap: "The session began with the party arriving at the ancient ruins of Thornkeep, where they discovered the entrance had been recently disturbed. After navigating a trapped corridor, they encountered a band of cultists performing a dark ritual.\n\nA fierce battle ensued in the ritual chamber. The party's fighter held the line while the rogue flanked from the shadows. The cultist leader escaped through a hidden passage, but not before the wizard disrupted the ritual, preventing the summoning of a shadow demon.\n\nWith the immediate threat neutralized, the party explored the deeper chambers and found evidence linking the cultists to the missing merchant guild members. A coded journal recovered from the scene hints at a larger conspiracy involving the city's nobility.",
+        looseEnds: [
+            "The cultist leader escaped through a hidden passage and remains at large",
+            "The coded journal needs to be deciphered to reveal the noble conspirators",
+            "Three merchant guild members are still missing",
+            "The disrupted ritual's residual energy may have attracted other dark entities"
+        ],
+        playerFacingRecap: "Our heroes ventured into the ruins of Thornkeep, where they clashed with mysterious cultists in the midst of a dark ritual. Through skill and bravery, they disrupted the ceremony and scattered the cultists, though their leader slipped away. The party recovered a coded journal that may hold the key to unraveling a deeper conspiracy."
+    });
+};
+
 export const analyzeSessionNotes = async (notes: string, knownEntityNames: string[], campaignContext?: string, isMockMode?: boolean): Promise<{entries: {content: string, relatedEntityNames: string[]}[]}> => {
     console.log(`[MOCK MODE] Called analyzeSessionNotes with notes length: ${notes.length}`);
     await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));

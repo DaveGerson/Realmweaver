@@ -141,3 +141,15 @@ export const analyzeSessionNotes = (notes: string, knownEntityNames: string[], c
     }
     return aiDmCoach.analyzeSessionNotes(notes, knownEntityNames, campaignContext);
 }
+
+export const generateSessionRecap = (
+    sessionNotes: string,
+    plotSummaries: string,
+    campaignContext?: string,
+    isMockMode: boolean = false
+): Promise<{ recap: string; looseEnds: string[]; playerFacingRecap: string }> => {
+    if (isMockMode) {
+        return mockService.generateSessionRecap(sessionNotes, plotSummaries, campaignContext);
+    }
+    return aiDmCoach.generateSessionRecap(sessionNotes, plotSummaries, campaignContext);
+};

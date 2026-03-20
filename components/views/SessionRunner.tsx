@@ -1,12 +1,15 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
-import type { Campaign, Scene, SessionLog, NPC, Combatant, CombatantType, Encounter, PlotSessionStatus } from '../../types';
+import type { Campaign, Scene, SessionLog, NPC, Combatant, CombatantType, Encounter, PlotSessionStatus, DiceRoll } from '../../types';
 import { Icons, SceneIcon } from '../common/Icons';
 import { twMerge } from 'tailwind-merge';
 import { campaignService } from '../../services/campaignService';
 import { DiceRoller } from '../tools/DiceRoller';
 import { CombatTracker } from '../tools/CombatTracker';
 import { generateNpc } from '../../services/geminiService';
+import { rollDice } from '../../utils/diceUtils';
+import { estimatePcHp } from '../../utils/entityUtils';
+import { SessionEndWizard } from '../dialogs/SessionEndWizard';
 
 /** Try to extract HP from a freeform NPC stats string. Returns null if not found. */
 const parseHpFromStats = (stats: string | undefined): number | null => {
@@ -64,7 +67,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
     const [noteInput, setNoteInput] = useState('');
     const [noteTags, setNoteTags] = useState<string[]>([]);
     const [showImportantOnly, setShowImportantOnly] = useState(false);
-    const [showEndConfirm, setShowEndConfirm] = useState(false);
+    const [showEndWizard, setShowEndWizard] = useState(false);
     const [showDiceRoller, setShowDiceRoller] = useState(false);
     const [showRecap, setShowRecap] = useState(true);
 
@@ -76,6 +79,12 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
     const [npcPrompt, setNpcPrompt] = useState('');
     const [npcGenerating, setNpcGenerating] = useState(false);
     const [npcError, setNpcError] = useState<string | null>(null);
+    const [npcPreview, setNpcPreview] = useState<Omit<NPC, 'id' | 'factionId'> | null>(null);
+    const [npcEditMode, setNpcEditMode] = useState(false);
+    const [npcEditData, setNpcEditData] = useState<{ name: string; description: string; traits: string }>({ name: '', description: '', traits: '' });
+
+    // Skill check roll results state
+    const [skillCheckRolls, setSkillCheckRolls] = useState<Record<number, { total: number; passed: boolean }>>({});
 
     // Plot session status tracking (persisted on sessionLog)
     const plotSessionStatus = sessionLog.plotProgressions || {};
@@ -150,11 +159,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
     };
 
     const handleEndSession = () => {
-        if (!showEndConfirm) {
-            setShowEndConfirm(true);
-            return;
-        }
-        onEndSession();
+        setShowEndWizard(true);
     };
 
     // Combat Tracker: open panel and auto-populate if needed
@@ -175,15 +180,18 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                         notes: npc.traits || '',
                     };
                 }),
-                ...(campaign.playerCharacters || []).map(pc => ({
-                    id: crypto.randomUUID(),
-                    name: pc.characterSocial.characterName,
-                    type: 'pc' as CombatantType,
-                    initiative: 0,
-                    hp: 20,
-                    maxHp: 20,
-                    notes: '',
-                }))
+                ...(campaign.playerCharacters || []).map(pc => {
+                    const pcHp = estimatePcHp(pc);
+                    return {
+                        id: crypto.randomUUID(),
+                        name: pc.characterSocial.characterName,
+                        type: 'pc' as CombatantType,
+                        initiative: 0,
+                        hp: pcHp,
+                        maxHp: pcHp,
+                        notes: '',
+                    };
+                })
             ];
 
             const newEncounter: Encounter = {
@@ -203,30 +211,68 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
         campaignService.updateEncounter(updatedEncounter);
     }, []);
 
-    // Quick NPC generation
+    // Quick NPC generation -- generates into preview, does NOT save immediately
     const handleGenerateQuickNpc = useCallback(async () => {
         if (!npcPrompt.trim()) return;
         setNpcGenerating(true);
         setNpcError(null);
+        setNpcPreview(null);
+        setNpcEditMode(false);
         try {
             const campaignContext = `Campaign: ${campaign.title}\nSetting: ${campaign.setting}`;
             const npcData = await generateNpc(npcPrompt.trim(), false, isMockMode, campaignContext);
-            const newNpcId = campaignService.createNpc(npcData);
-
-            // Auto-link to current scene if there is one
-            if (activeScene && adventure) {
-                const updatedNpcIds = [...activeScene.npcIds, newNpcId];
-                campaignService.updateScene(adventure.id, activeScene.id, { npcIds: updatedNpcIds });
-            }
-
-            setNpcPrompt('');
-            setShowQuickNpc(false);
+            setNpcPreview(npcData);
         } catch (err) {
             setNpcError(err instanceof Error ? err.message : 'Generation failed');
         } finally {
             setNpcGenerating(false);
         }
-    }, [npcPrompt, isMockMode, campaign.title, campaign.setting, activeScene, adventure]);
+    }, [npcPrompt, isMockMode, campaign.title, campaign.setting]);
+
+    // Save the previewed NPC
+    const handleSavePreviewNpc = useCallback(() => {
+        if (!npcPreview) return;
+        const dataToSave = npcEditMode
+            ? { ...npcPreview, name: npcEditData.name, description: npcEditData.description, traits: npcEditData.traits }
+            : npcPreview;
+        const newNpcId = campaignService.createNpc(dataToSave);
+
+        // Auto-link to current scene if there is one
+        if (activeScene && adventure) {
+            const updatedNpcIds = [...activeScene.npcIds, newNpcId];
+            campaignService.updateScene(adventure.id, activeScene.id, { npcIds: updatedNpcIds });
+        }
+
+        setNpcPreview(null);
+        setNpcEditMode(false);
+        setNpcPrompt('');
+        setShowQuickNpc(false);
+    }, [npcPreview, npcEditMode, npcEditData, activeScene, adventure]);
+
+    // Enter edit mode for previewed NPC
+    const handleEditPreviewNpc = useCallback(() => {
+        if (!npcPreview) return;
+        setNpcEditData({ name: npcPreview.name, description: npcPreview.description, traits: npcPreview.traits });
+        setNpcEditMode(true);
+    }, [npcPreview]);
+
+    // Roll a skill check inline
+    const handleSkillCheckRoll = useCallback((checkIndex: number, dc: number, skillName: string) => {
+        const { results, total } = rollDice({ count: 1, sides: 20, modifier: 0 });
+        const passed = total >= dc;
+        setSkillCheckRolls(prev => ({ ...prev, [checkIndex]: { total, passed } }));
+
+        // Log the roll to the session
+        const roll: DiceRoll = {
+            id: crypto.randomUUID(),
+            formula: '1d20',
+            results,
+            total,
+            timestamp: new Date().toISOString(),
+            note: `${skillName} check (DC ${dc}) - ${passed ? 'Pass' : 'Fail'}`,
+        };
+        campaignService.addDiceRollToSession(roll);
+    }, []);
 
     // Plot status cycling (persisted via campaignService)
     const cyclePlotStatus = useCallback((plotId: string) => {
@@ -295,15 +341,10 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                     </button>
                     <button
                         onClick={handleEndSession}
-                        className={twMerge(
-                            "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors",
-                            showEndConfirm
-                                ? "bg-red-600 hover:bg-red-500 text-white"
-                                : "bg-slate-700 hover:bg-slate-600 text-slate-200"
-                        )}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm transition-colors"
                     >
                         <Icons.Stop className="w-4 h-4" />
-                        {showEndConfirm ? 'Confirm End Session' : 'End Session'}
+                        End Session
                     </button>
                 </div>
             </div>
@@ -451,13 +492,34 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                                         Skill Checks
                                     </h3>
                                     <div className="space-y-2">
-                                        {activeScene.skillChecks.map((check, i) => (
-                                            <div key={i} className="flex items-center gap-3 text-sm">
-                                                <span className="text-amber-400 font-mono font-bold">DC {check.dc}</span>
-                                                <span className="text-white">{check.skill}</span>
-                                                {check.description && <span className="text-slate-400">— {check.description}</span>}
-                                            </div>
-                                        ))}
+                                        {activeScene.skillChecks.map((check, i) => {
+                                            const rollResult = skillCheckRolls[i];
+                                            return (
+                                                <div key={i} className="flex items-center gap-3 text-sm flex-wrap">
+                                                    <span className="text-amber-400 font-mono font-bold">DC {check.dc}</span>
+                                                    <span className="text-white">{check.skill}</span>
+                                                    {check.description && <span className="text-slate-400">— {check.description}</span>}
+                                                    <button
+                                                        onClick={() => handleSkillCheckRoll(i, check.dc, check.skill)}
+                                                        className="px-2 py-0.5 rounded-md bg-amber-700 hover:bg-amber-600 text-white text-xs font-semibold transition-colors flex items-center gap-1"
+                                                        title={`Roll 1d20 vs DC ${check.dc}`}
+                                                    >
+                                                        <Icons.Dice className="w-3 h-3" />
+                                                        Roll
+                                                    </button>
+                                                    {rollResult && (
+                                                        <span className={twMerge(
+                                                            "text-xs font-mono font-bold px-2 py-0.5 rounded-full",
+                                                            rollResult.passed
+                                                                ? "bg-green-500/20 text-green-400"
+                                                                : "bg-red-500/20 text-red-400"
+                                                        )}>
+                                                            Rolled: {rollResult.total} — {rollResult.passed ? 'Pass' : 'Fail'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}
@@ -529,33 +591,120 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                     {/* Quick NPC Inline Form */}
                     {showQuickNpc && (
                         <div className="px-3 pb-3 space-y-2">
-                            <input
-                                type="text"
-                                value={npcPrompt}
-                                onChange={(e) => setNpcPrompt(e.target.value)}
-                                onKeyDown={(e) => { if (e.key === 'Enter' && !npcGenerating) handleGenerateQuickNpc(); }}
-                                placeholder="A suspicious merchant..."
-                                disabled={npcGenerating}
-                                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 disabled:opacity-50"
-                                autoFocus
-                            />
-                            <button
-                                onClick={handleGenerateQuickNpc}
-                                disabled={!npcPrompt.trim() || npcGenerating}
-                                className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm transition-colors"
-                            >
-                                {npcGenerating ? (
-                                    <>
-                                        <Icons.Loader className="w-4 h-4 animate-spin" />
-                                        Generating...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Icons.Sparkles className="w-4 h-4" />
-                                        Generate
-                                    </>
-                                )}
-                            </button>
+                            {!npcPreview && (
+                                <>
+                                    <input
+                                        type="text"
+                                        value={npcPrompt}
+                                        onChange={(e) => setNpcPrompt(e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === 'Enter' && !npcGenerating) handleGenerateQuickNpc(); }}
+                                        placeholder="A suspicious merchant..."
+                                        disabled={npcGenerating}
+                                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 disabled:opacity-50"
+                                        autoFocus
+                                    />
+                                    <button
+                                        onClick={handleGenerateQuickNpc}
+                                        disabled={!npcPrompt.trim() || npcGenerating}
+                                        className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm transition-colors"
+                                    >
+                                        {npcGenerating ? (
+                                            <>
+                                                <Icons.Loader className="w-4 h-4 animate-spin" />
+                                                Generating...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Icons.Sparkles className="w-4 h-4" />
+                                                Generate
+                                            </>
+                                        )}
+                                    </button>
+                                </>
+                            )}
+
+                            {/* NPC Preview Card */}
+                            {npcPreview && !npcEditMode && (
+                                <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 space-y-2">
+                                    <p className="text-sm font-bold text-white">{npcPreview.name}</p>
+                                    {npcPreview.traits && <p className="text-xs text-amber-300 italic">{npcPreview.traits}</p>}
+                                    {npcPreview.description && <p className="text-xs text-slate-300 line-clamp-3">{npcPreview.description}</p>}
+                                    {npcPreview.exampleQuote && <p className="text-xs text-amber-400/70 italic">"{npcPreview.exampleQuote}"</p>}
+                                    <div className="flex gap-1.5 pt-1">
+                                        <button
+                                            onClick={handleSavePreviewNpc}
+                                            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors"
+                                        >
+                                            <Icons.CheckCircle className="w-3.5 h-3.5" />
+                                            Save
+                                        </button>
+                                        <button
+                                            onClick={handleGenerateQuickNpc}
+                                            disabled={npcGenerating}
+                                            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold transition-colors disabled:opacity-50"
+                                        >
+                                            <Icons.Sparkles className="w-3.5 h-3.5" />
+                                            {npcGenerating ? 'Generating...' : 'Regenerate'}
+                                        </button>
+                                        <button
+                                            onClick={handleEditPreviewNpc}
+                                            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold transition-colors"
+                                        >
+                                            <Icons.Edit className="w-3.5 h-3.5" />
+                                            Edit
+                                        </button>
+                                    </div>
+                                    <button
+                                        onClick={() => { setNpcPreview(null); setNpcEditMode(false); }}
+                                        className="w-full text-xs text-slate-500 hover:text-slate-400 transition-colors"
+                                    >
+                                        Discard
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* NPC Edit Mode */}
+                            {npcPreview && npcEditMode && (
+                                <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 space-y-2">
+                                    <input
+                                        type="text"
+                                        value={npcEditData.name}
+                                        onChange={(e) => setNpcEditData(prev => ({ ...prev, name: e.target.value }))}
+                                        placeholder="Name"
+                                        className="w-full bg-slate-900 border border-slate-600 rounded-md px-2 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500"
+                                    />
+                                    <textarea
+                                        value={npcEditData.traits}
+                                        onChange={(e) => setNpcEditData(prev => ({ ...prev, traits: e.target.value }))}
+                                        placeholder="Traits"
+                                        rows={2}
+                                        className="w-full bg-slate-900 border border-slate-600 rounded-md px-2 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 resize-none"
+                                    />
+                                    <textarea
+                                        value={npcEditData.description}
+                                        onChange={(e) => setNpcEditData(prev => ({ ...prev, description: e.target.value }))}
+                                        placeholder="Description"
+                                        rows={3}
+                                        className="w-full bg-slate-900 border border-slate-600 rounded-md px-2 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 resize-none"
+                                    />
+                                    <div className="flex gap-1.5">
+                                        <button
+                                            onClick={handleSavePreviewNpc}
+                                            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors"
+                                        >
+                                            <Icons.CheckCircle className="w-3.5 h-3.5" />
+                                            Save
+                                        </button>
+                                        <button
+                                            onClick={() => setNpcEditMode(false)}
+                                            className="flex-1 px-2 py-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold transition-colors"
+                                        >
+                                            Back to Preview
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
                             {npcError && (
                                 <p className="text-xs text-red-400">{npcError}</p>
                             )}
@@ -710,6 +859,17 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                     </div>
                 </div>
             </div>
+
+            {/* Session End Wizard */}
+            {showEndWizard && (
+                <SessionEndWizard
+                    campaign={campaign}
+                    sessionLog={sessionLog}
+                    isMockMode={isMockMode}
+                    onComplete={onEndSession}
+                    onCancel={() => setShowEndWizard(false)}
+                />
+            )}
 
             {/* Combat Tracker Slide-out Panel */}
             {showCombatPanel && (

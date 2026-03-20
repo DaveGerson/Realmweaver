@@ -47,6 +47,26 @@ export const sessionAnalysisSchema = {
   required: ['entries']
 };
 
+export const sessionRecapSchema = {
+  type: Type.OBJECT,
+  properties: {
+    recap: { type: Type.STRING, description: "A narrative recap of the session suitable for reading at the start of the next session (3-5 paragraphs). Written in past tense, third person. Engaging and dramatic." },
+    looseEnds: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+      description: "A list of unresolved plot threads, unanswered questions, or dangling hooks from this session that the DM should follow up on."
+    },
+    playerFacingRecap: { type: Type.STRING, description: "A shorter, player-safe version of the recap with any GM secrets or hidden information stripped out. Suitable for sharing with players between sessions." },
+  },
+  required: ['recap', 'looseEnds', 'playerFacingRecap'],
+};
+
+export interface SessionRecapResult {
+  recap: string;
+  looseEnds: string[];
+  playerFacingRecap: string;
+}
+
 // --- Generator Functions ---
 
 export const generateNarration = (prompt: string, campaignContext?: string, useLiteModel: boolean = false): Promise<string> => {
@@ -83,6 +103,26 @@ export const generateEnhancedText = (prompt: string, campaignContext?: string): 
 Request: "${prompt}"`;
     return generateText(fullPrompt, modelName, campaignContext);
 }
+
+export const generateSessionRecap = async (
+    sessionNotes: string,
+    plotSummaries: string,
+    campaignContext?: string
+): Promise<SessionRecapResult> => {
+    const modelName = 'gemini-2.5-flash';
+    const instructions = `You are an expert Game Master's assistant. Your task is to generate a structured session recap from the DM's running notes.
+
+You will produce three things:
+1. **recap**: A narrative recap of the session (3-5 paragraphs). Written in past tense, third person. Engaging and dramatic, suitable for reading aloud at the start of the next session. Cover all major events, decisions, and encounters.
+2. **looseEnds**: A list of unresolved plot threads, unanswered questions, cliffhangers, or dangling hooks that the DM should follow up on in future sessions. Be specific.
+3. **playerFacingRecap**: A shorter, player-safe version of the recap. Strip out any GM secrets, hidden motivations, or information the players have not yet discovered. Keep it engaging but spoiler-free.
+
+Active plot threads for context:
+${plotSummaries}`;
+
+    const prompt = `Here are the session notes to recap:\n\n${sessionNotes}`;
+    return generateWithSchema(prompt, sessionRecapSchema, instructions, {}, modelName, campaignContext);
+};
 
 export const analyzeSessionNotes = async (notes: string, knownEntityNames: string[], campaignContext?: string): Promise<{entries: {content: string, relatedEntityNames: string[]}[]}> => {
     const modelName = 'gemini-2.5-flash';
