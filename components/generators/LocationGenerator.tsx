@@ -4,6 +4,7 @@ import type { Location, Faction } from '../../types/index';
 import { generateLocation } from '../../services/geminiService';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
+import { SkeletonGeneratorOverlay } from '../common/SkeletonCard';
 import { EntityChatGenerator } from './EntityChatGenerator';
 import { LocationEditor } from '../editors/LocationEditor';
 import { createDefaultLocation } from '../../utils/entityUtils';
@@ -87,12 +88,7 @@ export const LocationGenerator: React.FC<LocationGeneratorProps> = ({ onLocation
 
   return (
     <div className="relative bg-slate-900 p-6 rounded-xl border border-slate-800 space-y-4 h-full flex flex-col">
-      {isLoading && (
-        <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm flex flex-col items-center justify-center rounded-xl z-10">
-          <Icons.Sparkles className="w-10 h-10 text-indigo-400 animate-spin" />
-          <p className="mt-4 text-md text-slate-300">Generating Location...</p>
-        </div>
-      )}
+      {isLoading && <SkeletonGeneratorOverlay />}
       <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Icons.Wizard className="w-7 h-7 text-indigo-400" />
