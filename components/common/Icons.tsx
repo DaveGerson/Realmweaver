@@ -64,6 +64,7 @@ import {
   Loader2,
   AlertTriangle,
   Clipboard,
+  Search,
 } from 'lucide-react';
 
 export const Icons = {
@@ -130,6 +131,7 @@ export const Icons = {
   Loader: Loader2,
   AlertTriangle,
   Clipboard,
+  Search,
 };
 
 export const SceneIcon = ({ type, className }: { type: string, className?: string }) => {
