@@ -22,9 +22,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-# Claude Code
+# Claude Code — orchestrator IP (kept locally, not committed)
+.claude/agents/
+.claude/references/
+.claude/knowledge/
+.claude/team-context/
 .claude/worktrees/
 .claude/settings.local.json
-.claude/team-context/
-.claude/agents/archive/
 /reference_files/*
