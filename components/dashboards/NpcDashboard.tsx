@@ -35,9 +35,10 @@ export const NpcDashboard: React.FC<NpcDashboardProps> = ({ npcs, factions = [],
               </button>
             ))}
             {npcs.length === 0 && (
-                <div className="md:col-span-2 text-center py-10 text-slate-500">
-                    <Icons.NPCs className="w-12 h-12 mx-auto mb-2" />
-                    <p>No NPCs created yet. Use the generator to bring some characters to life!</p>
+                <div className="md:col-span-2 text-center py-16">
+                    <Icons.NPCs className="w-16 h-16 mx-auto mb-4 text-slate-700" />
+                    <p className="text-lg font-serif text-slate-400 mb-2">Every great story needs its cast of characters</p>
+                    <p className="text-sm text-slate-600">Use the generator to bring your world's inhabitants to life.</p>
                 </div>
             )}
           </div>

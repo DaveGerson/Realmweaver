@@ -36,9 +36,10 @@ export const FactionDashboard: React.FC<FactionDashboardProps> = ({ factions, np
               </button>
             ))}
             {factions.length === 0 && (
-                <div className="md:col-span-2 text-center py-10 text-slate-500">
-                    <Icons.Factions className="w-12 h-12 mx-auto mb-2" />
-                    <p>No factions created yet. Use the generator to create organizations for your world!</p>
+                <div className="md:col-span-2 text-center py-16">
+                    <Icons.Factions className="w-16 h-16 mx-auto mb-4 text-slate-700" />
+                    <p className="text-lg font-serif text-slate-400 mb-2">Power structures shape every world</p>
+                    <p className="text-sm text-slate-600">Use the generator to forge guilds, cults, and noble houses.</p>
                 </div>
             )}
           </div>

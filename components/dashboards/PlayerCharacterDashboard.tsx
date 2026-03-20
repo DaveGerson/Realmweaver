@@ -34,9 +34,10 @@ export const PlayerCharacterDashboard: React.FC<PlayerCharacterDashboardProps> =
               </button>
             ))}
             {(!playerCharacters || playerCharacters.length === 0) && (
-                <div className="md:col-span-2 text-center py-10 text-slate-500">
-                    <Icons.PlayerCharacters className="w-12 h-12 mx-auto mb-2" />
-                    <p>No player characters added yet. Import a character sheet to get started!</p>
+                <div className="md:col-span-2 text-center py-16">
+                    <Icons.PlayerCharacters className="w-16 h-16 mx-auto mb-4 text-slate-700" />
+                    <p className="text-lg font-serif text-slate-400 mb-2">Your adventuring party awaits assembly</p>
+                    <p className="text-sm text-slate-600">Import character sheets to track your players' heroes.</p>
                 </div>
             )}
           </div>

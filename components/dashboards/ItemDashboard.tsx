@@ -35,9 +35,10 @@ export const ItemDashboard: React.FC<ItemDashboardProps> = ({ items, onItemCreat
               </button>
             ))}
             {items.length === 0 && (
-                <div className="md:col-span-2 text-center py-10 text-slate-500">
-                    <Icons.Items className="w-12 h-12 mx-auto mb-2" />
-                    <p>No items created yet. Use the generator to forge some magical artifacts!</p>
+                <div className="md:col-span-2 text-center py-16">
+                    <Icons.Items className="w-16 h-16 mx-auto mb-4 text-slate-700" />
+                    <p className="text-lg font-serif text-slate-400 mb-2">Every hero needs the right tools for the quest</p>
+                    <p className="text-sm text-slate-600">Use the generator to forge magical artifacts, cursed relics, and mundane gear.</p>
                 </div>
             )}
           </div>
