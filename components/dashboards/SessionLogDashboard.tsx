@@ -69,7 +69,7 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({ sessio
                       <button 
                           key={session.id}
                           onClick={() => onSelectSessionLog(session.id)}
-                          className="w-full text-left bg-slate-900/50 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-800 p-4 rounded-lg transition-all group"
+                          className="w-full text-left bg-slate-900/50 border border-slate-800 border-l-4 border-l-rose-500 hover:border-slate-700 hover:border-l-rose-400 hover:bg-slate-800 p-4 rounded-lg transition-all group"
                       >
                           <div className="flex justify-between items-center mb-1">
                               <span className="font-semibold text-slate-200 group-hover:text-indigo-300 transition-colors">{session.title}</span>
@@ -96,7 +96,7 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({ sessio
                       <button 
                           key={session.id}
                           onClick={() => onSelectSessionLog(session.id)}
-                          className="w-full text-left bg-slate-900/30 border border-slate-800 hover:border-slate-600 hover:bg-slate-800 p-4 rounded-lg transition-all opacity-80 hover:opacity-100"
+                          className="w-full text-left bg-slate-900/30 border border-slate-800 border-l-4 border-l-rose-500/50 hover:border-slate-600 hover:border-l-rose-400 hover:bg-slate-800 p-4 rounded-lg transition-all opacity-80 hover:opacity-100"
                       >
                           <div className="flex justify-between items-center mb-1">
                               <span className="font-semibold text-slate-300">{session.title}</span>

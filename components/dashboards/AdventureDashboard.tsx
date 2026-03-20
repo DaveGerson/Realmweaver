@@ -27,9 +27,9 @@ export const AdventureDashboard: React.FC<AdventureDashboardProps> = ({ adventur
               <button 
                 key={adv.id} 
                 onClick={() => onSelectAdventure(adv.id)}
-                className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 text-left hover:bg-slate-800 hover:border-indigo-600/50 transition-all space-y-2"
+                className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 border-l-4 border-l-orange-500 text-left hover:bg-slate-800 hover:border-slate-700 hover:border-l-orange-400 transition-all space-y-2"
               >
-                <h3 className="font-semibold text-indigo-400">{adv.title}</h3>
+                <h3 className="font-semibold text-orange-400">{adv.title}</h3>
                 <p className="text-sm text-slate-400 line-clamp-2">{adv.hook}</p>
                 <span className="text-xs bg-slate-700 text-slate-300 rounded-full px-2 py-0.5">Level {adv.level}</span>
               </button>

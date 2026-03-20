@@ -28,9 +28,9 @@ export const LocationDashboard: React.FC<LocationDashboardProps> = ({ locations,
               <button
                 key={location.id}
                 onClick={() => onSelectLocation(location.id)}
-                className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 text-left hover:bg-slate-800 hover:border-indigo-600/50 transition-all space-y-2"
+                className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 border-l-4 border-l-emerald-500 text-left hover:bg-slate-800 hover:border-slate-700 hover:border-l-emerald-400 transition-all space-y-2"
               >
-                <h3 className="font-semibold text-indigo-400">{location.name}</h3>
+                <h3 className="font-semibold text-emerald-400">{location.name}</h3>
                 <p className="text-sm text-slate-400 line-clamp-2">{location.description}</p>
               </button>
             ))}

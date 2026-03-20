@@ -107,7 +107,7 @@ interface PlotCardProps {
 const PlotCard: React.FC<PlotCardProps> = ({ plot, onClick, compact }) => (
     <button 
         onClick={onClick}
-        className={`w-full bg-slate-900/50 border border-slate-800 p-4 rounded-lg hover:bg-slate-800 hover:border-indigo-500/50 transition-all text-left flex flex-col group relative ${compact ? 'py-3' : 'h-32'}`}
+        className={`w-full bg-slate-900/50 border border-slate-800 border-l-4 border-l-yellow-500 p-4 rounded-lg hover:bg-slate-800 hover:border-slate-700 hover:border-l-yellow-400 transition-all text-left flex flex-col group relative ${compact ? 'py-3' : 'h-32'}`}
     >
         <div className="flex justify-between items-start w-full mb-1">
                 <h3 className={`font-semibold text-slate-200 truncate pr-2 ${compact ? 'text-sm' : 'text-lg'}`}>{plot.title}</h3>
