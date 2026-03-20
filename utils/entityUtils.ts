@@ -1,5 +1,5 @@
 
-import type { NPC, Location, Faction, Item, Article, Adventure, Scene, SessionLog, Plot, Campaign } from '../types/index';
+import type { NPC, Location, Faction, Item, Article, Adventure, Scene, SessionLog, Plot, Campaign, PlayerCharacter } from '../types/index';
 
 /**
  * Builds a campaign context string for AI generation functions.
@@ -38,6 +38,24 @@ export const buildCampaignContext = (campaign: Campaign): string => {
         lines.push(`Player Characters: ${campaign.playerCharacters.map(pc => pc.characterSocial.characterName).join(', ')}`);
     }
     return lines.join('\n');
+};
+
+/**
+ * Estimates PC hit points from character statistics.
+ * Uses 10 + (CON modifier * level) as a rough D&D 5e estimate.
+ * Falls back to 20 if data is missing or unparseable.
+ */
+export const estimatePcHp = (pc: PlayerCharacter): number => {
+    try {
+        const con = pc.characterStatistics?.attributes?.constitution;
+        const level = pc.characterStatistics?.classes?.level;
+        if (typeof con !== 'number' || typeof level !== 'number') return 20;
+        const conMod = Math.floor((con - 10) / 2);
+        // Base 10 HP + CON modifier per level (simplified average)
+        return Math.max(1, 10 + conMod * level);
+    } catch {
+        return 20;
+    }
 };
 
 export const createDefaultNpc = (): NPC => ({

@@ -5,6 +5,7 @@ import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { twMerge } from 'tailwind-merge';
 import { produce } from 'immer';
+import { estimatePcHp } from '../../utils/entityUtils';
 
 interface CombatTrackerProps {
   encounter: Encounter;
@@ -311,15 +312,18 @@ const AddCombatantMenu: React.FC<{
                     ) : (
                         <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
                             <p className="text-xs text-slate-500 mb-2">Click to add to combat.</p>
-                            {pcs.map(pc => (
-                                <button 
-                                    key={pc.id}
-                                    onClick={() => onAdd(pc.characterSocial.characterName, 'pc', 20, 0)} // Default HP/Init for now
-                                    className="w-full text-left px-2 py-1.5 rounded hover:bg-slate-700 text-sm text-blue-300 truncate"
-                                >
-                                    {pc.characterSocial.characterName}
-                                </button>
-                            ))}
+                            {pcs.map(pc => {
+                                const pcHp = estimatePcHp(pc);
+                                return (
+                                    <button
+                                        key={pc.id}
+                                        onClick={() => onAdd(pc.characterSocial.characterName, 'pc', pcHp, 0)}
+                                        className="w-full text-left px-2 py-1.5 rounded hover:bg-slate-700 text-sm text-blue-300 truncate"
+                                    >
+                                        {pc.characterSocial.characterName} ({pcHp} HP)
+                                    </button>
+                                );
+                            })}
                             {npcs.map(npc => {
                                 const hpMatch = npc.stats?.match(/(?:hp|hit\s*points)\s*[:=\-–—]?\s*(\d+)/i);
                                 const hp = hpMatch ? parseInt(hpMatch[1], 10) : 10;
