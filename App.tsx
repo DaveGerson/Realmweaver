@@ -39,6 +39,8 @@ import { campaignService } from './services/campaignService';
 import { RealmChatWidget } from './components/RealmChat/RealmChatWidget';
 import { SessionRunner } from './components/views/SessionRunner';
 import { buildCampaignContext } from './utils/entityUtils';
+import { Breadcrumbs } from './components/common/Breadcrumbs';
+import type { BreadcrumbSegment } from './components/common/Breadcrumbs';
 
 
 export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'combat' | 'relationships' | 'session-runner';
@@ -359,6 +361,43 @@ const App: FC = () => {
       resetSelections();
   };
 
+  const breadcrumbSegments = useMemo((): BreadcrumbSegment[] => {
+      if (!activeCampaign) return [];
+      const campaignCrumb: BreadcrumbSegment = { label: activeCampaign.title, onClick: () => { resetSelections(); setActiveView('setting'); } };
+
+      const viewLabels: Record<string, string> = {
+          'setting': 'Setting', 'npcs': 'NPCs', 'locations': 'Locations', 'factions': 'Factions',
+          'items': 'Items', 'adventures': 'Adventures', 'lorebook': 'Lorebook',
+          'session-logs': 'Sessions', 'player-characters': 'Characters', 'plots': 'Plots',
+          'combat': 'Combat Tracker', 'relationships': 'World Graph', 'session-runner': 'Session Live'
+      };
+
+      const categoryCrumb: BreadcrumbSegment = {
+          label: viewLabels[activeView] || activeView,
+          onClick: () => { resetSelections(); setActiveView(activeView); }
+      };
+
+      // Entity-level crumbs
+      if (selectedNpc) return [campaignCrumb, categoryCrumb, { label: selectedNpc.name }];
+      if (selectedLocation) return [campaignCrumb, categoryCrumb, { label: selectedLocation.name }];
+      if (selectedFaction) return [campaignCrumb, categoryCrumb, { label: selectedFaction.name }];
+      if (selectedItem) return [campaignCrumb, categoryCrumb, { label: selectedItem.name }];
+      if (selectedArticle) return [campaignCrumb, categoryCrumb, { label: selectedArticle.title }];
+      if (selectedPlayerCharacter) return [campaignCrumb, categoryCrumb, { label: selectedPlayerCharacter.characterSocial.characterName }];
+      if (selectedSessionLog) return [campaignCrumb, categoryCrumb, { label: selectedSessionLog.title }];
+      if (selectedPlot) return [campaignCrumb, categoryCrumb, { label: selectedPlot.title }];
+      if (selectedScene && selectedAdventure) return [
+          campaignCrumb,
+          { label: 'Adventures', onClick: () => { resetSelections(); setActiveView('adventures'); } },
+          { label: selectedAdventure.title, onClick: () => { resetSelections(); setSelectedAdventureId(selectedAdventure.id); setActiveView('adventures'); } },
+          { label: selectedScene.title }
+      ];
+      if (selectedAdventure) return [campaignCrumb, categoryCrumb, { label: selectedAdventure.title }];
+
+      // Dashboard-level crumbs (just campaign > category)
+      return [campaignCrumb, categoryCrumb];
+  }, [activeCampaign, activeView, selectedNpc, selectedLocation, selectedFaction, selectedItem, selectedArticle, selectedPlayerCharacter, selectedSessionLog, selectedPlot, selectedScene, selectedAdventure]);
+
   const renderMainContent = () => {
       if (!activeCampaign) return null;
 
@@ -622,6 +661,7 @@ const App: FC = () => {
                 </div>
 
                 <main className="flex-1 overflow-y-auto bg-slate-900 text-slate-100 relative w-full">
+                  {activeView !== 'session-runner' && <Breadcrumbs segments={breadcrumbSegments} />}
                   {renderMainContent()}
                 </main>
                 
