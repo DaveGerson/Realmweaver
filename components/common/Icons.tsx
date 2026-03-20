@@ -62,6 +62,8 @@ import {
   PauseCircle,
   CircleDot,
   Loader2,
+  AlertTriangle,
+  Clipboard,
 } from 'lucide-react';
 
 export const Icons = {
@@ -126,6 +128,8 @@ export const Icons = {
   Stalled: PauseCircle,
   Unchanged: CircleDot,
   Loader: Loader2,
+  AlertTriangle,
+  Clipboard,
 };
 
 export const SceneIcon = ({ type, className }: { type: string, className?: string }) => {

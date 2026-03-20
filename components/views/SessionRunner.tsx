@@ -9,6 +9,7 @@ import { CombatTracker } from '../tools/CombatTracker';
 import { generateNpc } from '../../services/geminiService';
 import { rollDice } from '../../utils/diceUtils';
 import { estimatePcHp } from '../../utils/entityUtils';
+import { SessionEndWizard } from '../dialogs/SessionEndWizard';
 
 /** Try to extract HP from a freeform NPC stats string. Returns null if not found. */
 const parseHpFromStats = (stats: string | undefined): number | null => {
@@ -66,7 +67,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
     const [noteInput, setNoteInput] = useState('');
     const [noteTags, setNoteTags] = useState<string[]>([]);
     const [showImportantOnly, setShowImportantOnly] = useState(false);
-    const [showEndConfirm, setShowEndConfirm] = useState(false);
+    const [showEndWizard, setShowEndWizard] = useState(false);
     const [showDiceRoller, setShowDiceRoller] = useState(false);
     const [showRecap, setShowRecap] = useState(true);
 
@@ -158,11 +159,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
     };
 
     const handleEndSession = () => {
-        if (!showEndConfirm) {
-            setShowEndConfirm(true);
-            return;
-        }
-        onEndSession();
+        setShowEndWizard(true);
     };
 
     // Combat Tracker: open panel and auto-populate if needed
@@ -344,15 +341,10 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                     </button>
                     <button
                         onClick={handleEndSession}
-                        className={twMerge(
-                            "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors",
-                            showEndConfirm
-                                ? "bg-red-600 hover:bg-red-500 text-white"
-                                : "bg-slate-700 hover:bg-slate-600 text-slate-200"
-                        )}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm transition-colors"
                     >
                         <Icons.Stop className="w-4 h-4" />
-                        {showEndConfirm ? 'Confirm End Session' : 'End Session'}
+                        End Session
                     </button>
                 </div>
             </div>
@@ -867,6 +859,17 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                     </div>
                 </div>
             </div>
+
+            {/* Session End Wizard */}
+            {showEndWizard && (
+                <SessionEndWizard
+                    campaign={campaign}
+                    sessionLog={sessionLog}
+                    isMockMode={isMockMode}
+                    onComplete={onEndSession}
+                    onCancel={() => setShowEndWizard(false)}
+                />
+            )}
 
             {/* Combat Tracker Slide-out Panel */}
             {showCombatPanel && (
