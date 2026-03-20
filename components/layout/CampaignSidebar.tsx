@@ -151,14 +151,14 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
         e.dataTransfer.dropEffect = 'move';
         const target = (e.target as HTMLElement).closest('button');
         if (target) {
-            target.classList.add('border-t-2', 'border-indigo-500', '-mt-0.5');
+            target.classList.add('border-t-2', 'border-amber-500', '-mt-0.5');
         }
     };
 
     const handleDragLeave = (e: React.DragEvent) => {
         const target = (e.target as HTMLElement).closest('button');
         if (target) {
-            target.classList.remove('border-t-2', 'border-indigo-500', '-mt-0.5');
+            target.classList.remove('border-t-2', 'border-amber-500', '-mt-0.5');
         }
     };
 
@@ -176,7 +176,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
 
     const handleDragEnd = (e: React.DragEvent) => {
         (e.target as HTMLElement).classList.remove('opacity-50');
-        document.querySelectorAll('.border-indigo-500').forEach(el => el.classList.remove('border-t-2', 'border-indigo-500', '-mt-0.5'));
+        document.querySelectorAll('.border-amber-500').forEach(el => el.classList.remove('border-t-2', 'border-amber-500', '-mt-0.5'));
     };
 
 
@@ -313,7 +313,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                             onClick={() => onSelectView('player-characters')}
                             className={twMerge(
                                 'flex items-center gap-3 text-sm transition-colors w-full',
-                                activeView === 'player-characters' ? 'text-indigo-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
+                                activeView === 'player-characters' ? 'text-amber-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
                             )}
                             >
                             <Icons.PlayerCharacters className="w-4 h-4" />
@@ -357,7 +357,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                             onClick={() => onSelectView('plots')}
                             className={twMerge(
                                 'flex items-center gap-3 text-sm transition-colors w-full',
-                                activeView === 'plots' ? 'text-indigo-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
+                                activeView === 'plots' ? 'text-amber-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
                             )}
                             >
                             <Icons.Plot className="w-4 h-4" />
@@ -409,7 +409,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                             onClick={() => onSelectView('adventures')}
                             className={twMerge(
                                 'flex items-center gap-3 text-sm transition-colors w-full',
-                                activeView === 'adventures' ? 'text-indigo-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
+                                activeView === 'adventures' ? 'text-amber-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
                             )}
                             >
                             <Icons.Adventures className="w-4 h-4" />
@@ -493,7 +493,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                                 onClick={() => onSelectView('lorebook')}
                                 className={twMerge(
                                     'flex items-center gap-3 text-sm transition-colors w-full',
-                                    activeView === 'lorebook' ? 'text-indigo-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
+                                    activeView === 'lorebook' ? 'text-amber-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
                                 )}
                             >
                                 <Icons.FileCode className="w-4 h-4" />
@@ -546,7 +546,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                                         onClick={() => { onSelectView(group.view); toggleView(group.view); }}
                                         className={twMerge(
                                             'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors',
-                                            activeView === group.view ? 'bg-indigo-600/20 text-indigo-300' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                                            activeView === group.view ? 'bg-amber-600/20 text-amber-300' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
                                         )}
                                     >
                                         <Icon className="w-4 h-4" /> <span>{group.label}</span>
@@ -589,7 +589,7 @@ const NavHeader = ({ label }: { label: string }) => <h3 className="px-3 pt-4 pb-
 const NavItem = ({ icon, label, active, onClick }: { icon: keyof typeof Icons, label: string, active: boolean, onClick: () => void }) => {
   const Icon = Icons[icon];
   return (
-    <button onClick={onClick} className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${active ? 'bg-indigo-600/20 text-indigo-300' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}>
+    <button onClick={onClick} className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${active ? 'bg-amber-600/20 text-amber-300' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}>
       <Icon className="w-4 h-4" /> <span>{label}</span>
     </button>
   );

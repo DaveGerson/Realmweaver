@@ -104,7 +104,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
       <header className="flex justify-between items-start">
         <div className="space-y-2">
-            <div className="flex items-center gap-3 text-indigo-400">
+            <div className="flex items-center gap-3 text-amber-400">
               <Icons.Scenes className="w-8 h-8" />
               <h1 className="text-3xl font-bold font-serif text-slate-100">Scene Editor</h1>
             </div>
@@ -115,7 +115,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
                     variant={isActiveScene ? "primary" : "secondary"}
                     size="sm"
                     onClick={() => onSetActive(isActiveScene ? null : scene.id)}
-                    className={isActiveScene ? "ring-2 ring-offset-2 ring-offset-slate-900 ring-indigo-500" : ""}
+                    className={isActiveScene ? "ring-2 ring-offset-2 ring-offset-slate-900 ring-amber-500" : ""}
                 >
                     {isActiveScene ? (
                          <>
@@ -142,7 +142,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
                 value={formData.title}
                 onChange={handleChange}
                 onBlur={handleBlur}
-                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-600"
+                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600"
               />
             </div>
             <div>
@@ -151,7 +151,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
                     name="type"
                     value={formData.type}
                     onChange={handleSelectChange}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all capitalize"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all capitalize"
                 >
                     {sceneTypeOptions.map(t => (
                         <option key={t} value={t} className="capitalize">{t}</option>
@@ -201,7 +201,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
                             value={sc.skill}
                             onChange={(e) => handleSkillCheckChange(sc.id, 'skill', e.target.value)}
                             onBlur={handleSkillCheckBlur}
-                            className="col-span-3 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500"
+                            className="col-span-3 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500"
                         />
                         <div className="col-span-2 flex items-center">
                            <span className="text-slate-500 text-sm mr-2">DC</span>
@@ -210,7 +210,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
                                 value={sc.dc}
                                 onChange={(e) => handleSkillCheckChange(sc.id, 'dc', parseInt(e.target.value, 10) || 0)}
                                 onBlur={handleSkillCheckBlur}
-                                className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500"
+                                className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500"
                             />
                         </div>
                         <input
@@ -219,7 +219,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
                             value={sc.description}
                             onChange={(e) => handleSkillCheckChange(sc.id, 'description', e.target.value)}
                             onBlur={handleSkillCheckBlur}
-                            className="col-span-6 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500"
+                            className="col-span-6 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500"
                         />
                         <div className="col-span-1 text-right">
                            <button onClick={() => handleDeleteSkillCheck(sc.id)} className="text-slate-500 hover:text-red-400 p-1 rounded transition-colors">
@@ -254,7 +254,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
                 name="locationId"
                 value={formData.locationId || "none"}
                 onChange={handleSelectChange}
-                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
+                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all"
             >
                 <option value="none">-- None --</option>
                 {allLocations.map(loc => (
@@ -272,7 +272,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
                             type="checkbox"
                             checked={formData.npcIds.includes(npc.id)}
                             onChange={() => handleNpcToggle(npc.id)}
-                            className="w-4 h-4 mr-3 bg-slate-800 border-slate-600 rounded text-indigo-600 focus:ring-indigo-500"
+                            className="w-4 h-4 mr-3 bg-slate-800 border-slate-600 rounded text-amber-600 focus:ring-amber-500"
                         />
                         {npc.name}
                     </label>

@@ -71,7 +71,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
       <header className="flex justify-between items-start">
         <div className="space-y-2">
-            <div className="flex items-center gap-3 text-indigo-400">
+            <div className="flex items-center gap-3 text-amber-400">
               <Icons.Notes className="w-8 h-8" />
               <h1 className="text-3xl font-bold font-serif text-slate-100">Campaign Note</h1>
             </div>
@@ -92,7 +92,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete
             value={formData.title}
             onChange={handleChange}
             onBlur={handleBlur}
-            className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all font-semibold text-lg placeholder:text-slate-600"
+            className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all font-semibold text-lg placeholder:text-slate-600"
             placeholder="Note Title..."
           />
         </div>
@@ -105,7 +105,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete
                 value={formData.tags.join(', ')}
                 onChange={handleTagsChange}
                 onBlur={handleBlur}
-                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all text-sm placeholder:text-slate-600"
+                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all text-sm placeholder:text-slate-600"
                 placeholder="e.g., Plot, Idea, ToDo"
              />
         </div>

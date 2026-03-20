@@ -86,7 +86,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
           <div className="flex items-center gap-2">
-              <Icons.Campaign className="w-6 h-6 text-indigo-400 hidden sm:block" />
+              <Icons.Campaign className="w-6 h-6 text-amber-400 hidden sm:block" />
               <h1 className="text-lg font-bold font-serif text-slate-100 hidden sm:block">RealmWeaver</h1>
           </div>
           <div className="h-6 w-px bg-slate-700 hidden sm:block"></div>

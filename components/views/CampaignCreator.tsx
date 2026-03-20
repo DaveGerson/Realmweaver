@@ -34,7 +34,7 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampai
     <div className="flex-1 flex flex-col items-center justify-center p-4">
         <div className="w-full max-w-2xl mx-auto animate-in fade-in duration-500">
             <header className="text-center mb-8">
-                <Icons.Sparkles className="w-12 h-12 mx-auto text-indigo-500" />
+                <Icons.Sparkles className="w-12 h-12 mx-auto text-amber-500" />
                 <h1 className="mt-4 text-3xl font-bold font-serif text-slate-100">Create Your Campaign</h1>
                 <p className="mt-1 text-slate-400">
                 Start with the big picture. You can add adventures and details later.
@@ -48,7 +48,7 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampai
                         type="text"
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-600"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600"
                         placeholder="The Sundered Crown"
                         required
                     />
@@ -64,7 +64,7 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampai
                         value="official" 
                         checked={settingType === 'official'} 
                         onChange={() => setSettingType('official')}
-                         className="mr-2 text-indigo-500 focus:ring-indigo-500 bg-slate-800 border-slate-600"
+                         className="mr-2 text-amber-500 focus:ring-amber-500 bg-slate-800 border-slate-600"
                       />
                       <span className="text-sm text-slate-300">Official Setting</span>
                     </label>
@@ -75,7 +75,7 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampai
                         value="custom" 
                         checked={settingType === 'custom'} 
                         onChange={() => setSettingType('custom')}
-                        className="mr-2 text-indigo-500 focus:ring-indigo-500 bg-slate-800 border-slate-600"
+                        className="mr-2 text-amber-500 focus:ring-amber-500 bg-slate-800 border-slate-600"
                       />
                       <span className="text-sm text-slate-300">Custom World</span>
                     </label>
@@ -88,13 +88,13 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampai
                       <select
                           value={officialSetting}
                           onChange={(e) => setOfficialSetting(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all"
                       >
                           {OFFICIAL_SETTINGS.map(s => (
                               <option key={s} value={s}>{s}</option>
                           ))}
                       </select>
-                      <p className="text-xs text-indigo-400 mt-1.5 flex items-center gap-1">
+                      <p className="text-xs text-amber-400 mt-1.5 flex items-center gap-1">
                         <Icons.Sparkles className="w-3 h-3" />
                         Official settings use Google Search to find canon lore.
                       </p>
@@ -109,7 +109,7 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampai
                         value={settingDescription}
                         onChange={(e) => setSettingDescription(e.target.value)}
                         rows={5}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-600 resize-y"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600 resize-y"
                         placeholder={settingType === 'official' ? "Add your own homebrew lore, artifacts, or deviations from the official canon here..." : "A high-level description of the world, its history, and its current state..."}
                     />
                 </div>

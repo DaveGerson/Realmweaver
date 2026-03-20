@@ -26,7 +26,7 @@ const NoteCreator: React.FC<{ onNoteCreated: (data: Omit<Note, 'id' | 'createdAt
     return (
         <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 space-y-4 h-full flex flex-col">
             <div className="flex items-center gap-3">
-                <Icons.Plus className="w-7 h-7 text-indigo-400" />
+                <Icons.Plus className="w-7 h-7 text-amber-400" />
                 <h2 className="text-2xl font-bold font-serif text-slate-100">New Note</h2>
             </div>
             <p className="text-sm text-slate-400 flex-grow">
@@ -35,7 +35,7 @@ const NoteCreator: React.FC<{ onNoteCreated: (data: Omit<Note, 'id' | 'createdAt
             <div className="space-y-3">
                  <div>
                     <label className="block text-xs font-medium text-slate-400 mb-1.5">Title</label>
-                    <input type="text" value={title} onChange={e => setTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleCreate()} placeholder="e.g., The villain's secret plan..." className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-slate-600" />
+                    <input type="text" value={title} onChange={e => setTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleCreate()} placeholder="e.g., The villain's secret plan..." className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-amber-500 outline-none placeholder:text-slate-600" />
                 </div>
             </div>
             <Button onClick={handleCreate} disabled={!title.trim()} size="lg" className="w-full mt-auto">

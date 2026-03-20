@@ -100,7 +100,7 @@ export const CombatTracker: React.FC<CombatTrackerProps> = ({ encounter, onUpdat
   return (
     <div className="p-6 md:p-8 h-full flex flex-col overflow-hidden animate-in fade-in duration-300">
         <header className="flex justify-between items-center mb-6 flex-shrink-0">
-            <div className="flex items-center gap-3 text-indigo-400">
+            <div className="flex items-center gap-3 text-amber-400">
                 <Icons.Combat className="w-8 h-8" />
                 <h1 className="text-3xl font-bold font-serif text-slate-100">Combat Tracker</h1>
             </div>
@@ -109,7 +109,7 @@ export const CombatTracker: React.FC<CombatTrackerProps> = ({ encounter, onUpdat
                     <span className="text-slate-400 text-xs uppercase tracking-wider font-bold mr-2">Round</span>
                     <span className="text-2xl font-bold text-white">{encounter.round}</span>
                 </div>
-                <Button onClick={nextTurn} size="lg" className="shadow-lg shadow-indigo-500/20">
+                <Button onClick={nextTurn} size="lg" className="shadow-lg shadow-amber-500/20">
                     Next Turn <Icons.ChevronDown className="ml-2 w-4 h-4 rotate-[-90deg]" />
                 </Button>
             </div>
@@ -131,7 +131,7 @@ export const CombatTracker: React.FC<CombatTrackerProps> = ({ encounter, onUpdat
                         key={combatant.id} 
                         className={twMerge(
                             "grid grid-cols-12 gap-4 p-4 items-center transition-colors",
-                            index === encounter.turnIndex ? "bg-indigo-500/10 border-l-4 border-indigo-500" : "hover:bg-slate-800/30 border-l-4 border-transparent"
+                            index === encounter.turnIndex ? "bg-amber-500/10 border-l-4 border-amber-500" : "hover:bg-slate-800/30 border-l-4 border-transparent"
                         )}
                     >
                          {/* Initiative */}
@@ -140,7 +140,7 @@ export const CombatTracker: React.FC<CombatTrackerProps> = ({ encounter, onUpdat
                                 type="number" 
                                 value={combatant.initiative} 
                                 onChange={(e) => updateCombatant(combatant.id, { initiative: parseInt(e.target.value) || 0 })}
-                                className="w-12 text-center bg-slate-800 border border-slate-700 rounded p-1 text-lg font-bold text-slate-200 focus:ring-1 focus:ring-indigo-500 outline-none"
+                                className="w-12 text-center bg-slate-800 border border-slate-700 rounded p-1 text-lg font-bold text-slate-200 focus:ring-1 focus:ring-amber-500 outline-none"
                             />
                         </div>
 
@@ -179,7 +179,7 @@ export const CombatTracker: React.FC<CombatTrackerProps> = ({ encounter, onUpdat
                                     value={combatant.hp} 
                                     onChange={(e) => updateCombatant(combatant.id, { hp: parseInt(e.target.value) || 0 })}
                                     className={twMerge(
-                                        "w-16 text-center bg-slate-800 border border-slate-700 rounded p-1 text-lg font-bold outline-none focus:ring-1 focus:ring-indigo-500",
+                                        "w-16 text-center bg-slate-800 border border-slate-700 rounded p-1 text-lg font-bold outline-none focus:ring-1 focus:ring-amber-500",
                                         combatant.hp <= 0 ? "text-red-500" : combatant.hp < combatant.maxHp / 2 ? "text-yellow-500" : "text-green-400"
                                     )}
                                 />
@@ -191,7 +191,7 @@ export const CombatTracker: React.FC<CombatTrackerProps> = ({ encounter, onUpdat
                                     type="number" 
                                     value={combatant.maxHp} 
                                     onChange={(e) => updateCombatant(combatant.id, { maxHp: parseInt(e.target.value) || 0 })}
-                                    className="w-16 text-center bg-slate-800 border border-slate-700 rounded p-1 text-sm text-slate-400 outline-none focus:ring-1 focus:ring-indigo-500"
+                                    className="w-16 text-center bg-slate-800 border border-slate-700 rounded p-1 text-sm text-slate-400 outline-none focus:ring-1 focus:ring-amber-500"
                                 />
                                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] text-slate-500 bg-slate-900 px-1">Max</span>
                             </div>
@@ -258,8 +258,8 @@ const AddCombatantMenu: React.FC<{
             {isOpen && (
                 <div className="absolute bottom-full right-0 mb-2 w-80 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-4 animate-in fade-in slide-in-from-bottom-2 z-20">
                     <div className="flex space-x-2 border-b border-slate-700 pb-2 mb-4">
-                        <button onClick={() => setActiveTab('manual')} className={twMerge("text-xs font-bold uppercase tracking-wider pb-1 border-b-2 transition-colors", activeTab === 'manual' ? "border-indigo-500 text-indigo-400" : "border-transparent text-slate-500 hover:text-slate-300")}>Manual</button>
-                        <button onClick={() => setActiveTab('roster')} className={twMerge("text-xs font-bold uppercase tracking-wider pb-1 border-b-2 transition-colors", activeTab === 'roster' ? "border-indigo-500 text-indigo-400" : "border-transparent text-slate-500 hover:text-slate-300")}>Roster</button>
+                        <button onClick={() => setActiveTab('manual')} className={twMerge("text-xs font-bold uppercase tracking-wider pb-1 border-b-2 transition-colors", activeTab === 'manual' ? "border-amber-500 text-amber-400" : "border-transparent text-slate-500 hover:text-slate-300")}>Manual</button>
+                        <button onClick={() => setActiveTab('roster')} className={twMerge("text-xs font-bold uppercase tracking-wider pb-1 border-b-2 transition-colors", activeTab === 'roster' ? "border-amber-500 text-amber-400" : "border-transparent text-slate-500 hover:text-slate-300")}>Roster</button>
                     </div>
 
                     {activeTab === 'manual' ? (
@@ -269,7 +269,7 @@ const AddCombatantMenu: React.FC<{
                                 placeholder="Name (e.g. Goblin Archer)" 
                                 value={manualForm.name}
                                 onChange={e => setManualForm({...manualForm, name: e.target.value})}
-                                className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-indigo-500"
+                                className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-amber-500"
                                 autoFocus
                              />
                              <div className="grid grid-cols-2 gap-2">
@@ -279,7 +279,7 @@ const AddCombatantMenu: React.FC<{
                                         type="number" 
                                         value={manualForm.hp}
                                         onChange={e => setManualForm({...manualForm, hp: parseInt(e.target.value) || 0})}
-                                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-indigo-500"
+                                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-amber-500"
                                     />
                                 </div>
                                 <div>
@@ -288,7 +288,7 @@ const AddCombatantMenu: React.FC<{
                                         type="number" 
                                         value={manualForm.init}
                                         onChange={e => setManualForm({...manualForm, init: parseInt(e.target.value) || 0})}
-                                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-indigo-500"
+                                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-amber-500"
                                     />
                                 </div>
                              </div>
@@ -297,7 +297,7 @@ const AddCombatantMenu: React.FC<{
                                     <button 
                                         key={t}
                                         onClick={() => setManualForm({...manualForm, type: t})}
-                                        className={twMerge("flex-1 py-1 text-xs uppercase rounded border transition-colors", manualForm.type === t ? "bg-indigo-600 border-indigo-600 text-white" : "border-slate-600 text-slate-400 hover:border-slate-500")}
+                                        className={twMerge("flex-1 py-1 text-xs uppercase rounded border transition-colors", manualForm.type === t ? "bg-amber-600 border-amber-600 text-white" : "border-slate-600 text-slate-400 hover:border-slate-500")}
                                     >
                                         {t}
                                     </button>

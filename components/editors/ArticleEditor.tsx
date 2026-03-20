@@ -104,7 +104,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
       <header className="flex justify-between items-start">
         <div className="space-y-2">
-            <div className="flex items-center gap-3 text-indigo-400">
+            <div className="flex items-center gap-3 text-amber-400">
               <Icons.FileCode className="w-8 h-8" />
               <h1 className="text-3xl font-bold font-serif text-slate-100">Lorebook Editor</h1>
             </div>
@@ -125,7 +125,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
                 value={formData.title}
                 onChange={handleChange}
                 onBlur={handleBlur}
-                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
+                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all"
               />
             </div>
             <div>
@@ -134,7 +134,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
                     name="category"
                     value={formData.category}
                     onChange={handleSelectChange}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all capitalize"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all capitalize"
                 >
                     {categoryOptions.map(c => (
                         <option key={c} value={c} className="capitalize">{c}</option>
@@ -184,7 +184,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
                     name="parentArticleId"
                     value={formData.parentArticleId || "none"}
                     onChange={handleSelectChange}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all"
                 >
                     <option value="none">-- None (Top Level) --</option>
                     {possibleParents.map(a => (
@@ -221,7 +221,7 @@ const EntityList = ({ title, entities, selectedIds, onToggle }: { title: string,
                             type="checkbox" 
                             checked={selectedIds.includes(entity.id)} 
                             onChange={() => onToggle(entity.id)}
-                            className="rounded border-slate-600 bg-slate-900 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-slate-900"
+                            className="rounded border-slate-600 bg-slate-900 text-amber-600 focus:ring-amber-500 focus:ring-offset-slate-900"
                         />
                         <span className="text-sm text-slate-300 truncate">{entity.name}</span>
                     </label>

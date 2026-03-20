@@ -27,7 +27,7 @@ const PlotCreator: React.FC<{ onPlotCreated: (data: Omit<Plot, 'id'>) => void; }
     return (
         <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 space-y-4 h-full flex flex-col">
             <div className="flex items-center gap-3">
-                <Icons.Plus className="w-7 h-7 text-indigo-400" />
+                <Icons.Plus className="w-7 h-7 text-amber-400" />
                 <h2 className="text-2xl font-bold font-serif text-slate-100">New Plot Arc</h2>
             </div>
             <p className="text-sm text-slate-400 flex-grow">
@@ -36,7 +36,7 @@ const PlotCreator: React.FC<{ onPlotCreated: (data: Omit<Plot, 'id'>) => void; }
             <div className="space-y-3">
                  <div>
                     <label className="block text-xs font-medium text-slate-400 mb-1.5">Title</label>
-                    <input type="text" value={title} onChange={e => setTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleCreate()} placeholder="e.g., The Return of the Lich King" className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-slate-600" />
+                    <input type="text" value={title} onChange={e => setTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleCreate()} placeholder="e.g., The Return of the Lich King" className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-amber-500 outline-none placeholder:text-slate-600" />
                 </div>
             </div>
             <Button onClick={handleCreate} disabled={!title.trim()} size="lg" className="w-full mt-auto">
@@ -111,14 +111,14 @@ const PlotCard: React.FC<PlotCardProps> = ({ plot, onClick, compact }) => (
     >
         <div className="flex justify-between items-start w-full mb-1">
                 <h3 className={`font-semibold text-slate-200 truncate pr-2 ${compact ? 'text-sm' : 'text-lg'}`}>{plot.title}</h3>
-                {!compact && <Icons.Target className="w-5 h-5 text-indigo-500/50 flex-shrink-0" />}
+                {!compact && <Icons.Target className="w-5 h-5 text-yellow-500/50 flex-shrink-0" />}
         </div>
         {!compact && (
             <p className="text-sm text-slate-400 line-clamp-2 flex-grow">{plot.description || <span className="italic opacity-50">No description...</span>}</p>
         )}
         <div className="mt-2 flex gap-2 overflow-hidden">
             {(plot.relatedEntityIds || []).length > 0 && (
-                <span className="text-[10px] bg-indigo-900/30 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/20">
+                <span className="text-[10px] bg-amber-900/30 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/20">
                     {plot.relatedEntityIds.length} Linked Entities
                 </span>
             )}

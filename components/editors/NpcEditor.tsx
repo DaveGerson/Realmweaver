@@ -106,7 +106,7 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
       <header className="flex justify-between items-start">
         <div className="space-y-2">
-            <div className="flex items-center gap-3 text-indigo-400">
+            <div className="flex items-center gap-3 text-amber-400">
               <Icons.NPCs className="w-8 h-8" />
               <h1 className="text-3xl font-bold font-serif text-slate-100">NPC Editor</h1>
             </div>
@@ -128,7 +128,7 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                 value={formData.name}
                 onChange={handleChange}
                 onBlur={handleBlur}
-                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-600"
+                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600"
               />
             </div>
              {/* Faction */}
@@ -138,7 +138,7 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                     name="factionId"
                     value={formData.factionId || "none"}
                     onChange={handleFactionChange}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all"
                 >
                     <option value="none">-- None --</option>
                     {factions.map(faction => (
@@ -256,7 +256,7 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                                     value={rel.targetId}
                                     onChange={(e) => handleRelationshipChange(index, 'targetId', e.target.value)}
                                     onBlur={handleRelationshipBlur}
-                                    className="w-1/2 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500"
+                                    className="w-1/2 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500"
                                 >
                                     <option value="">-- Select Target --</option>
                                     {possibleTargets.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -267,7 +267,7 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                                     value={rel.relationType}
                                     onChange={(e) => handleRelationshipChange(index, 'relationType', e.target.value)}
                                     onBlur={handleRelationshipBlur}
-                                    className="w-1/2 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500"
+                                    className="w-1/2 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500"
                                 />
                             </div>
                             <textarea
@@ -276,7 +276,7 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                                 onChange={(e) => handleRelationshipChange(index, 'description', e.target.value)}
                                 onBlur={handleRelationshipBlur}
                                 rows={1}
-                                className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500 resize-y"
+                                className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500 resize-y"
                             />
                         </div>
                         <button onClick={() => handleDeleteRelationship(index)} className="text-slate-500 hover:text-red-400 p-1 rounded transition-colors">

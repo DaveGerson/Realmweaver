@@ -207,7 +207,7 @@ export const EntityHistoryManager: React.FC<EntityHistoryManagerProps> = ({ subj
                         <select 
                             value={targetId} 
                             onChange={(e) => setTargetId(e.target.value)}
-                            className="w-1/3 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500"
+                            className="w-1/3 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500"
                         >
                             <option value="">{isEntitySubject ? '-- Select Context (Optional) --' : '-- Select Entity --'}</option>
                             {renderTargetOptions()}
@@ -217,7 +217,7 @@ export const EntityHistoryManager: React.FC<EntityHistoryManagerProps> = ({ subj
                             value={summary} 
                             onChange={(e) => setSummary(e.target.value)}
                             placeholder="What happened?"
-                            className="flex-grow bg-slate-950 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500"
+                            className="flex-grow bg-slate-950 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500"
                             autoFocus
                         />
                     </div>
@@ -236,7 +236,7 @@ export const EntityHistoryManager: React.FC<EntityHistoryManagerProps> = ({ subj
                         </div>
                         <div className="flex-grow text-sm">
                             <div className="flex justify-between items-start">
-                                <span className="font-semibold text-indigo-300">
+                                <span className="font-semibold text-amber-300">
                                     {isEntitySubject ? event.linkedEntityName : event.linkedEntityName}
                                 </span>
                                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

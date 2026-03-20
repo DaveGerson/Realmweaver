@@ -81,7 +81,7 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, onUpdate, onDelete
     <div className="p-6 md:p-8 h-full flex flex-col overflow-hidden animate-in fade-in duration-300">
       <header className="flex justify-between items-start mb-6 flex-shrink-0">
         <div className="space-y-2">
-            <div className="flex items-center gap-3 text-indigo-400">
+            <div className="flex items-center gap-3 text-amber-400">
               <Icons.Plot className="w-8 h-8" />
               <h1 className="text-3xl font-bold font-serif text-slate-100">Plot Arc Editor</h1>
             </div>
@@ -103,7 +103,7 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, onUpdate, onDelete
                         value={formData.title}
                         onChange={handleChange}
                         onBlur={handleBlur}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all font-semibold text-lg placeholder:text-slate-600"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all font-semibold text-lg placeholder:text-slate-600"
                         placeholder="Plot Title..."
                     />
                 </div>
@@ -114,7 +114,7 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, onUpdate, onDelete
                         value={formData.status}
                         onChange={handleChange}
                         onBlur={handleBlur}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all capitalize"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all capitalize"
                     >
                         <option value="active">Active</option>
                         <option value="dormant">Dormant</option>
@@ -145,7 +145,7 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, onUpdate, onDelete
                                 type="checkbox"
                                 checked={(formData.relatedEntityIds || []).includes(entity.id)}
                                 onChange={() => handleEntityToggle(entity.id)}
-                                className="rounded border-slate-600 bg-slate-900 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-slate-900"
+                                className="rounded border-slate-600 bg-slate-900 text-amber-600 focus:ring-amber-500 focus:ring-offset-slate-900"
                             />
                             <div className="flex flex-col min-w-0">
                                 <span className="text-sm text-slate-300 truncate">{entity.name}</span>
@@ -161,17 +161,17 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, onUpdate, onDelete
         {/* Narrative Timeline */}
         <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-800/50">
             <h2 className="text-lg font-bold font-serif text-slate-200 mb-4 flex items-center gap-2">
-                <Icons.List className="w-5 h-5 text-indigo-400" /> Narrative Timeline
+                <Icons.List className="w-5 h-5 text-amber-400" /> Narrative Timeline
             </h2>
             <div className="space-y-6 pl-4 border-l-2 border-slate-800 ml-2">
                 {narrativeTimeline.map((session, index) => (
                     <div key={session.id} className="relative pl-6 group">
                         {/* Timeline Node */}
-                        <div className="absolute -left-[29px] top-1 w-3 h-3 rounded-full bg-slate-800 border-2 border-slate-600 group-hover:border-indigo-500 group-hover:bg-indigo-900 transition-colors"></div>
+                        <div className="absolute -left-[29px] top-1 w-3 h-3 rounded-full bg-slate-800 border-2 border-slate-600 group-hover:border-amber-500 group-hover:bg-amber-900 transition-colors"></div>
                         
                         <div className="flex flex-col">
                             <span className="text-xs text-slate-500 font-mono mb-1">{new Date(session.sessionDate).toLocaleDateString()}</span>
-                            <h3 className="text-sm font-bold text-indigo-300 mb-2">{session.title}</h3>
+                            <h3 className="text-sm font-bold text-amber-300 mb-2">{session.title}</h3>
                             <div className="bg-slate-950/50 p-3 rounded-md border border-slate-800 text-sm text-slate-300 italic">
                                 {session.notableEvents || session.recap ? (
                                     <>

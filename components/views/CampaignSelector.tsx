@@ -16,7 +16,7 @@ export const CampaignSelector: React.FC<CampaignSelectorProps> = ({ campaigns, o
     <div className="flex-1 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-2xl mx-auto animate-in fade-in duration-500">
         <header className="text-center mb-8">
-            <Icons.Campaign className="w-12 h-12 mx-auto text-indigo-500" />
+            <Icons.Campaign className="w-12 h-12 mx-auto text-amber-500" />
             <h1 className="mt-4 text-3xl font-bold font-serif text-slate-100">Your Campaigns</h1>
             <p className="mt-1 text-slate-400">
                 Select a campaign to continue your journey, or create a new one.
@@ -28,7 +28,7 @@ export const CampaignSelector: React.FC<CampaignSelectorProps> = ({ campaigns, o
                 {campaigns.map(campaign => (
                     <div key={campaign.id} className="group flex items-center gap-3 p-4 rounded-lg bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 transition-all">
                         <div className="flex-grow cursor-pointer" onClick={() => onSelect(campaign.id)}>
-                            <h3 className="font-semibold text-lg text-slate-100 group-hover:text-indigo-400 transition-colors">{campaign.title}</h3>
+                            <h3 className="font-semibold text-lg text-slate-100 group-hover:text-amber-400 transition-colors">{campaign.title}</h3>
                             <p className="text-sm text-slate-400 line-clamp-2">{campaign.setting || 'No setting description provided.'}</p>
                         </div>
                         <button onClick={() => onDelete(campaign.id)} className="p-2 rounded-md text-slate-500 hover:bg-red-900/50 hover:text-red-400 transition-colors" aria-label={`Delete campaign ${campaign.title}`}>

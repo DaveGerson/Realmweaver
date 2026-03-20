@@ -32,7 +32,7 @@ export const PlayerCharacterEditor: React.FC<PlayerCharacterEditorProps> = ({ pc
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
       <header className="flex justify-between items-start">
         <div className="space-y-2">
-            <div className="flex items-center gap-3 text-indigo-400">
+            <div className="flex items-center gap-3 text-amber-400">
               <Icons.PlayerCharacters className="w-8 h-8" />
               <div>
                 <h1 className="text-3xl font-bold font-serif text-slate-100">{formData.characterSocial.characterName}</h1>
@@ -57,7 +57,7 @@ export const PlayerCharacterEditor: React.FC<PlayerCharacterEditorProps> = ({ pc
                              <div key={ability} className="bg-slate-950 p-2 rounded-md border border-slate-800">
                                 <div className="text-xs text-slate-400 uppercase">{ability.substring(0,3)}</div>
                                 <div className="text-2xl font-bold text-slate-100">{score}</div>
-                                <div className="text-sm text-indigo-400 font-semibold">{getModifier(score as number)}</div>
+                                <div className="text-sm text-amber-400 font-semibold">{getModifier(score as number)}</div>
                             </div>
                         ))}
                     </div>

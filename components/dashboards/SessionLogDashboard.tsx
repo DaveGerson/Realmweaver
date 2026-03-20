@@ -37,21 +37,21 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({ sessio
 
       {/* 1. Active Session (Hero Card) */}
       {activeSession && (
-          <div className="bg-indigo-900/20 border border-indigo-500/50 rounded-xl p-6 relative overflow-hidden group">
-              <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 animate-pulse"></div>
+          <div className="bg-amber-900/20 border border-amber-500/50 rounded-xl p-6 relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-1 h-full bg-amber-500 animate-pulse"></div>
               <div className="flex justify-between items-start relative z-10">
                   <div>
                       <div className="flex items-center gap-2 mb-2">
-                          <span className="bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">Live Now</span>
+                          <span className="bg-amber-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">Live Now</span>
                           <h2 className="text-2xl font-bold text-white">{activeSession.title}</h2>
                       </div>
-                      <p className="text-indigo-200 mb-4 line-clamp-2">{activeSession.prepNotes || "No prep notes yet..."}</p>
-                      <div className="flex gap-4 text-sm text-indigo-300/70">
+                      <p className="text-amber-200 mb-4 line-clamp-2">{activeSession.prepNotes || "No prep notes yet..."}</p>
+                      <div className="flex gap-4 text-sm text-amber-300/70">
                           <span className="flex items-center gap-1"><Icons.Calendar className="w-3 h-3" /> {new Date(activeSession.sessionDate).toLocaleDateString()}</span>
                           {activeSession.plannedSceneIds.length > 0 && <span className="flex items-center gap-1"><Icons.Scenes className="w-3 h-3" /> {activeSession.plannedSceneIds.length} Scenes Planned</span>}
                       </div>
                   </div>
-                  <Button size="lg" onClick={() => onSelectSessionLog(activeSession.id)} className="shadow-lg shadow-indigo-500/20">
+                  <Button size="lg" onClick={() => onSelectSessionLog(activeSession.id)} className="shadow-lg shadow-amber-500/20">
                       <Icons.Play className="w-5 h-5 mr-2" /> Continue Session
                   </Button>
               </div>
@@ -62,7 +62,7 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({ sessio
           {/* 2. Upcoming Sessions */}
           <div>
               <h3 className="text-lg font-bold font-serif text-slate-200 mb-4 flex items-center gap-2">
-                  <Icons.Calendar className="w-5 h-5 text-indigo-400" /> Upcoming & Planned
+                  <Icons.Calendar className="w-5 h-5 text-amber-400" /> Upcoming & Planned
               </h3>
               <div className="space-y-3">
                   {plannedSessions.map(session => (
@@ -72,7 +72,7 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({ sessio
                           className="w-full text-left bg-slate-900/50 border border-slate-800 border-l-4 border-l-rose-500 hover:border-slate-700 hover:border-l-rose-400 hover:bg-slate-800 p-4 rounded-lg transition-all group"
                       >
                           <div className="flex justify-between items-center mb-1">
-                              <span className="font-semibold text-slate-200 group-hover:text-indigo-300 transition-colors">{session.title}</span>
+                              <span className="font-semibold text-slate-200 group-hover:text-amber-300 transition-colors">{session.title}</span>
                               <span className="text-xs text-slate-500 bg-slate-900 px-2 py-1 rounded border border-slate-800">{new Date(session.sessionDate).toLocaleDateString()}</span>
                           </div>
                           <p className="text-sm text-slate-500 line-clamp-1">{session.prepNotes || "No prep notes."}</p>

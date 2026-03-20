@@ -16,7 +16,7 @@ export const AiTextarea: React.FC<AiTextareaProps> = ({
   isGenerating = false,
   ...props
 }) => {
-  const baseClasses = 'w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-200 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-y placeholder:text-slate-500 transition-colors';
+  const baseClasses = 'w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-200 focus:ring-1 focus:ring-amber-500 focus:border-amber-500 outline-none resize-y placeholder:text-slate-500 transition-colors';
   const mergedClasses = twMerge(baseClasses, className);
 
   return (

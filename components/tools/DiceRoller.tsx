@@ -185,13 +185,13 @@ export const DiceRoller: React.FC<DiceRollerProps> = ({ onLogRoll }) => {
                                 onChange={(e) => { setFormulaInput(e.target.value); setFormulaError(''); }}
                                 onKeyDown={(e) => { if (e.key === 'Enter') handleFormulaRoll(); }}
                                 placeholder="2d6+4, 4d6kh3..."
-                                className="w-full bg-slate-700 border border-slate-600 rounded-md pl-7 pr-2 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                                className="w-full bg-slate-700 border border-slate-600 rounded-md pl-7 pr-2 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
                             />
                         </div>
                         <button
                             onClick={handleFormulaRoll}
                             disabled={!formulaInput.trim()}
-                            className="px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors"
+                            className="px-3 py-1.5 rounded-md bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors"
                         >
                             Roll
                         </button>
@@ -259,11 +259,11 @@ export const DiceRoller: React.FC<DiceRollerProps> = ({ onLogRoll }) => {
                             value={noteInput}
                             onChange={(e) => setNoteInput(e.target.value)}
                             placeholder="Note (optional)..."
-                            className="w-full bg-slate-700 border border-slate-600 rounded-md px-2 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                            className="w-full bg-slate-700 border border-slate-600 rounded-md px-2 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
                         />
                         <button
                             onClick={() => handleLogRoll(lastRoll)}
-                            className="w-full px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors"
+                            className="w-full px-3 py-1.5 rounded-md bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold transition-colors"
                         >
                             Log to Session
                         </button>
