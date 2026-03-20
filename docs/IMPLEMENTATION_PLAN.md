@@ -10,13 +10,14 @@
 ## Implementation Sequence
 
 ```
-Phase A: Universal Fixes ──────────── (immediate, ~1 week)
-Phase B: Search & Generation UX ──── (~2 weeks)
-Phase C: Session Intelligence ─────── (~2 weeks)
-Phase D: World Coherence ──────────── (~2 weeks)
-Phase E: Visual Polish & Mobile ───── (~2 weeks)
-Phase F: Growth & Advanced AI ─────── (~2 weeks)
-Phase G: Cloud & Collaboration ────── (3-4 months out, ~4 weeks)
+Phase A:  Universal Fixes ─────────── (immediate, ~1 week) ✅ COMPLETE
+Phase A2: No-Regrets UI Foundation ── (~1 week)
+Phase B:  Search & Generation UX ──── (~2 weeks)
+Phase C:  Session Intelligence ─────── (~2 weeks)
+Phase D:  World Coherence ──────────── (~2 weeks)
+Phase E:  Visual Polish & Mobile ───── (~2 weeks)
+Phase F:  Growth & Advanced AI ─────── (~2 weeks)
+Phase G:  Cloud & Collaboration ────── (3-4 months out, ~4 weeks)
 ```
 
 ---
@@ -93,6 +94,78 @@ Phase G: Cloud & Collaboration ────── (3-4 months out, ~4 weeks)
 - Skill checks have roll buttons
 - Combat HP reflects NPC data
 - Session end wizard functions end-to-end in mock mode
+
+---
+
+## Phase A2: No-Regrets UI Foundation
+
+> **Goal:** Apply 6 UI improvements that are safe regardless of future design direction. These appear across 3+ design proposals in `UI_DESIGN_EVALUATION.md` and benefit all archetypes.
+> **Predecessor:** Phase A (Universal Fixes) — COMPLETE
+> **Source:** `UI_DESIGN_EVALUATION.md` — cross-proposal analysis
+> **Archetypes served:** All 5
+> **Estimated agents:** 6 (all parallelizable)
+
+### A2-1: Entity Type Color Language
+- **What:** Add left-border color accents to all entity cards and sidebar items. Each entity type gets a distinct color.
+- **Colors:** NPC=amber, Location=emerald, Faction=violet, Item=sky, Adventure=orange, Article=cyan, Session=rose, Plot=yellow, PlayerCharacter=teal
+- **Where:** Dashboard cards, sidebar entity lists, editor headers, entity quick-references
+- **Files:** All dashboard components, `components/layout/CampaignSidebar.tsx`, all editor components
+- **Effort:** Medium (many files but simple CSS changes per file)
+- **Archetypes:** All (improves scannability — Worldbuilder and Tactician benefit most)
+
+### A2-2: Amber Primary / Indigo for AI
+- **What:** Replace indigo as the primary UI accent with amber. Reserve indigo exclusively for AI-powered features (generation buttons, Coach, Evocation Wizard, sparkle icons).
+- **Rationale:** CLAUDE.md already says "amber accents" but the actual implementation uses indigo everywhere. This creates a clear visual language: **amber = user actions, indigo = AI actions**.
+- **Scope:** Buttons, active sidebar items, selected states, focus rings, links → amber. AI generation buttons, Coach UI, Evocation Wizard, loading states for AI calls → indigo with sparkle icon.
+- **Files:** `components/common/Button.tsx`, `components/layout/Header.tsx`, `components/layout/CampaignSidebar.tsx`, all generator components, `components/dialogs/DmCoach.tsx`, `components/dialogs/EvocationWizard.tsx`, `components/views/SessionRunner.tsx`, `index.html` (custom CSS)
+- **Effort:** Large (touches many files but is a systematic find-and-replace of color classes)
+- **Archetypes:** All (clearer visual hierarchy — New DM benefits most from reduced confusion)
+
+### A2-3: Better Empty States
+- **What:** Replace bare "No X yet" messages with illustrated empty states including encouraging flavor text and one-click generation prompts.
+- **Examples:**
+  - NPCs: "Every great story needs its cast of characters" + "Generate a tavern full of NPCs?"
+  - Locations: "Your world awaits — where does the adventure begin?" + "Generate a starting location?"
+  - Factions: "Power structures shape every world" + "Generate a faction?"
+  - Adventures: "The quest begins with a single scene" + "Create your first adventure?"
+  - Session Logs: "Ready to run your first session?" + "Start session prep?"
+- **Visual:** Use a muted icon (from Icons.tsx) at 64px + text + amber CTA button. No external images needed.
+- **Files:** All dashboard components
+- **Effort:** Small (template pattern repeated across dashboards)
+- **Archetypes:** All (New DM CRITICAL — blank canvas paralysis is their #1 pain point)
+
+### A2-4: Sidebar Search/Filter
+- **What:** Add a text filter input at the top of the sidebar's entity section. Typing filters visible entity names across all categories in real-time.
+- **Behavior:** Debounced 100ms, filters across NPCs/Locations/Factions/Items/Adventures/Articles/Sessions/Plots. Matching items highlighted, non-matching hidden. Empty filter shows all. Category headers hidden when all their items are filtered out.
+- **Files:** `components/layout/CampaignSidebar.tsx`
+- **Effort:** Medium
+- **Archetypes:** All (essential once campaigns exceed 20 entities — Worldbuilder and Forever DM most impacted)
+
+### A2-5: Loading Skeletons
+- **What:** Replace spinner/pulse loading indicators with skeleton placeholder content for dashboards and editors.
+- **Implementation:** Create a `components/common/SkeletonCard.tsx` that shows a gray pulsing card shape matching the entity card layout. Use in dashboards during AI generation and initial load.
+- **Files:** New `components/common/SkeletonCard.tsx`, all dashboard components, generator components
+- **Effort:** Small
+- **Archetypes:** All (better perceived performance)
+
+### A2-6: Breadcrumbs
+- **What:** Add a breadcrumb trail above the content area showing navigation context: Campaign > [Category] > [Entity Name]
+- **Behavior:** Each segment is clickable (navigates back). Shows full path for nested items (Campaign > Adventures > Adventure Name > Scene Name).
+- **Files:** New `components/common/Breadcrumbs.tsx`, `components/layout/ContentWrapper.tsx` or `App.tsx`
+- **Effort:** Small
+- **Archetypes:** All (Worldbuilder HIGH — deep hierarchies need orientation cues)
+
+### QA Gate: Phase A2
+- `npm run build` passes
+- `npm test` passes
+- Entity type colors visible on all dashboard cards and sidebar items
+- Amber is primary accent; indigo only appears on AI features
+- All empty dashboards show illustrated empty states with generation CTAs
+- Sidebar filter works across all entity types
+- Skeleton loading appears during AI generation
+- Breadcrumbs show correct path and navigate on click
+- All changes responsive at 375px width
+- No visual regressions in Session Runner or existing editors
 
 ---
 

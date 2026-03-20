@@ -113,6 +113,48 @@ Manual verification:
 
 ---
 
+## Phase A2: No-Regrets UI Foundation — Orchestration Detail
+
+### Risk Level: LOW
+### Budget Tier: Standard (6 agents)
+### Git Strategy: Commit-per-agent on single feature branch
+
+### Agent Routing
+
+| Work Package | Agent | Model | Parallel Group |
+|---|---|---|---|
+| A2-1: Entity type color borders | `frontend-engineer--realmweaver` | sonnet | Group 1 |
+| A2-2: Amber primary / Indigo for AI | `frontend-engineer--realmweaver` | sonnet | Group 2 (after A2-1 — both touch color classes) |
+| A2-3: Better empty states | `frontend-engineer--realmweaver` | sonnet | Group 1 |
+| A2-4: Sidebar search/filter | `frontend-engineer--realmweaver` | sonnet | Group 1 |
+| A2-5: Loading skeletons | `frontend-engineer--realmweaver` | sonnet | Group 1 |
+| A2-6: Breadcrumbs | `frontend-engineer--realmweaver` | sonnet | Group 1 |
+
+### Parallel Strategy
+- **Group 1 (A2-1, A2-3, A2-4, A2-5, A2-6):** Run in parallel with worktree isolation. Minimal overlap — different files.
+- **Group 2 (A2-2):** Sequential after Group 1. The amber/indigo palette swap touches many of the same files as A2-1 (entity colors). Merge A2-1 first, then A2-2 works on the merged state.
+
+### Conflict Hotspots
+- `CampaignSidebar.tsx` — A2-1 (entity colors), A2-2 (amber active states), A2-4 (search filter) all touch this. Merge order: A2-4 → A2-1 → A2-2.
+- Dashboard components — A2-1 (color borders), A2-3 (empty states), A2-5 (skeletons) all touch dashboards. Use worktrees; merge sequentially.
+
+### Shared Context for Phase A2 Agents
+```
+Every agent receives:
+- CLAUDE.md (project conventions)
+- UI_DESIGN_EVALUATION.md (source design rationale)
+- docs/IMPLEMENTATION_PLAN.md → Phase A2 section
+- .claude/team-context/context.md (phase-specific shared context)
+
+Key instruction for A2-2 (amber/indigo):
+- Amber classes: bg-amber-600, hover:bg-amber-500, text-amber-400, border-amber-500, ring-amber-500
+- Indigo classes (AI only): bg-indigo-600, hover:bg-indigo-500, text-indigo-400
+- Systematically replace indigo with amber for non-AI elements
+- Add sparkle/wand icon to AI-specific buttons to reinforce the distinction
+```
+
+---
+
 ## Phase B: Search & Generation — Orchestration Detail
 
 ### Risk Level: LOW
