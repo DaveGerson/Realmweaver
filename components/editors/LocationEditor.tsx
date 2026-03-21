@@ -6,6 +6,7 @@ import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
 import { generateEnhancedText, generatePoiFromLoot, generateNpc } from '../../services/geminiService';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
+import { RegenerateButton } from '../common/RegenerateButton';
 import { campaignService } from '../../services/campaignService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
 
@@ -76,6 +77,13 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
       setIsGenerating(null);
     }
   };
+
+  const handleFieldRegenerate = (field: GenerationField) => (newValue: string) => {
+    setFormData(prev => ({ ...prev, [field]: newValue }));
+    onUpdate(location.id, { [field]: newValue });
+  };
+
+  const locationEntityContext = `Location Name: ${formData.name}\nDescription: ${formData.description || 'Not specified'}\nSecrets: ${formData.secrets || 'Not specified'}`;
 
   const handleDelete = () => {
     if (window.confirm(`Are you sure you want to delete ${location.name}? This action cannot be undone.`)) {
@@ -277,9 +285,9 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
           </div>
         </div>
 
-        <AiTextarea label="Description" name="description" value={formData.description} onChange={handleChange} onBlur={handleBlur} rows={5} onAiGenerate={() => handleAiGenerate('description')} isGenerating={isGenerating === 'description'} />
+        <AiTextarea label="Description" name="description" value={formData.description} onChange={handleChange} onBlur={handleBlur} rows={5} onAiGenerate={() => handleAiGenerate('description')} isGenerating={isGenerating === 'description'} regenerateButton={<RegenerateButton fieldName="description" currentValue={formData.description} entityType="Location" entityContext={locationEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />} />
 
-        <AiTextarea label="Secrets & Hidden Details" name="secrets" value={formData.secrets} onChange={handleChange} onBlur={handleBlur} rows={3} onAiGenerate={() => handleAiGenerate('secrets')} isGenerating={isGenerating === 'secrets'} />
+        <AiTextarea label="Secrets & Hidden Details" name="secrets" value={formData.secrets} onChange={handleChange} onBlur={handleBlur} rows={3} onAiGenerate={() => handleAiGenerate('secrets')} isGenerating={isGenerating === 'secrets'} regenerateButton={<RegenerateButton fieldName="secrets" currentValue={formData.secrets} entityType="Location" entityContext={locationEntityContext} onRegenerate={handleFieldRegenerate('secrets')} isMockMode={isMockMode} campaignContext={campaignContext} />} />
 
         {/* Items & Loot */}
         <div>

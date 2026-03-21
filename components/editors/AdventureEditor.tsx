@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import type { Adventure, Campaign } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { PrepDocumentView } from './PrepDocumentView';
+import { RegenerateButton } from '../common/RegenerateButton';
 import { twMerge } from 'tailwind-merge';
 import { generateScene } from '../../services/geminiService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
@@ -38,6 +39,13 @@ export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, cam
         onUpdate(adventure.id, { [name]: isNumber ? parseInt(value) || 0 : value });
     }
   };
+
+  const handleFieldRegenerate = (field: 'hook') => (newValue: string) => {
+    setFormData(prev => ({ ...prev, [field]: newValue }));
+    onUpdate(adventure.id, { [field]: newValue });
+  };
+
+  const adventureEntityContext = `Adventure Title: ${formData.title}\nLevel: ${formData.level}\nTheme: ${formData.theme || 'Not specified'}\nHook: ${formData.hook || 'Not specified'}`;
 
   // --- Generate Next Scene ---
   const lastScene = adventure.scenes[adventure.scenes.length - 1];
@@ -124,7 +132,10 @@ export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, cam
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-400 mb-1.5">One-Sentence Hook</label>
+            <div className="flex items-center mb-1.5">
+              <label className="block text-sm font-medium text-slate-400">One-Sentence Hook</label>
+              <RegenerateButton fieldName="hook" currentValue={formData.hook} entityType="Adventure" entityContext={adventureEntityContext} onRegenerate={handleFieldRegenerate('hook')} isMockMode={isMockMode} campaignContext={campaignContext} />
+            </div>
             <textarea
               name="hook"
               value={formData.hook}

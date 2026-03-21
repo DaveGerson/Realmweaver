@@ -5,17 +5,19 @@ import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
 import { generateEnhancedText } from '../../services/geminiService';
+import { RegenerateButton } from '../common/RegenerateButton';
 
 interface ItemEditorProps {
   item: Item;
   onUpdate: (id: string, updatedData: Partial<Item>) => void;
   onDelete: (id: string) => void;
   isMockMode: boolean;
+  campaignContext?: string;
 }
 
 const rarityOptions: ItemRarity[] = ['common', 'uncommon', 'rare', 'very rare', 'legendary', 'artifact'];
 
-export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onUpdate, onDelete, isMockMode }) => {
+export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onUpdate, onDelete, isMockMode, campaignContext }) => {
   const [formData, setFormData] = useState(item);
   const [isGenerating, setIsGenerating] = useState<keyof Omit<Item, 'id' | 'rarity'> | null>(null);
 
@@ -62,6 +64,13 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onUpdate, onDelete
       setIsGenerating(null);
     }
   };
+
+  const handleFieldRegenerate = (field: keyof Omit<Item, 'id' | 'rarity'>) => (newValue: string) => {
+    setFormData(prev => ({ ...prev, [field]: newValue }));
+    onUpdate(item.id, { [field]: newValue });
+  };
+
+  const itemEntityContext = `Item Name: ${formData.name}\nRarity: ${formData.rarity}\nDescription: ${formData.description || 'Not specified'}\nProperties: ${formData.properties || 'Not specified'}`;
 
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
@@ -116,6 +125,7 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onUpdate, onDelete
           placeholder="A detailed description of the item's appearance and history."
           onAiGenerate={() => handleAiGenerate('description')}
           isGenerating={isGenerating === 'description'}
+          regenerateButton={<RegenerateButton fieldName="description" currentValue={formData.description} entityType="Item" entityContext={itemEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />}
         />
 
         <AiTextarea

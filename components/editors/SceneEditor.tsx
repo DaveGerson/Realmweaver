@@ -6,6 +6,7 @@ import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
 import { generateEnhancedText, generateNpc } from '../../services/geminiService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
+import { RegenerateButton } from '../common/RegenerateButton';
 import { campaignService } from '../../services/campaignService';
 
 interface SceneEditorProps {
@@ -79,6 +80,13 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
       setIsGenerating(null);
     }
   };
+
+  const handleFieldRegenerate = (field: 'readAloudText' | 'gmNotes') => (newValue: string) => {
+    setFormData(prev => ({ ...prev, [field]: newValue }));
+    onUpdate(scene.id, { [field]: newValue });
+  };
+
+  const sceneEntityContext = `Scene Title: ${formData.title}\nScene Type: ${formData.type}\nRead-Aloud Text: ${formData.readAloudText || 'Not specified'}\nGM Notes: ${formData.gmNotes || 'Not specified'}`;
 
   // --- Generate NPC for Scene ---
   const sceneLocation = allLocations.find(l => l.id === scene.locationId);
@@ -195,6 +203,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
           placeholder="Evocative 'box text' to read to your players to set the scene."
           onAiGenerate={() => handleAiGenerate('readAloudText')}
           isGenerating={isGenerating === 'readAloudText'}
+          regenerateButton={<RegenerateButton fieldName="readAloudText" currentValue={formData.readAloudText} entityType="Scene" entityContext={sceneEntityContext} onRegenerate={handleFieldRegenerate('readAloudText')} isMockMode={isMockMode} campaignContext={campaignContext} />}
         />
 
         <AiTextarea
@@ -207,6 +216,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
           placeholder="GM-only notes: scene goals, character motivations, potential outcomes, hidden details..."
           onAiGenerate={() => handleAiGenerate('gmNotes')}
           isGenerating={isGenerating === 'gmNotes'}
+          regenerateButton={<RegenerateButton fieldName="gmNotes" currentValue={formData.gmNotes} entityType="Scene" entityContext={sceneEntityContext} onRegenerate={handleFieldRegenerate('gmNotes')} isMockMode={isMockMode} campaignContext={campaignContext} />}
         />
 
         {/* --- Skill Checks --- */}

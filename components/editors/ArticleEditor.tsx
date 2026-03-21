@@ -6,23 +6,25 @@ import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
 import { generateEnhancedText } from '../../services/geminiService';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
+import { RegenerateButton } from '../common/RegenerateButton';
 import { campaignService } from '../../services/campaignService';
 
 interface ArticleEditorProps {
   article: Article;
   allArticles: Article[];
   // Optional props
-  allNpcs?: any[]; 
+  allNpcs?: any[];
   allLocations?: any[];
   allFactions?: any[];
   onUpdate: (id: string, updatedData: Partial<Article>) => void;
   onDelete: (id: string) => void;
   isMockMode: boolean;
+  campaignContext?: string;
 }
 
 const categoryOptions: ArticleCategory[] = ['lore', 'history', 'cosmology'];
 
-export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticles, onUpdate, onDelete, isMockMode }) => {
+export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticles, onUpdate, onDelete, isMockMode, campaignContext }) => {
   const [formData, setFormData] = useState(article);
   const [isGenerating, setIsGenerating] = useState<keyof Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds' | 'category'> | null>(null);
   const campaign = campaignService.getState().campaigns.find(c => c.id === campaignService.getState().activeCampaignId)!;
@@ -85,6 +87,13 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
       setIsGenerating(null);
     }
   };
+
+  const handleFieldRegenerate = (field: 'content') => (newValue: string) => {
+    setFormData(prev => ({ ...prev, [field]: newValue }));
+    onUpdate(article.id, { [field]: newValue });
+  };
+
+  const articleEntityContext = `Article Title: ${formData.title}\nCategory: ${formData.category}\nContent summary: ${(formData.content || '').substring(0, 200)}...`;
 
   const possibleParents = allArticles.filter(a => {
     if (a.id === article.id) return false;
@@ -152,6 +161,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
           rows={15}
           onAiGenerate={() => handleAiGenerate('content')}
           isGenerating={isGenerating === 'content'}
+          regenerateButton={<RegenerateButton fieldName="content" currentValue={formData.content} entityType="Article" entityContext={articleEntityContext} onRegenerate={handleFieldRegenerate('content')} isMockMode={isMockMode} campaignContext={campaignContext} />}
         />
         
         {/* Related Entities Section */}

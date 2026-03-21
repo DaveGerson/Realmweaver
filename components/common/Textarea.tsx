@@ -7,6 +7,12 @@ interface AiTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaEleme
   label: string;
   onAiGenerate?: () => void;
   isGenerating?: boolean;
+  /**
+   * Optional RegenerateButton rendered inline next to the label text in the label row.
+   * RegenerateButton uses absolute positioning for its expanded panel so it does
+   * not disrupt the layout when activated.
+   */
+  regenerateButton?: React.ReactNode;
 }
 
 export const AiTextarea: React.FC<AiTextareaProps> = ({
@@ -14,6 +20,7 @@ export const AiTextarea: React.FC<AiTextareaProps> = ({
   className,
   onAiGenerate,
   isGenerating = false,
+  regenerateButton,
   ...props
 }) => {
   const baseClasses = 'w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-200 focus:ring-1 focus:ring-amber-500 focus:border-amber-500 outline-none resize-y placeholder:text-slate-500 transition-colors';
@@ -22,7 +29,10 @@ export const AiTextarea: React.FC<AiTextareaProps> = ({
   return (
     <div>
       <div className="flex justify-between items-center mb-1.5">
-        <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider">{label}</label>
+        <div className="flex items-center">
+          <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider">{label}</label>
+          {regenerateButton}
+        </div>
         {onAiGenerate && (
           <button
             onClick={onAiGenerate}

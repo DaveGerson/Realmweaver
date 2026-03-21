@@ -6,6 +6,7 @@ import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
 import { generateEnhancedText, generateNpc } from '../../services/geminiService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
+import { RegenerateButton } from '../common/RegenerateButton';
 import { campaignService } from '../../services/campaignService';
 
 interface FactionEditorProps {
@@ -67,6 +68,13 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
       setIsGenerating(null);
     }
   };
+
+  const handleFieldRegenerate = (field: keyof Omit<Faction, 'id' | 'leaderId' | 'memberIds' | 'headquartersLocationId'>) => (newValue: string) => {
+    setFormData(prev => ({ ...prev, [field]: newValue }));
+    onUpdate(faction.id, { [field]: newValue });
+  };
+
+  const factionEntityContext = `Faction Name: ${formData.name}\nDescription: ${formData.description || 'Not specified'}\nGoals: ${formData.goals || 'Not specified'}\nAlignment: ${formData.alignment || 'Not specified'}`;
 
   // --- Generate Member NPC ---
   const memberGenerationDefaultPrompt = `Generate a member NPC for the "${faction.name}" faction. ${faction.description ? `The faction is: ${faction.description}` : ''} This NPC should have a clear role and motivation within the faction.`.trim();
@@ -140,6 +148,7 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
           placeholder="The faction's purpose, public image, and typical members."
           onAiGenerate={() => handleAiGenerate('description')}
           isGenerating={isGenerating === 'description'}
+          regenerateButton={<RegenerateButton fieldName="description" currentValue={formData.description} entityType="Faction" entityContext={factionEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />}
         />
 
         {/* Goals */}
@@ -153,6 +162,7 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
           placeholder="The faction's primary short-term and long-term objectives."
           onAiGenerate={() => handleAiGenerate('goals')}
           isGenerating={isGenerating === 'goals'}
+          regenerateButton={<RegenerateButton fieldName="goals" currentValue={formData.goals} entityType="Faction" entityContext={factionEntityContext} onRegenerate={handleFieldRegenerate('goals')} isMockMode={isMockMode} campaignContext={campaignContext} />}
         />
 
         {/* Resources */}
