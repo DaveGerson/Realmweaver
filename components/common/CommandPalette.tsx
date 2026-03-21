@@ -131,8 +131,8 @@ function getEntitySubtitle(type: CommandPaletteEntityType, entity: NPC | Locatio
     case 'plot': return (entity as Plot).description?.slice(0, 80) || undefined;
     case 'player-character': {
       const pc = entity as PlayerCharacter;
-      const classes = pc.characterStatistics?.classes?.map(c => c.className).join(', ');
-      return classes || undefined;
+      const cls = pc.characterStatistics?.classes;
+      return cls ? `${cls.charClass}${cls.subclass ? ` (${cls.subclass})` : ''} Lvl ${cls.level}` : undefined;
     }
     default: return undefined;
   }
