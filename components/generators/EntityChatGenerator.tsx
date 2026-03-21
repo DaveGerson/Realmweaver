@@ -13,6 +13,7 @@ interface EntityChatGeneratorProps {
   initialData: any;
   isMockMode: boolean;
   campaignContext?: string;
+  promptChips?: string[];
 }
 
 export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
@@ -21,7 +22,8 @@ export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
     renderPreview,
     initialData,
     isMockMode,
-    campaignContext
+    campaignContext,
+    promptChips,
 }) => {
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -106,7 +108,7 @@ export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
       };
 
       setHistory(prev => [...prev, newAiMsg]);
-      
+
       // Update local draft if the AI returned an update for our ID
       const updatedDraft = response.draftEntities.find(d => d.id === draftId && d.type === entityType);
       if (updatedDraft) {
@@ -138,12 +140,12 @@ export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
                     <Icons.Chat className="w-4 h-4 text-indigo-400" />
                     <span className="text-sm font-semibold text-slate-200">Chat Assistant</span>
                 </div>
-                
+
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
                     {history.map(msg => (
                         <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                              <div className={twMerge(
-                                "max-w-[90%] p-3 rounded-lg text-sm whitespace-pre-wrap", 
+                                "max-w-[90%] p-3 rounded-lg text-sm whitespace-pre-wrap",
                                 msg.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-200 border border-slate-700'
                              )}>
                                 {msg.text}
@@ -151,8 +153,8 @@ export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
                             {msg.suggestions && msg.suggestions.length > 0 && (
                                 <div className="flex flex-wrap gap-2 mt-2">
                                     {msg.suggestions.map((s, i) => (
-                                        <button 
-                                            key={i} 
+                                        <button
+                                            key={i}
                                             onClick={() => handleSend(s)}
                                             disabled={isLoading}
                                             className="text-xs bg-slate-800 border border-indigo-500/30 text-indigo-300 px-2 py-1 rounded-full hover:bg-indigo-900/50 transition-colors text-left"
@@ -174,7 +176,22 @@ export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
                     <div ref={chatEndRef} />
                 </div>
 
-                <div className="p-3 border-t border-slate-800 bg-slate-900">
+                <div className="p-3 border-t border-slate-800 bg-slate-900 space-y-2">
+                    {/* Prompt chips */}
+                    {promptChips && promptChips.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                            {promptChips.map((chip, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() => handleSend(chip)}
+                                    disabled={isLoading}
+                                    className="text-xs bg-indigo-900/40 border border-indigo-700/50 text-indigo-300 px-2.5 py-1 rounded-full hover:bg-indigo-800/50 hover:border-indigo-600/70 transition-colors disabled:opacity-50 disabled:pointer-events-none min-h-[28px]"
+                                >
+                                    {chip}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                     <div className="flex gap-2">
                         <input
                             type="text"
