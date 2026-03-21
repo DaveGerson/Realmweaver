@@ -4,7 +4,9 @@ import type { Faction, NPC, Location } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
-import { generateEnhancedText } from '../../services/geminiService';
+import { generateEnhancedText, generateNpc } from '../../services/geminiService';
+import { GenerateHerePanel } from '../common/GenerateHerePanel';
+import { campaignService } from '../../services/campaignService';
 
 interface FactionEditorProps {
   faction: Faction;
@@ -13,11 +15,13 @@ interface FactionEditorProps {
   onUpdate: (id: string, updatedData: Partial<Faction>) => void;
   onDelete: (id: string) => void;
   isMockMode: boolean;
+  campaignContext?: string;
 }
 
-export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, allLocations = [], onUpdate, onDelete, isMockMode }) => {
+export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, allLocations = [], onUpdate, onDelete, isMockMode, campaignContext }) => {
   const [formData, setFormData] = useState(faction);
   const [isGenerating, setIsGenerating] = useState<keyof Omit<Faction, 'id' | 'leaderId' | 'memberIds'> | null>(null);
+  const [isGeneratingMember, setIsGeneratingMember] = useState(false);
 
   useEffect(() => {
     setFormData(faction);
@@ -61,6 +65,23 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
       console.error("AI generation failed:", error);
     } finally {
       setIsGenerating(null);
+    }
+  };
+
+  // --- Generate Member NPC ---
+  const memberGenerationDefaultPrompt = `Generate a member NPC for the "${faction.name}" faction. ${faction.description ? `The faction is: ${faction.description}` : ''} This NPC should have a clear role and motivation within the faction.`.trim();
+
+  const handleGenerateMemberNpc = async (prompt: string) => {
+    setIsGeneratingMember(true);
+    const contextWithFaction = `${campaignContext || ''}\nFaction: ${faction.name}${faction.description ? ` — ${faction.description}` : ''}${faction.goals ? `\nFaction Goals: ${faction.goals}` : ''}`.trim();
+    try {
+      const npcData = await generateNpc(prompt, false, isMockMode, contextWithFaction);
+      // Create the NPC pre-linked to this faction (factionId triggers bidirectional sync in campaignService)
+      campaignService.createNpc({ ...npcData, factionId: faction.id, relationships: [], history: [] });
+    } catch (error) {
+      console.error('Failed to generate member NPC:', error);
+    } finally {
+      setIsGeneratingMember(false);
     }
   };
 
@@ -177,7 +198,15 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
                 </select>
             </div>
              <div>
-                 <label className="block text-sm font-medium text-slate-400 mb-1.5">Members</label>
+                 <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                   <label className="block text-sm font-medium text-slate-400">Members</label>
+                   <GenerateHerePanel
+                     buttonLabel="Generate member NPC"
+                     defaultPrompt={memberGenerationDefaultPrompt}
+                     isGenerating={isGeneratingMember}
+                     onGenerate={handleGenerateMemberNpc}
+                   />
+                 </div>
                  {memberNpcs.length > 0 ? (
                     <div className="bg-slate-950 border border-slate-800 rounded-md p-3 space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
                         {memberNpcs.map(npc => (

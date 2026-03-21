@@ -4,9 +4,10 @@ import type { Location, LocationConnection, PointOfInterest, PoiInteraction, Loo
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
-import { generateEnhancedText, generatePoiFromLoot } from '../../services/geminiService';
+import { generateEnhancedText, generatePoiFromLoot, generateNpc } from '../../services/geminiService';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { campaignService } from '../../services/campaignService';
+import { GenerateHerePanel } from '../common/GenerateHerePanel';
 
 interface LocationEditorProps {
   location: Location;
@@ -17,14 +18,16 @@ interface LocationEditorProps {
   onUpdate: (id: string, updatedData: Partial<Location>) => void;
   onDelete: (id: string) => void;
   isMockMode: boolean;
+  campaignContext?: string;
 }
 
 type GenerationField = 'description' | 'secrets';
 
-export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLocations, allFactions = [], onUpdate, onDelete, isMockMode }) => {
+export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLocations, allFactions = [], onUpdate, onDelete, isMockMode, campaignContext }) => {
   const [formData, setFormData] = useState(location);
   const [isGenerating, setIsGenerating] = useState<GenerationField | null>(null);
   const [generatingPoiFor, setGeneratingPoiFor] = useState<string | null>(null);
+  const [isGeneratingNpc, setIsGeneratingNpc] = useState(false);
 
   const campaign = campaignService.getState().campaigns.find(c => c.id === campaignService.getState().activeCampaignId)!;
 
@@ -210,6 +213,22 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     }
   };
 
+  // --- Generate NPC at this Location ---
+  const npcGenerationDefaultPrompt = `Generate an NPC who frequents or is associated with "${location.name}". They should feel at home in this location and have a reason to be here.`;
+
+  const handleGenerateNpcAtLocation = async (prompt: string) => {
+    setIsGeneratingNpc(true);
+    const contextWithLocation = `${campaignContext || ''}\nCurrent Location: ${location.name}${location.description ? ` — ${location.description}` : ''}`.trim();
+    try {
+      const npcData = await generateNpc(prompt, false, isMockMode, contextWithLocation);
+      campaignService.createNpc({ ...npcData, factionId: undefined, relationships: [], history: [] });
+    } catch (error) {
+      console.error('Failed to generate NPC at location:', error);
+    } finally {
+      setIsGeneratingNpc(false);
+    }
+  };
+
   // Filter out the current location and its own children from the list of possible parents
   const possibleParents = allLocations.filter(l => {
     if (l.id === location.id) return false; // Can't be its own parent
@@ -243,9 +262,19 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
       </header>
       
       <div className="space-y-6 bg-slate-900/50 p-6 rounded-xl border border-slate-800/50">
-        <div>
-          <label className="block text-sm font-medium text-slate-400 mb-1.5">Location Name</label>
-          <input type="text" name="name" value={formData.name} onChange={handleChange} onBlur={handleBlur} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600"/>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <label className="block text-sm font-medium text-slate-400 mb-1.5">Location Name</label>
+            <input type="text" name="name" value={formData.name} onChange={handleChange} onBlur={handleBlur} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600"/>
+          </div>
+          <div className="pt-5">
+            <GenerateHerePanel
+              buttonLabel="Generate NPC at this location"
+              defaultPrompt={npcGenerationDefaultPrompt}
+              isGenerating={isGeneratingNpc}
+              onGenerate={handleGenerateNpcAtLocation}
+            />
+          </div>
         </div>
 
         <AiTextarea label="Description" name="description" value={formData.description} onChange={handleChange} onBlur={handleBlur} rows={5} onAiGenerate={() => handleAiGenerate('description')} isGenerating={isGenerating === 'description'} />

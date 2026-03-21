@@ -4,16 +4,22 @@ import type { Adventure, Campaign } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { PrepDocumentView } from './PrepDocumentView';
 import { twMerge } from 'tailwind-merge';
+import { generateScene } from '../../services/geminiService';
+import { GenerateHerePanel } from '../common/GenerateHerePanel';
+import { campaignService } from '../../services/campaignService';
 
 interface AdventureEditorProps {
   adventure: Adventure;
   campaign: Campaign;
   onUpdate: (id: string, updatedData: Partial<Adventure>) => void;
+  isMockMode?: boolean;
+  campaignContext?: string;
 }
 
-export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, campaign, onUpdate }) => {
+export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, campaign, onUpdate, isMockMode = false, campaignContext }) => {
   const [formData, setFormData] = useState(adventure);
   const [activeTab, setActiveTab] = useState<'details' | 'prepDoc'>('details');
+  const [isGeneratingScene, setIsGeneratingScene] = useState(false);
 
   useEffect(() => {
     setFormData(adventure);
@@ -30,6 +36,29 @@ export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, cam
         const { name, value } = e.target;
         const isNumber = e.target.type === 'number';
         onUpdate(adventure.id, { [name]: isNumber ? parseInt(value) || 0 : value });
+    }
+  };
+
+  // --- Generate Next Scene ---
+  const lastScene = adventure.scenes[adventure.scenes.length - 1];
+  const sceneCount = adventure.scenes.length;
+  const sceneGenerationDefaultPrompt = lastScene
+    ? `Generate the next scene (scene ${sceneCount + 1}) for the adventure "${adventure.title}". The previous scene was "${lastScene.title}" (${lastScene.type}). Continue the narrative with a compelling follow-up that fits the theme: ${adventure.theme || 'adventure'}.`
+    : `Generate the first scene for the adventure "${adventure.title}". Hook: ${adventure.hook || 'A dramatic opening'}. Theme: ${adventure.theme || 'adventure'}. This scene should grab the players immediately.`;
+
+  const handleGenerateNextScene = async (prompt: string) => {
+    setIsGeneratingScene(true);
+    try {
+      const sceneData = await generateScene(prompt, false, isMockMode, campaignContext);
+      campaignService.createScene(adventure.id, {
+        ...sceneData,
+        locationId: undefined,
+        npcIds: [],
+      });
+    } catch (error) {
+      console.error('Failed to generate scene for adventure:', error);
+    } finally {
+      setIsGeneratingScene(false);
     }
   };
 
@@ -55,6 +84,18 @@ export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, cam
       
       {activeTab === 'details' && (
         <div className="space-y-6 bg-slate-900/50 p-6 rounded-xl border border-slate-800/50 animate-in fade-in duration-300">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-slate-800/50">
+            <div className="flex items-center gap-2 text-sm text-slate-400">
+              <Icons.Scenes className="w-4 h-4" />
+              <span>{adventure.scenes.length} scene{adventure.scenes.length !== 1 ? 's' : ''}</span>
+            </div>
+            <GenerateHerePanel
+              buttonLabel="Generate next scene"
+              defaultPrompt={sceneGenerationDefaultPrompt}
+              isGenerating={isGeneratingScene}
+              onGenerate={handleGenerateNextScene}
+            />
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-slate-400 mb-1.5">Adventure Title</label>

@@ -4,7 +4,8 @@ import type { Plot, PlotStatus, SessionLog } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
-import { generateEnhancedText } from '../../services/geminiService';
+import { generateEnhancedText, generateScene } from '../../services/geminiService';
+import { GenerateHerePanel } from '../common/GenerateHerePanel';
 import { campaignService } from '../../services/campaignService';
 
 interface PlotEditorProps {
@@ -12,11 +13,13 @@ interface PlotEditorProps {
   onUpdate: (id: string, updatedData: Partial<Plot>) => void;
   onDelete: (id: string) => void;
   isMockMode: boolean;
+  campaignContext?: string;
 }
 
-export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, onUpdate, onDelete, isMockMode }) => {
+export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, onUpdate, onDelete, isMockMode, campaignContext }) => {
   const [formData, setFormData] = useState(plot);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingScene, setIsGeneratingScene] = useState(false);
   const campaign = campaignService.getState().campaigns.find(c => c.id === campaignService.getState().activeCampaignId)!;
 
   useEffect(() => {
@@ -64,6 +67,29 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, onUpdate, onDelete
     }
   };
 
+  // --- Generate Scene Advancing this Plot ---
+  const targetAdventure = campaign.adventures[campaign.adventures.length - 1] ?? null;
+  const sceneGenerationDefaultPrompt = targetAdventure
+    ? `Generate a scene that advances the plot "${plot.title}". ${plot.description ? `Plot summary: ${plot.description}` : ''} This scene should create meaningful progress or complication for this story arc. It will be added to the adventure "${targetAdventure.title}".`.trim()
+    : '';
+
+  const handleGeneratePlotScene = async (prompt: string) => {
+    if (!targetAdventure) return;
+    setIsGeneratingScene(true);
+    try {
+      const sceneData = await generateScene(prompt, false, isMockMode, campaignContext);
+      campaignService.createScene(targetAdventure.id, {
+        ...sceneData,
+        locationId: undefined,
+        npcIds: [],
+      });
+    } catch (error) {
+      console.error('Failed to generate scene for plot:', error);
+    } finally {
+      setIsGeneratingScene(false);
+    }
+  };
+
   const allEntities = [
       ...campaign.npcs.map(n => ({ id: n.id, name: n.name, type: 'NPC' })),
       ...campaign.locations.map(l => ({ id: l.id, name: l.name, type: 'Location' })),
@@ -79,17 +105,27 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, onUpdate, onDelete
 
   return (
     <div className="p-6 md:p-8 h-full flex flex-col overflow-hidden animate-in fade-in duration-300">
-      <header className="flex justify-between items-start mb-6 flex-shrink-0">
+      <header className="flex flex-wrap justify-between items-start mb-6 flex-shrink-0 gap-3">
         <div className="space-y-2">
             <div className="flex items-center gap-3 text-amber-400">
               <Icons.Plot className="w-8 h-8" />
               <h1 className="text-3xl font-bold font-serif text-slate-100">Plot Arc Editor</h1>
             </div>
         </div>
-        <Button variant="danger" size="sm" onClick={handleDelete}>
-            <Icons.Trash className="w-3.5 h-3.5 mr-2" />
-            Delete Plot
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <GenerateHerePanel
+            buttonLabel="Generate scene for this plot"
+            defaultPrompt={sceneGenerationDefaultPrompt}
+            isGenerating={isGeneratingScene}
+            onGenerate={handleGeneratePlotScene}
+            disabled={!targetAdventure}
+            disabledReason="Create an adventure first to generate scenes."
+          />
+          <Button variant="danger" size="sm" onClick={handleDelete}>
+              <Icons.Trash className="w-3.5 h-3.5 mr-2" />
+              Delete Plot
+          </Button>
+        </div>
       </header>
       
       <div className="flex-1 overflow-y-auto custom-scrollbar space-y-6">

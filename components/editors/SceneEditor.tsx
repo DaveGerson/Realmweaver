@@ -4,7 +4,9 @@ import type { Scene, SceneType, NPC, Location, SkillCheck } from '../../types/in
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
-import { generateEnhancedText } from '../../services/geminiService';
+import { generateEnhancedText, generateNpc } from '../../services/geminiService';
+import { GenerateHerePanel } from '../common/GenerateHerePanel';
+import { campaignService } from '../../services/campaignService';
 
 interface SceneEditorProps {
   scene: Scene;
@@ -13,15 +15,17 @@ interface SceneEditorProps {
   onUpdate: (id: string, updatedData: Partial<Scene>) => void;
   onDelete: (id: string) => void;
   isMockMode: boolean;
+  campaignContext?: string;
   isActiveScene?: boolean;
   onSetActive?: (id: string | null) => void;
 }
 
 const sceneTypeOptions: SceneType[] = ['combat', 'social', 'exploration', 'puzzle'];
 
-export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLocations, onUpdate, onDelete, isMockMode, isActiveScene, onSetActive }) => {
+export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLocations, onUpdate, onDelete, isMockMode, campaignContext, isActiveScene, onSetActive }) => {
   const [formData, setFormData] = useState(scene);
   const [isGenerating, setIsGenerating] = useState<keyof Omit<Scene, 'id' | 'type' | 'locationId' | 'npcIds' | 'skillChecks'> | null>(null);
+  const [isGeneratingNpc, setIsGeneratingNpc] = useState(false);
 
   useEffect(() => {
     setFormData(scene);
@@ -73,6 +77,27 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
       console.error("AI generation failed:", error);
     } finally {
       setIsGenerating(null);
+    }
+  };
+
+  // --- Generate NPC for Scene ---
+  const sceneLocation = allLocations.find(l => l.id === scene.locationId);
+  const npcGenerationDefaultPrompt = sceneLocation
+    ? `Generate an NPC for the scene "${scene.title}" (${scene.type}) set in "${sceneLocation.name}". The NPC should fit naturally into this ${scene.type} encounter.`
+    : `Generate an NPC for the scene "${scene.title}" (${scene.type}). The NPC should fit naturally into this ${scene.type} encounter.`;
+
+  const handleGenerateNpcForScene = async (prompt: string) => {
+    setIsGeneratingNpc(true);
+    try {
+      const npcData = await generateNpc(prompt, false, isMockMode, campaignContext);
+      const newNpcId = campaignService.createNpc({ ...npcData, factionId: undefined, relationships: [], history: [] });
+      const newNpcIds = [...formData.npcIds, newNpcId];
+      setFormData(prev => ({ ...prev, npcIds: newNpcIds }));
+      onUpdate(scene.id, { npcIds: newNpcIds });
+    } catch (error) {
+      console.error('Failed to generate NPC for scene:', error);
+    } finally {
+      setIsGeneratingNpc(false);
     }
   };
 
@@ -264,7 +289,15 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
         </div>
         
         <div>
-            <label className="block text-sm font-medium text-slate-400 mb-1.5">NPCs Involved</label>
+            <div className="flex flex-wrap justify-between items-center gap-2 mb-1.5">
+              <label className="block text-sm font-medium text-slate-400">NPCs Involved</label>
+              <GenerateHerePanel
+                buttonLabel="Generate NPC for this scene"
+                defaultPrompt={npcGenerationDefaultPrompt}
+                isGenerating={isGeneratingNpc}
+                onGenerate={handleGenerateNpcForScene}
+              />
+            </div>
             <div className="max-h-60 overflow-y-auto bg-slate-950 border border-slate-800 rounded-md p-3 space-y-2 custom-scrollbar">
                 {allNpcs.length > 0 ? allNpcs.map(npc => (
                      <label key={npc.id} className="flex items-center text-sm text-slate-300 select-none p-1 rounded-md hover:bg-slate-800/50 transition-colors">
