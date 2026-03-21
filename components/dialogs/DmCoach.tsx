@@ -5,6 +5,7 @@ import type { Campaign, RollableTable, RollableTableEntry } from '../../types/in
 import { generateNarration, generateImprovisation, generateRollableTable } from '../../services/geminiService';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
+import { MentionInput, buildMentionedEntityContext } from '../common/MentionInput';
 import { twMerge } from 'tailwind-merge';
 
 type CoachTool = 'narrate' | 'improvise' | 'table';
@@ -20,6 +21,7 @@ interface DmCoachProps {
 export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClose, onSendToNotes, isMockMode }) => {
     const [activeTool, setActiveTool] = useState<CoachTool>('narrate');
     const [prompt, setPrompt] = useState('');
+    const [mentionedEntityIds, setMentionedEntityIds] = useState<string[]>([]);
     const [result, setResult] = useState<string | RollableTable | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -60,7 +62,8 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClo
         setError(null);
         setResult(null);
 
-        const campaignContext = `Campaign Title: ${campaign.title}\nSetting: ${campaign.setting}\n\n${activeContext || ''}`;
+        const entityContext = buildMentionedEntityContext(mentionedEntityIds);
+        const campaignContext = `Campaign Title: ${campaign.title}\nSetting: ${campaign.setting}\n\n${activeContext || ''}${entityContext}`;
 
         try {
             const resultData = await currentTool.action(prompt, campaignContext, useLiteModel, isMockMode);
@@ -76,6 +79,7 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClo
     const handleSwitchTool = (tool: CoachTool) => {
         setActiveTool(tool);
         setPrompt('');
+        setMentionedEntityIds([]);
         setResult(null);
         setError(null);
     }
@@ -149,13 +153,15 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClo
                         <h3 className="text-md font-semibold font-serif text-slate-200">{currentTool.title}</h3>
                         <p className="text-sm text-slate-400">{currentTool.description}</p>
                     </div>
-                    <textarea
+                    <MentionInput
                         value={prompt}
-                        onChange={(e) => setPrompt(e.target.value)}
+                        onChange={setPrompt}
+                        onMentionedIdsChange={setMentionedEntityIds}
                         placeholder={currentTool.placeholder}
                         rows={5}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none resize-y placeholder:text-slate-600"
                         disabled={isLoading}
+                        aria-label="DM Coach prompt"
+                        textareaClassName="bg-slate-950 border-slate-700 focus:ring-indigo-500/50 focus:border-indigo-500 placeholder:text-slate-600"
                     />
                     {error && <p className="text-xs text-red-400">{error}</p>}
                     <Button onClick={handleGenerate} disabled={isLoading} className="w-full">

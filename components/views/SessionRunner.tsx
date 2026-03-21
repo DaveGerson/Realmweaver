@@ -10,6 +10,7 @@ import { generateNpc } from '../../services/geminiService';
 import { rollDice } from '../../utils/diceUtils';
 import { estimatePcHp } from '../../utils/entityUtils';
 import { SessionEndWizard } from '../dialogs/SessionEndWizard';
+import { MentionInput } from '../common/MentionInput';
 
 /** Try to extract HP from a freeform NPC stats string. Returns null if not found. */
 const parseHpFromStats = (stats: string | undefined): number | null => {
@@ -66,6 +67,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
 }) => {
     const [noteInput, setNoteInput] = useState('');
     const [noteTags, setNoteTags] = useState<string[]>([]);
+    const [noteMentionedEntityIds, setNoteMentionedEntityIds] = useState<string[]>([]);
     const [showImportantOnly, setShowImportantOnly] = useState(false);
     const [showEndWizard, setShowEndWizard] = useState(false);
     const [showDiceRoller, setShowDiceRoller] = useState(false);
@@ -129,9 +131,10 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
 
     const handleAddNote = () => {
         if (!noteInput.trim()) return;
-        campaignService.addSessionRunnerNote(noteInput.trim(), [], 'manual', noteTags);
+        campaignService.addSessionRunnerNote(noteInput.trim(), noteMentionedEntityIds, 'manual', noteTags);
         setNoteInput('');
         setNoteTags([]);
+        setNoteMentionedEntityIds([]);
     };
 
     const toggleTag = (tag: string) => {
@@ -841,18 +844,21 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                         ))}
                     </div>
                     <div className="flex gap-2">
-                        <input
-                            type="text"
+                        <MentionInput
                             value={noteInput}
-                            onChange={(e) => setNoteInput(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Enter') handleAddNote(); }}
-                            placeholder="Add a quick note..."
-                            className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                            onChange={setNoteInput}
+                            onMentionedIdsChange={setNoteMentionedEntityIds}
+                            onEnterSubmit={handleAddNote}
+                            placeholder="Add a quick note... (@ to mention an entity)"
+                            singleLine
+                            className="flex-1"
+                            textareaClassName="bg-slate-800 border-slate-700 placeholder-slate-500 focus:border-amber-500 focus:ring-amber-500/30 py-1.5"
+                            aria-label="Session note input"
                         />
                         <button
                             onClick={handleAddNote}
                             disabled={!noteInput.trim()}
-                            className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm transition-colors"
+                            className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm transition-colors flex-shrink-0"
                         >
                             Add
                         </button>

@@ -65,6 +65,8 @@ import {
   AlertTriangle,
   Clipboard,
   Search,
+  AtSign,
+  MapPin,
 } from 'lucide-react';
 
 export const Icons = {
@@ -132,6 +134,8 @@ export const Icons = {
   AlertTriangle,
   Clipboard,
   Search,
+  AtSign,
+  MapPin,
 };
 
 export const SceneIcon = ({ type, className }: { type: string, className?: string }) => {
