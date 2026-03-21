@@ -41,6 +41,8 @@ import { SessionRunner } from './components/views/SessionRunner';
 import { buildCampaignContext } from './utils/entityUtils';
 import { Breadcrumbs } from './components/common/Breadcrumbs';
 import type { BreadcrumbSegment } from './components/common/Breadcrumbs';
+import { CommandPalette } from './components/common/CommandPalette';
+import type { RecentItem, CommandPaletteEntityType } from './components/common/CommandPalette';
 
 
 export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'combat' | 'relationships' | 'session-runner';
@@ -73,11 +75,36 @@ const App: FC = () => {
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
 
 
   useEffect(() => {
     runSmokeTests(isMockMode).catch(err => console.error('Smoke tests failed:', err));
   }, [isMockMode]);
+
+  // Cmd+K / Ctrl+K to open command palette (suppressed inside input/textarea)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        const target = e.target as HTMLElement;
+        const tagName = target.tagName.toLowerCase();
+        if (tagName === 'input' || tagName === 'textarea' || target.isContentEditable) return;
+        e.preventDefault();
+        setIsCommandPaletteOpen(prev => !prev);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Track recently viewed entities (max 10, session-only)
+  const trackRecentItem = (type: CommandPaletteEntityType, id: string, name: string) => {
+    setRecentItems(prev => {
+      const filtered = prev.filter(r => !(r.type === type && r.id === id));
+      return [{ type, id, name }, ...filtered].slice(0, 10);
+    });
+  };
 
   const activeCampaign = useMemo(() => campaigns.find(c => c.id === activeCampaignId), [campaigns, activeCampaignId]);
   const isOfficialSetting = activeCampaign?.settingType === 'official';
@@ -331,19 +358,66 @@ const App: FC = () => {
                 setActiveView('adventures');
                 setSelectedAdventureId(parentAdventure.id);
                 setSelectedSceneId(id);
+                const scene = parentAdventure.scenes.find(s => s.id === id);
+                if (scene) trackRecentItem('adventure', parentAdventure.id, parentAdventure.title);
             }
         } else {
             resetSelections();
             switch(type) {
-                case 'adventure': setActiveView('adventures'); setSelectedAdventureId(id); break;
-                case 'npc': setActiveView('npcs'); setSelectedNpcId(id); break;
-                case 'location': setActiveView('locations'); setSelectedLocationId(id); break;
-                case 'faction': setActiveView('factions'); setSelectedFactionId(id); break;
-                case 'item': setActiveView('items'); setSelectedItemId(id); break;
-                case 'article': setActiveView('lorebook'); setSelectedArticleId(id); break;
-                case 'session-log': setActiveView('session-logs'); setSelectedSessionLogId(id); break;
-                case 'player-character': setActiveView('player-characters'); setSelectedPlayerCharacterId(id); break;
-                case 'plot': setActiveView('plots'); setSelectedPlotId(id); break;
+                case 'adventure': {
+                    setActiveView('adventures'); setSelectedAdventureId(id);
+                    const adv = activeCampaign?.adventures.find(a => a.id === id);
+                    if (adv) trackRecentItem('adventure', id, adv.title);
+                    break;
+                }
+                case 'npc': {
+                    setActiveView('npcs'); setSelectedNpcId(id);
+                    const npc = activeCampaign?.npcs.find(n => n.id === id);
+                    if (npc) trackRecentItem('npc', id, npc.name);
+                    break;
+                }
+                case 'location': {
+                    setActiveView('locations'); setSelectedLocationId(id);
+                    const loc = activeCampaign?.locations.find(l => l.id === id);
+                    if (loc) trackRecentItem('location', id, loc.name);
+                    break;
+                }
+                case 'faction': {
+                    setActiveView('factions'); setSelectedFactionId(id);
+                    const fac = activeCampaign?.factions.find(f => f.id === id);
+                    if (fac) trackRecentItem('faction', id, fac.name);
+                    break;
+                }
+                case 'item': {
+                    setActiveView('items'); setSelectedItemId(id);
+                    const itm = activeCampaign?.items.find(i => i.id === id);
+                    if (itm) trackRecentItem('item', id, itm.name);
+                    break;
+                }
+                case 'article': {
+                    setActiveView('lorebook'); setSelectedArticleId(id);
+                    const art = activeCampaign?.articles.find(a => a.id === id);
+                    if (art) trackRecentItem('article', id, art.title);
+                    break;
+                }
+                case 'session-log': {
+                    setActiveView('session-logs'); setSelectedSessionLogId(id);
+                    const log = activeCampaign?.sessionLogs?.find(s => s.id === id);
+                    if (log) trackRecentItem('session-log', id, log.title);
+                    break;
+                }
+                case 'player-character': {
+                    setActiveView('player-characters'); setSelectedPlayerCharacterId(id);
+                    const pc = activeCampaign?.playerCharacters?.find(p => p.id === id);
+                    if (pc) trackRecentItem('player-character', id, pc.characterSocial?.characterName || 'Character');
+                    break;
+                }
+                case 'plot': {
+                    setActiveView('plots'); setSelectedPlotId(id);
+                    const plt = activeCampaign?.plots?.find(p => p.id === id);
+                    if (plt) trackRecentItem('plot', id, plt.title);
+                    break;
+                }
             }
         }
         setIsSidebarOpen(false);
@@ -687,12 +761,37 @@ const App: FC = () => {
                     }} 
                     isMockMode={isMockMode}
                 />}
-                {isExportModalOpen && <ExportModal 
+                {isExportModalOpen && <ExportModal
                   campaignTitle={activeCampaign.title}
-                  onClose={() => setIsExportModalOpen(false)} 
+                  onClose={() => setIsExportModalOpen(false)}
                   onExportJson={() => { exportCampaignAsJson(activeCampaign); setIsExportModalOpen(false); }}
                   onExportObsidian={() => { exportCampaignAsObsidian(activeCampaign); setIsExportModalOpen(false); }}
                 />}
+                <CommandPalette
+                  isOpen={isCommandPaletteOpen}
+                  onClose={() => setIsCommandPaletteOpen(false)}
+                  npcs={activeCampaign.npcs}
+                  locations={activeCampaign.locations}
+                  factions={activeCampaign.factions}
+                  items={activeCampaign.items}
+                  adventures={activeCampaign.adventures}
+                  articles={activeCampaign.articles}
+                  sessionLogs={activeCampaign.sessionLogs || []}
+                  plots={activeCampaign.plots || []}
+                  playerCharacters={activeCampaign.playerCharacters || []}
+                  recentItems={recentItems}
+                  onSelectNpc={(id) => handleSelect('npc', id)}
+                  onSelectLocation={(id) => handleSelect('location', id)}
+                  onSelectFaction={(id) => handleSelect('faction', id)}
+                  onSelectItem={(id) => handleSelect('item', id)}
+                  onSelectAdventure={(id) => handleSelect('adventure', id)}
+                  onSelectArticle={(id) => handleSelect('article', id)}
+                  onSelectSessionLog={(id) => handleSelect('session-log', id)}
+                  onSelectPlot={(id) => handleSelect('plot', id)}
+                  onSelectPlayerCharacter={(id) => handleSelect('player-character', id)}
+                  onNavigateTo={(view) => { handleSelectView(view as any); }}
+                  onOpenCoach={() => setIsCoachOpen(true)}
+                />
               </div>
             </>
           );
