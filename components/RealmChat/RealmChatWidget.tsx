@@ -6,6 +6,8 @@ import type { Campaign, ChatMessage, DraftEntity, ModelTier, NPC, Location, Fact
 import { chatWithRealmWeaver } from '../../services/geminiService';
 import { twMerge } from 'tailwind-merge';
 import { buildCampaignContext } from '../../utils/entityUtils';
+import { LinkedText } from '../common/LinkedText';
+import type { QuickCardEntityType } from '../common/EntityQuickCard';
 
 // Editors
 import { NpcEditor } from '../editors/NpcEditor';
@@ -17,12 +19,13 @@ import { ArticleEditor } from '../editors/ArticleEditor';
 
 interface RealmChatWidgetProps {
   campaign: Campaign;
-  onAddToCampaign: (type: string, data: any) => void; 
+  onAddToCampaign: (type: string, data: any) => void;
   onUpdateCampaign?: (type: string, id: string, data: any) => void;
   isMockMode: boolean;
+  onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
 }
 
-export const RealmChatWidget: React.FC<RealmChatWidgetProps> = ({ campaign, onAddToCampaign, onUpdateCampaign, isMockMode }) => {
+export const RealmChatWidget: React.FC<RealmChatWidgetProps> = ({ campaign, onAddToCampaign, onUpdateCampaign, isMockMode, onNavigate }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false); // New state for minimized view
   const [history, setHistory] = useState<ChatMessage[]>([]);
@@ -303,7 +306,11 @@ export const RealmChatWidget: React.FC<RealmChatWidgetProps> = ({ campaign, onAd
                             {history.map(msg => (
                                 <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                     <div className={`max-w-[85%] p-3 rounded-lg text-sm whitespace-pre-wrap ${msg.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-200 border border-slate-700'}`}>
-                                        {msg.text}
+                                        {msg.role === 'model' && onNavigate ? (
+                                            <LinkedText text={msg.text} onNavigate={onNavigate} />
+                                        ) : (
+                                            msg.text
+                                        )}
                                     </div>
                                     {msg.suggestions && msg.suggestions.length > 0 && (
                                         <div className="flex flex-wrap gap-2 mt-2">

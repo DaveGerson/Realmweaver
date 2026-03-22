@@ -1,12 +1,13 @@
 
 import React, { useState } from 'react';
-import { X, Clipboard, Check } from 'lucide-react';
 import type { Campaign, RollableTable, RollableTableEntry } from '../../types/index';
 import { generateNarration, generateImprovisation, generateRollableTable } from '../../services/geminiService';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { MentionInput, buildMentionedEntityContext } from '../common/MentionInput';
+import { LinkedText } from '../common/LinkedText';
 import { twMerge } from 'tailwind-merge';
+import type { QuickCardEntityType } from '../common/EntityQuickCard';
 
 type CoachTool = 'narrate' | 'improvise' | 'table';
 
@@ -16,9 +17,10 @@ interface DmCoachProps {
   onClose: () => void;
   onSendToNotes?: (content: string) => void;
   isMockMode: boolean;
+  onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
 }
 
-export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClose, onSendToNotes, isMockMode }) => {
+export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClose, onSendToNotes, isMockMode, onNavigate }) => {
     const [activeTool, setActiveTool] = useState<CoachTool>('narrate');
     const [prompt, setPrompt] = useState('');
     const [mentionedEntityIds, setMentionedEntityIds] = useState<string[]>([]);
@@ -111,7 +113,7 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClo
                         />
                     </button>
                     <button onClick={onClose} className="p-1 rounded-md hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
-                        <X className="w-5 h-5" />
+                        <Icons.X className="w-5 h-5" />
                     </button>
                 </div>
             </header>
@@ -176,7 +178,7 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClo
                 {result && (
                     <div className="mt-6">
                         {typeof result === 'string' ? (
-                            <TextResultDisplay text={result} onSendToNotes={onSendToNotes} toolLabel={currentTool.title} />
+                            <TextResultDisplay text={result} onSendToNotes={onSendToNotes} toolLabel={currentTool.title} onNavigate={onNavigate} />
                         ) : (
                             <RollableTableDisplay table={result} onSendToNotes={onSendToNotes} />
                         )}
@@ -189,7 +191,7 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClo
 
 // --- Sub-components for DMCoach ---
 
-const TextResultDisplay = ({ text, onSendToNotes, toolLabel }: { text: string; onSendToNotes?: (content: string) => void; toolLabel?: string }) => {
+const TextResultDisplay = ({ text, onSendToNotes, toolLabel, onNavigate }: { text: string; onSendToNotes?: (content: string) => void; toolLabel?: string; onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void }) => {
     const [hasCopied, setHasCopied] = useState(false);
     const [hasSent, setHasSent] = useState(false);
 
@@ -217,7 +219,7 @@ const TextResultDisplay = ({ text, onSendToNotes, toolLabel }: { text: string; o
                         aria-label="Send to session notes"
                         title="Send to session notes"
                     >
-                        {hasSent ? <Check className="w-4 h-4 text-green-400" /> : <Icons.FileText className="w-4 h-4" />}
+                        {hasSent ? <Icons.Check className="w-4 h-4 text-green-400" /> : <Icons.FileText className="w-4 h-4" />}
                     </button>
                 )}
                 <button
@@ -225,10 +227,16 @@ const TextResultDisplay = ({ text, onSendToNotes, toolLabel }: { text: string; o
                     className="p-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
                     aria-label="Copy to clipboard"
                 >
-                    {hasCopied ? <Check className="w-4 h-4 text-green-400" /> : <Clipboard className="w-4 h-4" />}
+                    {hasCopied ? <Icons.Check className="w-4 h-4 text-green-400" /> : <Icons.Clipboard className="w-4 h-4" />}
                 </button>
             </div>
-            <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{text}</p>
+            {onNavigate ? (
+                <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">
+                    <LinkedText text={text} onNavigate={onNavigate} />
+                </p>
+            ) : (
+                <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{text}</p>
+            )}
         </div>
     );
 };
@@ -293,7 +301,7 @@ const RollableTableDisplay = ({ table, onSendToNotes }: { table: RollableTable; 
                         }}
                         title="Send to session notes"
                     >
-                        {hasSent ? <Check className="w-4 h-4" /> : <Icons.FileText className="w-4 h-4" />}
+                        {hasSent ? <Icons.Check className="w-4 h-4" /> : <Icons.FileText className="w-4 h-4" />}
                     </Button>
                 )}
             </div>
