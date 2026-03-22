@@ -7,7 +7,10 @@ import { AiTextarea } from '../common/Textarea';
 import { generateEnhancedText } from '../../services/geminiService';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { RegenerateButton } from '../common/RegenerateButton';
+import { EntityLink } from '../common/EntityLink';
+import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService'; // Import store for access to full state
+import type { QuickCardEntityType } from '../common/EntityQuickCard';
 
 interface NpcEditorProps {
   npc: NPC;
@@ -21,9 +24,10 @@ interface NpcEditorProps {
   onDelete: (id: string) => void;
   isMockMode: boolean;
   campaignContext?: string;
+  onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
 }
 
-export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [], playerCharacters = [], onUpdate, onDelete, isMockMode, campaignContext }) => {
+export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [], playerCharacters = [], onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(npc);
   const [isGenerating, setIsGenerating] = useState<keyof Omit<NPC, 'id' | 'factionId' | 'knowsPlayerHistory' | 'relationships' | 'history'> | null>(null);
 
@@ -154,6 +158,16 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                         <option key={faction.id} value={faction.id}>{faction.name}</option>
                     ))}
                 </select>
+                {formData.factionId && onNavigate && (
+                    <div className="mt-1.5">
+                        <EntityLink
+                            entityType="faction"
+                            entityId={formData.factionId}
+                            label={factions.find(f => f.id === formData.factionId)?.name}
+                            onNavigate={onNavigate}
+                        />
+                    </div>
+                )}
             </div>
         </div>
 
@@ -171,6 +185,11 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
           isGenerating={isGenerating === 'description'}
           regenerateButton={<RegenerateButton fieldName="description" currentValue={formData.description} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />}
         />
+        {formData.description && onNavigate && (
+            <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
+                <LinkedText text={formData.description} onNavigate={onNavigate} />
+            </p>
+        )}
 
         {/* Traits */}
         <AiTextarea
@@ -226,6 +245,11 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
           isGenerating={isGenerating === 'motivations'}
           regenerateButton={<RegenerateButton fieldName="motivations" currentValue={formData.motivations} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('motivations')} isMockMode={isMockMode} campaignContext={campaignContext} />}
         />
+        {formData.motivations && onNavigate && (
+            <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
+                <LinkedText text={formData.motivations} onNavigate={onNavigate} />
+            </p>
+        )}
 
         {/* Secrets */}
         <AiTextarea
@@ -240,6 +264,11 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
           isGenerating={isGenerating === 'secrets'}
           regenerateButton={<RegenerateButton fieldName="secrets" currentValue={formData.secrets} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('secrets')} isMockMode={isMockMode} campaignContext={campaignContext} />}
         />
+        {formData.secrets && onNavigate && (
+            <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
+                <LinkedText text={formData.secrets} onNavigate={onNavigate} />
+            </p>
+        )}
 
         {/* Stats */}
         <AiTextarea
@@ -267,8 +296,8 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                 {(formData.relationships || []).map((rel, index) => (
                     <div key={rel.id} className="flex items-start gap-2 bg-slate-950/50 p-2 rounded-md border border-slate-800/50">
                         <div className="flex flex-col gap-2 w-full">
-                            <div className="flex gap-2">
-                                <select 
+                            <div className="flex gap-2 flex-wrap items-center">
+                                <select
                                     value={rel.targetId}
                                     onChange={(e) => handleRelationshipChange(index, 'targetId', e.target.value)}
                                     onBlur={handleRelationshipBlur}
@@ -277,6 +306,17 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                                     <option value="">-- Select Target --</option>
                                     {possibleTargets.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                                 </select>
+                                {rel.targetId && onNavigate && (() => {
+                                    const isPc = playerCharacters.some(pc => pc.id === rel.targetId);
+                                    return isPc ? null : (
+                                        <EntityLink
+                                            entityType="npc"
+                                            entityId={rel.targetId}
+                                            label={possibleTargets.find(t => t.id === rel.targetId)?.name}
+                                            onNavigate={onNavigate}
+                                        />
+                                    );
+                                })()}
                                 <input 
                                     type="text" 
                                     placeholder="Type (e.g. Rival)" 

@@ -7,7 +7,10 @@ import { AiTextarea } from '../common/Textarea';
 import { generateEnhancedText, generateNpc } from '../../services/geminiService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
 import { RegenerateButton } from '../common/RegenerateButton';
+import { EntityLink } from '../common/EntityLink';
+import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService';
+import type { QuickCardEntityType } from '../common/EntityQuickCard';
 
 interface FactionEditorProps {
   faction: Faction;
@@ -17,9 +20,10 @@ interface FactionEditorProps {
   onDelete: (id: string) => void;
   isMockMode: boolean;
   campaignContext?: string;
+  onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
 }
 
-export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, allLocations = [], onUpdate, onDelete, isMockMode, campaignContext }) => {
+export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, allLocations = [], onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(faction);
   const [isGenerating, setIsGenerating] = useState<keyof Omit<Faction, 'id' | 'leaderId' | 'memberIds'> | null>(null);
   const [isGeneratingMember, setIsGeneratingMember] = useState(false);
@@ -150,6 +154,11 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
           isGenerating={isGenerating === 'description'}
           regenerateButton={<RegenerateButton fieldName="description" currentValue={formData.description} entityType="Faction" entityContext={factionEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />}
         />
+        {formData.description && onNavigate && (
+            <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
+                <LinkedText text={formData.description} onNavigate={onNavigate} />
+            </p>
+        )}
 
         {/* Goals */}
         <AiTextarea
@@ -164,6 +173,11 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
           isGenerating={isGenerating === 'goals'}
           regenerateButton={<RegenerateButton fieldName="goals" currentValue={formData.goals} entityType="Faction" entityContext={factionEntityContext} onRegenerate={handleFieldRegenerate('goals')} isMockMode={isMockMode} campaignContext={campaignContext} />}
         />
+        {formData.goals && onNavigate && (
+            <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
+                <LinkedText text={formData.goals} onNavigate={onNavigate} />
+            </p>
+        )}
 
         {/* Resources */}
         <AiTextarea
@@ -206,6 +220,16 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
                         <option key={loc.id} value={loc.id}>{loc.name}</option>
                     ))}
                 </select>
+                {formData.headquartersLocationId && onNavigate && (
+                    <div className="mt-1.5">
+                        <EntityLink
+                            entityType="location"
+                            entityId={formData.headquartersLocationId}
+                            label={allLocations.find(l => l.id === formData.headquartersLocationId)?.name}
+                            onNavigate={onNavigate}
+                        />
+                    </div>
+                )}
             </div>
              <div>
                  <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
@@ -221,8 +245,15 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
                     <div className="bg-slate-950 border border-slate-800 rounded-md p-3 space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
                         {memberNpcs.map(npc => (
                             <div key={npc.id} className="text-sm text-slate-300 flex items-center gap-2">
-                                <Icons.NPCs className="w-3 h-3 text-slate-500" />
-                                {npc.name}
+                                <Icons.NPCs className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                                {onNavigate ? (
+                                    <EntityLink
+                                        entityType="npc"
+                                        entityId={npc.id}
+                                        label={npc.name}
+                                        onNavigate={onNavigate}
+                                    />
+                                ) : npc.name}
                             </div>
                         ))}
                     </div>

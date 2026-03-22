@@ -7,7 +7,10 @@ import { AiTextarea } from '../common/Textarea';
 import { generateEnhancedText, generateNpc } from '../../services/geminiService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
 import { RegenerateButton } from '../common/RegenerateButton';
+import { EntityLink } from '../common/EntityLink';
+import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService';
+import type { QuickCardEntityType } from '../common/EntityQuickCard';
 
 interface SceneEditorProps {
   scene: Scene;
@@ -19,11 +22,12 @@ interface SceneEditorProps {
   campaignContext?: string;
   isActiveScene?: boolean;
   onSetActive?: (id: string | null) => void;
+  onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
 }
 
 const sceneTypeOptions: SceneType[] = ['combat', 'social', 'exploration', 'puzzle'];
 
-export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLocations, onUpdate, onDelete, isMockMode, campaignContext, isActiveScene, onSetActive }) => {
+export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLocations, onUpdate, onDelete, isMockMode, campaignContext, isActiveScene, onSetActive, onNavigate }) => {
   const [formData, setFormData] = useState(scene);
   const [isGenerating, setIsGenerating] = useState<keyof Omit<Scene, 'id' | 'type' | 'locationId' | 'npcIds' | 'skillChecks'> | null>(null);
   const [isGeneratingNpc, setIsGeneratingNpc] = useState(false);
@@ -205,6 +209,11 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
           isGenerating={isGenerating === 'readAloudText'}
           regenerateButton={<RegenerateButton fieldName="readAloudText" currentValue={formData.readAloudText} entityType="Scene" entityContext={sceneEntityContext} onRegenerate={handleFieldRegenerate('readAloudText')} isMockMode={isMockMode} campaignContext={campaignContext} />}
         />
+        {formData.readAloudText && onNavigate && (
+            <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
+                <LinkedText text={formData.readAloudText} onNavigate={onNavigate} />
+            </p>
+        )}
 
         <AiTextarea
           label="GM Notes"
@@ -296,6 +305,16 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
                     <option key={loc.id} value={loc.id}>{loc.name}</option>
                 ))}
             </select>
+            {formData.locationId && onNavigate && (
+                <div className="mt-1.5">
+                    <EntityLink
+                        entityType="location"
+                        entityId={formData.locationId}
+                        label={allLocations.find(l => l.id === formData.locationId)?.name}
+                        onNavigate={onNavigate}
+                    />
+                </div>
+            )}
         </div>
         
         <div>
@@ -315,9 +334,16 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
                             type="checkbox"
                             checked={formData.npcIds.includes(npc.id)}
                             onChange={() => handleNpcToggle(npc.id)}
-                            className="w-4 h-4 mr-3 bg-slate-800 border-slate-600 rounded text-amber-600 focus:ring-amber-500"
+                            className="w-4 h-4 mr-3 bg-slate-800 border-slate-600 rounded text-amber-600 focus:ring-amber-500 flex-shrink-0"
                         />
-                        {npc.name}
+                        {formData.npcIds.includes(npc.id) && onNavigate ? (
+                            <EntityLink
+                                entityType="npc"
+                                entityId={npc.id}
+                                label={npc.name}
+                                onNavigate={onNavigate}
+                            />
+                        ) : npc.name}
                     </label>
                 )) : <p className="text-xs text-slate-500 italic">No NPCs exist in this campaign yet.</p>}
             </div>

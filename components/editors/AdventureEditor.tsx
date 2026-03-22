@@ -7,7 +7,9 @@ import { RegenerateButton } from '../common/RegenerateButton';
 import { twMerge } from 'tailwind-merge';
 import { generateScene } from '../../services/geminiService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
+import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService';
+import type { QuickCardEntityType } from '../common/EntityQuickCard';
 
 interface AdventureEditorProps {
   adventure: Adventure;
@@ -15,9 +17,10 @@ interface AdventureEditorProps {
   onUpdate: (id: string, updatedData: Partial<Adventure>) => void;
   isMockMode?: boolean;
   campaignContext?: string;
+  onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
 }
 
-export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, campaign, onUpdate, isMockMode = false, campaignContext }) => {
+export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, campaign, onUpdate, isMockMode = false, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(adventure);
   const [activeTab, setActiveTab] = useState<'details' | 'prepDoc'>('details');
   const [isGeneratingScene, setIsGeneratingScene] = useState(false);
@@ -145,6 +148,11 @@ export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, cam
               className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600 resize-y"
               placeholder="A mysterious artifact is discovered, but it's part of a key to an ancient, powerful prison..."
             />
+            {formData.hook && onNavigate && (
+                <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
+                    <LinkedText text={formData.hook} onNavigate={onNavigate} />
+                </p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-400 mb-1.5">Themes & Mood</label>

@@ -6,7 +6,10 @@ import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
 import { generateEnhancedText, generateScene } from '../../services/geminiService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
+import { EntityLink } from '../common/EntityLink';
+import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService';
+import type { QuickCardEntityType } from '../common/EntityQuickCard';
 
 interface PlotEditorProps {
   plot: Plot;
@@ -14,9 +17,10 @@ interface PlotEditorProps {
   onDelete: (id: string) => void;
   isMockMode: boolean;
   campaignContext?: string;
+  onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
 }
 
-export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, onUpdate, onDelete, isMockMode, campaignContext }) => {
+export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(plot);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingScene, setIsGeneratingScene] = useState(false);
@@ -170,10 +174,36 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, onUpdate, onDelete
             onAiGenerate={handleAiGenerate}
             isGenerating={isGenerating}
             />
+            {formData.description && onNavigate && (
+                <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
+                    <LinkedText text={formData.description} onNavigate={onNavigate} />
+                </p>
+            )}
 
             {/* Entity Tagging */}
             <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-800/50">
                 <label className="block text-sm font-medium text-slate-400 mb-3">Related Entities</label>
+                {/* EntityLink chips for selected entities */}
+                {(formData.relatedEntityIds || []).length > 0 && onNavigate && (() => {
+                    const TYPE_MAP: Record<string, QuickCardEntityType> = {
+                        NPC: 'npc', Location: 'location', Faction: 'faction',
+                    };
+                    const chips: React.ReactNode[] = [];
+                    for (const id of formData.relatedEntityIds || []) {
+                        const entity = allEntities.find(e => e.id === id);
+                        if (!entity) continue;
+                        const entityType = TYPE_MAP[entity.type];
+                        if (!entityType) continue;
+                        chips.push(
+                            <EntityLink key={id} entityType={entityType} entityId={id} label={entity.name} onNavigate={onNavigate!} />
+                        );
+                    }
+                    return chips.length > 0 ? (
+                        <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b border-slate-800">
+                            {chips}
+                        </div>
+                    ) : null;
+                })()}
                 <div className="max-h-40 overflow-y-auto custom-scrollbar grid grid-cols-1 md:grid-cols-3 gap-2">
                     {allEntities.map(entity => (
                         <label key={entity.id} className="flex items-center gap-2 p-1.5 rounded hover:bg-slate-800 cursor-pointer transition-colors">

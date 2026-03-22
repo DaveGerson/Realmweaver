@@ -4,11 +4,13 @@ import type { SessionLog, SessionLogEntry } from '../../types';
 import { Icons, SceneIcon } from '../common/Icons';
 import { Button } from '../common/Button';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
+import { EntityLink } from '../common/EntityLink';
 import { campaignService } from '../../services/campaignService';
 import { AiTextarea } from '../common/Textarea';
 import { generateEnhancedText, analyzeSessionNotes } from '../../services/geminiService';
 import { twMerge } from 'tailwind-merge';
 import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
+import type { QuickCardEntityType } from '../common/EntityQuickCard';
 
 interface SessionLogEditorProps {
   log: SessionLog;
@@ -16,6 +18,7 @@ interface SessionLogEditorProps {
   onDelete: (id: string) => void;
   isMockMode: boolean;
   onGoLive?: (sessionLogId: string) => void;
+  onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
 }
 
 // Audio Context & Processor Types for TypeScript
@@ -25,7 +28,7 @@ declare global {
   }
 }
 
-export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdate, onDelete, isMockMode, onGoLive }) => {
+export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdate, onDelete, isMockMode, onGoLive, onNavigate }) => {
   const [formData, setFormData] = useState(log);
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState<'structured' | 'scratchpad'>('structured');
@@ -495,20 +498,30 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
                 {/* Adventure & Scene Selection */}
                 <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800/50">
                     <label className="block text-sm font-medium text-slate-400 mb-2">Target Adventure</label>
-                    <select 
-                        name="adventureId" 
-                        value={formData.adventureId || ''} 
+                    <select
+                        name="adventureId"
+                        value={formData.adventureId || ''}
                         onChange={(e) => {
                             setFormData(prev => ({...prev, adventureId: e.target.value}));
                             onUpdate(log.id, { adventureId: e.target.value });
                         }}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-amber-500 outline-none mb-4"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-amber-500 outline-none mb-2"
                     >
                         <option value="">-- Independent Session --</option>
                         {campaign.adventures.map(adv => (
                             <option key={adv.id} value={adv.id}>{adv.title}</option>
                         ))}
                     </select>
+                    {formData.adventureId && onNavigate && (
+                        <div className="mb-4 mt-1">
+                            <EntityLink
+                                entityType="adventure"
+                                entityId={formData.adventureId}
+                                label={campaign.adventures.find(a => a.id === formData.adventureId)?.title}
+                                onNavigate={onNavigate}
+                            />
+                        </div>
+                    )}
 
                     {activeAdventure && (
                         <div>
@@ -536,12 +549,29 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
                 {/* Plot Arc Integration */}
                 <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800/50">
                     <label className="block text-sm font-medium text-slate-400 mb-2">Active Plot Arcs</label>
+                    {/* EntityLink chips for checked plots */}
+                    {(formData.relatedPlotIds || []).length > 0 && onNavigate && (
+                        <div className="flex flex-wrap gap-2 mb-2">
+                            {(formData.relatedPlotIds || []).map(plotId => {
+                                const p = campaign.plots.find(pl => pl.id === plotId);
+                                return p ? (
+                                    <EntityLink
+                                        key={plotId}
+                                        entityType="plot"
+                                        entityId={plotId}
+                                        label={p.title}
+                                        onNavigate={onNavigate!}
+                                    />
+                                ) : null;
+                            })}
+                        </div>
+                    )}
                     <div className="space-y-1 bg-slate-950 border border-slate-800 rounded-md p-2 max-h-40 overflow-y-auto custom-scrollbar">
                         {activePlots.length > 0 ? activePlots.map(plot => (
                             <label key={plot.id} className="flex items-center p-2 rounded hover:bg-slate-900 cursor-pointer">
-                                <input 
-                                    type="checkbox" 
-                                    checked={formData.relatedPlotIds?.includes(plot.id)} 
+                                <input
+                                    type="checkbox"
+                                    checked={formData.relatedPlotIds?.includes(plot.id)}
                                     onChange={() => handlePlotToggle(plot.id)}
                                     className="rounded border-slate-600 bg-slate-800 text-amber-600 focus:ring-amber-500 mr-3"
                                 />

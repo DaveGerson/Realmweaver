@@ -7,7 +7,10 @@ import { AiTextarea } from '../common/Textarea';
 import { generateEnhancedText } from '../../services/geminiService';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { RegenerateButton } from '../common/RegenerateButton';
+import { EntityLink } from '../common/EntityLink';
+import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService';
+import type { QuickCardEntityType } from '../common/EntityQuickCard';
 
 interface ArticleEditorProps {
   article: Article;
@@ -20,11 +23,12 @@ interface ArticleEditorProps {
   onDelete: (id: string) => void;
   isMockMode: boolean;
   campaignContext?: string;
+  onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
 }
 
 const categoryOptions: ArticleCategory[] = ['lore', 'history', 'cosmology'];
 
-export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticles, onUpdate, onDelete, isMockMode, campaignContext }) => {
+export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticles, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(article);
   const [isGenerating, setIsGenerating] = useState<keyof Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds' | 'category'> | null>(null);
   const campaign = campaignService.getState().campaigns.find(c => c.id === campaignService.getState().activeCampaignId)!;
@@ -163,10 +167,32 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
           isGenerating={isGenerating === 'content'}
           regenerateButton={<RegenerateButton fieldName="content" currentValue={formData.content} entityType="Article" entityContext={articleEntityContext} onRegenerate={handleFieldRegenerate('content')} isMockMode={isMockMode} campaignContext={campaignContext} />}
         />
+        {formData.content && onNavigate && (
+            <div className="text-sm text-slate-300 leading-relaxed mt-1 px-1 whitespace-pre-wrap">
+                <LinkedText text={formData.content} onNavigate={onNavigate} />
+            </div>
+        )}
         
         {/* Related Entities Section */}
         <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-800/50">
             <label className="block text-sm font-medium text-slate-400 mb-3">Related Entities</label>
+            {/* EntityLink chips for currently-selected entities */}
+            {(formData.relatedEntityIds || []).length > 0 && onNavigate && (() => {
+                const selectedLinks: React.ReactNode[] = [];
+                for (const id of formData.relatedEntityIds || []) {
+                    const npc = allNpcs.find((n: any) => n.id === id);
+                    if (npc) { selectedLinks.push(<EntityLink key={id} entityType="npc" entityId={id} label={npc.name} onNavigate={onNavigate!} />); continue; }
+                    const loc = allLocations.find((l: any) => l.id === id);
+                    if (loc) { selectedLinks.push(<EntityLink key={id} entityType="location" entityId={id} label={loc.name} onNavigate={onNavigate!} />); continue; }
+                    const fac = allFactions.find((f: any) => f.id === id);
+                    if (fac) { selectedLinks.push(<EntityLink key={id} entityType="faction" entityId={id} label={fac.name} onNavigate={onNavigate!} />); }
+                }
+                return selectedLinks.length > 0 ? (
+                    <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b border-slate-800">
+                        {selectedLinks}
+                    </div>
+                ) : null;
+            })()}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-h-60 overflow-y-auto custom-scrollbar">
                 <EntityList title="NPCs" entities={allNpcs} selectedIds={formData.relatedEntityIds || []} onToggle={handleRelatedEntityToggle} />
                 <EntityList title="Locations" entities={allLocations} selectedIds={formData.relatedEntityIds || []} onToggle={handleRelatedEntityToggle} />
@@ -201,13 +227,35 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
                         <option key={a.id} value={a.id}>{a.title}</option>
                     ))}
                 </select>
+                {formData.parentArticleId && onNavigate && (
+                    <div className="mt-1.5">
+                        <EntityLink
+                            entityType="article"
+                            entityId={formData.parentArticleId}
+                            label={allArticles.find(a => a.id === formData.parentArticleId)?.title}
+                            onNavigate={onNavigate}
+                        />
+                    </div>
+                )}
             </div>
 
             <div>
                  <label className="block text-sm font-medium text-slate-400 mb-1.5">Sub-Articles</label>
                  {subArticles.length > 0 ? (
-                    <ul className="list-disc list-inside text-slate-300 text-sm space-y-1 mt-2 pl-2">
-                        {subArticles.map(a => <li key={a.id}>{a.title}</li>)}
+                    <ul className="space-y-1 mt-2">
+                        {subArticles.map(a => (
+                            <li key={a.id} className="flex items-center gap-1.5 text-sm text-slate-300">
+                                <Icons.FileText className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                                {onNavigate ? (
+                                    <EntityLink
+                                        entityType="article"
+                                        entityId={a.id}
+                                        label={a.title}
+                                        onNavigate={onNavigate}
+                                    />
+                                ) : a.title}
+                            </li>
+                        ))}
                     </ul>
                  ) : (
                     <p className="text-sm text-slate-500 italic mt-2">No sub-articles assigned.</p>

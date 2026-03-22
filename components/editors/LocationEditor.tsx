@@ -7,8 +7,11 @@ import { AiTextarea } from '../common/Textarea';
 import { generateEnhancedText, generatePoiFromLoot, generateNpc } from '../../services/geminiService';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { RegenerateButton } from '../common/RegenerateButton';
+import { EntityLink } from '../common/EntityLink';
+import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
+import type { QuickCardEntityType } from '../common/EntityQuickCard';
 
 interface LocationEditorProps {
   location: Location;
@@ -20,11 +23,12 @@ interface LocationEditorProps {
   onDelete: (id: string) => void;
   isMockMode: boolean;
   campaignContext?: string;
+  onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
 }
 
 type GenerationField = 'description' | 'secrets';
 
-export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLocations, allFactions = [], onUpdate, onDelete, isMockMode, campaignContext }) => {
+export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLocations, allFactions = [], onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(location);
   const [isGenerating, setIsGenerating] = useState<GenerationField | null>(null);
   const [generatingPoiFor, setGeneratingPoiFor] = useState<string | null>(null);
@@ -286,8 +290,18 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
         </div>
 
         <AiTextarea label="Description" name="description" value={formData.description} onChange={handleChange} onBlur={handleBlur} rows={5} onAiGenerate={() => handleAiGenerate('description')} isGenerating={isGenerating === 'description'} regenerateButton={<RegenerateButton fieldName="description" currentValue={formData.description} entityType="Location" entityContext={locationEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />} />
+        {formData.description && onNavigate && (
+            <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
+                <LinkedText text={formData.description} onNavigate={onNavigate} />
+            </p>
+        )}
 
         <AiTextarea label="Secrets & Hidden Details" name="secrets" value={formData.secrets} onChange={handleChange} onBlur={handleBlur} rows={3} onAiGenerate={() => handleAiGenerate('secrets')} isGenerating={isGenerating === 'secrets'} regenerateButton={<RegenerateButton fieldName="secrets" currentValue={formData.secrets} entityType="Location" entityContext={locationEntityContext} onRegenerate={handleFieldRegenerate('secrets')} isMockMode={isMockMode} campaignContext={campaignContext} />} />
+        {formData.secrets && onNavigate && (
+            <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
+                <LinkedText text={formData.secrets} onNavigate={onNavigate} />
+            </p>
+        )}
 
         {/* Items & Loot */}
         <div>
@@ -405,6 +419,16 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                     <option value="none">-- None --</option>
                     {possibleParents.map(loc => (<option key={loc.id} value={loc.id}>{loc.name}</option>))}
                 </select>
+                {formData.parentLocationId && onNavigate && (
+                    <div className="mt-1.5">
+                        <EntityLink
+                            entityType="location"
+                            entityId={formData.parentLocationId}
+                            label={allLocations.find(l => l.id === formData.parentLocationId)?.name}
+                            onNavigate={onNavigate}
+                        />
+                    </div>
+                )}
             </div>
              <div>
                 <label className="block text-sm font-medium text-slate-400 mb-1.5">Controlling Faction</label>
@@ -412,14 +436,59 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                     <option value="none">-- None --</option>
                     {allFactions.map(f => (<option key={f.id} value={f.id}>{f.name}</option>))}
                 </select>
+                {formData.controllingFactionId && onNavigate && (
+                    <div className="mt-1.5">
+                        <EntityLink
+                            entityType="faction"
+                            entityId={formData.controllingFactionId}
+                            label={allFactions.find(f => f.id === formData.controllingFactionId)?.name}
+                            onNavigate={onNavigate}
+                        />
+                    </div>
+                )}
             </div>
             <div>
                  <label className="block text-sm font-medium text-slate-400 mb-1.5">Sub-Locations</label>
-                 {subLocations.length > 0 ? (<ul className="list-disc list-inside text-slate-300 text-sm space-y-1 mt-2 pl-2">{subLocations.map(loc => <li key={loc.id}>{loc.name}</li>)}</ul>) : (<p className="text-sm text-slate-500 italic mt-2">No sub-locations assigned.</p>)}
+                 {subLocations.length > 0 ? (
+                    <ul className="space-y-1 mt-2">
+                        {subLocations.map(loc => (
+                            <li key={loc.id} className="flex items-center gap-1.5 text-sm text-slate-300">
+                                <Icons.Locations className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                                {onNavigate ? (
+                                    <EntityLink
+                                        entityType="location"
+                                        entityId={loc.id}
+                                        label={loc.name}
+                                        onNavigate={onNavigate}
+                                    />
+                                ) : loc.name}
+                            </li>
+                        ))}
+                    </ul>
+                 ) : (<p className="text-sm text-slate-500 italic mt-2">No sub-locations assigned.</p>)}
             </div>
             <div className="md:col-span-2">
                  <label className="block text-sm font-medium text-slate-400 mb-1.5">Connected From</label>
-                 {inboundConnections.length > 0 ? (<div className="space-y-1 text-sm text-slate-300 mt-2">{inboundConnections.map(loc => { const conn = loc.connections?.find(c => c.targetLocationId === location.id); return conn ? (<div key={loc.id} className="flex items-center gap-2"><span className="font-semibold">{loc.name}</span><span className="text-xs bg-slate-700 text-slate-300 rounded-full px-2 py-0.5">{conn.description}</span></div>) : null; })}</div>) : (<p className="text-sm text-slate-500 italic mt-2">No other locations connect to this one.</p>)}
+                 {inboundConnections.length > 0 ? (
+                    <div className="space-y-1 text-sm text-slate-300 mt-2">
+                        {inboundConnections.map(loc => {
+                            const conn = loc.connections?.find(c => c.targetLocationId === location.id);
+                            return conn ? (
+                                <div key={loc.id} className="flex items-center gap-2">
+                                    {onNavigate ? (
+                                        <EntityLink
+                                            entityType="location"
+                                            entityId={loc.id}
+                                            label={loc.name}
+                                            onNavigate={onNavigate}
+                                        />
+                                    ) : <span className="font-semibold">{loc.name}</span>}
+                                    {conn.description && <span className="text-xs bg-slate-700 text-slate-300 rounded-full px-2 py-0.5">{conn.description}</span>}
+                                </div>
+                            ) : null;
+                        })}
+                    </div>
+                 ) : (<p className="text-sm text-slate-500 italic mt-2">No other locations connect to this one.</p>)}
             </div>
         </div>
       </div>

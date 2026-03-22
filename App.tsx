@@ -617,54 +617,59 @@ const App: FC = () => {
             onDelete={(id) => { campaignService.deleteSessionLog(id); resetSelections(); }}
             isMockMode={isMockMode}
             onGoLive={handleGoLive}
+            onNavigate={handleEntityNavigate}
         />
       );
-      
-      if (selectedPlot) return <PlotEditor plot={selectedPlot} onUpdate={campaignService.updatePlot} onDelete={(id) => { campaignService.deletePlot(id); resetSelections(); }} isMockMode={isMockMode} />;
-      if (selectedScene && selectedAdventure) return <SceneEditor scene={selectedScene} allNpcs={activeCampaign.npcs} allLocations={activeCampaign.locations} onUpdate={(id, data) => campaignService.updateScene(selectedAdventure.id, id, data)} onDelete={(id) => { campaignService.deleteScene(selectedAdventure.id, id); setSelectedSceneId(null); }} isMockMode={isMockMode} isActiveScene={activeCampaign.activeSceneId === selectedScene.id} onSetActive={campaignService.setActiveScene} />;
-      if (selectedAdventure) return <AdventureEditor adventure={selectedAdventure} campaign={activeCampaign} onUpdate={campaignService.updateAdventure} />;
-      
+
+      if (selectedPlot) return <PlotEditor plot={selectedPlot} onUpdate={campaignService.updatePlot} onDelete={(id) => { campaignService.deletePlot(id); resetSelections(); }} isMockMode={isMockMode} onNavigate={handleEntityNavigate} />;
+      if (selectedScene && selectedAdventure) return <SceneEditor scene={selectedScene} allNpcs={activeCampaign.npcs} allLocations={activeCampaign.locations} onUpdate={(id, data) => campaignService.updateScene(selectedAdventure.id, id, data)} onDelete={(id) => { campaignService.deleteScene(selectedAdventure.id, id); setSelectedSceneId(null); }} isMockMode={isMockMode} isActiveScene={activeCampaign.activeSceneId === selectedScene.id} onSetActive={campaignService.setActiveScene} onNavigate={handleEntityNavigate} />;
+      if (selectedAdventure) return <AdventureEditor adventure={selectedAdventure} campaign={activeCampaign} onUpdate={campaignService.updateAdventure} onNavigate={handleEntityNavigate} />;
+
       if (selectedArticle) return (
-        <ArticleEditor 
-            article={selectedArticle} 
-            allArticles={activeCampaign.articles} 
-            onUpdate={campaignService.updateArticle} 
-            onDelete={(id) => { campaignService.deleteArticle(id); resetSelections(); }} 
-            isMockMode={isMockMode} 
+        <ArticleEditor
+            article={selectedArticle}
+            allArticles={activeCampaign.articles}
+            onUpdate={campaignService.updateArticle}
+            onDelete={(id) => { campaignService.deleteArticle(id); resetSelections(); }}
+            isMockMode={isMockMode}
+            onNavigate={handleEntityNavigate}
         />
       );
-      
+
       if (selectedNpc) return (
-        <NpcEditor 
-            npc={selectedNpc} 
-            factions={activeCampaign.factions} 
-            allNpcs={activeCampaign.npcs} 
-            playerCharacters={activeCampaign.playerCharacters} 
-            onUpdate={campaignService.updateNpc} 
-            onDelete={(id) => { campaignService.deleteNpc(id); resetSelections(); }} 
-            isMockMode={isMockMode} 
+        <NpcEditor
+            npc={selectedNpc}
+            factions={activeCampaign.factions}
+            allNpcs={activeCampaign.npcs}
+            playerCharacters={activeCampaign.playerCharacters}
+            onUpdate={campaignService.updateNpc}
+            onDelete={(id) => { campaignService.deleteNpc(id); resetSelections(); }}
+            isMockMode={isMockMode}
+            onNavigate={handleEntityNavigate}
         />
       );
-      
+
       if (selectedLocation) return (
-        <LocationEditor 
-            location={selectedLocation} 
-            allLocations={activeCampaign.locations} 
-            allFactions={activeCampaign.factions} 
-            onUpdate={campaignService.updateLocation} 
-            onDelete={(id) => { campaignService.deleteLocation(id); resetSelections(); }} 
-            isMockMode={isMockMode} 
+        <LocationEditor
+            location={selectedLocation}
+            allLocations={activeCampaign.locations}
+            allFactions={activeCampaign.factions}
+            onUpdate={campaignService.updateLocation}
+            onDelete={(id) => { campaignService.deleteLocation(id); resetSelections(); }}
+            isMockMode={isMockMode}
+            onNavigate={handleEntityNavigate}
         />
       );
-      
+
       if (selectedFaction) return (
-        <FactionEditor 
-            faction={selectedFaction} 
-            allNpcs={activeCampaign.npcs} 
+        <FactionEditor
+            faction={selectedFaction}
+            allNpcs={activeCampaign.npcs}
             allLocations={activeCampaign.locations}
-            onUpdate={campaignService.updateFaction} 
-            onDelete={(id) => { campaignService.deleteFaction(id); resetSelections(); }} 
-            isMockMode={isMockMode} 
+            onUpdate={campaignService.updateFaction}
+            onDelete={(id) => { campaignService.deleteFaction(id); resetSelections(); }}
+            isMockMode={isMockMode}
+            onNavigate={handleEntityNavigate}
         />
       );
       if (selectedItem) return <ItemEditor item={selectedItem} onUpdate={campaignService.updateItem} onDelete={(id) => { campaignService.deleteItem(id); resetSelections(); }} isMockMode={isMockMode} />;
