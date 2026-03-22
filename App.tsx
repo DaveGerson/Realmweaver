@@ -48,6 +48,14 @@ import type { RecentItem, CommandPaletteEntityType } from './components/common/C
 export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'combat' | 'relationships' | 'session-runner';
 export type GeneratorType = 'npc' | 'location' | 'faction' | 'item' | 'scene' | 'article';
 
+export interface NavStackEntry {
+  view: EditorView;
+  selectedId: string | null;
+  adventureId?: string | null;
+  sceneId?: string | null;
+  label: string;
+}
+
 const App: FC = () => {
   const { campaigns, activeCampaignId, appStatus, saveStatus, lastSavedAt } = useSyncExternalStore(
     campaignService.subscribe,
@@ -77,6 +85,7 @@ const App: FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
+  const [navStack, setNavStack] = useState<NavStackEntry[]>([]);
 
 
   useEffect(() => {
@@ -345,76 +354,180 @@ const App: FC = () => {
   }, [activeCampaign, activeCampaign?.activeSceneId, activeCampaign?.sessionLogs, selectedScene, selectedAdventure, selectedLocation, selectedNpc, selectedFaction]);
 
 
+  // ── Navigation Back Stack ────────────────────────────────────────────────
+
+  /**
+   * Captures the CURRENT view/selection state and pushes it onto the nav stack
+   * before navigating away. Call this before any state mutation in handleSelect.
+   * Max depth of 20 entries to prevent unbounded growth.
+   */
+  const pushNavStack = (label: string) => {
+    setNavStack(prev => {
+      // Derive the currently selected ID from the active view
+      let selectedId: string | null = null;
+      switch (activeView) {
+        case 'npcs': selectedId = selectedNpcId; break;
+        case 'locations': selectedId = selectedLocationId; break;
+        case 'factions': selectedId = selectedFactionId; break;
+        case 'items': selectedId = selectedItemId; break;
+        case 'lorebook': selectedId = selectedArticleId; break;
+        case 'session-logs': selectedId = selectedSessionLogId; break;
+        case 'player-characters': selectedId = selectedPlayerCharacterId; break;
+        case 'plots': selectedId = selectedPlotId; break;
+        case 'adventures': selectedId = selectedAdventureId; break;
+        default: selectedId = null;
+      }
+      const entry: NavStackEntry = {
+        view: activeView,
+        selectedId,
+        adventureId: selectedAdventureId,
+        sceneId: selectedSceneId,
+        label,
+      };
+      return [...prev, entry].slice(-20);
+    });
+  };
+
+  /**
+   * Pops the last entry from the nav stack and restores its view + selection.
+   * If the stack is empty, does nothing.
+   */
+  const handleGoBack = () => {
+    setNavStack(prev => {
+      if (prev.length === 0) return prev;
+      const entry = prev[prev.length - 1];
+      const next = prev.slice(0, -1);
+
+      // Restore selection state
+      setActiveView(entry.view);
+      setSelectedNpcId(entry.view === 'npcs' ? entry.selectedId : null);
+      setSelectedLocationId(entry.view === 'locations' ? entry.selectedId : null);
+      setSelectedFactionId(entry.view === 'factions' ? entry.selectedId : null);
+      setSelectedItemId(entry.view === 'items' ? entry.selectedId : null);
+      setSelectedArticleId(entry.view === 'lorebook' ? entry.selectedId : null);
+      setSelectedSessionLogId(entry.view === 'session-logs' ? entry.selectedId : null);
+      setSelectedPlayerCharacterId(entry.view === 'player-characters' ? entry.selectedId : null);
+      setSelectedPlotId(entry.view === 'plots' ? entry.selectedId : null);
+      setSelectedAdventureId(entry.adventureId ?? null);
+      setSelectedSceneId(entry.sceneId ?? null);
+      setActiveGenerator(null);
+
+      return next;
+    });
+    setIsSidebarOpen(false);
+  };
+
+  /**
+   * Bridge between EntityLink's QuickCardEntityType system and the existing
+   * handleSelect function. Editors will receive this as their onNavigate prop.
+   */
+  const handleEntityNavigate = (entityType: string, entityId: string) => {
+    const typeMap: Record<string, string> = {
+      npc: 'npc',
+      location: 'location',
+      faction: 'faction',
+      item: 'item',
+      adventure: 'adventure',
+      article: 'article',
+      plot: 'plot',
+      'session-log': 'session-log',
+      'player-character': 'player-character',
+    };
+    const selectType = typeMap[entityType] ?? entityType;
+    handleSelect(selectType as Parameters<typeof handleSelect>[0], entityId);
+  };
+
   const handleSelectView = (view: EditorView) => {
+    // Sidebar navigation starts a fresh context — reset the back stack
+    setNavStack([]);
     setActiveView(view);
     resetSelections();
     setIsSidebarOpen(false);
   };
-  
+
     const handleSelect = (type: 'adventure' | 'scene' | 'npc' | 'location' | 'faction' | 'item' | 'article' | 'session-log' | 'player-character' | 'plot', id: string) => {
         if (type === 'scene') {
             const parentAdventure = activeCampaign?.adventures.find(adv => adv.scenes.some(s => s.id === id));
             if (parentAdventure) {
+                // Push current state before navigating to scene
+                const scene = parentAdventure.scenes.find(s => s.id === id);
+                if (scene) pushNavStack(scene.title);
                 setActiveView('adventures');
                 setSelectedAdventureId(parentAdventure.id);
                 setSelectedSceneId(id);
-                const scene = parentAdventure.scenes.find(s => s.id === id);
                 if (scene) trackRecentItem('adventure', parentAdventure.id, parentAdventure.title);
             }
         } else {
-            resetSelections();
             switch(type) {
                 case 'adventure': {
-                    setActiveView('adventures'); setSelectedAdventureId(id);
                     const adv = activeCampaign?.adventures.find(a => a.id === id);
+                    if (adv) pushNavStack(adv.title);
+                    resetSelections();
+                    setActiveView('adventures'); setSelectedAdventureId(id);
                     if (adv) trackRecentItem('adventure', id, adv.title);
                     break;
                 }
                 case 'npc': {
-                    setActiveView('npcs'); setSelectedNpcId(id);
                     const npc = activeCampaign?.npcs.find(n => n.id === id);
+                    if (npc) pushNavStack(npc.name);
+                    resetSelections();
+                    setActiveView('npcs'); setSelectedNpcId(id);
                     if (npc) trackRecentItem('npc', id, npc.name);
                     break;
                 }
                 case 'location': {
-                    setActiveView('locations'); setSelectedLocationId(id);
                     const loc = activeCampaign?.locations.find(l => l.id === id);
+                    if (loc) pushNavStack(loc.name);
+                    resetSelections();
+                    setActiveView('locations'); setSelectedLocationId(id);
                     if (loc) trackRecentItem('location', id, loc.name);
                     break;
                 }
                 case 'faction': {
-                    setActiveView('factions'); setSelectedFactionId(id);
                     const fac = activeCampaign?.factions.find(f => f.id === id);
+                    if (fac) pushNavStack(fac.name);
+                    resetSelections();
+                    setActiveView('factions'); setSelectedFactionId(id);
                     if (fac) trackRecentItem('faction', id, fac.name);
                     break;
                 }
                 case 'item': {
-                    setActiveView('items'); setSelectedItemId(id);
                     const itm = activeCampaign?.items.find(i => i.id === id);
+                    if (itm) pushNavStack(itm.name);
+                    resetSelections();
+                    setActiveView('items'); setSelectedItemId(id);
                     if (itm) trackRecentItem('item', id, itm.name);
                     break;
                 }
                 case 'article': {
-                    setActiveView('lorebook'); setSelectedArticleId(id);
                     const art = activeCampaign?.articles.find(a => a.id === id);
+                    if (art) pushNavStack(art.title);
+                    resetSelections();
+                    setActiveView('lorebook'); setSelectedArticleId(id);
                     if (art) trackRecentItem('article', id, art.title);
                     break;
                 }
                 case 'session-log': {
-                    setActiveView('session-logs'); setSelectedSessionLogId(id);
                     const log = activeCampaign?.sessionLogs?.find(s => s.id === id);
+                    if (log) pushNavStack(log.title);
+                    resetSelections();
+                    setActiveView('session-logs'); setSelectedSessionLogId(id);
                     if (log) trackRecentItem('session-log', id, log.title);
                     break;
                 }
                 case 'player-character': {
-                    setActiveView('player-characters'); setSelectedPlayerCharacterId(id);
                     const pc = activeCampaign?.playerCharacters?.find(p => p.id === id);
+                    if (pc) pushNavStack(pc.characterSocial?.characterName || 'Character');
+                    resetSelections();
+                    setActiveView('player-characters'); setSelectedPlayerCharacterId(id);
                     if (pc) trackRecentItem('player-character', id, pc.characterSocial?.characterName || 'Character');
                     break;
                 }
                 case 'plot': {
-                    setActiveView('plots'); setSelectedPlotId(id);
                     const plt = activeCampaign?.plots?.find(p => p.id === id);
+                    if (plt) pushNavStack(plt.title);
+                    resetSelections();
+                    setActiveView('plots'); setSelectedPlotId(id);
                     if (plt) trackRecentItem('plot', id, plt.title);
                     break;
                 }
@@ -735,7 +848,13 @@ const App: FC = () => {
                 </div>
 
                 <main className="flex-1 overflow-y-auto bg-slate-900 text-slate-100 relative w-full">
-                  {activeView !== 'session-runner' && <Breadcrumbs segments={breadcrumbSegments} />}
+                  {activeView !== 'session-runner' && (
+                    <Breadcrumbs
+                      segments={breadcrumbSegments}
+                      canGoBack={navStack.length > 0}
+                      onGoBack={handleGoBack}
+                    />
+                  )}
                   {renderMainContent()}
                 </main>
                 

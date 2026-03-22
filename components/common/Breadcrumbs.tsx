@@ -9,13 +9,25 @@ export interface BreadcrumbSegment {
 
 interface BreadcrumbsProps {
     segments: BreadcrumbSegment[];
+    canGoBack?: boolean;
+    onGoBack?: () => void;
 }
 
-export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ segments }) => {
-    if (segments.length <= 1) return null;
+export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ segments, canGoBack = false, onGoBack }) => {
+    if (segments.length <= 1 && !canGoBack) return null;
 
     return (
         <nav className="flex items-center gap-1.5 text-sm text-slate-500 px-6 md:px-8 pt-4 pb-0" aria-label="Breadcrumb">
+            {canGoBack && (
+                <button
+                    onClick={onGoBack}
+                    aria-label="Go back"
+                    title="Go back"
+                    className="flex items-center justify-center w-6 h-6 rounded hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors flex-shrink-0 mr-1"
+                >
+                    <Icons.ArrowLeft className="w-3.5 h-3.5" />
+                </button>
+            )}
             {segments.map((segment, index) => {
                 const isLast = index === segments.length - 1;
                 return (

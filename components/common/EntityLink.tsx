@@ -27,6 +27,10 @@ const ENTITY_TEXT_CLASS: Record<QuickCardEntityType, string> = {
   faction: 'text-violet-400 hover:text-violet-300',
   item: 'text-sky-400 hover:text-sky-300',
   adventure: 'text-orange-400 hover:text-orange-300',
+  article: 'text-cyan-400 hover:text-cyan-300',
+  plot: 'text-yellow-400 hover:text-yellow-300',
+  'session-log': 'text-rose-400 hover:text-rose-300',
+  'player-character': 'text-indigo-400 hover:text-indigo-300',
 };
 
 // ─── Props ────────────────────────────────────────────────────────────────────

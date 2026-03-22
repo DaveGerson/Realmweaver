@@ -3,11 +3,11 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { Icons } from '@/components/common/Icons';
 import { campaignService } from '@/services/campaignService';
-import type { NPC, Location, Faction, Item, Adventure } from '@/types/index';
+import type { NPC, Location, Faction, Item, Adventure, Article, Plot, SessionLog, PlayerCharacter } from '@/types/index';
 
 // ─── Entity type configuration ──────────────────────────────────────────────
 
-export type QuickCardEntityType = 'npc' | 'location' | 'faction' | 'item' | 'adventure';
+export type QuickCardEntityType = 'npc' | 'location' | 'faction' | 'item' | 'adventure' | 'article' | 'plot' | 'session-log' | 'player-character';
 
 interface EntityTypeConfig {
   label: string;
@@ -46,6 +46,30 @@ const ENTITY_CONFIG: Record<QuickCardEntityType, EntityTypeConfig> = {
     badgeClass: 'bg-orange-900/60 text-orange-300',
     borderClass: 'border-l-orange-500',
     Icon: Icons.Adventures,
+  },
+  article: {
+    label: 'Article',
+    badgeClass: 'bg-cyan-900/60 text-cyan-300',
+    borderClass: 'border-l-cyan-500',
+    Icon: Icons.FileText,
+  },
+  plot: {
+    label: 'Plot',
+    badgeClass: 'bg-yellow-900/60 text-yellow-300',
+    borderClass: 'border-l-yellow-500',
+    Icon: Icons.Plot,
+  },
+  'session-log': {
+    label: 'Session',
+    badgeClass: 'bg-rose-900/60 text-rose-300',
+    borderClass: 'border-l-rose-500',
+    Icon: Icons.SessionLog,
+  },
+  'player-character': {
+    label: 'Character',
+    badgeClass: 'bg-indigo-900/60 text-indigo-300',
+    borderClass: 'border-l-indigo-500',
+    Icon: Icons.PlayerCharacters,
   },
 };
 
@@ -143,6 +167,76 @@ function getAdventureDetails(adventure: Adventure): EntityDetail[] {
   return details.slice(0, 4);
 }
 
+function getArticleDetails(article: Article, campaign: ReturnType<typeof campaignService.getActiveCampaign>): EntityDetail[] {
+  const details: EntityDetail[] = [];
+
+  details.push({ label: 'Category', value: article.category });
+  if (article.content) {
+    const firstLine = article.content.split(/[.\n]/)[0].trim();
+    if (firstLine) details.push({ label: 'Content', value: truncate(firstLine, 80) });
+  }
+  const relatedCount = article.relatedEntityIds?.length ?? 0;
+  if (relatedCount > 0) {
+    details.push({ label: 'References', value: String(relatedCount) });
+  }
+  if (article.parentArticleId && campaign) {
+    const parent = campaign.articles.find(a => a.id === article.parentArticleId);
+    if (parent) details.push({ label: 'Under', value: parent.title });
+  }
+  return details.slice(0, 4);
+}
+
+function getPlotDetails(plot: Plot): EntityDetail[] {
+  const details: EntityDetail[] = [];
+
+  details.push({ label: 'Status', value: plot.status });
+  if (plot.description) {
+    const firstLine = plot.description.split(/[.\n]/)[0].trim();
+    if (firstLine) details.push({ label: 'Summary', value: truncate(firstLine, 80) });
+  }
+  if (plot.relatedEntityIds.length > 0) {
+    details.push({ label: 'Entities', value: String(plot.relatedEntityIds.length) });
+  }
+  return details.slice(0, 4);
+}
+
+function getSessionLogDetails(log: SessionLog): EntityDetail[] {
+  const details: EntityDetail[] = [];
+
+  if (log.sessionDate) details.push({ label: 'Date', value: log.sessionDate });
+  details.push({ label: 'Status', value: log.status });
+  if (log.recap) {
+    const firstLine = log.recap.split(/[.\n]/)[0].trim();
+    if (firstLine) details.push({ label: 'Recap', value: truncate(firstLine, 80) });
+  } else if (log.runningNotes) {
+    const firstLine = log.runningNotes.split(/[.\n]/)[0].trim();
+    if (firstLine) details.push({ label: 'Notes', value: truncate(firstLine, 80) });
+  }
+  if (log.structuredNotes.length > 0) {
+    details.push({ label: 'Entries', value: String(log.structuredNotes.length) });
+  }
+  return details.slice(0, 4);
+}
+
+function getPlayerCharacterDetails(pc: PlayerCharacter): EntityDetail[] {
+  const details: EntityDetail[] = [];
+
+  const { characterSocial, characterStatistics } = pc;
+  if (characterSocial.species) details.push({ label: 'Race', value: characterSocial.species });
+  const { classes } = characterStatistics;
+  if (classes) {
+    const classStr = classes.subclass
+      ? `${classes.subclass} ${classes.charClass} ${classes.level}`
+      : `${classes.charClass} ${classes.level}`;
+    details.push({ label: 'Class', value: classStr });
+  }
+  if (characterSocial.background) details.push({ label: 'Background', value: characterSocial.background });
+  if (characterSocial.personality) {
+    details.push({ label: 'Personality', value: truncate(characterSocial.personality, 80) });
+  }
+  return details.slice(0, 4);
+}
+
 function lookupEntity(
   entityType: QuickCardEntityType,
   entityId: string,
@@ -175,6 +269,26 @@ function lookupEntity(
       const adventure = campaign.adventures.find(a => a.id === entityId);
       if (!adventure) return null;
       return { name: adventure.title, details: getAdventureDetails(adventure) };
+    }
+    case 'article': {
+      const article = campaign.articles.find(a => a.id === entityId);
+      if (!article) return null;
+      return { name: article.title, details: getArticleDetails(article, campaign) };
+    }
+    case 'plot': {
+      const plot = campaign.plots.find(p => p.id === entityId);
+      if (!plot) return null;
+      return { name: plot.title, details: getPlotDetails(plot) };
+    }
+    case 'session-log': {
+      const log = campaign.sessionLogs.find(s => s.id === entityId);
+      if (!log) return null;
+      return { name: log.title, details: getSessionLogDetails(log) };
+    }
+    case 'player-character': {
+      const pc = campaign.playerCharacters.find(p => p.id === entityId);
+      if (!pc) return null;
+      return { name: pc.characterSocial.characterName, details: getPlayerCharacterDetails(pc) };
     }
     default:
       return null;
