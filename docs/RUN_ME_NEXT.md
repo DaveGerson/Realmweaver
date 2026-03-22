@@ -1,73 +1,64 @@
 # Run Me Next — Pickup Instructions
 
-> **Last Updated:** 2026-03-20
-> **Branch:** main (clean, pushed)
-> **Build:** Clean | **Tests:** 64 passing
+> **Last Updated:** 2026-03-21
+> **Branch:** feat/testing-and-phase-b
+> **Build:** Clean | **Tests:** 84 passing
 
 ---
 
 ## What Was Completed This Session
 
-### Agent Roster Overhaul
-- 9 irrelevant agents archived, 2 new agents created (frontend-engineer--realmweaver, subject-matter-expert--ttrpg)
-- 6 existing agents tuned for Realmweaver, 2 knowledge packs created (TTRPG + Gemini AI)
-- Orchestrator IP removed from git (kept locally, gitignored)
+### Navigation Overhaul — Phase 1 + Phase 4a COMPLETE
 
-### Phase A: Universal Fixes (COMPLETE)
-- A4: Quick NPC preview/edit before save
-- A5: Skill check → dice roller integration
-- A6: Combat tracker real HP from NPC/PC data
-- A7: Session End Wizard (5-step: AI recap → plots → loose ends → player recap → confirm)
-- (A1-A3 were already done in Sprint 1)
+Executed as an orchestrated chain (4 activities + gate). All delivered:
 
-### Phase A2: No-Regrets UI Foundation (COMPLETE)
-- Entity type color borders (9 entity types, distinct colors)
-- Amber primary / Indigo for AI accent split (28 files)
-- Better empty states with flavor text (7 dashboards)
-- Sidebar search/filter
-- Loading skeletons for AI generation
-- Breadcrumb navigation
+| Feature | What | Files |
+|---------|------|-------|
+| **Nav Back Stack** | Navigation history (max 20), Back button in Breadcrumbs, sidebar resets stack | App.tsx, Breadcrumbs.tsx, Icons.tsx |
+| **Recent Items** | "Recent" section at top of sidebar, collapsible, max 5, type-colored icons | CampaignSidebar.tsx, App.tsx |
+| **EntityLinks in Editors** | Hover tooltips + click-to-navigate for all entity reference fields across 8 editors | All editors/*.tsx |
+| **LinkedText Auto-Linking** | Entity names in text fields auto-detected and rendered as clickable EntityLinks | LinkedText.tsx (NEW), 7 editors |
+| **All 9 Entity Types** | QuickCard + EntityLink support: npc, location, faction, item, adventure, article, plot, session-log, player-character | EntityQuickCard.tsx, EntityLink.tsx |
 
-### Planning Documents Created
-- `docs/IMPLEMENTATION_PLAN.md` — 7-phase sequenced plan (A through G)
-- `docs/ORCHESTRATION_PLAN.md` — Per-phase orchestrator execution detail
+Commits: `ad8e14d`, `6e110c0`, `5278278`
+
+### Prior Sessions (Still Complete)
+- Phase A + A2 universal fixes (all done)
+- Phase B search & generation UX (B1-B6 all done)
+- Agent roster overhaul, testing knowledge pack, 84 Vitest tests
 
 ---
 
 ## What To Do Next (In Order)
 
-### 1. Functional Testing Setup (Before Phase B)
-
-Create a testing knowledge pack and write archetype-based functional tests. Say:
+### 1. Execute Navigation Overhaul — Phase 2: "Make Scenes Playable"
 
 ```
-Create a functional testing knowledge pack and write Vitest tests that simulate
-DM archetype workflows through campaignService. Use the subject-matter-expert--ttrpg
-to define realistic scenarios (prep a session, run combat, improvise an NPC,
-end a session with recap) and the test-engineer to implement them.
-Each test persona should represent one of the 5 DM archetypes.
+Execute Phase 2 of the navigation overhaul from .claude/team-context/plan.md
 ```
 
-### 2. Phase B: Search & Generation UX
+Phase 2 delivers:
+- **2a: Scene Resources Panel** — Inlines NPC traits/motivation/quotes and location secrets directly in SceneEditor for zero-click mid-session reference
+- **2b: Sidebar Favorites** — Pin/unpin entities (star icon), persisted in campaign state, "Pinned" section in sidebar
 
-After testing is set up, say:
+### 2. Phase 3: "Complete the Web"
 
 ```
-Use the orchestrator to execute Phase B from docs/IMPLEMENTATION_PLAN.md
-and docs/ORCHESTRATION_PLAN.md
+Execute Phase 3 of the navigation overhaul from .claude/team-context/plan.md
 ```
 
-Phase B delivers:
-- B1: Global Search / Command Palette (Cmd+K)
-- B2: Contextual "Generate Here" buttons
-- B3: Conversational generation as default
-- B4: Quick Entity Card popovers
-- B5: Inline field regeneration
-- B6: @Mention entity referencing
+Phase 3 delivers:
+- **3a: Backlinks Utility** — `computeBacklinks(entityId, campaign)` returns all entities that reference a given entity, grouped by type with relationship labels
+- **3b: "Referenced By" Panel** — Collapsible section in all editors showing inbound connections
 
-### 3. Phases C through G
+### 3. Phase 4b: Semantic Graph Labels (Optional)
 
-Continue phase-at-a-time execution per `docs/IMPLEMENTATION_PLAN.md`. Each phase:
+Phase 4a (LinkedText auto-linking) is already complete. Remaining:
+- **4b:** Semantic labels on relationship graph edges ("member-of", "controlled-by")
+
+### 4. Remaining Phases (C through G)
+
+After navigation overhaul, continue per `docs/IMPLEMENTATION_PLAN.md`:
 1. Orchestrator executes full phase
 2. You review completion report
 3. Merge to main
@@ -79,7 +70,7 @@ Continue phase-at-a-time execution per `docs/IMPLEMENTATION_PLAN.md`. Each phase
 
 ```bash
 npm run dev      # Start dev server on localhost:3000
-npm test         # Run all 64 Vitest tests
+npm test         # Run all 84 Vitest tests
 npm run build    # Production build (verify zero TS errors)
 ```
 
@@ -87,9 +78,8 @@ npm run build    # Production build (verify zero TS errors)
 
 | Document | Purpose |
 |----------|---------|
+| `.claude/team-context/plan.md` | **Navigation overhaul execution plan (4 phases, 10 steps)** |
+| `.claude/team-context/context.md` | **Shared context for agent delegation (entity cross-ref map, patterns)** |
+| `.claude/team-context/mission-log.md` | **Chain execution log with commits and status** |
 | `docs/IMPLEMENTATION_PLAN.md` | Sequenced 7-phase plan with all work packages |
-| `docs/ORCHESTRATION_PLAN.md` | How the orchestrator executes each phase |
-| `docs/DM_ARCHETYPES.md` | 5 DM personas driving feature prioritization |
-| `docs/SESSION_COCKPIT_ARCHETYPE_REVIEW.md` | 67 user stories and priority matrix |
-| `UI_DESIGN_EVALUATION.md` | UI audit + 4 design proposals |
 | `CLAUDE.md` | Codebase conventions (always read first) |
