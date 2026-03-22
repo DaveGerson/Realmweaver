@@ -599,6 +599,7 @@ const App: FC = () => {
                       isMockMode={isMockMode}
                       onEndSession={handleEndSession}
                       onOpenCoach={() => setIsCoachOpen(true)}
+                      onNavigate={handleEntityNavigate}
                   />
               );
           }
@@ -866,14 +867,15 @@ const App: FC = () => {
                 </main>
                 
                 {/* Floating Widgets */}
-                <RealmChatWidget 
-                  campaign={activeCampaign} 
+                <RealmChatWidget
+                  campaign={activeCampaign}
                   onAddToCampaign={handleAddEntityFromChat}
                   onUpdateCampaign={handleUpdateEntityFromChat}
-                  isMockMode={isMockMode} 
+                  isMockMode={isMockMode}
+                  onNavigate={handleEntityNavigate}
                 />
-                
-                {isCoachOpen && <DmCoach campaign={activeCampaign} activeContext={currentContext} onClose={() => setIsCoachOpen(false)} onSendToNotes={(content) => campaignService.addAutoEvent('coach-used', content)} isMockMode={isMockMode} />}
+
+                {isCoachOpen && <DmCoach campaign={activeCampaign} activeContext={currentContext} onClose={() => setIsCoachOpen(false)} onSendToNotes={(content) => campaignService.addAutoEvent('coach-used', content)} isMockMode={isMockMode} onNavigate={handleEntityNavigate} />}
                 {isWizardOpen && <EvocationWizard 
                     campaign={activeCampaign} 
                     onClose={() => setIsWizardOpen(false)} 

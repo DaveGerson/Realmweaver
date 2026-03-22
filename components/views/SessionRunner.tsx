@@ -11,6 +11,9 @@ import { rollDice } from '../../utils/diceUtils';
 import { estimatePcHp } from '../../utils/entityUtils';
 import { SessionEndWizard } from '../dialogs/SessionEndWizard';
 import { MentionInput } from '../common/MentionInput';
+import { EntityLink } from '../common/EntityLink';
+import { LinkedText } from '../common/LinkedText';
+import type { QuickCardEntityType } from '../common/EntityQuickCard';
 
 /** Try to extract HP from a freeform NPC stats string. Returns null if not found. */
 const parseHpFromStats = (stats: string | undefined): number | null => {
@@ -56,6 +59,7 @@ interface SessionRunnerProps {
     isMockMode: boolean;
     onEndSession: () => void;
     onOpenCoach: () => void;
+    onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
 }
 
 export const SessionRunner: React.FC<SessionRunnerProps> = ({
@@ -64,6 +68,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
     isMockMode,
     onEndSession,
     onOpenCoach,
+    onNavigate,
 }) => {
     const [noteInput, setNoteInput] = useState('');
     const [noteTags, setNoteTags] = useState<string[]>([]);
@@ -358,23 +363,45 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                 <div className="w-56 flex-shrink-0 bg-slate-900 border-r border-slate-800 overflow-y-auto p-3">
                     <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Scenes</h2>
                     <div className="space-y-1">
-                        {plannedScenes.map((scene) => (
-                            <button
-                                key={scene.id}
-                                onClick={() => handleSelectScene(scene.id)}
-                                className={twMerge(
-                                    "w-full flex items-center gap-2 px-2 py-2 rounded-lg text-sm transition-all",
-                                    campaign.activeSceneId === scene.id
-                                        ? "bg-amber-900/30 text-amber-200 border border-amber-700/50"
-                                        : scene.status === 'completed'
-                                        ? "text-slate-500 hover:bg-slate-800"
-                                        : "text-slate-300 hover:bg-slate-800"
-                                )}
-                            >
-                                {sceneStatusIcon(scene)}
-                                <span className="truncate">{scene.title}</span>
-                            </button>
-                        ))}
+                        {plannedScenes.map((scene) => {
+                            const sceneLocation = scene.locationId
+                                ? campaign.locations.find(l => l.id === scene.locationId)
+                                : null;
+                            const sceneNpcCount = scene.npcIds.length;
+                            return (
+                                <button
+                                    key={scene.id}
+                                    onClick={() => handleSelectScene(scene.id)}
+                                    className={twMerge(
+                                        "w-full flex items-start gap-2 px-2 py-2 rounded-lg text-sm transition-all text-left",
+                                        campaign.activeSceneId === scene.id
+                                            ? "bg-amber-900/30 text-amber-200 border border-amber-700/50"
+                                            : scene.status === 'completed'
+                                            ? "text-slate-500 hover:bg-slate-800"
+                                            : "text-slate-300 hover:bg-slate-800"
+                                    )}
+                                >
+                                    <span className="flex-shrink-0 mt-0.5">{sceneStatusIcon(scene)}</span>
+                                    <span className="flex flex-col min-w-0">
+                                        <span className="truncate">{scene.title}</span>
+                                        {(sceneLocation || sceneNpcCount > 0) && (
+                                            <span className="flex items-center gap-1.5 mt-0.5">
+                                                {sceneLocation && (
+                                                    <span className="text-[10px] text-emerald-400/70 truncate max-w-[80px]" title={sceneLocation.name}>
+                                                        {sceneLocation.name}
+                                                    </span>
+                                                )}
+                                                {sceneNpcCount > 0 && (
+                                                    <span className="text-[10px] px-1 py-0.5 rounded bg-slate-700/80 text-slate-400 flex-shrink-0">
+                                                        {sceneNpcCount} NPC{sceneNpcCount !== 1 ? 's' : ''}
+                                                    </span>
+                                                )}
+                                            </span>
+                                        )}
+                                    </span>
+                                </button>
+                            );
+                        })}
                         {plannedScenes.length === 0 && (
                             <p className="text-xs text-slate-500 italic px-2">No scenes planned</p>
                         )}
@@ -433,7 +460,12 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                             {activeScene.readAloudText && (
                                 <div className="bg-amber-900/20 border border-amber-800/40 rounded-lg p-4">
                                     <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2">Read Aloud</h3>
-                                    <p className="text-amber-100 italic leading-relaxed whitespace-pre-wrap">{activeScene.readAloudText}</p>
+                                    <p className="text-amber-100 italic leading-relaxed whitespace-pre-wrap">
+                                        {onNavigate
+                                            ? <LinkedText text={activeScene.readAloudText} onNavigate={onNavigate} />
+                                            : activeScene.readAloudText
+                                        }
+                                    </p>
                                 </div>
                             )}
 
@@ -441,7 +473,12 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                             {activeScene.gmNotes && (
                                 <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
                                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">GM Notes</h3>
-                                    <p className="text-slate-200 leading-relaxed whitespace-pre-wrap">{activeScene.gmNotes}</p>
+                                    <p className="text-slate-200 leading-relaxed whitespace-pre-wrap">
+                                        {onNavigate
+                                            ? <LinkedText text={activeScene.gmNotes} onNavigate={onNavigate} />
+                                            : activeScene.gmNotes
+                                        }
+                                    </p>
                                 </div>
                             )}
 
@@ -452,7 +489,12 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                                         <Icons.Locations className="w-3 h-3 inline mr-1" />
                                         Location
                                     </h3>
-                                    <p className="text-white font-semibold">{activeSceneLocation.name}</p>
+                                    <p className="text-white font-semibold">
+                                        {onNavigate
+                                            ? <EntityLink entityType="location" entityId={activeSceneLocation.id} label={activeSceneLocation.name} onNavigate={onNavigate} />
+                                            : activeSceneLocation.name
+                                        }
+                                    </p>
                                     {activeSceneLocation.description && (
                                         <p className="text-slate-300 text-sm mt-1">{activeSceneLocation.description}</p>
                                     )}
@@ -471,10 +513,20 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                                             const faction = npc.factionId ? campaign.factions.find(f => f.id === npc.factionId) : null;
                                             return (
                                                 <div key={npc.id} className="bg-slate-900/50 rounded-md p-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <p className="text-white font-semibold text-sm">{npc.name}</p>
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <p className="text-white font-semibold text-sm">
+                                                            {onNavigate
+                                                                ? <EntityLink entityType="npc" entityId={npc.id} label={npc.name} onNavigate={onNavigate} />
+                                                                : npc.name
+                                                            }
+                                                        </p>
                                                         {faction && (
-                                                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 uppercase font-bold">{faction.name}</span>
+                                                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 uppercase font-bold">
+                                                                {onNavigate
+                                                                    ? <EntityLink entityType="faction" entityId={faction.id} label={faction.name} onNavigate={onNavigate} className="text-[10px] uppercase font-bold no-underline" />
+                                                                    : faction.name
+                                                                }
+                                                            </span>
                                                         )}
                                                     </div>
                                                     {npc.traits && <p className="text-slate-400 text-xs mt-1">{npc.traits}</p>}
