@@ -16,6 +16,7 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { twMerge } from 'tailwind-merge';
 import { EntityQuickCard } from '@/components/common/EntityQuickCard';
 import type { QuickCardEntityType } from '@/components/common/EntityQuickCard';
 
@@ -31,6 +32,7 @@ const ENTITY_TEXT_CLASS: Record<QuickCardEntityType, string> = {
   plot: 'text-yellow-400 hover:text-yellow-300',
   'session-log': 'text-rose-400 hover:text-rose-300',
   'player-character': 'text-indigo-400 hover:text-indigo-300',
+  scene: 'text-blue-400 hover:text-blue-300',
 };
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -38,8 +40,8 @@ const ENTITY_TEXT_CLASS: Record<QuickCardEntityType, string> = {
 export interface EntityLinkProps {
   entityType: QuickCardEntityType;
   entityId: string;
-  /** Display text; defaults to entityId if omitted */
-  label?: string;
+  /** Display text or element; defaults to entityId if omitted */
+  label?: React.ReactNode;
   /**
    * Called when the user clicks "View" / "Edit" in the popover, or clicks the
    * link text directly. The parent is responsible for navigating to the editor.
@@ -147,7 +149,9 @@ export const EntityLink: React.FC<EntityLinkProps> = ({
     closeCard();
   }, [onNavigate, closeCard]);
 
-  const displayText = label ?? entityId;
+  const displayContent = label ?? entityId;
+  // aria-label must be a plain string; use entityId as fallback when label is a React element
+  const ariaLabel = typeof label === 'string' ? `Show quick info for ${label}` : `Show quick info`;
 
   return (
     <>
@@ -157,18 +161,18 @@ export const EntityLink: React.FC<EntityLinkProps> = ({
         onClick={handleClick}
         onPointerEnter={handlePointerEnter}
         onPointerLeave={handlePointerLeave}
-        className={[
+        className={twMerge(
           'inline underline decoration-dotted underline-offset-2 cursor-pointer',
           'focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-sm',
           'transition-colors',
           colorClass,
           className,
-        ].join(' ')}
+        )}
         aria-haspopup="dialog"
         aria-expanded={isOpen}
-        aria-label={`Show quick info for ${displayText}`}
+        aria-label={ariaLabel}
       >
-        {displayText}
+        {displayContent}
       </button>
 
       {isOpen && triggerRect && (

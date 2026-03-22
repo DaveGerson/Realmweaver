@@ -432,6 +432,7 @@ const App: FC = () => {
       plot: 'plot',
       'session-log': 'session-log',
       'player-character': 'player-character',
+      scene: 'scene',
     };
     const selectType = typeMap[entityType] ?? entityType;
     handleSelect(selectType as Parameters<typeof handleSelect>[0], entityId);

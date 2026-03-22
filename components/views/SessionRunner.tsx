@@ -368,38 +368,59 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                                 ? campaign.locations.find(l => l.id === scene.locationId)
                                 : null;
                             const sceneNpcCount = scene.npcIds.length;
+                            const isActive = campaign.activeSceneId === scene.id;
                             return (
-                                <button
+                                <div
                                     key={scene.id}
-                                    onClick={() => handleSelectScene(scene.id)}
                                     className={twMerge(
-                                        "w-full flex items-start gap-2 px-2 py-2 rounded-lg text-sm transition-all text-left",
-                                        campaign.activeSceneId === scene.id
-                                            ? "bg-amber-900/30 text-amber-200 border border-amber-700/50"
-                                            : scene.status === 'completed'
-                                            ? "text-slate-500 hover:bg-slate-800"
-                                            : "text-slate-300 hover:bg-slate-800"
+                                        "flex items-stretch rounded-lg text-sm transition-all",
+                                        isActive
+                                            ? "bg-amber-900/30 border border-amber-700/50"
+                                            : "hover:bg-slate-800"
                                     )}
                                 >
-                                    <span className="flex-shrink-0 mt-0.5">{sceneStatusIcon(scene)}</span>
-                                    <span className="flex flex-col min-w-0">
-                                        <span className="truncate">{scene.title}</span>
-                                        {(sceneLocation || sceneNpcCount > 0) && (
-                                            <span className="flex items-center gap-1.5 mt-0.5">
-                                                {sceneLocation && (
-                                                    <span className="text-[10px] text-emerald-400/70 truncate max-w-[80px]" title={sceneLocation.name}>
-                                                        {sceneLocation.name}
-                                                    </span>
-                                                )}
-                                                {sceneNpcCount > 0 && (
-                                                    <span className="text-[10px] px-1 py-0.5 rounded bg-slate-700/80 text-slate-400 flex-shrink-0">
-                                                        {sceneNpcCount} NPC{sceneNpcCount !== 1 ? 's' : ''}
-                                                    </span>
-                                                )}
-                                            </span>
+                                    {/* Main scene button — click to activate */}
+                                    <button
+                                        onClick={() => handleSelectScene(scene.id)}
+                                        className={twMerge(
+                                            "flex-1 flex items-start gap-2 px-2 py-2 text-left min-w-0",
+                                            isActive
+                                                ? "text-amber-200"
+                                                : scene.status === 'completed'
+                                                ? "text-slate-500"
+                                                : "text-slate-300"
                                         )}
-                                    </span>
-                                </button>
+                                    >
+                                        <span className="flex-shrink-0 mt-0.5">{sceneStatusIcon(scene)}</span>
+                                        <span className="flex flex-col min-w-0">
+                                            <span className="truncate">{scene.title}</span>
+                                            {(sceneLocation || sceneNpcCount > 0) && (
+                                                <span className="flex items-center gap-1.5 mt-0.5">
+                                                    {sceneLocation && (
+                                                        <span className="text-[10px] text-emerald-400/70 truncate max-w-[80px]" title={sceneLocation.name}>
+                                                            {sceneLocation.name}
+                                                        </span>
+                                                    )}
+                                                    {sceneNpcCount > 0 && (
+                                                        <span className="text-[10px] px-1 py-0.5 rounded bg-slate-700/80 text-slate-400 flex-shrink-0">
+                                                            {sceneNpcCount} NPC{sceneNpcCount !== 1 ? 's' : ''}
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            )}
+                                        </span>
+                                    </button>
+                                    {/* Info icon — hover to show EntityQuickCard tooltip */}
+                                    <div className="flex items-center pr-1.5 flex-shrink-0">
+                                        <EntityLink
+                                            entityType="scene"
+                                            entityId={scene.id}
+                                            label={<Icons.Help className="w-3.5 h-3.5 text-slate-500 hover:text-blue-400 transition-colors" />}
+                                            onNavigate={onNavigate ?? (() => {})}
+                                            className="p-1 rounded no-underline"
+                                        />
+                                    </div>
+                                </div>
                             );
                         })}
                         {plannedScenes.length === 0 && (
