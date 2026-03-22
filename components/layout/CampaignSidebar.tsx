@@ -3,6 +3,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import type { Campaign, Article } from '../../types/index';
 import { Icons, SceneIcon } from '../common/Icons';
 import type { EditorView, GeneratorType } from '../../App';
+import type { RecentItem, CommandPaletteEntityType } from '../common/CommandPalette';
 import { twMerge } from 'tailwind-merge';
 
 type SelectedIds = {
@@ -26,6 +27,8 @@ interface CampaignSidebarProps {
     onSelect: (type: 'adventure' | 'scene' | 'npc' | 'location' | 'faction' | 'item' | 'article' | 'session-log' | 'player-character' | 'plot', id: string) => void;
     onShowGenerator: (type: GeneratorType) => void;
     onReorderScene: (adventureId: string, draggedSceneId: string, targetSceneId: string) => void;
+    recentItems?: RecentItem[];
+    onSelectRecent?: (type: CommandPaletteEntityType, id: string) => void;
 }
 
 // Helper component for recursively rendering the article tree
@@ -82,6 +85,32 @@ const ArticleTreeItem: React.FC<{
 };
 
 
+// Map entity type to icon key from Icons
+const RECENT_TYPE_ICON: Record<CommandPaletteEntityType, keyof typeof Icons> = {
+    npc: 'NPCs',
+    location: 'Locations',
+    faction: 'Factions',
+    item: 'Items',
+    adventure: 'Adventures',
+    article: 'BookCopy',
+    'session-log': 'SessionLog',
+    plot: 'Plot',
+    'player-character': 'PlayerCharacters',
+};
+
+// Map entity type to Tailwind text color class (matches EntityLink / CommandPalette colors)
+const RECENT_TYPE_COLOR: Record<CommandPaletteEntityType, string> = {
+    npc: 'text-amber-400',
+    location: 'text-emerald-400',
+    faction: 'text-violet-400',
+    item: 'text-sky-400',
+    adventure: 'text-orange-400',
+    article: 'text-cyan-400',
+    'session-log': 'text-rose-400',
+    plot: 'text-yellow-400',
+    'player-character': 'text-teal-400',
+};
+
 export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
     campaign,
     activeView,
@@ -89,7 +118,9 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
     selectedIds,
     onSelect,
     onShowGenerator,
-    onReorderScene
+    onReorderScene,
+    recentItems = [],
+    onSelectRecent,
 }) => {
     const [expandedAdventures, setExpandedAdventures] = useState<Record<string, boolean>>({});
     const [expandedArticles, setExpandedArticles] = useState<Record<string, boolean>>({});
@@ -98,6 +129,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
     });
     const [filterText, setFilterText] = useState('');
     const [debouncedFilter, setDebouncedFilter] = useState('');
+    const [showAllRecent, setShowAllRecent] = useState(false);
     const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const handleFilterChange = useCallback((value: string) => {
@@ -271,6 +303,42 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                         )}
                     </div>
                 </div>
+
+                {/* --- Recent Items --- */}
+                {recentItems.length > 0 && !debouncedFilter && (
+                <div className="mb-4">
+                    <div className="flex items-center gap-1.5 px-3 pt-3 pb-1">
+                        <Icons.Clock className="w-3.5 h-3.5 text-slate-500" />
+                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Recent</h3>
+                    </div>
+                    <div className="space-y-0.5">
+                        {(showAllRecent ? recentItems : recentItems.slice(0, 5)).map(item => {
+                            const iconKey = RECENT_TYPE_ICON[item.type];
+                            const Icon = Icons[iconKey];
+                            const colorClass = RECENT_TYPE_COLOR[item.type];
+                            return (
+                                <button
+                                    key={`${item.type}-${item.id}`}
+                                    onClick={() => onSelectRecent?.(item.type, item.id)}
+                                    className="w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-md text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
+                                    title={item.name}
+                                >
+                                    <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${colorClass}`} />
+                                    <span className="truncate">{item.name}</span>
+                                </button>
+                            );
+                        })}
+                        {recentItems.length > 5 && (
+                            <button
+                                onClick={() => setShowAllRecent(prev => !prev)}
+                                className="w-full text-left text-xs text-slate-500 hover:text-slate-300 px-3 py-1 transition-colors"
+                            >
+                                {showAllRecent ? 'Show less' : `Show ${recentItems.length - 5} more...`}
+                            </button>
+                        )}
+                    </div>
+                </div>
+                )}
 
                 {/* --- Bucket 1: Campaign State (Maintenance & History) --- */}
                 {hasCampaignStateItems && (

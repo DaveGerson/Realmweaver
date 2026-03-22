@@ -834,6 +834,8 @@ const App: FC = () => {
                         plot: selectedPlotId
                     }}
                     onSelect={handleSelect}
+                    recentItems={recentItems}
+                    onSelectRecent={(type, id) => handleSelect(type as Parameters<typeof handleSelect>[0], id)}
                     onShowGenerator={(type) => {
                       if (type === 'scene') {
                         if (!selectedAdventureId) {
