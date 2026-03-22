@@ -338,6 +338,10 @@ export interface EntityQuickCardProps {
   onNavigate: (entityType: QuickCardEntityType, entityId: string) => void;
   /** Called when the popover should close */
   onClose: () => void;
+  /** Called when the pointer enters the card (keeps it alive during hover) */
+  onPointerEnter?: () => void;
+  /** Called when the pointer leaves the card */
+  onPointerLeave?: () => void;
 }
 
 export const EntityQuickCard: React.FC<EntityQuickCardProps> = ({
@@ -346,6 +350,8 @@ export const EntityQuickCard: React.FC<EntityQuickCardProps> = ({
   triggerRect,
   onNavigate,
   onClose,
+  onPointerEnter,
+  onPointerLeave,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const config = ENTITY_CONFIG[entityType];
@@ -436,6 +442,8 @@ export const EntityQuickCard: React.FC<EntityQuickCardProps> = ({
       aria-label={`Quick info: ${entityData?.name ?? 'Entity'}`}
       className={`fixed z-50 w-72 bg-stone-800 border border-stone-600 border-l-4 ${config.borderClass} rounded-lg shadow-xl`}
       style={{ top, left }}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
     >
       <QuickCardContent
         config={config}

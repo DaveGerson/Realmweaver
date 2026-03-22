@@ -98,13 +98,12 @@ export const EntityLink: React.FC<EntityLinkProps> = ({
       clearTimeout(hoverTimerRef.current);
       hoverTimerRef.current = null;
     }
-    // Give a small grace window in case the pointer moves to the card itself.
-    // The card's own pointer events handle keeping itself alive.
+    // Give a generous grace window so the user can move the pointer to the card.
     setTimeout(() => {
       if (!cardHoveredRef.current) {
         closeCard();
       }
-    }, 80);
+    }, 300);
   }, [closeCard]);
 
   // Cleanup timer on unmount
@@ -113,6 +112,22 @@ export const EntityLink: React.FC<EntityLinkProps> = ({
       if (hoverTimerRef.current !== null) clearTimeout(hoverTimerRef.current);
     };
   }, []);
+
+  // ── Card hover callbacks (keep card open while user interacts) ──────────
+
+  const handleCardPointerEnter = useCallback(() => {
+    cardHoveredRef.current = true;
+  }, []);
+
+  const handleCardPointerLeave = useCallback(() => {
+    cardHoveredRef.current = false;
+    // Delay close so brief pointer exits (e.g. moving between action buttons) don't dismiss
+    setTimeout(() => {
+      if (!cardHoveredRef.current) {
+        closeCard();
+      }
+    }, 300);
+  }, [closeCard]);
 
   // ── Click handling ───────────────────────────────────────────────────────
 
@@ -163,6 +178,8 @@ export const EntityLink: React.FC<EntityLinkProps> = ({
           triggerRect={triggerRect}
           onNavigate={handleNavigate}
           onClose={closeCard}
+          onPointerEnter={handleCardPointerEnter}
+          onPointerLeave={handleCardPointerLeave}
         />
       )}
     </>
