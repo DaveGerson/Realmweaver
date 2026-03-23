@@ -1,13 +1,17 @@
 
 import React, { useState } from 'react';
 import type { Plot } from '../../types/index';
+import type { SessionLog } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
+import { PlotTimeline } from '../visualizers/PlotTimeline';
 
 interface PlotDashboardProps {
   plots: Plot[];
+  sessionLogs: SessionLog[];
   onPlotCreated: (data: Omit<Plot, 'id'>) => void;
   onSelectPlot: (id: string) => void;
+  onSelectSession?: (sessionId: string) => void;
 }
 
 const PlotCreator: React.FC<{ onPlotCreated: (data: Omit<Plot, 'id'>) => void; }> = ({ onPlotCreated }) => {
@@ -46,13 +50,45 @@ const PlotCreator: React.FC<{ onPlotCreated: (data: Omit<Plot, 'id'>) => void; }
     )
 }
 
-export const PlotDashboard: React.FC<PlotDashboardProps> = ({ plots, onPlotCreated, onSelectPlot }) => {
+export const PlotDashboard: React.FC<PlotDashboardProps> = ({ plots, sessionLogs, onPlotCreated, onSelectPlot, onSelectSession }) => {
   const activePlots = plots.filter(p => p.status === 'active');
   const resolvedPlots = plots.filter(p => p.status === 'resolved');
   const dormantPlots = plots.filter(p => p.status === 'dormant');
+  const [timelineOpen, setTimelineOpen] = useState(true);
 
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
+
+      {/* Plot Timeline — collapsible bird's-eye view */}
+      <div className="bg-stone-900 border border-stone-700 rounded-lg overflow-hidden">
+        <button
+          className="w-full flex items-center justify-between px-5 py-3 hover:bg-stone-800/60 transition-colors"
+          onClick={() => setTimelineOpen(o => !o)}
+        >
+          <div className="flex items-center gap-2">
+            <Icons.Plot className="w-4 h-4 text-amber-400" />
+            <span className="text-sm font-semibold text-stone-200">Plot Timeline</span>
+            <span className="text-xs text-stone-500 ml-1">
+              {plots.length} {plots.length === 1 ? 'arc' : 'arcs'} &middot; {sessionLogs.length} {sessionLogs.length === 1 ? 'session' : 'sessions'}
+            </span>
+          </div>
+          {timelineOpen
+            ? <Icons.ChevronUp className="w-4 h-4 text-stone-400" />
+            : <Icons.ChevronDown className="w-4 h-4 text-stone-400" />
+          }
+        </button>
+        {timelineOpen && (
+          <div className="px-5 pb-5 pt-2 border-t border-stone-800">
+            <PlotTimeline
+              plots={plots}
+              sessionLogs={sessionLogs}
+              onSelectPlot={onSelectPlot}
+              onSelectSession={onSelectSession}
+            />
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1">
           <PlotCreator onPlotCreated={onPlotCreated} />
