@@ -939,6 +939,38 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 if (campaign) Object.assign(campaign, updatedData);
             });
         },
+
+        // --- Pinned entities ---
+        pinEntity(type: string, id: string) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign) return;
+                if (!campaign.pinnedEntities) campaign.pinnedEntities = [];
+                // No duplicates
+                const alreadyPinned = campaign.pinnedEntities.some(p => p.type === type && p.id === id);
+                if (alreadyPinned) return;
+                // Prepend; enforce max 15
+                campaign.pinnedEntities.unshift({ type, id });
+                if (campaign.pinnedEntities.length > 15) {
+                    campaign.pinnedEntities = campaign.pinnedEntities.slice(0, 15);
+                }
+            });
+        },
+        unpinEntity(type: string, id: string) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign || !campaign.pinnedEntities) return;
+                campaign.pinnedEntities = campaign.pinnedEntities.filter(
+                    p => !(p.type === type && p.id === id)
+                );
+            });
+        },
+        isPinned(type: string, id: string): boolean {
+            const campaign = getActiveCampaignFromState(state);
+            if (!campaign || !campaign.pinnedEntities) return false;
+            return campaign.pinnedEntities.some(p => p.type === type && p.id === id);
+        },
+
         startNewCampaignCreation() { _internalUpdate(draft => { draft.appStatus = 'creating'; }); },
         switchToCampaignSelector() { 
             // Switching is a navigational event, persist active ID change immediately

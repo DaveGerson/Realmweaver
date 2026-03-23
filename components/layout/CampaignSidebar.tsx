@@ -29,6 +29,9 @@ interface CampaignSidebarProps {
     onReorderScene: (adventureId: string, draggedSceneId: string, targetSceneId: string) => void;
     recentItems?: RecentItem[];
     onSelectRecent?: (type: CommandPaletteEntityType, id: string) => void;
+    pinnedEntities?: Array<{ type: string; id: string }>;
+    onSelectPinned?: (type: string, id: string) => void;
+    onUnpin?: (type: string, id: string) => void;
 }
 
 // Helper component for recursively rendering the article tree
@@ -111,6 +114,23 @@ const RECENT_TYPE_COLOR: Record<CommandPaletteEntityType, string> = {
     'player-character': 'text-teal-400',
 };
 
+// Resolve display name for a pinned entity from the campaign data.
+// Returns null if the entity no longer exists (e.g. was deleted).
+function resolvePinnedEntityName(campaign: Campaign, type: string, id: string): string | null {
+    switch (type) {
+        case 'npc': return campaign.npcs.find(e => e.id === id)?.name ?? null;
+        case 'location': return campaign.locations.find(e => e.id === id)?.name ?? null;
+        case 'faction': return campaign.factions.find(e => e.id === id)?.name ?? null;
+        case 'item': return campaign.items.find(e => e.id === id)?.name ?? null;
+        case 'adventure': return campaign.adventures.find(e => e.id === id)?.title ?? null;
+        case 'article': return campaign.articles.find(e => e.id === id)?.title ?? null;
+        case 'session-log': return campaign.sessionLogs?.find(e => e.id === id)?.title ?? null;
+        case 'player-character': return campaign.playerCharacters?.find(e => e.id === id)?.characterSocial?.characterName ?? null;
+        case 'plot': return campaign.plots?.find(e => e.id === id)?.title ?? null;
+        default: return null;
+    }
+}
+
 export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
     campaign,
     activeView,
@@ -121,6 +141,9 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
     onReorderScene,
     recentItems = [],
     onSelectRecent,
+    pinnedEntities,
+    onSelectPinned,
+    onUnpin,
 }) => {
     const [expandedAdventures, setExpandedAdventures] = useState<Record<string, boolean>>({});
     const [expandedArticles, setExpandedArticles] = useState<Record<string, boolean>>({});
@@ -303,6 +326,45 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                         )}
                     </div>
                 </div>
+
+                {/* --- Pinned Entities --- */}
+                {pinnedEntities && pinnedEntities.length > 0 && !debouncedFilter && (
+                <div className="mb-4">
+                    <div className="flex items-center gap-1.5 px-3 pt-3 pb-1">
+                        <Icons.Star className="w-3.5 h-3.5 text-amber-500" />
+                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pinned</h3>
+                    </div>
+                    <div className="space-y-0.5">
+                        {pinnedEntities.slice(0, 15).map(pinned => {
+                            const iconKey = RECENT_TYPE_ICON[pinned.type as CommandPaletteEntityType];
+                            const Icon = iconKey ? Icons[iconKey] : Icons.Star;
+                            const colorClass = RECENT_TYPE_COLOR[pinned.type as CommandPaletteEntityType] ?? 'text-stone-400';
+                            const name = resolvePinnedEntityName(campaign, pinned.type, pinned.id);
+                            if (!name) return null;
+                            return (
+                                <div key={`${pinned.type}-${pinned.id}`} className="flex items-center group">
+                                    <button
+                                        onClick={() => onSelectPinned?.(pinned.type, pinned.id)}
+                                        className="flex-1 flex items-center gap-2 px-3 py-1.5 text-sm rounded-md text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors min-w-0"
+                                        title={name}
+                                    >
+                                        <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${colorClass}`} />
+                                        <span className="truncate">{name}</span>
+                                    </button>
+                                    <button
+                                        onClick={() => onUnpin?.(pinned.type, pinned.id)}
+                                        className="flex-shrink-0 mr-2 p-1 text-slate-600 hover:text-slate-300 opacity-0 group-hover:opacity-100 transition-all"
+                                        title="Unpin"
+                                        aria-label={`Unpin ${name}`}
+                                    >
+                                        <Icons.X className="w-3 h-3" />
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+                )}
 
                 {/* --- Recent Items --- */}
                 {recentItems.length > 0 && !debouncedFilter && (

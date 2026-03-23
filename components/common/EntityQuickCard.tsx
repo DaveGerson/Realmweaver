@@ -858,6 +858,7 @@ const QuickCardContent: React.FC<QuickCardContentProps> = ({
   isExpanded,
   onToggleExpand,
 }) => {
+  const [pinned, setPinned] = useState(() => campaignService.isPinned(entityType, entityId));
   if (!entityData) {
     return (
       <div className="p-3 text-stone-400 text-sm">
@@ -971,6 +972,22 @@ const QuickCardContent: React.FC<QuickCardContentProps> = ({
             : <Icons.Maximize className="w-3.5 h-3.5" />
           }
           {isExpanded ? 'Collapse' : 'Expand'}
+        </button>
+        <button
+          onClick={() => {
+            if (pinned) {
+              campaignService.unpinEntity(entityType, entityId);
+            } else {
+              campaignService.pinEntity(entityType, entityId);
+            }
+            setPinned(prev => !prev);
+          }}
+          className={`flex items-center gap-1.5 text-xs transition-colors min-h-[44px] sm:min-h-0 py-2 sm:py-1 px-1 ${pinned ? 'text-amber-400 hover:text-amber-300' : 'text-stone-400 hover:text-stone-200'}`}
+          aria-label={pinned ? `Unpin ${entityData.name}` : `Pin ${entityData.name}`}
+          title={pinned ? 'Unpin from sidebar' : 'Pin to sidebar'}
+        >
+          {pinned ? <Icons.Star className="w-3.5 h-3.5 fill-current" /> : <Icons.Star className="w-3.5 h-3.5" />}
+          {pinned ? 'Pinned' : 'Pin'}
         </button>
         <button
           onClick={onCopyName}

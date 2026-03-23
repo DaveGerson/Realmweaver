@@ -33,4 +33,5 @@ export interface Campaign {
   activeEncounter?: Encounter;
   activeSceneId?: string; // The ID of the scene currently being played in the session
   activeSessionId?: string; // The ID of the currently live session (Session Runner)
+  pinnedEntities?: Array<{ type: string; id: string }>;
 }
