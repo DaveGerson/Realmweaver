@@ -20,6 +20,7 @@ import { PlayerCharacterEditor } from './components/editors/PlayerCharacterEdito
 import { PlotEditor } from './components/editors/PlotEditor';
 import { CampaignSettingEditor } from './components/editors/CampaignSettingEditor';
 import { CombatTracker } from './components/tools/CombatTracker';
+import { SecretsTracker } from './components/tools/SecretsTracker';
 import { RelationshipGraph } from './components/visualizers/RelationshipGraph';
 import { ContentWrapper } from './components/layout/ContentWrapper';
 import { DmCoach } from './components/dialogs/DmCoach';
@@ -45,7 +46,7 @@ import { CommandPalette } from './components/common/CommandPalette';
 import type { RecentItem, CommandPaletteEntityType } from './components/common/CommandPalette';
 
 
-export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'combat' | 'relationships' | 'session-runner';
+export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'combat' | 'relationships' | 'session-runner' | 'secrets';
 export type GeneratorType = 'npc' | 'location' | 'faction' | 'item' | 'scene' | 'article';
 
 export interface NavStackEntry {
@@ -557,7 +558,8 @@ const App: FC = () => {
           'setting': 'Setting', 'npcs': 'NPCs', 'locations': 'Locations', 'factions': 'Factions',
           'items': 'Items', 'adventures': 'Adventures', 'lorebook': 'Lorebook',
           'session-logs': 'Sessions', 'player-characters': 'Characters', 'plots': 'Plots',
-          'combat': 'Combat Tracker', 'relationships': 'World Graph', 'session-runner': 'Session Live'
+          'combat': 'Combat Tracker', 'relationships': 'World Graph', 'session-runner': 'Session Live',
+          'secrets': 'Secrets & Clues'
       };
 
       const categoryCrumb: BreadcrumbSegment = {
@@ -715,11 +717,23 @@ const App: FC = () => {
           }}
           isMockMode={isMockMode}
         />;
-      if (activeView === 'session-logs') return <SessionLogDashboard sessionLogs={activeCampaign.sessionLogs || []} onSessionLogCreated={(logData) => {
-            const newId = campaignService.createSessionLog(logData);
-            setActiveView('session-logs');
-            setSelectedSessionLogId(newId);
-        }} onSelectSessionLog={setSelectedSessionLogId} />;
+      if (activeView === 'session-logs') return <SessionLogDashboard
+          campaign={activeCampaign}
+          sessionLogs={activeCampaign.sessionLogs || []}
+          onSessionLogCreated={(logData) => {
+              const newId = campaignService.createSessionLog(logData);
+              setActiveView('session-logs');
+              setSelectedSessionLogId(newId);
+          }}
+          onSelectSessionLog={(id) => {
+              setSelectedSessionLogId(id);
+              if (activeCampaign.activeSessionId === id) {
+                  setActiveView('session-runner');
+              }
+          }}
+          onGoLive={handleGoLive}
+          isMockMode={isMockMode}
+      />;
       if (activeView === 'plots') return <PlotDashboard plots={activeCampaign.plots || []} onPlotCreated={(noteData) => {
             const newId = campaignService.createPlot(noteData);
             setActiveView('plots');
@@ -763,10 +777,19 @@ const App: FC = () => {
 
       // Relationship Graph View
       if (activeView === 'relationships') {
-          return <RelationshipGraph 
-            campaign={activeCampaign} 
-            onNodeSelect={(type, id) => handleSelect(type as any, id)} 
+          return <RelationshipGraph
+            campaign={activeCampaign}
+            onNodeSelect={(type, id) => handleSelect(type as any, id)}
           />;
+      }
+
+      // Secrets & Clues View
+      if (activeView === 'secrets') {
+          return (
+              <ContentWrapper title="Secrets & Clues" icon="Lock">
+                  <SecretsTracker campaign={activeCampaign} />
+              </ContentWrapper>
+          );
       }
 
       // Fallback to Campaign Setting Editor
