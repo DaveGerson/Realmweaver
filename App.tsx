@@ -27,6 +27,8 @@ import { DmCoach } from './components/dialogs/DmCoach';
 import { EvocationWizard } from './components/dialogs/EvocationWizard';
 import { runSmokeTests } from './smokeTest';
 import { ExportModal } from './components/dialogs/ExportModal';
+import { ContinuityChecker } from './components/dialogs/ContinuityChecker';
+import { checkContinuity } from './services/continuityChecker';
 import { exportCampaignAsJson, exportCampaignAsObsidian } from './services/importExportService';
 import { NpcDashboard } from './components/dashboards/NpcDashboard';
 import { LocationDashboard } from './components/dashboards/LocationDashboard';
@@ -39,7 +41,7 @@ import { PlotDashboard } from './components/dashboards/PlotDashboard';
 import { campaignService } from './services/campaignService';
 import { RealmChatWidget } from './components/RealmChat/RealmChatWidget';
 import { SessionRunner } from './components/views/SessionRunner';
-import { buildCampaignContext } from './utils/entityUtils';
+import { buildCampaignContext } from './services/contextBuilder';
 import { Breadcrumbs } from './components/common/Breadcrumbs';
 import type { BreadcrumbSegment } from './components/common/Breadcrumbs';
 import { CommandPalette } from './components/common/CommandPalette';
@@ -83,6 +85,7 @@ const App: FC = () => {
   const [isCoachOpen, setIsCoachOpen] = useState(false);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isContinuityCheckerOpen, setIsContinuityCheckerOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
@@ -118,7 +121,23 @@ const App: FC = () => {
 
   const activeCampaign = useMemo(() => campaigns.find(c => c.id === activeCampaignId), [campaigns, activeCampaignId]);
   const isOfficialSetting = activeCampaign?.settingType === 'official';
-  const campaignContext = useMemo(() => activeCampaign ? buildCampaignContext(activeCampaign) : undefined, [activeCampaign]);
+
+  // Continuity issue count — recomputed whenever the campaign changes. Only counts
+  // errors and warnings (info items don't warrant a badge).
+  const continuityIssueCount = useMemo(() => {
+    if (!activeCampaign) return 0;
+    const issues = checkContinuity(activeCampaign);
+    return issues.filter(i => i.severity === 'error' || i.severity === 'warning').length;
+  }, [activeCampaign]);
+  const campaignContext = useMemo(() => {
+    if (!activeCampaign) return undefined;
+    return buildCampaignContext({
+      variant: 'generation',
+      campaign: activeCampaign,
+      activeSceneId: activeCampaign.activeSceneId,
+      activeSessionId: activeCampaign.activeSessionId,
+    });
+  }, [activeCampaign]);
 
   const resetSelections = () => {
     setSelectedNpcId(null);
@@ -734,11 +753,11 @@ const App: FC = () => {
           onGoLive={handleGoLive}
           isMockMode={isMockMode}
       />;
-      if (activeView === 'plots') return <PlotDashboard plots={activeCampaign.plots || []} onPlotCreated={(noteData) => {
+      if (activeView === 'plots') return <PlotDashboard plots={activeCampaign.plots || []} sessionLogs={activeCampaign.sessionLogs || []} onPlotCreated={(noteData) => {
             const newId = campaignService.createPlot(noteData);
             setActiveView('plots');
             setSelectedPlotId(newId);
-      }} onSelectPlot={setSelectedPlotId} />;
+      }} onSelectPlot={setSelectedPlotId} onSelectSession={(id) => { setSelectedSessionLogId(id); setActiveView('session-logs'); }} />;
       if (activeView === 'npcs') return <NpcDashboard npcs={activeCampaign.npcs} factions={activeCampaign.factions} onNpcCreated={(npcData) => {
             const newId = campaignService.createNpc(npcData);
             setActiveView('npcs');
@@ -817,12 +836,14 @@ const App: FC = () => {
         if (activeCampaign) {
           return (
             <>
-              <Header 
+              <Header
                 activeCampaign={activeCampaign}
                 isMockMode={isMockMode}
                 onToggleMockMode={() => setIsMockMode(p => !p)}
                 onToggleCoach={() => setIsCoachOpen(p => !p)}
                 onToggleWizard={() => setIsWizardOpen(p => !p)}
+                onToggleContinuityChecker={() => setIsContinuityCheckerOpen(p => !p)}
+                continuityIssueCount={continuityIssueCount}
                 onSaveCampaign={campaignService.saveCampaign}
                 onSwitchCampaign={campaignService.switchToCampaignSelector}
                 onCreateNew={campaignService.startNewCampaignCreation}
@@ -922,6 +943,13 @@ const App: FC = () => {
                   onExportJson={() => { exportCampaignAsJson(activeCampaign); setIsExportModalOpen(false); }}
                   onExportObsidian={() => { exportCampaignAsObsidian(activeCampaign); setIsExportModalOpen(false); }}
                 />}
+                {isContinuityCheckerOpen && (
+                  <ContinuityChecker
+                    campaign={activeCampaign}
+                    onNavigate={handleEntityNavigate}
+                    onClose={() => setIsContinuityCheckerOpen(false)}
+                  />
+                )}
                 <CommandPalette
                   isOpen={isCommandPaletteOpen}
                   onClose={() => setIsCommandPaletteOpen(false)}

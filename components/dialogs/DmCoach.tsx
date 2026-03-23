@@ -8,6 +8,7 @@ import { MentionInput, buildMentionedEntityContext } from '../common/MentionInpu
 import { LinkedText } from '../common/LinkedText';
 import { twMerge } from 'tailwind-merge';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
+import { buildCampaignContext } from '../../services/contextBuilder';
 
 type CoachTool = 'narrate' | 'improvise' | 'table' | 'roleplay';
 
@@ -140,7 +141,16 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClo
         setResult(null);
 
         const entityContext = buildMentionedEntityContext(mentionedEntityIds);
-        const campaignContext = `Campaign Title: ${campaign.title}\nSetting: ${campaign.setting}\n\n${activeContext || ''}${entityContext}`;
+        // Build tiered campaign context then append live session context and @mention details.
+        const baseContext = buildCampaignContext({
+          variant: 'coach',
+          campaign,
+          activeSceneId: campaign.activeSceneId,
+          activeSessionId: campaign.activeSessionId,
+          // Leave some budget for activeContext and entityContext (~800 tokens)
+          maxTokenEstimate: 3200,
+        });
+        const campaignContext = `${baseContext}\n\n${activeContext || ''}${entityContext}`;
 
         try {
             const resultData = await currentTool!.action(prompt, campaignContext, useLiteModel, isMockMode);
@@ -202,7 +212,13 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClo
         }));
 
         const npcContext = buildNpcContext(selectedNpc);
-        const campaignContext = `Campaign Title: ${campaign.title}\nSetting: ${campaign.setting}`;
+        const campaignContext = buildCampaignContext({
+          variant: 'coach',
+          campaign,
+          activeSceneId: campaign.activeSceneId,
+          activeSessionId: campaign.activeSessionId,
+          maxTokenEstimate: 2000,
+        });
 
         try {
             const response = await generateNpcRoleplay(

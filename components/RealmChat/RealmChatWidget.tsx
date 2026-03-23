@@ -5,7 +5,7 @@ import { Button } from '../common/Button';
 import type { Campaign, ChatMessage, DraftEntity, ModelTier, NPC, Location, Faction, Item, Adventure, Article } from '../../types/index';
 import { chatWithRealmWeaver } from '../../services/geminiService';
 import { twMerge } from 'tailwind-merge';
-import { buildCampaignContext } from '../../utils/entityUtils';
+import { buildCampaignContext } from '../../services/contextBuilder';
 import { LinkedText } from '../common/LinkedText';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
 
@@ -69,7 +69,12 @@ export const RealmChatWidget: React.FC<RealmChatWidgetProps> = ({ campaign, onAd
     setInput('');
     setIsLoading(true);
 
-    const context = buildCampaignContext(campaign);
+    const context = buildCampaignContext({
+      variant: 'chat',
+      campaign,
+      activeSceneId: campaign.activeSceneId,
+      activeSessionId: campaign.activeSessionId,
+    });
 
     try {
       const response = await chatWithRealmWeaver(
