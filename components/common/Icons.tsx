@@ -77,6 +77,7 @@ import {
   Unlock,
   Theater,
   SendHorizonal,
+  Keyboard,
 } from 'lucide-react';
 
 export const Icons = {
@@ -156,6 +157,7 @@ export const Icons = {
   Unlock,
   Roleplay: Theater,
   Send: SendHorizonal,
+  Keyboard,
 };
 
 export const SceneIcon = ({ type, className }: { type: string, className?: string }) => {

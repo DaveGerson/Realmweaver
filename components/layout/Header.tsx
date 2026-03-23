@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Icons } from '../common/Icons';
 import type { Campaign } from '../../types/index';
 import type { SaveStatus } from '../../services/campaignService';
+import { getModifierSymbol } from '../../utils/keyboardShortcuts';
 
 interface HeaderProps {
   activeCampaign: Campaign | null;
@@ -18,6 +19,8 @@ interface HeaderProps {
   onImportCampaign: (file: File) => void;
   onShowExportModal: () => void;
   onToggleSidebar?: () => void;
+  onShowShortcutsHelp?: () => void;
+  onOpenCommandPalette?: () => void;
   saveStatus?: SaveStatus;
   lastSavedAt?: string | null;
 }
@@ -36,6 +39,8 @@ export const Header: React.FC<HeaderProps> = ({
   onImportCampaign,
   onShowExportModal,
   onToggleSidebar,
+  onShowShortcutsHelp,
+  onOpenCommandPalette,
   saveStatus = 'saved',
   lastSavedAt
 }) => {
@@ -121,10 +126,26 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-6">
+          {/* Command Palette Search Button */}
+          {onOpenCommandPalette && (
+            <button
+              onClick={onOpenCommandPalette}
+              className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-800 border border-slate-700 text-sm text-slate-400 hover:text-white hover:border-slate-600 transition-colors"
+              title={`Search (${getModifierSymbol()}+K)`}
+              aria-label={`Search (${getModifierSymbol()}+K)`}
+            >
+              <Icons.Search className="w-4 h-4" />
+              <span className="hidden lg:inline">Search</span>
+              <kbd className="hidden lg:inline-flex items-center px-1 py-0.5 rounded border border-slate-600 text-slate-500 text-xs font-mono">
+                {getModifierSymbol()}K
+              </kbd>
+            </button>
+          )}
+
           {/* Auto-Save Indicator */}
           <div
             className="hidden sm:flex items-center gap-2 text-sm text-slate-400 cursor-help"
-            title={`Last saved: ${formatLastSaved(lastSavedAt)}`}
+            title={`Force save (${getModifierSymbol()}+S) — Last saved: ${formatLastSaved(lastSavedAt)}`}
           >
              {saveStatus === 'saving' && (
                  <>
@@ -179,6 +200,18 @@ export const Header: React.FC<HeaderProps> = ({
             <Icons.Coach className="w-5 h-5 text-indigo-400" />
             <span className="hidden lg:inline">Session Weaver</span>
           </button>
+          {/* Keyboard Shortcuts Help */}
+          {onShowShortcutsHelp && (
+            <button
+              onClick={onShowShortcutsHelp}
+              className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-indigo-500 rounded-md p-1 sm:-m-1"
+              aria-label="Keyboard shortcuts"
+              title="Keyboard shortcuts (?)"
+            >
+              <Icons.Keyboard className="w-5 h-5 text-slate-400" />
+            </button>
+          )}
+
           <div className="flex items-center gap-2 sm:gap-3">
               <span className={`hidden md:inline text-xs font-medium ${isMockMode ? 'text-indigo-400' : 'text-slate-500'}`}>
                 Mock Mode

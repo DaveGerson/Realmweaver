@@ -46,6 +46,8 @@ import { Breadcrumbs } from './components/common/Breadcrumbs';
 import type { BreadcrumbSegment } from './components/common/Breadcrumbs';
 import { CommandPalette } from './components/common/CommandPalette';
 import type { RecentItem, CommandPaletteEntityType } from './components/common/CommandPalette';
+import { KeyboardShortcutsHelp } from './components/common/KeyboardShortcutsHelp';
+import { matchShortcut } from './utils/keyboardShortcuts';
 
 
 export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'combat' | 'relationships' | 'session-runner' | 'secrets';
@@ -88,6 +90,7 @@ const App: FC = () => {
   const [isContinuityCheckerOpen, setIsContinuityCheckerOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
   const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
   const [navStack, setNavStack] = useState<NavStackEntry[]>([]);
 
@@ -96,20 +99,41 @@ const App: FC = () => {
     runSmokeTests(isMockMode).catch(err => console.error('Smoke tests failed:', err));
   }, [isMockMode]);
 
-  // Cmd+K / Ctrl+K to open command palette (suppressed inside input/textarea)
+  // Global keyboard shortcut handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        const target = e.target as HTMLElement;
-        const tagName = target.tagName.toLowerCase();
-        if (tagName === 'input' || tagName === 'textarea' || target.isContentEditable) return;
-        e.preventDefault();
-        setIsCommandPaletteOpen(prev => !prev);
+      const action = matchShortcut(e);
+      if (!action) return;
+
+      e.preventDefault();
+      switch (action) {
+        case 'search':
+          setIsCommandPaletteOpen(prev => !prev);
+          break;
+        case 'new-entity':
+          // Navigate to the dashboard of the current view (clears any selected entity)
+          resetSelections();
+          break;
+        case 'save':
+          campaignService.saveCampaign();
+          break;
+        case 'close':
+          if (isCommandPaletteOpen) { setIsCommandPaletteOpen(false); break; }
+          if (isShortcutsHelpOpen) { setIsShortcutsHelpOpen(false); break; }
+          if (isContinuityCheckerOpen) { setIsContinuityCheckerOpen(false); break; }
+          if (isCoachOpen) { setIsCoachOpen(false); break; }
+          if (isWizardOpen) { setIsWizardOpen(false); break; }
+          if (isExportModalOpen) { setIsExportModalOpen(false); break; }
+          break;
+        case 'help':
+          setIsShortcutsHelpOpen(prev => !prev);
+          break;
       }
     };
+
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isCommandPaletteOpen, isShortcutsHelpOpen, isContinuityCheckerOpen, isCoachOpen, isWizardOpen, isExportModalOpen]);
 
   // Track recently viewed entities (max 10, session-only)
   const trackRecentItem = (type: CommandPaletteEntityType, id: string, name: string) => {
@@ -850,6 +874,8 @@ const App: FC = () => {
                 onImportCampaign={handleImportCampaign}
                 onShowExportModal={() => setIsExportModalOpen(true)}
                 onToggleSidebar={() => setIsSidebarOpen(p => !p)}
+                onShowShortcutsHelp={() => setIsShortcutsHelpOpen(p => !p)}
+                onOpenCommandPalette={() => setIsCommandPaletteOpen(p => !p)}
                 saveStatus={saveStatus}
                 lastSavedAt={lastSavedAt}
               />
@@ -950,6 +976,10 @@ const App: FC = () => {
                     onClose={() => setIsContinuityCheckerOpen(false)}
                   />
                 )}
+                <KeyboardShortcutsHelp
+                  isOpen={isShortcutsHelpOpen}
+                  onClose={() => setIsShortcutsHelpOpen(false)}
+                />
                 <CommandPalette
                   isOpen={isCommandPaletteOpen}
                   onClose={() => setIsCommandPaletteOpen(false)}
