@@ -248,13 +248,31 @@ export function buildCampaignContext(options: ContextOptions): string {
   if (activeScene && hasBudget()) {
     const sceneNpcs = npcsInScene(activeScene);
     if (sceneNpcs.length > 0) {
+      const sceneNpcIds = new Set(sceneNpcs.map(n => n.id));
       const npcLines = sceneNpcs.map(n => {
         const parts: string[] = [n.name];
         if (n.traits) parts.push(trunc(n.traits, 80));
         if (n.motivations) parts.push(trunc(n.motivations, 80));
+        const faction = n.factionId ? campaign.factions.find(f => f.id === n.factionId) : undefined;
+        if (faction) parts.push(`[${faction.name}]`);
         return `  - ${parts.join(' | ')}`;
       });
       tryAdd(['NPCs in Scene:', ...npcLines].join('\n'));
+
+      // Inter-NPC relationship lines (coach variant: helps AI generate aware dialogue/narration)
+      if (variant === 'coach' && hasBudget()) {
+        const relLines: string[] = [];
+        for (const npc of sceneNpcs) {
+          for (const rel of npc.relationships ?? []) {
+            if (!sceneNpcIds.has(rel.targetId)) continue;
+            const targetName = campaign.npcs.find(n => n.id === rel.targetId)?.name ?? rel.targetId;
+            relLines.push(`  - ${npc.name} ${rel.relationType} ${targetName}`);
+          }
+        }
+        if (relLines.length > 0) {
+          tryAdd(['NPC Relationships in Scene:', ...relLines].join('\n'));
+        }
+      }
     }
   }
 

@@ -158,6 +158,40 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
             .filter((n): n is NPC => !!n);
     }, [activeScene, campaign.npcs]);
 
+    /**
+     * For each NPC in the active scene, collect relationships whose target is
+     * also in the scene. Shape: Map<npcId, {rel, targetNpc}[]>
+     */
+    const sceneNpcRelationshipMap = useMemo(() => {
+        const sceneNpcIds = new Set(activeSceneNpcs.map(n => n.id));
+        const map = new Map<string, { relationType: string; targetId: string; targetName: string }[]>();
+        for (const npc of activeSceneNpcs) {
+            const rels = (npc.relationships ?? []).filter(r => sceneNpcIds.has(r.targetId));
+            if (rels.length > 0) {
+                map.set(npc.id, rels.map(r => ({
+                    relationType: r.relationType,
+                    targetId: r.targetId,
+                    targetName: campaign.npcs.find(n => n.id === r.targetId)?.name ?? r.targetId,
+                })));
+            }
+        }
+        return map;
+    }, [activeSceneNpcs, campaign.npcs]);
+
+    /** One-line cast dynamics summary for the active scene. */
+    const castDynamicsSummary = useMemo(() => {
+        if (sceneNpcRelationshipMap.size === 0) return null;
+        const parts: string[] = [];
+        for (const [npcId, rels] of sceneNpcRelationshipMap) {
+            const npcName = activeSceneNpcs.find(n => n.id === npcId)?.name ?? npcId;
+            for (const r of rels) {
+                parts.push(`${npcName} ${r.relationType.toLowerCase()}s ${r.targetName}`);
+            }
+        }
+        if (parts.length === 0) return null;
+        return 'Cast dynamics: ' + parts.join('. ') + '.';
+    }, [sceneNpcRelationshipMap, activeSceneNpcs]);
+
     const previousSession = useMemo(() => {
         const completed = campaign.sessionLogs
             .filter(s => s.status === 'completed')
@@ -688,9 +722,14 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                                         <Icons.NPCs className="w-3 h-3 inline mr-1" />
                                         NPCs Present
                                     </h3>
+                                    {/* Cast dynamics summary — only shown when there are inter-NPC relationships */}
+                                    {castDynamicsSummary && (
+                                        <p className="text-slate-500 text-xs italic mb-3">{castDynamicsSummary}</p>
+                                    )}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         {activeSceneNpcs.map(npc => {
                                             const faction = npc.factionId ? campaign.factions.find(f => f.id === npc.factionId) : null;
+                                            const npcRels = sceneNpcRelationshipMap.get(npc.id) ?? [];
                                             return (
                                                 <div key={npc.id} className="bg-slate-900/50 rounded-md p-3">
                                                     <div className="flex items-center gap-2 flex-wrap">
@@ -712,6 +751,33 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                                                     {npc.traits && <p className="text-slate-400 text-xs mt-1">{npc.traits}</p>}
                                                     {npc.motivations && <p className="text-slate-500 text-xs mt-1 italic">{npc.motivations}</p>}
                                                     {npc.exampleQuote && <p className="text-amber-400/70 text-xs mt-1 italic">"{npc.exampleQuote}"</p>}
+                                                    {/* Inter-NPC relationship badges */}
+                                                    {npcRels.length > 0 && (
+                                                        <div className="flex flex-wrap gap-1 mt-2">
+                                                            {npcRels.map((r, idx) => {
+                                                                const relLower = r.relationType.toLowerCase();
+                                                                const badgeClass = relLower.includes('rival') || relLower.includes('enemy') || relLower.includes('foe')
+                                                                    ? 'bg-red-500/15 text-red-400 border-red-500/30'
+                                                                    : relLower.includes('ally') || relLower.includes('friend') || relLower.includes('allied')
+                                                                        ? 'bg-green-500/15 text-green-400 border-green-500/30'
+                                                                        : relLower.includes('family') || relLower.includes('sibling') || relLower.includes('parent') || relLower.includes('child')
+                                                                            ? 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                                                                            : 'bg-slate-500/15 text-slate-400 border-slate-500/30';
+                                                                return (
+                                                                    <span
+                                                                        key={idx}
+                                                                        className={twMerge('text-[10px] px-1.5 py-0.5 rounded-full border font-medium', badgeClass)}
+                                                                    >
+                                                                        {r.relationType} of{' '}
+                                                                        {onNavigate
+                                                                            ? <EntityLink entityType="npc" entityId={r.targetId} label={r.targetName} onNavigate={onNavigate} className="text-[10px] font-medium no-underline" />
+                                                                            : r.targetName
+                                                                        }
+                                                                    </span>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         })}
