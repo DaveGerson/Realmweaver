@@ -9,16 +9,17 @@ import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { RegenerateButton } from '../common/RegenerateButton';
 import { EntityLink } from '../common/EntityLink';
 import { LinkedText } from '../common/LinkedText';
-import { campaignService } from '../../services/campaignService'; // Import store for access to full state
+import { campaignService } from '../../services/campaignService';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
 import { BacklinksPanel } from '../common/BacklinksPanel';
+import { TabLayout } from '../common/TabLayout';
+import type { TabDefinition } from '../common/TabLayout';
 
 interface NpcEditorProps {
   npc: NPC;
   factions: Faction[];
   allNpcs?: NPC[];
   playerCharacters?: PlayerCharacter[];
-  // sessionLogs and articles are no longer needed directly as props if we access via store, but kept for prop compatibility if needed
   sessionLogs?: any[];
   articles?: any[];
   onUpdate: (id: string, updatedData: Partial<NPC>) => void;
@@ -28,12 +29,24 @@ interface NpcEditorProps {
   onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
 }
 
+const NPC_TABS: TabDefinition[] = [
+  { id: 'identity',     label: 'Identity',      icon: Icons.NPCs },
+  { id: 'personality',  label: 'Personality',   icon: Icons.Chat },
+  { id: 'stats',        label: 'Stats & Combat', icon: Icons.Combat },
+  { id: 'connections',  label: 'Connections',   icon: Icons.Link },
+];
+
 export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [], playerCharacters = [], onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(npc);
   const [isGenerating, setIsGenerating] = useState<keyof Omit<NPC, 'id' | 'factionId' | 'knowsPlayerHistory' | 'relationships' | 'history'> | null>(null);
+  const [activeTab, setActiveTab] = useState('identity');
 
-  // We need access to the full campaign for the HistoryManager to resolve links
   const campaign = campaignService.getState().campaigns.find(c => c.id === campaignService.getState().activeCampaignId)!;
+
+  // Reset to first tab when the entity changes
+  useEffect(() => {
+    setActiveTab('identity');
+  }, [npc.id]);
 
   useEffect(() => {
     setFormData(npc);
@@ -43,7 +56,7 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
-  
+
   const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     if (formData[e.target.name as keyof NPC] !== npc[e.target.name as keyof NPC]) {
         onUpdate(npc.id, { [e.target.name]: e.target.value });
@@ -117,8 +130,8 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
   ];
 
   return (
-    <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
-      <header className="flex justify-between items-start">
+    <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar animate-fade-in">
+      <header className="flex justify-between items-start mb-6">
         <div className="space-y-2">
             <div className="flex items-center gap-3 text-amber-400">
               <Icons.NPCs className="w-8 h-8" />
@@ -130,237 +143,258 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
             Delete NPC
         </Button>
       </header>
-      
-      <div className="space-y-6 bg-slate-900/50 p-6 rounded-xl border border-slate-800/50">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Name */}
-            <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1.5">NPC Name</label>
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600"
-              />
-            </div>
-             {/* Faction */}
-            <div>
-                <label className="block text-sm font-medium text-slate-400 mb-1.5">Faction</label>
-                <select
-                    name="factionId"
-                    value={formData.factionId || "none"}
-                    onChange={handleFactionChange}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all"
-                >
-                    <option value="none">-- None --</option>
-                    {factions.map(faction => (
-                        <option key={faction.id} value={faction.id}>{faction.name}</option>
-                    ))}
-                </select>
-                {formData.factionId && onNavigate && (
-                    <div className="mt-1.5">
-                        <EntityLink
-                            entityType="faction"
-                            entityId={formData.factionId}
-                            label={factions.find(f => f.id === formData.factionId)?.name}
-                            onNavigate={onNavigate}
-                        />
-                    </div>
-                )}
-            </div>
-        </div>
 
+      <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-800/50">
+        <TabLayout tabs={NPC_TABS} activeTab={activeTab} onTabChange={setActiveTab}>
 
-        {/* Description */}
-        <AiTextarea
-          label="Description"
-          name="description"
-          value={formData.description}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          rows={4}
-          placeholder="Physical appearance, typical attire, mannerisms..."
-          onAiGenerate={() => handleAiGenerate('description')}
-          isGenerating={isGenerating === 'description'}
-          regenerateButton={<RegenerateButton fieldName="description" currentValue={formData.description} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />}
-        />
-        {formData.description && onNavigate && (
-            <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
-                <LinkedText text={formData.description} onNavigate={onNavigate} />
-            </p>
-        )}
-
-        {/* Traits */}
-        <AiTextarea
-          label="Personality Traits"
-          name="traits"
-          value={formData.traits}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          rows={2}
-          placeholder="e.g., 'Taps fingers when impatient, speaks in riddles.'"
-          onAiGenerate={() => handleAiGenerate('traits')}
-          isGenerating={isGenerating === 'traits'}
-          regenerateButton={<RegenerateButton fieldName="traits" currentValue={formData.traits} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('traits')} isMockMode={isMockMode} campaignContext={campaignContext} />}
-        />
-
-         {/* Example Quote */}
-        <AiTextarea
-          label="Example Quote"
-          name="exampleQuote"
-          value={formData.exampleQuote}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          rows={2}
-          placeholder="A memorable line of dialogue that captures their personality."
-          onAiGenerate={() => handleAiGenerate('exampleQuote')}
-          isGenerating={isGenerating === 'exampleQuote'}
-          regenerateButton={<RegenerateButton fieldName="exampleQuote" currentValue={formData.exampleQuote} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('exampleQuote')} isMockMode={isMockMode} campaignContext={campaignContext} />}
-        />
-
-        {/* Backstory */}
-        <AiTextarea
-          label="Backstory"
-          name="backstory"
-          value={formData.backstory}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          rows={5}
-          onAiGenerate={() => handleAiGenerate('backstory')}
-          isGenerating={isGenerating === 'backstory'}
-          regenerateButton={<RegenerateButton fieldName="backstory" currentValue={formData.backstory} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('backstory')} isMockMode={isMockMode} campaignContext={campaignContext} />}
-        />
-
-        {/* Motivations */}
-        <AiTextarea
-          label="Motivations"
-          name="motivations"
-          value={formData.motivations}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          rows={2}
-          placeholder="What drives this character?"
-          onAiGenerate={() => handleAiGenerate('motivations')}
-          isGenerating={isGenerating === 'motivations'}
-          regenerateButton={<RegenerateButton fieldName="motivations" currentValue={formData.motivations} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('motivations')} isMockMode={isMockMode} campaignContext={campaignContext} />}
-        />
-        {formData.motivations && onNavigate && (
-            <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
-                <LinkedText text={formData.motivations} onNavigate={onNavigate} />
-            </p>
-        )}
-
-        {/* Secrets */}
-        <AiTextarea
-          label="Secrets"
-          name="secrets"
-          value={formData.secrets}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          rows={3}
-          placeholder="What are they hiding? What important information do they know?"
-          onAiGenerate={() => handleAiGenerate('secrets')}
-          isGenerating={isGenerating === 'secrets'}
-          regenerateButton={<RegenerateButton fieldName="secrets" currentValue={formData.secrets} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('secrets')} isMockMode={isMockMode} campaignContext={campaignContext} />}
-        />
-        {formData.secrets && onNavigate && (
-            <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
-                <LinkedText text={formData.secrets} onNavigate={onNavigate} />
-            </p>
-        )}
-
-        {/* Stats */}
-        <AiTextarea
-          label="Stats / Game Info"
-          name="stats"
-          value={formData.stats}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          rows={2}
-          placeholder="e.g., 'Veteran warrior (use Knight stat block)' or 'Skilled archer, but clumsy.'"
-          onAiGenerate={() => handleAiGenerate('stats')}
-          isGenerating={isGenerating === 'stats'}
-          regenerateButton={<RegenerateButton fieldName="stats" currentValue={formData.stats} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('stats')} isMockMode={isMockMode} campaignContext={campaignContext} />}
-        />
-        
-        {/* Relationships Section */}
-        <div>
-            <div className="flex justify-between items-center mb-1.5">
-                <label className="block text-sm font-medium text-slate-400">Relationships</label>
-                <Button size="sm" variant="ghost" onClick={handleAddRelationship}>
-                    <Icons.Plus className="w-3 h-3 mr-1.5" /> Add Relationship
-                </Button>
-            </div>
-            <div className="space-y-2">
-                {(formData.relationships || []).map((rel, index) => (
-                    <div key={rel.id} className="flex items-start gap-2 bg-slate-950/50 p-2 rounded-md border border-slate-800/50">
-                        <div className="flex flex-col gap-2 w-full">
-                            <div className="flex gap-2 flex-wrap items-center">
-                                <select
-                                    value={rel.targetId}
-                                    onChange={(e) => handleRelationshipChange(index, 'targetId', e.target.value)}
-                                    onBlur={handleRelationshipBlur}
-                                    className="w-1/2 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500"
-                                >
-                                    <option value="">-- Select Target --</option>
-                                    {possibleTargets.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                                </select>
-                                {rel.targetId && onNavigate && (() => {
-                                    const isPc = playerCharacters.some(pc => pc.id === rel.targetId);
-                                    return isPc ? null : (
-                                        <EntityLink
-                                            entityType="npc"
-                                            entityId={rel.targetId}
-                                            label={possibleTargets.find(t => t.id === rel.targetId)?.name}
-                                            onNavigate={onNavigate}
-                                        />
-                                    );
-                                })()}
-                                <input 
-                                    type="text" 
-                                    placeholder="Type (e.g. Rival)" 
-                                    value={rel.relationType}
-                                    onChange={(e) => handleRelationshipChange(index, 'relationType', e.target.value)}
-                                    onBlur={handleRelationshipBlur}
-                                    className="w-1/2 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500"
-                                />
-                            </div>
-                            <textarea
-                                placeholder="Details about the relationship..."
-                                value={rel.description}
-                                onChange={(e) => handleRelationshipChange(index, 'description', e.target.value)}
-                                onBlur={handleRelationshipBlur}
-                                rows={1}
-                                className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500 resize-y"
+          {/* Identity Tab */}
+          {activeTab === 'identity' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Name */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-1.5">NPC Name</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600"
+                  />
+                </div>
+                {/* Faction */}
+                <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1.5">Faction</label>
+                    <select
+                        name="factionId"
+                        value={formData.factionId || "none"}
+                        onChange={handleFactionChange}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all"
+                    >
+                        <option value="none">-- None --</option>
+                        {factions.map(faction => (
+                            <option key={faction.id} value={faction.id}>{faction.name}</option>
+                        ))}
+                    </select>
+                    {formData.factionId && onNavigate && (
+                        <div className="mt-1.5">
+                            <EntityLink
+                                entityType="faction"
+                                entityId={formData.factionId}
+                                label={factions.find(f => f.id === formData.factionId)?.name}
+                                onNavigate={onNavigate}
                             />
                         </div>
-                        <button onClick={() => handleDeleteRelationship(index)} className="text-slate-500 hover:text-red-400 p-1 rounded transition-colors">
-                            <Icons.Trash className="w-4 h-4" />
-                        </button>
-                    </div>
-                ))}
-                {(!formData.relationships || formData.relationships.length === 0) && (
-                    <p className="text-xs text-slate-500 italic px-2 py-1">No relationships defined.</p>
-                )}
+                    )}
+                </div>
+              </div>
+
+              {/* Description */}
+              <AiTextarea
+                label="Description"
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                rows={4}
+                placeholder="Physical appearance, typical attire, mannerisms..."
+                onAiGenerate={() => handleAiGenerate('description')}
+                isGenerating={isGenerating === 'description'}
+                regenerateButton={<RegenerateButton fieldName="description" currentValue={formData.description} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />}
+              />
+              {formData.description && onNavigate && (
+                  <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
+                      <LinkedText text={formData.description} onNavigate={onNavigate} />
+                  </p>
+              )}
+
+              {/* Traits */}
+              <AiTextarea
+                label="Personality Traits"
+                name="traits"
+                value={formData.traits}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                rows={2}
+                placeholder="e.g., 'Taps fingers when impatient, speaks in riddles.'"
+                onAiGenerate={() => handleAiGenerate('traits')}
+                isGenerating={isGenerating === 'traits'}
+                regenerateButton={<RegenerateButton fieldName="traits" currentValue={formData.traits} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('traits')} isMockMode={isMockMode} campaignContext={campaignContext} />}
+              />
             </div>
-        </div>
+          )}
 
-        {/* History Manager */}
-        <EntityHistoryManager
-            subjectId={npc.id}
-            subjectType="npc"
-            campaign={campaign}
-            onUpdateEntity={(type, id, changes) => {
-                if (type === 'npc') campaignService.updateNpc(id, changes);
-                if (type === 'location') campaignService.updateLocation(id, changes);
-            }}
-        />
+          {/* Personality Tab */}
+          {activeTab === 'personality' && (
+            <div className="space-y-6">
+              {/* Motivations */}
+              <AiTextarea
+                label="Motivations"
+                name="motivations"
+                value={formData.motivations}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                rows={2}
+                placeholder="What drives this character?"
+                onAiGenerate={() => handleAiGenerate('motivations')}
+                isGenerating={isGenerating === 'motivations'}
+                regenerateButton={<RegenerateButton fieldName="motivations" currentValue={formData.motivations} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('motivations')} isMockMode={isMockMode} campaignContext={campaignContext} />}
+              />
+              {formData.motivations && onNavigate && (
+                  <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
+                      <LinkedText text={formData.motivations} onNavigate={onNavigate} />
+                  </p>
+              )}
 
-        {/* Backlinks Panel */}
-        <BacklinksPanel entityId={npc.id} entityType="npc" onNavigate={onNavigate} />
+              {/* Secrets */}
+              <AiTextarea
+                label="Secrets"
+                name="secrets"
+                value={formData.secrets}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                rows={3}
+                placeholder="What are they hiding? What important information do they know?"
+                onAiGenerate={() => handleAiGenerate('secrets')}
+                isGenerating={isGenerating === 'secrets'}
+                regenerateButton={<RegenerateButton fieldName="secrets" currentValue={formData.secrets} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('secrets')} isMockMode={isMockMode} campaignContext={campaignContext} />}
+              />
+              {formData.secrets && onNavigate && (
+                  <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
+                      <LinkedText text={formData.secrets} onNavigate={onNavigate} />
+                  </p>
+              )}
 
+              {/* Example Quote */}
+              <AiTextarea
+                label="Example Quote"
+                name="exampleQuote"
+                value={formData.exampleQuote}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                rows={2}
+                placeholder="A memorable line of dialogue that captures their personality."
+                onAiGenerate={() => handleAiGenerate('exampleQuote')}
+                isGenerating={isGenerating === 'exampleQuote'}
+                regenerateButton={<RegenerateButton fieldName="exampleQuote" currentValue={formData.exampleQuote} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('exampleQuote')} isMockMode={isMockMode} campaignContext={campaignContext} />}
+              />
+
+              {/* Backstory */}
+              <AiTextarea
+                label="Backstory"
+                name="backstory"
+                value={formData.backstory}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                rows={5}
+                onAiGenerate={() => handleAiGenerate('backstory')}
+                isGenerating={isGenerating === 'backstory'}
+                regenerateButton={<RegenerateButton fieldName="backstory" currentValue={formData.backstory} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('backstory')} isMockMode={isMockMode} campaignContext={campaignContext} />}
+              />
+            </div>
+          )}
+
+          {/* Stats & Combat Tab */}
+          {activeTab === 'stats' && (
+            <div className="space-y-6">
+              <AiTextarea
+                label="Stats / Game Info"
+                name="stats"
+                value={formData.stats}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                rows={6}
+                placeholder="e.g., 'Veteran warrior (use Knight stat block)' or 'Skilled archer, but clumsy.'"
+                onAiGenerate={() => handleAiGenerate('stats')}
+                isGenerating={isGenerating === 'stats'}
+                regenerateButton={<RegenerateButton fieldName="stats" currentValue={formData.stats} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('stats')} isMockMode={isMockMode} campaignContext={campaignContext} />}
+              />
+            </div>
+          )}
+
+          {/* Connections Tab */}
+          {activeTab === 'connections' && (
+            <div className="space-y-6">
+              {/* Relationships Section */}
+              <div>
+                  <div className="flex justify-between items-center mb-1.5">
+                      <label className="block text-sm font-medium text-slate-400">Relationships</label>
+                      <Button size="sm" variant="ghost" onClick={handleAddRelationship}>
+                          <Icons.Plus className="w-3 h-3 mr-1.5" /> Add Relationship
+                      </Button>
+                  </div>
+                  <div className="space-y-2">
+                      {(formData.relationships || []).map((rel, index) => (
+                          <div key={rel.id} className="flex items-start gap-2 bg-slate-950/50 p-2 rounded-md border border-slate-800/50">
+                              <div className="flex flex-col gap-2 w-full">
+                                  <div className="flex gap-2 flex-wrap items-center">
+                                      <select
+                                          value={rel.targetId}
+                                          onChange={(e) => handleRelationshipChange(index, 'targetId', e.target.value)}
+                                          onBlur={handleRelationshipBlur}
+                                          className="w-1/2 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500"
+                                      >
+                                          <option value="">-- Select Target --</option>
+                                          {possibleTargets.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                      </select>
+                                      {rel.targetId && onNavigate && (() => {
+                                          const isPc = playerCharacters.some(pc => pc.id === rel.targetId);
+                                          return isPc ? null : (
+                                              <EntityLink
+                                                  entityType="npc"
+                                                  entityId={rel.targetId}
+                                                  label={possibleTargets.find(t => t.id === rel.targetId)?.name}
+                                                  onNavigate={onNavigate}
+                                              />
+                                          );
+                                      })()}
+                                      <input
+                                          type="text"
+                                          placeholder="Type (e.g. Rival)"
+                                          value={rel.relationType}
+                                          onChange={(e) => handleRelationshipChange(index, 'relationType', e.target.value)}
+                                          onBlur={handleRelationshipBlur}
+                                          className="w-1/2 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500"
+                                      />
+                                  </div>
+                                  <textarea
+                                      placeholder="Details about the relationship..."
+                                      value={rel.description}
+                                      onChange={(e) => handleRelationshipChange(index, 'description', e.target.value)}
+                                      onBlur={handleRelationshipBlur}
+                                      rows={1}
+                                      className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500 resize-y"
+                                  />
+                              </div>
+                              <button onClick={() => handleDeleteRelationship(index)} className="text-slate-500 hover:text-red-400 p-1 rounded transition-colors">
+                                  <Icons.Trash className="w-4 h-4" />
+                              </button>
+                          </div>
+                      ))}
+                      {(!formData.relationships || formData.relationships.length === 0) && (
+                          <p className="text-xs text-slate-500 italic px-2 py-1">No relationships defined.</p>
+                      )}
+                  </div>
+              </div>
+
+              {/* History Manager */}
+              <EntityHistoryManager
+                  subjectId={npc.id}
+                  subjectType="npc"
+                  campaign={campaign}
+                  onUpdateEntity={(type, id, changes) => {
+                      if (type === 'npc') campaignService.updateNpc(id, changes);
+                      if (type === 'location') campaignService.updateLocation(id, changes);
+                  }}
+              />
+
+              {/* Backlinks Panel */}
+              <BacklinksPanel entityId={npc.id} entityType="npc" onNavigate={onNavigate} />
+            </div>
+          )}
+
+        </TabLayout>
       </div>
     </div>
   );

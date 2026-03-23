@@ -4,13 +4,14 @@ import type { Adventure, Campaign } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { PrepDocumentView } from './PrepDocumentView';
 import { RegenerateButton } from '../common/RegenerateButton';
-import { twMerge } from 'tailwind-merge';
 import { generateScene } from '../../services/geminiService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
 import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
 import { BacklinksPanel } from '../common/BacklinksPanel';
+import { TabLayout } from '../common/TabLayout';
+import type { TabDefinition } from '../common/TabLayout';
 
 interface AdventureEditorProps {
   adventure: Adventure;
@@ -21,10 +22,21 @@ interface AdventureEditorProps {
   onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
 }
 
+const ADVENTURE_TABS: TabDefinition[] = [
+  { id: 'overview',  label: 'Overview',      icon: Icons.Adventures },
+  { id: 'scenes',    label: 'Scenes',        icon: Icons.Scenes },
+  { id: 'prepDoc',   label: 'Prep Document', icon: Icons.FileCode },
+];
+
 export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, campaign, onUpdate, isMockMode = false, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(adventure);
-  const [activeTab, setActiveTab] = useState<'details' | 'prepDoc'>('details');
+  const [activeTab, setActiveTab] = useState<string>('overview');
   const [isGeneratingScene, setIsGeneratingScene] = useState(false);
+
+  // Reset to first tab when the adventure changes
+  useEffect(() => {
+    setActiveTab('overview');
+  }, [adventure.id]);
 
   useEffect(() => {
     setFormData(adventure);
@@ -75,122 +87,135 @@ export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, cam
   };
 
   return (
-    <div className="p-6 md:p-8 h-full flex flex-col overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
-      <header className="space-y-4">
+    <div className="p-6 md:p-8 h-full flex flex-col overflow-y-auto custom-scrollbar animate-fade-in">
+      <header className="space-y-4 mb-6">
         <div className="flex items-center gap-3 text-amber-400">
           <Icons.Adventures className="w-8 h-8" />
           <h1 className="text-3xl font-bold font-serif text-slate-100">Adventure: {adventure.title}</h1>
         </div>
-        
-        <div className="border-b border-slate-800">
-          <nav className="-mb-px flex space-x-6">
-            <TabButton isActive={activeTab === 'details'} onClick={() => setActiveTab('details')}>
-              <Icons.Setting className="w-4 h-4 mr-2" /> Details
-            </TabButton>
-            <TabButton isActive={activeTab === 'prepDoc'} onClick={() => setActiveTab('prepDoc')}>
-              <Icons.FileCode className="w-4 h-4 mr-2" /> Prep Document
-            </TabButton>
-          </nav>
-        </div>
       </header>
-      
-      {activeTab === 'details' && (
-        <div className="space-y-6 bg-slate-900/50 p-6 rounded-xl border border-slate-800/50 animate-in fade-in duration-300">
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-slate-800/50">
-            <div className="flex items-center gap-2 text-sm text-slate-400">
-              <Icons.Scenes className="w-4 h-4" />
-              <span>{adventure.scenes.length} scene{adventure.scenes.length !== 1 ? 's' : ''}</span>
-            </div>
-            <GenerateHerePanel
-              buttonLabel="Generate next scene"
-              defaultPrompt={sceneGenerationDefaultPrompt}
-              isGenerating={isGeneratingScene}
-              onGenerate={handleGenerateNextScene}
-            />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-slate-400 mb-1.5">Adventure Title</label>
-              <input
-                type="text"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600"
-                placeholder="The Sunken City of Zylos"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1.5">Target Level</label>
-              <input
-                type="number"
-                name="level"
-                min={1}
-                max={20}
-                value={formData.level}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all"
-              />
-            </div>
-          </div>
-          <div>
-            <div className="flex items-center mb-1.5">
-              <label className="block text-sm font-medium text-slate-400">One-Sentence Hook</label>
-              <RegenerateButton fieldName="hook" currentValue={formData.hook} entityType="Adventure" entityContext={adventureEntityContext} onRegenerate={handleFieldRegenerate('hook')} isMockMode={isMockMode} campaignContext={campaignContext} />
-            </div>
-            <textarea
-              name="hook"
-              value={formData.hook}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              rows={2}
-              className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600 resize-y"
-              placeholder="A mysterious artifact is discovered, but it's part of a key to an ancient, powerful prison..."
-            />
-            {formData.hook && onNavigate && (
-                <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
-                    <LinkedText text={formData.hook} onNavigate={onNavigate} />
-                </p>
-            )}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-400 mb-1.5">Themes & Mood</label>
-            <input
-              type="text"
-              name="theme"
-              value={formData.theme}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600"
-              placeholder="Cosmic Horror, Investigation, Desperate Survival"
-            />
-          </div>
 
-          {/* Backlinks Panel */}
-          <BacklinksPanel entityId={adventure.id} entityType="adventure" onNavigate={onNavigate} />
+      <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-800/50 flex-1">
+        <TabLayout tabs={ADVENTURE_TABS} activeTab={activeTab} onTabChange={setActiveTab}>
 
-        </div>
-      )}
+          {/* Overview Tab */}
+          {activeTab === 'overview' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-slate-400 mb-1.5">Adventure Title</label>
+                  <input
+                    type="text"
+                    name="title"
+                    value={formData.title}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600"
+                    placeholder="The Sunken City of Zylos"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-1.5">Target Level</label>
+                  <input
+                    type="number"
+                    name="level"
+                    min={1}
+                    max={20}
+                    value={formData.level}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all"
+                  />
+                </div>
+              </div>
 
-      {activeTab === 'prepDoc' && (
-        <PrepDocumentView adventure={adventure} campaign={campaign} />
-      )}
+              <div>
+                <div className="flex items-center mb-1.5">
+                  <label className="block text-sm font-medium text-slate-400">One-Sentence Hook</label>
+                  <RegenerateButton
+                    fieldName="hook"
+                    currentValue={formData.hook}
+                    entityType="Adventure"
+                    entityContext={adventureEntityContext}
+                    onRegenerate={handleFieldRegenerate('hook')}
+                    isMockMode={isMockMode}
+                    campaignContext={campaignContext}
+                  />
+                </div>
+                <textarea
+                  name="hook"
+                  value={formData.hook}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  rows={2}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600 resize-y"
+                  placeholder="A mysterious artifact is discovered, but it's part of a key to an ancient, powerful prison..."
+                />
+                {formData.hook && onNavigate && (
+                    <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
+                        <LinkedText text={formData.hook} onNavigate={onNavigate} />
+                    </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-1.5">Themes & Mood</label>
+                <input
+                  type="text"
+                  name="theme"
+                  value={formData.theme}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600"
+                  placeholder="Cosmic Horror, Investigation, Desperate Survival"
+                />
+              </div>
+
+              {/* Backlinks Panel */}
+              <BacklinksPanel entityId={adventure.id} entityType="adventure" onNavigate={onNavigate} />
+            </div>
+          )}
+
+          {/* Scenes Tab */}
+          {activeTab === 'scenes' && (
+            <div className="space-y-6">
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-slate-800/50">
+                <div className="flex items-center gap-2 text-sm text-slate-400">
+                  <Icons.Scenes className="w-4 h-4" />
+                  <span>{adventure.scenes.length} scene{adventure.scenes.length !== 1 ? 's' : ''}</span>
+                </div>
+                <GenerateHerePanel
+                  buttonLabel="Generate next scene"
+                  defaultPrompt={sceneGenerationDefaultPrompt}
+                  isGenerating={isGeneratingScene}
+                  onGenerate={handleGenerateNextScene}
+                />
+              </div>
+
+              {adventure.scenes.length === 0 ? (
+                <p className="text-sm text-slate-500 italic">No scenes yet. Generate one above, or add scenes from the adventure dashboard.</p>
+              ) : (
+                <div className="space-y-2">
+                  {adventure.scenes.map((scene, index) => (
+                    <div key={scene.id} className="flex items-center gap-3 p-3 bg-slate-950/50 rounded-md border border-slate-800/50">
+                      <span className="text-xs text-slate-500 w-5 text-right flex-shrink-0">{index + 1}</span>
+                      <Icons.Scenes className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                      <span className="text-sm text-slate-200 flex-grow">{scene.title}</span>
+                      <span className="text-xs text-slate-500 capitalize bg-slate-800 px-2 py-0.5 rounded-full">{scene.type}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Prep Document Tab */}
+          {activeTab === 'prepDoc' && (
+            <PrepDocumentView adventure={adventure} campaign={campaign} />
+          )}
+
+        </TabLayout>
+      </div>
     </div>
   );
 };
-
-const TabButton: React.FC<{isActive: boolean, onClick: () => void, children: React.ReactNode}> = ({ isActive, onClick, children }) => (
-  <button
-    onClick={onClick}
-    className={twMerge(
-      'flex items-center whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm focus:outline-none',
-      isActive
-        ? 'border-amber-500 text-amber-400'
-        : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-500'
-    )}
-  >
-    {children}
-  </button>
-)

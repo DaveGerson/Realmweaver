@@ -141,7 +141,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
 
 
   return (
-    <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
+    <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
       <header className="flex justify-between items-start">
         <div className="space-y-2">
             <div className="flex items-center gap-3 text-amber-400">
@@ -213,7 +213,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
           regenerateButton={<RegenerateButton fieldName="readAloudText" currentValue={formData.readAloudText} entityType="Scene" entityContext={sceneEntityContext} onRegenerate={handleFieldRegenerate('readAloudText')} isMockMode={isMockMode} campaignContext={campaignContext} />}
         />
         {formData.readAloudText && onNavigate && (
-            <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
+            <p className="text-lg italic text-amber-100/90 leading-relaxed font-serif border-l-4 border-amber-700/40 pl-4 mt-1">
                 <LinkedText text={formData.readAloudText} onNavigate={onNavigate} />
             </p>
         )}

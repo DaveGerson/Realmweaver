@@ -13,11 +13,13 @@ import { campaignService } from '../../services/campaignService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
 import { BacklinksPanel } from '../common/BacklinksPanel';
+import { TabLayout } from '../common/TabLayout';
+import type { TabDefinition } from '../common/TabLayout';
 
 interface LocationEditorProps {
   location: Location;
-  allLocations: Location[]; // To select a parent
-  allFactions?: Faction[]; // To select controlling faction
+  allLocations: Location[];
+  allFactions?: Faction[];
   sessionLogs?: SessionLog[];
   articles?: Article[];
   onUpdate: (id: string, updatedData: Partial<Location>) => void;
@@ -29,13 +31,26 @@ interface LocationEditorProps {
 
 type GenerationField = 'description' | 'secrets';
 
+const LOCATION_TABS: TabDefinition[] = [
+  { id: 'overview',     label: 'Overview',     icon: Icons.Locations },
+  { id: 'details',      label: 'Details',      icon: Icons.Puzzle },
+  { id: 'connections',  label: 'Connections',  icon: Icons.Link },
+  { id: 'history',      label: 'History',      icon: Icons.Clock },
+];
+
 export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLocations, allFactions = [], onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(location);
   const [isGenerating, setIsGenerating] = useState<GenerationField | null>(null);
   const [generatingPoiFor, setGeneratingPoiFor] = useState<string | null>(null);
   const [isGeneratingNpc, setIsGeneratingNpc] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
 
   const campaign = campaignService.getState().campaigns.find(c => c.id === campaignService.getState().activeCampaignId)!;
+
+  // Reset to first tab when the entity changes
+  useEffect(() => {
+    setActiveTab('overview');
+  }, [location.id]);
 
   useEffect(() => {
     setFormData(location);
@@ -58,14 +73,14 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     setFormData(prev => ({ ...prev, [name]: newParentId }));
     onUpdate(location.id, { [name]: newParentId });
   };
-  
+
   const handleFactionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { value } = e.target;
     const newFactionId = value === "none" ? undefined : value;
     setFormData(prev => ({ ...prev, controllingFactionId: newFactionId }));
     onUpdate(location.id, { controllingFactionId: newFactionId });
   };
-  
+
   const handleAiGenerate = async (field: GenerationField) => {
     setIsGenerating(field);
     const context = `Location Name: ${formData.name}\nDescription: ${field === 'description' ? '[GENERATE THIS]' : formData.description}\nSecrets: ${field === 'secrets' ? '[GENERATE THIS]' : formData.secrets}`;
@@ -118,12 +133,12 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
   const handleConnectionsBlur = () => {
     onUpdate(location.id, { connections: formData.connections });
   };
-  
+
   // --- Point of Interest Handlers ---
   const handlePoisBlur = () => {
     onUpdate(location.id, { pointsOfInterest: formData.pointsOfInterest });
   };
-  
+
   const handleAddPoi = () => {
     const newPoi: PointOfInterest = { id: crypto.randomUUID(), name: 'New Point of Interest', passivePerceptionDC: 10, description: '', investigationChecks: [], interactions: [] };
     const newPois = [...(formData.pointsOfInterest || []), newPoi];
@@ -141,7 +156,7 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     const newPois = (formData.pointsOfInterest || []).map(p => p.id === id ? { ...p, [field]: value } : p);
     setFormData(prev => ({ ...prev, pointsOfInterest: newPois }));
   };
-  
+
   const updatePoiInteractions = (poiId: string, updatedInteractions: PoiInteraction[], type: 'interactions' | 'investigationChecks') => {
       const newPois = (formData.pointsOfInterest || []).map(p => p.id === poiId ? { ...p, [type]: updatedInteractions } : p);
       setFormData(prev => ({...prev, pointsOfInterest: newPois}));
@@ -209,12 +224,12 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     try {
         const poiData = await generatePoiFromLoot(lootItem.description, undefined, isMockMode);
         const newPoi: PointOfInterest = { ...poiData, id: crypto.randomUUID() };
-        
+
         const newPois = [...(formData.pointsOfInterest || []), newPoi];
         const newLoot = (formData.loot || []).map(item =>
             item.id === lootItem.id ? { ...item, pointOfInterestId: newPoi.id } : item
         );
-        
+
         const updatedData = { pointsOfInterest: newPois, loot: newLoot };
         setFormData(prev => ({ ...prev, ...updatedData }));
         onUpdate(location.id, updatedData);
@@ -244,10 +259,10 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
 
   // Filter out the current location and its own children from the list of possible parents
   const possibleParents = allLocations.filter(l => {
-    if (l.id === location.id) return false; // Can't be its own parent
+    if (l.id === location.id) return false;
     let current = l;
     while(current.parentLocationId) {
-        if(current.parentLocationId === location.id) return false; // Avoid circular dependencies
+        if(current.parentLocationId === location.id) return false;
         const parent = allLocations.find(p => p.id === current.parentLocationId);
         if(!parent) break;
         current = parent;
@@ -260,8 +275,8 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
   const inboundConnections = allLocations.filter(l => l.connections?.some(c => c.targetLocationId === location.id));
 
   return (
-    <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
-      <header className="flex justify-between items-start">
+    <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar animate-fade-in">
+      <header className="flex justify-between items-start mb-6">
         <div className="space-y-2">
             <div className="flex items-center gap-3 text-amber-400">
               <Icons.Locations className="w-8 h-8" />
@@ -273,209 +288,216 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
             Delete Location
         </Button>
       </header>
-      
-      <div className="space-y-6 bg-slate-900/50 p-6 rounded-xl border border-slate-800/50">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <label className="block text-sm font-medium text-slate-400 mb-1.5">Location Name</label>
-            <input type="text" name="name" value={formData.name} onChange={handleChange} onBlur={handleBlur} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600"/>
-          </div>
-          <div className="pt-5">
-            <GenerateHerePanel
-              buttonLabel="Generate NPC at this location"
-              defaultPrompt={npcGenerationDefaultPrompt}
-              isGenerating={isGeneratingNpc}
-              onGenerate={handleGenerateNpcAtLocation}
-            />
-          </div>
-        </div>
 
-        <AiTextarea label="Description" name="description" value={formData.description} onChange={handleChange} onBlur={handleBlur} rows={5} onAiGenerate={() => handleAiGenerate('description')} isGenerating={isGenerating === 'description'} regenerateButton={<RegenerateButton fieldName="description" currentValue={formData.description} entityType="Location" entityContext={locationEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />} />
-        {formData.description && onNavigate && (
-            <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
-                <LinkedText text={formData.description} onNavigate={onNavigate} />
-            </p>
-        )}
+      <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-800/50">
+        <TabLayout tabs={LOCATION_TABS} activeTab={activeTab} onTabChange={setActiveTab}>
 
-        <AiTextarea label="Secrets & Hidden Details" name="secrets" value={formData.secrets} onChange={handleChange} onBlur={handleBlur} rows={3} onAiGenerate={() => handleAiGenerate('secrets')} isGenerating={isGenerating === 'secrets'} regenerateButton={<RegenerateButton fieldName="secrets" currentValue={formData.secrets} entityType="Location" entityContext={locationEntityContext} onRegenerate={handleFieldRegenerate('secrets')} isMockMode={isMockMode} campaignContext={campaignContext} />} />
-        {formData.secrets && onNavigate && (
-            <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
-                <LinkedText text={formData.secrets} onNavigate={onNavigate} />
-            </p>
-        )}
-
-        {/* Items & Loot */}
-        <div>
-          <div className="flex justify-between items-center mb-1.5">
-            <label className="block text-sm font-medium text-slate-400">Items & Loot</label>
-            <Button size="sm" variant="ghost" onClick={handleAddLootItem}>
-              <Icons.Plus className="w-3 h-3 mr-1.5" /> Add Loot
-            </Button>
-          </div>
-          <div className="space-y-2">
-            {(formData.loot || []).map(item => (
-              <div key={item.id} className="flex items-center gap-2 bg-slate-950/50 p-2 rounded-md border border-slate-800/50">
-                <Icons.Items className="w-4 h-4 text-slate-500 flex-shrink-0" />
-                <input
-                  type="text"
-                  placeholder="Loot description (e.g., 200gp, Potion of Healing)"
-                  value={item.description}
-                  onChange={(e) => handleLootItemChange(item.id, 'description', e.target.value)}
-                  onBlur={handleLootBlur}
-                  className="flex-grow bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500"
-                />
-                <select
-                  value={item.pointOfInterestId || 'none'}
-                  onChange={(e) => handleLootItemChange(item.id, 'pointOfInterestId', e.target.value)}
-                  onBlur={handleLootBlur}
-                  className="w-1/3 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500"
-                >
-                  <option value="none">-- General Location --</option>
-                  {(formData.pointsOfInterest || []).map(poi => (
-                    <option key={poi.id} value={poi.id}>{poi.name}</option>
-                  ))}
-                </select>
-                <button 
-                  onClick={() => handleGeneratePoi(item)} 
-                  disabled={generatingPoiFor === item.id || !item.description}
-                  className="text-amber-400 hover:text-amber-300 p-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed group relative"
-                  aria-label="Generate Point of Interest from loot"
-                >
-                  {generatingPoiFor === item.id ? <Icons.Sparkles className="w-4 h-4 animate-spin" /> : <Icons.Sparkles className="w-4 h-4" />}
-                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-slate-900 text-slate-300 text-xs rounded-md p-2 border border-slate-700 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg">
-                    Generate an interactive Point of Interest for this loot item.
-                  </span>
-                </button>
-                <button onClick={() => handleDeleteLootItem(item.id)} className="text-slate-500 hover:text-red-400 p-1 rounded transition-colors">
-                  <Icons.Trash className="w-4 h-4" />
-                </button>
+          {/* Overview Tab */}
+          {activeTab === 'overview' && (
+            <div className="space-y-6">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <label className="block text-sm font-medium text-slate-400 mb-1.5">Location Name</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600"
+                  />
+                </div>
+                <div className="pt-5">
+                  <GenerateHerePanel
+                    buttonLabel="Generate NPC at this location"
+                    defaultPrompt={npcGenerationDefaultPrompt}
+                    isGenerating={isGeneratingNpc}
+                    onGenerate={handleGenerateNpcAtLocation}
+                  />
+                </div>
               </div>
-            ))}
-            {(!formData.loot || formData.loot.length === 0) && (
-              <p className="text-xs text-slate-500 italic px-2 py-1">No loot defined for this location.</p>
-            )}
-          </div>
-        </div>
-        
-        {/* Points of Interest */}
-        <div>
-          <div className="flex justify-between items-center mb-1.5">
-            <label className="block text-sm font-medium text-slate-400">Points of Interest</label>
-            <Button size="sm" variant="ghost" onClick={handleAddPoi}><Icons.Plus className="w-3 h-3 mr-1.5" /> Add Point of Interest</Button>
-          </div>
-          <div className="space-y-3">
-            {(formData.pointsOfInterest || []).map(poi => 
-                <PointOfInterestEditor 
-                    key={poi.id} 
-                    poi={poi} 
-                    onDelete={handleDeletePoi} 
-                    onChange={handlePoiChange} 
-                    onAddSubItem={handleAddPoiSubItem}
-                    onDeleteSubItem={handleDeletePoiSubItem}
-                    onChangeSubItem={handlePoiSubItemChange}
-                    onBlur={handlePoisBlur} 
-                />
-            )}
-            {(!formData.pointsOfInterest || formData.pointsOfInterest.length === 0) && (<p className="text-xs text-slate-500 italic px-2 py-1">No points of interest defined for this location.</p>)}
-          </div>
-        </div>
 
-        {/* Connections */}
-        <div>
-            <div className="flex justify-between items-center mb-1.5">
-                <label className="block text-sm font-medium text-slate-400">Connections & Relationships</label>
-                <Button size="sm" variant="ghost" onClick={handleAddConnection}><Icons.Plus className="w-3 h-3 mr-1.5" /> Add Connection</Button>
-            </div>
-            <div className="space-y-2">
-                {(formData.connections || []).map((conn) => (
-                    <div key={conn.id} className="flex items-center gap-2 bg-slate-950/50 p-2 rounded-md border border-slate-800/50">
-                        <Icons.Link className="w-4 h-4 text-slate-500 flex-shrink-0" />
-                        <input type="text" placeholder="Description of connection" value={conn.description} onChange={(e) => handleConnectionChange(conn.id, 'description', e.target.value)} onBlur={handleConnectionsBlur} className="w-1/2 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500" />
-                        <span className="text-slate-500">→</span>
-                        <select value={conn.targetLocationId} onChange={(e) => handleConnectionChange(conn.id, 'targetLocationId', e.target.value)} onBlur={handleConnectionsBlur} className="flex-grow bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500">
-                            <option value="">-- Select Target --</option>
-                            {possibleConnectionTargets.map(loc => (<option key={loc.id} value={loc.id}>{loc.name}</option>))}
-                        </select>
-                        <button onClick={() => handleDeleteConnection(conn.id)} className="text-slate-500 hover:text-red-400 p-1 rounded transition-colors"><Icons.Trash className="w-4 h-4" /></button>
-                    </div>
-                ))}
-                {(!formData.connections || formData.connections.length === 0) && (<p className="text-xs text-slate-500 italic px-2 py-1">No connections defined for this location.</p>)}
-            </div>
-        </div>
+              <AiTextarea
+                label="Description"
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                rows={5}
+                onAiGenerate={() => handleAiGenerate('description')}
+                isGenerating={isGenerating === 'description'}
+                regenerateButton={<RegenerateButton fieldName="description" currentValue={formData.description} entityType="Location" entityContext={locationEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />}
+              />
+              {formData.description && onNavigate && (
+                  <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
+                      <LinkedText text={formData.description} onNavigate={onNavigate} />
+                  </p>
+              )}
 
-        <EntityHistoryManager 
-            subjectId={location.id}
-            subjectType="location"
-            campaign={campaign}
-            onUpdateEntity={(type, id, changes) => {
-                if (type === 'npc') campaignService.updateNpc(id, changes);
-                if (type === 'location') campaignService.updateLocation(id, changes);
-            }}
-        />
+              <AiTextarea
+                label="Secrets & Hidden Details"
+                name="secrets"
+                value={formData.secrets}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                rows={3}
+                onAiGenerate={() => handleAiGenerate('secrets')}
+                isGenerating={isGenerating === 'secrets'}
+                regenerateButton={<RegenerateButton fieldName="secrets" currentValue={formData.secrets} entityType="Location" entityContext={locationEntityContext} onRegenerate={handleFieldRegenerate('secrets')} isMockMode={isMockMode} campaignContext={campaignContext} />}
+              />
+              {formData.secrets && onNavigate && (
+                  <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
+                      <LinkedText text={formData.secrets} onNavigate={onNavigate} />
+                  </p>
+              )}
+            </div>
+          )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-800">
-            <div>
-                <label className="block text-sm font-medium text-slate-400 mb-1.5">Parent Location</label>
-                <select name="parentLocationId" value={formData.parentLocationId || "none"} onChange={handleParentChange} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all">
-                    <option value="none">-- None --</option>
-                    {possibleParents.map(loc => (<option key={loc.id} value={loc.id}>{loc.name}</option>))}
-                </select>
-                {formData.parentLocationId && onNavigate && (
-                    <div className="mt-1.5">
-                        <EntityLink
-                            entityType="location"
-                            entityId={formData.parentLocationId}
-                            label={allLocations.find(l => l.id === formData.parentLocationId)?.name}
-                            onNavigate={onNavigate}
-                        />
-                    </div>
-                )}
-            </div>
-             <div>
-                <label className="block text-sm font-medium text-slate-400 mb-1.5">Controlling Faction</label>
-                <select name="controllingFactionId" value={formData.controllingFactionId || "none"} onChange={handleFactionChange} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all">
-                    <option value="none">-- None --</option>
-                    {allFactions.map(f => (<option key={f.id} value={f.id}>{f.name}</option>))}
-                </select>
-                {formData.controllingFactionId && onNavigate && (
-                    <div className="mt-1.5">
-                        <EntityLink
-                            entityType="faction"
-                            entityId={formData.controllingFactionId}
-                            label={allFactions.find(f => f.id === formData.controllingFactionId)?.name}
-                            onNavigate={onNavigate}
-                        />
-                    </div>
-                )}
-            </div>
-            <div>
-                 <label className="block text-sm font-medium text-slate-400 mb-1.5">Sub-Locations</label>
-                 {subLocations.length > 0 ? (
-                    <ul className="space-y-1 mt-2">
-                        {subLocations.map(loc => (
-                            <li key={loc.id} className="flex items-center gap-1.5 text-sm text-slate-300">
-                                <Icons.Locations className="w-3 h-3 text-slate-500 flex-shrink-0" />
-                                {onNavigate ? (
-                                    <EntityLink
-                                        entityType="location"
-                                        entityId={loc.id}
-                                        label={loc.name}
-                                        onNavigate={onNavigate}
-                                    />
-                                ) : loc.name}
-                            </li>
+          {/* Details Tab */}
+          {activeTab === 'details' && (
+            <div className="space-y-6">
+              {/* Items & Loot */}
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="block text-sm font-medium text-slate-400">Items & Loot</label>
+                  <Button size="sm" variant="ghost" onClick={handleAddLootItem}>
+                    <Icons.Plus className="w-3 h-3 mr-1.5" /> Add Loot
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {(formData.loot || []).map(item => (
+                    <div key={item.id} className="flex items-center gap-2 bg-slate-950/50 p-2 rounded-md border border-slate-800/50">
+                      <Icons.Items className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                      <input
+                        type="text"
+                        placeholder="Loot description (e.g., 200gp, Potion of Healing)"
+                        value={item.description}
+                        onChange={(e) => handleLootItemChange(item.id, 'description', e.target.value)}
+                        onBlur={handleLootBlur}
+                        className="flex-grow bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500"
+                      />
+                      <select
+                        value={item.pointOfInterestId || 'none'}
+                        onChange={(e) => handleLootItemChange(item.id, 'pointOfInterestId', e.target.value)}
+                        onBlur={handleLootBlur}
+                        className="w-1/3 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500"
+                      >
+                        <option value="none">-- General Location --</option>
+                        {(formData.pointsOfInterest || []).map(poi => (
+                          <option key={poi.id} value={poi.id}>{poi.name}</option>
                         ))}
-                    </ul>
-                 ) : (<p className="text-sm text-slate-500 italic mt-2">No sub-locations assigned.</p>)}
+                      </select>
+                      <button
+                        onClick={() => handleGeneratePoi(item)}
+                        disabled={generatingPoiFor === item.id || !item.description}
+                        className="text-amber-400 hover:text-amber-300 p-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed group relative"
+                        aria-label="Generate Point of Interest from loot"
+                      >
+                        {generatingPoiFor === item.id ? <Icons.Sparkles className="w-4 h-4 animate-spin" /> : <Icons.Sparkles className="w-4 h-4" />}
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-slate-900 text-slate-300 text-xs rounded-md p-2 border border-slate-700 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg">
+                          Generate an interactive Point of Interest for this loot item.
+                        </span>
+                      </button>
+                      <button onClick={() => handleDeleteLootItem(item.id)} className="text-slate-500 hover:text-red-400 p-1 rounded transition-colors">
+                        <Icons.Trash className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  {(!formData.loot || formData.loot.length === 0) && (
+                    <p className="text-xs text-slate-500 italic px-2 py-1">No loot defined for this location.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Points of Interest */}
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="block text-sm font-medium text-slate-400">Points of Interest</label>
+                  <Button size="sm" variant="ghost" onClick={handleAddPoi}>
+                    <Icons.Plus className="w-3 h-3 mr-1.5" /> Add Point of Interest
+                  </Button>
+                </div>
+                <div className="space-y-3">
+                  {(formData.pointsOfInterest || []).map(poi =>
+                      <PointOfInterestEditor
+                          key={poi.id}
+                          poi={poi}
+                          onDelete={handleDeletePoi}
+                          onChange={handlePoiChange}
+                          onAddSubItem={handleAddPoiSubItem}
+                          onDeleteSubItem={handleDeletePoiSubItem}
+                          onChangeSubItem={handlePoiSubItemChange}
+                          onBlur={handlePoisBlur}
+                      />
+                  )}
+                  {(!formData.pointsOfInterest || formData.pointsOfInterest.length === 0) && (
+                    <p className="text-xs text-slate-500 italic px-2 py-1">No points of interest defined for this location.</p>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="md:col-span-2">
-                 <label className="block text-sm font-medium text-slate-400 mb-1.5">Connected From</label>
-                 {inboundConnections.length > 0 ? (
-                    <div className="space-y-1 text-sm text-slate-300 mt-2">
-                        {inboundConnections.map(loc => {
-                            const conn = loc.connections?.find(c => c.targetLocationId === location.id);
-                            return conn ? (
-                                <div key={loc.id} className="flex items-center gap-2">
+          )}
+
+          {/* Connections Tab */}
+          {activeTab === 'connections' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Parent Location */}
+                <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1.5">Parent Location</label>
+                    <select
+                      name="parentLocationId"
+                      value={formData.parentLocationId || "none"}
+                      onChange={handleParentChange}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all"
+                    >
+                        <option value="none">-- None --</option>
+                        {possibleParents.map(loc => (<option key={loc.id} value={loc.id}>{loc.name}</option>))}
+                    </select>
+                    {formData.parentLocationId && onNavigate && (
+                        <div className="mt-1.5">
+                            <EntityLink
+                                entityType="location"
+                                entityId={formData.parentLocationId}
+                                label={allLocations.find(l => l.id === formData.parentLocationId)?.name}
+                                onNavigate={onNavigate}
+                            />
+                        </div>
+                    )}
+                </div>
+
+                {/* Controlling Faction */}
+                <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1.5">Controlling Faction</label>
+                    <select
+                      name="controllingFactionId"
+                      value={formData.controllingFactionId || "none"}
+                      onChange={handleFactionChange}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all"
+                    >
+                        <option value="none">-- None --</option>
+                        {allFactions.map(f => (<option key={f.id} value={f.id}>{f.name}</option>))}
+                    </select>
+                    {formData.controllingFactionId && onNavigate && (
+                        <div className="mt-1.5">
+                            <EntityLink
+                                entityType="faction"
+                                entityId={formData.controllingFactionId}
+                                label={allFactions.find(f => f.id === formData.controllingFactionId)?.name}
+                                onNavigate={onNavigate}
+                            />
+                        </div>
+                    )}
+                </div>
+
+                {/* Sub-Locations */}
+                <div>
+                     <label className="block text-sm font-medium text-slate-400 mb-1.5">Sub-Locations</label>
+                     {subLocations.length > 0 ? (
+                        <ul className="space-y-1 mt-2">
+                            {subLocations.map(loc => (
+                                <li key={loc.id} className="flex items-center gap-1.5 text-sm text-slate-300">
+                                    <Icons.Locations className="w-3 h-3 text-slate-500 flex-shrink-0" />
                                     {onNavigate ? (
                                         <EntityLink
                                             entityType="location"
@@ -483,19 +505,104 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                                             label={loc.name}
                                             onNavigate={onNavigate}
                                         />
-                                    ) : <span className="font-semibold">{loc.name}</span>}
-                                    {conn.description && <span className="text-xs bg-slate-700 text-slate-300 rounded-full px-2 py-0.5">{conn.description}</span>}
-                                </div>
-                            ) : null;
-                        })}
-                    </div>
-                 ) : (<p className="text-sm text-slate-500 italic mt-2">No other locations connect to this one.</p>)}
+                                    ) : loc.name}
+                                </li>
+                            ))}
+                        </ul>
+                     ) : (<p className="text-sm text-slate-500 italic mt-2">No sub-locations assigned.</p>)}
+                </div>
+
+                {/* Connected From */}
+                <div>
+                     <label className="block text-sm font-medium text-slate-400 mb-1.5">Connected From</label>
+                     {inboundConnections.length > 0 ? (
+                        <div className="space-y-1 text-sm text-slate-300 mt-2">
+                            {inboundConnections.map(loc => {
+                                const conn = loc.connections?.find(c => c.targetLocationId === location.id);
+                                return conn ? (
+                                    <div key={loc.id} className="flex items-center gap-2">
+                                        {onNavigate ? (
+                                            <EntityLink
+                                                entityType="location"
+                                                entityId={loc.id}
+                                                label={loc.name}
+                                                onNavigate={onNavigate}
+                                            />
+                                        ) : <span className="font-semibold">{loc.name}</span>}
+                                        {conn.description && <span className="text-xs bg-slate-700 text-slate-300 rounded-full px-2 py-0.5">{conn.description}</span>}
+                                    </div>
+                                ) : null;
+                            })}
+                        </div>
+                     ) : (<p className="text-sm text-slate-500 italic mt-2">No other locations connect to this one.</p>)}
+                </div>
+              </div>
+
+              {/* Outbound Connections */}
+              <div>
+                  <div className="flex justify-between items-center mb-1.5">
+                      <label className="block text-sm font-medium text-slate-400">Connections & Relationships</label>
+                      <Button size="sm" variant="ghost" onClick={handleAddConnection}>
+                        <Icons.Plus className="w-3 h-3 mr-1.5" /> Add Connection
+                      </Button>
+                  </div>
+                  <div className="space-y-2">
+                      {(formData.connections || []).map((conn) => (
+                          <div key={conn.id} className="flex items-center gap-2 bg-slate-950/50 p-2 rounded-md border border-slate-800/50">
+                              <Icons.Link className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                              <input
+                                type="text"
+                                placeholder="Description of connection"
+                                value={conn.description}
+                                onChange={(e) => handleConnectionChange(conn.id, 'description', e.target.value)}
+                                onBlur={handleConnectionsBlur}
+                                className="w-1/2 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500"
+                              />
+                              <span className="text-slate-500">→</span>
+                              <select
+                                value={conn.targetLocationId}
+                                onChange={(e) => handleConnectionChange(conn.id, 'targetLocationId', e.target.value)}
+                                onBlur={handleConnectionsBlur}
+                                className="flex-grow bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500"
+                              >
+                                  <option value="">-- Select Target --</option>
+                                  {possibleConnectionTargets.map(loc => (<option key={loc.id} value={loc.id}>{loc.name}</option>))}
+                              </select>
+                              <button
+                                onClick={() => handleDeleteConnection(conn.id)}
+                                className="text-slate-500 hover:text-red-400 p-1 rounded transition-colors"
+                              >
+                                <Icons.Trash className="w-4 h-4" />
+                              </button>
+                          </div>
+                      ))}
+                      {(!formData.connections || formData.connections.length === 0) && (
+                        <p className="text-xs text-slate-500 italic px-2 py-1">No connections defined for this location.</p>
+                      )}
+                  </div>
+              </div>
+
+              {/* Backlinks Panel */}
+              <BacklinksPanel entityId={location.id} entityType="location" onNavigate={onNavigate} />
             </div>
-        </div>
+          )}
 
-        {/* Backlinks Panel */}
-        <BacklinksPanel entityId={location.id} entityType="location" onNavigate={onNavigate} />
+          {/* History Tab */}
+          {activeTab === 'history' && (
+            <div className="space-y-6">
+              <EntityHistoryManager
+                  subjectId={location.id}
+                  subjectType="location"
+                  campaign={campaign}
+                  onUpdateEntity={(type, id, changes) => {
+                      if (type === 'npc') campaignService.updateNpc(id, changes);
+                      if (type === 'location') campaignService.updateLocation(id, changes);
+                  }}
+              />
+            </div>
+          )}
 
+        </TabLayout>
       </div>
     </div>
   );
@@ -545,7 +652,7 @@ const PointOfInterestEditor: React.FC<PointOfInterestEditorProps> = ({ poi, onDe
                         <label className="block text-xs font-medium text-slate-400 mb-1">Description (Read-Aloud)</label>
                         <textarea value={poi.description} onChange={e => onChange(poi.id, 'description', e.target.value)} onBlur={onBlur} rows={3} placeholder="What players notice if they meet the passive perception DC." className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500 resize-y" />
                     </div>
-                    
+
                     <PoiSubSection
                         title="Investigation Checks"
                         items={poi.investigationChecks}
