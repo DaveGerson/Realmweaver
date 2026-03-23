@@ -12,6 +12,7 @@ import type { Plot } from './Plot';
 import type { Encounter } from './Encounter';
 import type { Note } from './Note';
 import type { Secret } from './Secret';
+import type { DmStyle } from './CampaignSetting';
 
 export type SettingType = 'custom' | 'official';
 
@@ -36,4 +37,6 @@ export interface Campaign {
   activeSceneId?: string; // The ID of the scene currently being played in the session
   activeSessionId?: string; // The ID of the currently live session (Session Runner)
   pinnedEntities?: Array<{ type: string; id: string }>;
+  dmStyle?: DmStyle; // Progressive disclosure setting for feature visibility
+  featureOverrides?: Record<string, boolean>; // Per-feature manual overrides (bypasses dmStyle)
 }

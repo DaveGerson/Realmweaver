@@ -20,3 +20,4 @@ export * from './Graph';
 export * from './Note';
 export * from './DiceRoll';
 export * from './Secret';
+export * from './CampaignSetting';

@@ -78,6 +78,8 @@ import {
   Theater,
   SendHorizonal,
   Keyboard,
+  Zap,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 export const Icons = {
@@ -158,6 +160,8 @@ export const Icons = {
   Roleplay: Theater,
   Send: SendHorizonal,
   Keyboard,
+  Zap,
+  Sliders: SlidersHorizontal,
 };
 
 export const SceneIcon = ({ type, className }: { type: string, className?: string }) => {

@@ -22,7 +22,8 @@ import type {
     DiceRoll,
     PlotSessionStatus,
     Secret,
-    Beat
+    Beat,
+    DmStyle
 } from '../types/index';
 import { importCampaignFromJson } from './importExportService';
 import { parseCharacterSheetPdf } from './geminiService';
@@ -854,22 +855,24 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             _internalUpdate(draft => { draft.saveStatus = 'saving'; });
             setTimeout(persistToStorage, 0);
         },
-        createCampaign(title: string, setting: string, settingType: SettingType = 'custom', officialSetting?: string) {
+        createCampaign(title: string, setting: string, settingType: SettingType = 'custom', officialSetting?: string, dmStyle: DmStyle = 'standard') {
             updateState(draft => {
-                const newCampaign: Campaign = { 
-                    id: crypto.randomUUID(), 
-                    title, 
+                const newCampaign: Campaign = {
+                    id: crypto.randomUUID(),
+                    title,
                     setting,
                     settingType,
                     officialSetting,
-                    articles: [], 
-                    adventures: [], 
-                    npcs: [], 
-                    locations: [], 
-                    factions: [], 
-                    items: [], 
-                    sessionLogs: [], 
-                    playerCharacters: [], 
+                    dmStyle,
+                    featureOverrides: {},
+                    articles: [],
+                    adventures: [],
+                    npcs: [],
+                    locations: [],
+                    factions: [],
+                    items: [],
+                    sessionLogs: [],
+                    playerCharacters: [],
                     plots: [],
                     notes: [],
                     secrets: [],
@@ -878,6 +881,29 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 draft.campaigns.push(newCampaign);
                 draft.activeCampaignId = newCampaign.id;
                 draft.appStatus = 'editing';
+            });
+        },
+        setDmStyle(style: DmStyle) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (campaign) campaign.dmStyle = style;
+            });
+        },
+        setFeatureOverride(feature: string, visible: boolean) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (campaign) {
+                    if (!campaign.featureOverrides) campaign.featureOverrides = {};
+                    campaign.featureOverrides[feature] = visible;
+                }
+            });
+        },
+        clearFeatureOverride(feature: string) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (campaign && campaign.featureOverrides) {
+                    delete campaign.featureOverrides[feature];
+                }
             });
         },
         deleteCampaign(id: string) {
