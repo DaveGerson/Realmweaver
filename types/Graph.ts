@@ -31,5 +31,6 @@ export interface GraphNode {
 export interface GraphLink {
   source: string | GraphNode;
   target: string | GraphNode;
+  label?: string;
   index?: number;
 }

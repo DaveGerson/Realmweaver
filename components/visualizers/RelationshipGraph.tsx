@@ -48,12 +48,18 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
           });
       }
 
+      // Build a set of faction leader IDs so NPC->Faction links can say "leads"
+      const factionLeaderIds = new Set(
+          campaign.factions.filter(f => f.leaderId).map(f => f.leaderId as string)
+      );
+
       // 2. NPCs
       if (filters[EntityType.NPC]) {
           campaign.npcs.forEach(n => {
               nodes.push({ id: n.id, group: EntityType.NPC, name: n.name });
               if (filters[EntityType.FACTION] && n.factionId) {
-                  links.push({ source: n.id, target: n.factionId });
+                  const label = factionLeaderIds.has(n.id) ? 'leads' : 'member-of';
+                  links.push({ source: n.id, target: n.factionId, label });
               }
           });
       }
@@ -63,16 +69,16 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
           campaign.locations.forEach(l => {
               nodes.push({ id: l.id, group: EntityType.LOCATION, name: l.name });
               if (filters[EntityType.LOCATION] && l.parentLocationId) {
-                  links.push({ source: l.id, target: l.parentLocationId });
+                  links.push({ source: l.id, target: l.parentLocationId, label: 'within' });
               }
               if (filters[EntityType.FACTION] && l.controllingFactionId) {
-                  links.push({ source: l.id, target: l.controllingFactionId });
+                  links.push({ source: l.id, target: l.controllingFactionId, label: 'controlled-by' });
               }
               if (filters[EntityType.LOCATION] && l.connections) {
                   l.connections.forEach(c => {
                       // Only link if target exists
                       if (campaign.locations.some(loc => loc.id === c.targetLocationId)) {
-                          links.push({ source: l.id, target: c.targetLocationId });
+                          links.push({ source: l.id, target: c.targetLocationId, label: 'connected-to' });
                       }
                   });
               }
@@ -83,18 +89,18 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
       if (filters[EntityType.ADVENTURE]) {
           campaign.adventures.forEach(a => {
               nodes.push({ id: a.id, group: EntityType.ADVENTURE, name: a.title });
-              
+
               if (filters[EntityType.SCENE]) {
                   a.scenes.forEach(s => {
                       nodes.push({ id: s.id, group: EntityType.SCENE, name: s.title });
-                      links.push({ source: a.id, target: s.id }); // Adventure -> Scene
+                      links.push({ source: a.id, target: s.id, label: 'contains' });
 
                       if (filters[EntityType.LOCATION] && s.locationId) {
-                          links.push({ source: s.id, target: s.locationId });
+                          links.push({ source: s.id, target: s.locationId, label: 'set-in' });
                       }
                       if (filters[EntityType.NPC] && s.npcIds) {
                           s.npcIds.forEach(nid => {
-                              links.push({ source: s.id, target: nid });
+                              links.push({ source: s.id, target: nid, label: 'features' });
                           });
                       }
                   });
@@ -107,18 +113,18 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
           campaign.articles.forEach(a => {
               nodes.push({ id: a.id, group: EntityType.ARTICLE, name: a.title });
               if (filters[EntityType.ARTICLE] && a.parentArticleId) {
-                  links.push({ source: a.id, target: a.parentArticleId });
+                  links.push({ source: a.id, target: a.parentArticleId, label: 'child-of' });
               }
               if (a.relatedEntityIds) {
                   a.relatedEntityIds.forEach(rid => {
                       // Check if target exists in current node set to avoid d3 errors
-                      // Note: This check is slightly expensive O(N^2) in naive impl, but map-based check would be better. 
+                      // Note: This check is slightly expensive O(N^2) in naive impl, but map-based check would be better.
                       // D3 link force will fail if target doesn't exist.
                       // However, since we filter nodes based on filters, we just need to know if the target entity type is enabled.
                       // Simplification: We'll trust D3 to filter or we check existence.
                       // Better to check if the ID matches any node we just added.
                       // We will do a cleanup pass at the end.
-                      links.push({ source: a.id, target: rid });
+                      links.push({ source: a.id, target: rid, label: 'references' });
                   });
               }
           });
@@ -174,13 +180,36 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
       .force("center", d3.forceCenter(width / 2, height / 2))
       .force("collide", d3.forceCollide(30));
 
-    const link = g.append("g")
+    // Each link is a <g> containing a <line> and an optional <text> label
+    const linkGroup = g.append("g")
+      .selectAll<SVGGElement, GraphLink>("g")
+      .data(simulationLinks)
+      .join("g");
+
+    // Title element on the group acts as a native SVG tooltip on hover
+    linkGroup.append("title")
+      .text((d: GraphLink) => d.label ?? '');
+
+    const link = linkGroup.append("line")
       .attr("stroke", "#475569") // slate-600
       .attr("stroke-opacity", 0.6)
-      .selectAll<SVGLineElement, GraphLink>("line")
-      .data(simulationLinks)
-      .join("line")
       .attr("stroke-width", 1.5);
+
+    // Edge label text — subtle, stone-500 equivalent, small font
+    const linkLabel = linkGroup.append("text")
+      .text((d: GraphLink) => d.label ?? '')
+      .attr("text-anchor", "middle")
+      .attr("dominant-baseline", "middle")
+      .attr("fill", "#78716c") // stone-500
+      .attr("font-size", "9px")
+      .attr("font-family", "sans-serif")
+      .style("pointer-events", "none")
+      .style("user-select", "none")
+      // Subtle background effect via paint-order so the stroke doesn't interfere with fill
+      .attr("paint-order", "stroke")
+      .attr("stroke", "#020617") // same as svg background (slate-950)
+      .attr("stroke-width", "3px")
+      .attr("stroke-linejoin", "round");
 
     const node = g.append("g")
       .selectAll<SVGGElement, GraphNode>("g")
@@ -232,6 +261,11 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
         .attr("y1", (d: GraphLink) => ((d.source as GraphNode).y ?? 0))
         .attr("x2", (d: GraphLink) => ((d.target as GraphNode).x ?? 0))
         .attr("y2", (d: GraphLink) => ((d.target as GraphNode).y ?? 0));
+
+      // Position label at the geometric midpoint of each edge
+      linkLabel
+        .attr("x", (d: GraphLink) => (((d.source as GraphNode).x ?? 0) + ((d.target as GraphNode).x ?? 0)) / 2)
+        .attr("y", (d: GraphLink) => (((d.source as GraphNode).y ?? 0) + ((d.target as GraphNode).y ?? 0)) / 2);
 
       node
         .attr("transform", (d: GraphNode) => `translate(${d.x},${d.y})`);
