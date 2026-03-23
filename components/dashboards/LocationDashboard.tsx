@@ -41,7 +41,7 @@ export const LocationDashboard: React.FC<LocationDashboardProps> = ({ locations,
   };
 
   return (
-    <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
+    <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
       {/* Creation Area */}
       <div className="space-y-3">
         {/* Mode toggle header */}
@@ -109,18 +109,37 @@ export const LocationDashboard: React.FC<LocationDashboardProps> = ({ locations,
 
       {/* Entity List */}
       <div>
-        <h2 className="text-2xl font-bold font-serif text-slate-200 mb-4">Existing Locations</h2>
+        <h2 className="text-2xl font-bold font-serif text-slate-200 mb-4">Existing Locations ({locations.length})</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {locations.map(location => (
-            <button
-              key={location.id}
-              onClick={() => onSelectLocation(location.id)}
-              className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 border-l-4 border-l-emerald-500 text-left hover:bg-slate-800 hover:border-slate-700 hover:border-l-emerald-400 transition-all space-y-2"
-            >
-              <h3 className="font-semibold text-emerald-400">{location.name}</h3>
-              <p className="text-sm text-slate-400 line-clamp-2">{location.description}</p>
-            </button>
-          ))}
+          {locations.map(location => {
+            const parent = locations.find(l => l.id === location.parentLocationId);
+            const connectionCount = location.connections?.length ?? 0;
+            const descSnippet = location.description ? location.description.slice(0, 80) + (location.description.length > 80 ? '…' : '') : '';
+            return (
+              <button
+                key={location.id}
+                onClick={() => onSelectLocation(location.id)}
+                className="card-parchment p-4 rounded-lg border border-slate-800 border-l-4 border-l-emerald-500 text-left hover:border-slate-700 hover:border-l-emerald-400 transition-all space-y-2"
+              >
+                <h3 className="font-semibold text-emerald-400 leading-tight">{location.name}</h3>
+                {descSnippet && (
+                  <p className="text-xs text-slate-400 leading-relaxed">{descSnippet}</p>
+                )}
+                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  {connectionCount > 0 && (
+                    <span className="text-[10px] bg-emerald-900/40 text-emerald-300 border border-emerald-500/30 rounded-full px-2 py-0.5">
+                      {connectionCount} {connectionCount === 1 ? 'connection' : 'connections'}
+                    </span>
+                  )}
+                  {parent && (
+                    <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                      <Icons.ChevronRight className="w-3 h-3" />{parent.name}
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
           {locations.length === 0 && (
             <div className="md:col-span-2 xl:col-span-3 text-center py-16">
               <Icons.Locations className="w-16 h-16 mx-auto mb-4 text-slate-700" />

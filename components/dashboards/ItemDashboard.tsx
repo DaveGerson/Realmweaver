@@ -33,7 +33,7 @@ export const ItemDashboard: React.FC<ItemDashboardProps> = ({ items, onItemCreat
   };
 
   return (
-    <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
+    <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
       {/* Creation Area */}
       <div className="space-y-3">
         {/* Mode toggle header */}
@@ -97,19 +97,40 @@ export const ItemDashboard: React.FC<ItemDashboardProps> = ({ items, onItemCreat
 
       {/* Entity List */}
       <div>
-        <h2 className="text-2xl font-bold font-serif text-slate-200 mb-4">Existing Items</h2>
+        <h2 className="text-2xl font-bold font-serif text-slate-200 mb-4">Existing Items ({items.length})</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {items.map(item => (
-            <button
-              key={item.id}
-              onClick={() => onSelectItem(item.id)}
-              className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 border-l-4 border-l-sky-500 text-left hover:bg-slate-800 hover:border-slate-700 hover:border-l-sky-400 transition-all space-y-2"
-            >
-              <h3 className="font-semibold text-sky-400">{item.name}</h3>
-              <p className="text-sm text-slate-400 line-clamp-2">{item.description}</p>
-              <span className="text-xs bg-slate-700 text-slate-300 rounded-full px-2 py-0.5 capitalize">{item.rarity}</span>
-            </button>
-          ))}
+          {items.map(item => {
+            const descSnippet = item.description ? item.description.slice(0, 80) + (item.description.length > 80 ? '…' : '') : '';
+            const rarityColors: Record<string, string> = {
+              common: 'bg-slate-700/60 text-slate-300 border-slate-600/30',
+              uncommon: 'bg-green-900/40 text-green-300 border-green-500/30',
+              rare: 'bg-blue-900/40 text-blue-300 border-blue-500/30',
+              'very rare': 'bg-purple-900/40 text-purple-300 border-purple-500/30',
+              legendary: 'bg-orange-900/40 text-orange-300 border-orange-500/30',
+              artifact: 'bg-red-900/40 text-red-300 border-red-500/30',
+            };
+            const rarityStyle = rarityColors[item.rarity] ?? rarityColors['common'];
+            return (
+              <button
+                key={item.id}
+                onClick={() => onSelectItem(item.id)}
+                className="card-parchment p-4 rounded-lg border border-slate-800 border-l-4 border-l-sky-500 text-left hover:border-slate-700 hover:border-l-sky-400 transition-all space-y-2"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-semibold text-sky-400 leading-tight">{item.name}</h3>
+                  <span className={`flex-shrink-0 text-[10px] border rounded-full px-2 py-0.5 capitalize ${rarityStyle}`}>
+                    {item.rarity}
+                  </span>
+                </div>
+                {descSnippet && (
+                  <p className="text-xs text-slate-400 leading-relaxed">{descSnippet}</p>
+                )}
+                {item.properties && (
+                  <p className="text-xs text-slate-500 italic line-clamp-1">{item.properties}</p>
+                )}
+              </button>
+            );
+          })}
           {items.length === 0 && (
             <div className="md:col-span-2 xl:col-span-3 text-center py-16">
               <Icons.Items className="w-16 h-16 mx-auto mb-4 text-slate-700" />

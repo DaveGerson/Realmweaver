@@ -39,7 +39,7 @@ export const FactionDashboard: React.FC<FactionDashboardProps> = ({ factions, np
   };
 
   return (
-    <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
+    <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
       {/* Creation Area */}
       <div className="space-y-3">
         {/* Mode toggle header */}
@@ -107,18 +107,37 @@ export const FactionDashboard: React.FC<FactionDashboardProps> = ({ factions, np
 
       {/* Entity List */}
       <div>
-        <h2 className="text-2xl font-bold font-serif text-slate-200 mb-4">Existing Factions</h2>
+        <h2 className="text-2xl font-bold font-serif text-slate-200 mb-4">Existing Factions ({factions.length})</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {factions.map(faction => (
-            <button
-              key={faction.id}
-              onClick={() => onSelectFaction(faction.id)}
-              className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 border-l-4 border-l-violet-500 text-left hover:bg-slate-800 hover:border-slate-700 hover:border-l-violet-400 transition-all space-y-2"
-            >
-              <h3 className="font-semibold text-violet-400">{faction.name}</h3>
-              <p className="text-sm text-slate-400 line-clamp-2">{faction.description}</p>
-            </button>
-          ))}
+          {factions.map(faction => {
+            const leader = npcs.find(n => n.id === faction.leaderId);
+            const goalsSnippet = faction.goals ? faction.goals.slice(0, 80) + (faction.goals.length > 80 ? '…' : '') : '';
+            const memberCount = faction.memberIds?.length ?? 0;
+            return (
+              <button
+                key={faction.id}
+                onClick={() => onSelectFaction(faction.id)}
+                className="card-parchment p-4 rounded-lg border border-slate-800 border-l-4 border-l-violet-500 text-left hover:border-slate-700 hover:border-l-violet-400 transition-all space-y-2"
+              >
+                <h3 className="font-semibold text-violet-400 leading-tight">{faction.name}</h3>
+                {goalsSnippet && (
+                  <p className="text-xs text-slate-400 leading-relaxed">{goalsSnippet}</p>
+                )}
+                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  {memberCount > 0 && (
+                    <span className="text-[10px] bg-violet-900/40 text-violet-300 border border-violet-500/30 rounded-full px-2 py-0.5">
+                      {memberCount} {memberCount === 1 ? 'member' : 'members'}
+                    </span>
+                  )}
+                  {leader && (
+                    <span className="text-[10px] text-slate-500">
+                      Led by {leader.name}
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
           {factions.length === 0 && (
             <div className="md:col-span-2 xl:col-span-3 text-center py-16">
               <Icons.Factions className="w-16 h-16 mx-auto mb-4 text-slate-700" />

@@ -43,7 +43,7 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
 
   return (
     <>
-      <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
+      <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
         <header className="flex justify-between items-center flex-wrap gap-3">
             <div>
               <h1 className="text-3xl font-bold font-serif text-slate-100">Session Manager</h1>
@@ -94,19 +94,36 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
                     <Icons.Calendar className="w-5 h-5 text-amber-400" /> Upcoming & Planned
                 </h3>
                 <div className="space-y-3">
-                    {plannedSessions.map(session => (
-                        <button
-                            key={session.id}
-                            onClick={() => onSelectSessionLog(session.id)}
-                            className="w-full text-left bg-slate-900/50 border border-slate-800 border-l-4 border-l-rose-500 hover:border-slate-700 hover:border-l-rose-400 hover:bg-slate-800 p-4 rounded-lg transition-all group"
-                        >
-                            <div className="flex justify-between items-center mb-1">
-                                <span className="font-semibold text-slate-200 group-hover:text-amber-300 transition-colors">{session.title}</span>
-                                <span className="text-xs text-slate-500 bg-slate-900 px-2 py-1 rounded border border-slate-800">{new Date(session.sessionDate).toLocaleDateString()}</span>
-                            </div>
-                            <p className="text-sm text-slate-500 line-clamp-1">{session.prepNotes || "No prep notes."}</p>
-                        </button>
-                    ))}
+                    {plannedSessions.map(session => {
+                        const linkedAdventure = session.adventureId
+                            ? campaign.adventures?.find(a => a.id === session.adventureId)
+                            : undefined;
+                        const beatCount = session.beats?.length ?? 0;
+                        return (
+                            <button
+                                key={session.id}
+                                onClick={() => onSelectSessionLog(session.id)}
+                                className="card-parchment w-full text-left border border-slate-800 border-l-4 border-l-rose-500 hover:border-slate-700 hover:border-l-rose-400 p-4 rounded-lg transition-all group space-y-2"
+                            >
+                                <div className="flex justify-between items-start gap-2">
+                                    <span className="font-semibold text-slate-200 group-hover:text-amber-300 transition-colors leading-tight">{session.title}</span>
+                                    <span className="flex-shrink-0 text-xs text-slate-500 bg-slate-900 px-2 py-1 rounded border border-slate-800">{new Date(session.sessionDate).toLocaleDateString()}</span>
+                                </div>
+                                <p className="text-xs text-slate-500 line-clamp-1">{session.prepNotes || 'No prep notes.'}</p>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className="text-[10px] bg-rose-900/30 text-rose-300 border border-rose-500/30 rounded-full px-2 py-0.5">Planned</span>
+                                    {linkedAdventure && (
+                                        <span className="text-[10px] bg-orange-900/30 text-orange-300 border border-orange-500/30 rounded-full px-2 py-0.5 truncate max-w-[140px]">
+                                            {linkedAdventure.title}
+                                        </span>
+                                    )}
+                                    {beatCount > 0 && (
+                                        <span className="text-[10px] text-slate-500">{beatCount} beats</span>
+                                    )}
+                                </div>
+                            </button>
+                        );
+                    })}
                     {plannedSessions.length === 0 && (
                         <div className="text-center py-8 bg-slate-900/30 rounded-lg border border-dashed border-slate-800">
                             <p className="text-slate-500 text-sm">No future sessions planned.</p>
@@ -127,19 +144,32 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
                     <Icons.BookCopy className="w-5 h-5 text-slate-500" /> Session Chronicle
                 </h3>
                 <div className="space-y-3">
-                    {pastSessions.map(session => (
-                        <button
-                            key={session.id}
-                            onClick={() => onSelectSessionLog(session.id)}
-                            className="w-full text-left bg-slate-900/30 border border-slate-800 border-l-4 border-l-rose-500/50 hover:border-slate-600 hover:border-l-rose-400 hover:bg-slate-800 p-4 rounded-lg transition-all opacity-80 hover:opacity-100"
-                        >
-                            <div className="flex justify-between items-center mb-1">
-                                <span className="font-semibold text-slate-300">{session.title}</span>
-                                <span className="text-xs text-slate-600">{new Date(session.sessionDate).toLocaleDateString()}</span>
-                            </div>
-                            <p className="text-sm text-slate-500 line-clamp-2 italic">"{session.recap || "No recap recorded."}"</p>
-                        </button>
-                    ))}
+                    {pastSessions.map(session => {
+                        const linkedAdventure = session.adventureId
+                            ? campaign.adventures?.find(a => a.id === session.adventureId)
+                            : undefined;
+                        return (
+                            <button
+                                key={session.id}
+                                onClick={() => onSelectSessionLog(session.id)}
+                                className="w-full text-left bg-slate-900/30 border border-slate-800 border-l-4 border-l-rose-500/50 hover:border-slate-600 hover:border-l-rose-400 hover:bg-slate-800 p-4 rounded-lg transition-all opacity-80 hover:opacity-100 space-y-2"
+                            >
+                                <div className="flex justify-between items-start gap-2">
+                                    <span className="font-semibold text-slate-300 leading-tight">{session.title}</span>
+                                    <span className="flex-shrink-0 text-xs text-slate-600">{new Date(session.sessionDate).toLocaleDateString()}</span>
+                                </div>
+                                <p className="text-xs text-slate-500 line-clamp-2 italic">"{session.recap || 'No recap recorded.'}"</p>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className="text-[10px] bg-slate-700/40 text-slate-400 border border-slate-600/30 rounded-full px-2 py-0.5">Completed</span>
+                                    {linkedAdventure && (
+                                        <span className="text-[10px] bg-orange-900/30 text-orange-300 border border-orange-500/30 rounded-full px-2 py-0.5 truncate max-w-[140px]">
+                                            {linkedAdventure.title}
+                                        </span>
+                                    )}
+                                </div>
+                            </button>
+                        );
+                    })}
                      {pastSessions.length === 0 && (
                         <div className="text-center py-8 bg-slate-900/30 rounded-lg border border-dashed border-slate-800">
                             <p className="text-slate-500 text-sm">No history recorded yet.</p>

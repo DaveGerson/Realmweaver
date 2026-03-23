@@ -40,7 +40,7 @@ export const ArticleDashboard: React.FC<ArticleDashboardProps> = ({ articles, np
   };
 
   return (
-    <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
+    <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
       {/* Creation Area */}
       <div className="space-y-3">
         {/* Mode toggle header */}
@@ -112,19 +112,34 @@ export const ArticleDashboard: React.FC<ArticleDashboardProps> = ({ articles, np
 
       {/* Entity List */}
       <div>
-        <h2 className="text-2xl font-bold font-serif text-slate-200 mb-4">Lorebook Articles</h2>
+        <h2 className="text-2xl font-bold font-serif text-slate-200 mb-4">Lorebook Articles ({articles.length})</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {articles.map(article => (
-            <button
-              key={article.id}
-              onClick={() => onSelectArticle(article.id)}
-              className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 border-l-4 border-l-cyan-500 text-left hover:bg-slate-800 hover:border-slate-700 hover:border-l-cyan-400 transition-all space-y-2"
-            >
-              <h3 className="font-semibold text-cyan-400">{article.title}</h3>
-              <p className="text-sm text-slate-400 line-clamp-2">{article.content}</p>
-              <span className="text-xs bg-slate-700 text-slate-300 rounded-full px-2 py-0.5 capitalize">{article.category}</span>
-            </button>
-          ))}
+          {articles.map(article => {
+            const contentSnippet = article.content ? article.content.slice(0, 100) + (article.content.length > 100 ? '…' : '') : '';
+            const categoryColors: Record<string, string> = {
+              lore: 'bg-cyan-900/40 text-cyan-300 border-cyan-500/30',
+              history: 'bg-amber-900/40 text-amber-300 border-amber-500/30',
+              cosmology: 'bg-indigo-900/40 text-indigo-300 border-indigo-500/30',
+            };
+            const categoryStyle = categoryColors[article.category] ?? 'bg-slate-700/60 text-slate-300 border-slate-600/30';
+            return (
+              <button
+                key={article.id}
+                onClick={() => onSelectArticle(article.id)}
+                className="card-parchment p-4 rounded-lg border border-slate-800 border-l-4 border-l-cyan-500 text-left hover:border-slate-700 hover:border-l-cyan-400 transition-all space-y-2"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-semibold text-cyan-400 leading-tight">{article.title}</h3>
+                  <span className={`flex-shrink-0 text-[10px] border rounded-full px-2 py-0.5 capitalize ${categoryStyle}`}>
+                    {article.category}
+                  </span>
+                </div>
+                {contentSnippet && (
+                  <p className="text-xs text-slate-400 leading-relaxed">{contentSnippet}</p>
+                )}
+              </button>
+            );
+          })}
           {articles.length === 0 && (
             <div className="md:col-span-2 xl:col-span-3 text-center py-16">
               <Icons.FileCode className="w-16 h-16 mx-auto mb-4 text-slate-700" />

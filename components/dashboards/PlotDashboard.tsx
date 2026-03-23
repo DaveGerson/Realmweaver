@@ -57,7 +57,7 @@ export const PlotDashboard: React.FC<PlotDashboardProps> = ({ plots, sessionLogs
   const [timelineOpen, setTimelineOpen] = useState(true);
 
   return (
-    <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
+    <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
 
       {/* Plot Timeline — collapsible bird's-eye view */}
       <div className="bg-stone-900 border border-stone-700 rounded-lg overflow-hidden">
@@ -140,24 +140,39 @@ interface PlotCardProps {
     compact?: boolean;
 }
 
-const PlotCard: React.FC<PlotCardProps> = ({ plot, onClick, compact }) => (
-    <button 
-        onClick={onClick}
-        className={`w-full bg-slate-900/50 border border-slate-800 border-l-4 border-l-yellow-500 p-4 rounded-lg hover:bg-slate-800 hover:border-slate-700 hover:border-l-yellow-400 transition-all text-left flex flex-col group relative ${compact ? 'py-3' : 'h-32'}`}
-    >
-        <div className="flex justify-between items-start w-full mb-1">
-                <h3 className={`font-semibold text-slate-200 truncate pr-2 ${compact ? 'text-sm' : 'text-lg'}`}>{plot.title}</h3>
-                {!compact && <Icons.Target className="w-5 h-5 text-yellow-500/50 flex-shrink-0" />}
-        </div>
-        {!compact && (
-            <p className="text-sm text-slate-400 line-clamp-2 flex-grow">{plot.description || <span className="italic opacity-50">No description...</span>}</p>
-        )}
-        <div className="mt-2 flex gap-2 overflow-hidden">
-            {(plot.relatedEntityIds || []).length > 0 && (
-                <span className="text-[10px] bg-amber-900/30 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/20">
-                    {plot.relatedEntityIds.length} Linked Entities
+const PLOT_STATUS_STYLES: Record<string, string> = {
+    active: 'bg-green-900/40 text-green-300 border-green-500/30',
+    dormant: 'bg-slate-700/60 text-slate-400 border-slate-600/30',
+    resolved: 'bg-indigo-900/40 text-indigo-300 border-indigo-500/30',
+};
+
+const PlotCard: React.FC<PlotCardProps> = ({ plot, onClick, compact }) => {
+    const statusStyle = PLOT_STATUS_STYLES[plot.status] ?? PLOT_STATUS_STYLES['active'];
+    const descSnippet = plot.description ? plot.description.slice(0, 100) + (plot.description.length > 100 ? '…' : '') : '';
+    return (
+        <button
+            onClick={onClick}
+            className={`card-parchment w-full border border-slate-800 border-l-4 border-l-yellow-500 p-4 rounded-lg hover:border-slate-700 hover:border-l-yellow-400 transition-all text-left flex flex-col group relative space-y-2 ${compact ? 'py-3' : ''}`}
+        >
+            <div className="flex justify-between items-start w-full gap-2">
+                <h3 className={`font-semibold text-slate-200 truncate pr-1 ${compact ? 'text-sm' : 'text-base'}`}>{plot.title}</h3>
+                <span className={`flex-shrink-0 text-[10px] border rounded-full px-2 py-0.5 capitalize ${statusStyle}`}>
+                    {plot.status}
                 </span>
+            </div>
+            {!compact && descSnippet && (
+                <p className="text-xs text-slate-400 line-clamp-2">{descSnippet}</p>
             )}
-        </div>
-    </button>
-)
+            {!compact && !descSnippet && (
+                <p className="text-xs text-slate-600 italic">No description...</p>
+            )}
+            <div className="flex gap-2 overflow-hidden">
+                {(plot.relatedEntityIds || []).length > 0 && (
+                    <span className="text-[10px] bg-amber-900/30 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/20">
+                        {plot.relatedEntityIds.length} Linked {plot.relatedEntityIds.length === 1 ? 'Entity' : 'Entities'}
+                    </span>
+                )}
+            </div>
+        </button>
+    );
+}

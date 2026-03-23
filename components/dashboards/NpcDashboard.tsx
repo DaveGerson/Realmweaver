@@ -34,7 +34,7 @@ export const NpcDashboard: React.FC<NpcDashboardProps> = ({ npcs, factions = [],
   };
 
   return (
-    <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
+    <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
       {/* Creation Area */}
       <div className="space-y-3">
         {/* Mode toggle header */}
@@ -101,18 +101,34 @@ export const NpcDashboard: React.FC<NpcDashboardProps> = ({ npcs, factions = [],
 
       {/* Entity List */}
       <div>
-        <h2 className="text-2xl font-bold font-serif text-slate-200 mb-4">Existing NPCs</h2>
+        <h2 className="text-2xl font-bold font-serif text-slate-200 mb-4">Existing NPCs ({npcs.length})</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {npcs.map(npc => (
-            <button
-              key={npc.id}
-              onClick={() => onSelectNpc(npc.id)}
-              className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 border-l-4 border-l-amber-500 text-left hover:bg-slate-800 hover:border-slate-700 hover:border-l-amber-400 transition-all space-y-2"
-            >
-              <h3 className="font-semibold text-amber-400">{npc.name}</h3>
-              <p className="text-sm text-slate-400 line-clamp-2">{npc.description}</p>
-            </button>
-          ))}
+          {npcs.map(npc => {
+            const faction = factions.find(f => f.id === npc.factionId);
+            const descSnippet = npc.description ? npc.description.slice(0, 80) + (npc.description.length > 80 ? '…' : '') : '';
+            return (
+              <button
+                key={npc.id}
+                onClick={() => onSelectNpc(npc.id)}
+                className="card-parchment p-4 rounded-lg border border-slate-800 border-l-4 border-l-amber-500 text-left hover:border-slate-700 hover:border-l-amber-400 transition-all space-y-2"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-semibold text-amber-400 leading-tight">{npc.name}</h3>
+                  {faction && (
+                    <span className="flex-shrink-0 text-[10px] bg-violet-900/50 text-violet-300 border border-violet-500/30 rounded-full px-2 py-0.5 truncate max-w-[120px]">
+                      {faction.name}
+                    </span>
+                  )}
+                </div>
+                {descSnippet && (
+                  <p className="text-xs text-slate-400 leading-relaxed">{descSnippet}</p>
+                )}
+                {npc.traits && (
+                  <p className="text-xs text-slate-500 italic line-clamp-1">{npc.traits}</p>
+                )}
+              </button>
+            );
+          })}
           {npcs.length === 0 && (
             <div className="md:col-span-2 xl:col-span-3 text-center py-16">
               <Icons.NPCs className="w-16 h-16 mx-auto mb-4 text-slate-700" />
