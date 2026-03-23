@@ -10,6 +10,7 @@ import { EntityLink } from '../common/EntityLink';
 import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
+import { BacklinksPanel } from '../common/BacklinksPanel';
 
 interface PlotEditorProps {
   plot: Plot;
@@ -258,6 +259,10 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, onUpdate, onDelete
                 )}
             </div>
         </div>
+
+        {/* Backlinks Panel */}
+        <BacklinksPanel entityId={plot.id} entityType="plot" onNavigate={onNavigate} />
+
       </div>
     </div>
   );

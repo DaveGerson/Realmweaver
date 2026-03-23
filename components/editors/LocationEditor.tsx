@@ -12,6 +12,7 @@ import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
+import { BacklinksPanel } from '../common/BacklinksPanel';
 
 interface LocationEditorProps {
   location: Location;
@@ -491,6 +492,10 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                  ) : (<p className="text-sm text-slate-500 italic mt-2">No other locations connect to this one.</p>)}
             </div>
         </div>
+
+        {/* Backlinks Panel */}
+        <BacklinksPanel entityId={location.id} entityType="location" onNavigate={onNavigate} />
+
       </div>
     </div>
   );

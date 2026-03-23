@@ -11,6 +11,7 @@ import { EntityLink } from '../common/EntityLink';
 import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
+import { BacklinksPanel } from '../common/BacklinksPanel';
 
 interface ArticleEditorProps {
   article: Article;
@@ -262,6 +263,10 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
                  )}
             </div>
         </div>
+
+        {/* Backlinks Panel */}
+        <BacklinksPanel entityId={article.id} entityType="article" onNavigate={onNavigate} />
+
       </div>
     </div>
   );

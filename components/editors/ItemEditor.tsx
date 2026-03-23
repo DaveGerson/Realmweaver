@@ -6,6 +6,8 @@ import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
 import { generateEnhancedText } from '../../services/geminiService';
 import { RegenerateButton } from '../common/RegenerateButton';
+import { BacklinksPanel } from '../common/BacklinksPanel';
+import type { QuickCardEntityType } from '../common/EntityQuickCard';
 
 interface ItemEditorProps {
   item: Item;
@@ -13,11 +15,12 @@ interface ItemEditorProps {
   onDelete: (id: string) => void;
   isMockMode: boolean;
   campaignContext?: string;
+  onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
 }
 
 const rarityOptions: ItemRarity[] = ['common', 'uncommon', 'rare', 'very rare', 'legendary', 'artifact'];
 
-export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onUpdate, onDelete, isMockMode, campaignContext }) => {
+export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(item);
   const [isGenerating, setIsGenerating] = useState<keyof Omit<Item, 'id' | 'rarity'> | null>(null);
 
@@ -139,6 +142,10 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onUpdate, onDelete
           onAiGenerate={() => handleAiGenerate('properties')}
           isGenerating={isGenerating === 'properties'}
         />
+
+        {/* Backlinks Panel */}
+        <BacklinksPanel entityId={item.id} entityType="item" onNavigate={onNavigate} />
+
       </div>
     </div>
   );

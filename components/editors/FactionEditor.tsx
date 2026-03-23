@@ -11,6 +11,7 @@ import { EntityLink } from '../common/EntityLink';
 import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
+import { BacklinksPanel } from '../common/BacklinksPanel';
 
 interface FactionEditorProps {
   faction: Faction;
@@ -262,6 +263,10 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
                  )}
             </div>
         </div>
+
+        {/* Backlinks Panel */}
+        <BacklinksPanel entityId={faction.id} entityType="faction" onNavigate={onNavigate} />
+
       </div>
     </div>
   );

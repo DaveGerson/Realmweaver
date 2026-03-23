@@ -11,6 +11,7 @@ import { EntityLink } from '../common/EntityLink';
 import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService'; // Import store for access to full state
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
+import { BacklinksPanel } from '../common/BacklinksPanel';
 
 interface NpcEditorProps {
   npc: NPC;
@@ -347,7 +348,7 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
         </div>
 
         {/* History Manager */}
-        <EntityHistoryManager 
+        <EntityHistoryManager
             subjectId={npc.id}
             subjectType="npc"
             campaign={campaign}
@@ -356,6 +357,9 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                 if (type === 'location') campaignService.updateLocation(id, changes);
             }}
         />
+
+        {/* Backlinks Panel */}
+        <BacklinksPanel entityId={npc.id} entityType="npc" onNavigate={onNavigate} />
 
       </div>
     </div>

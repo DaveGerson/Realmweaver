@@ -10,6 +10,7 @@ import { GenerateHerePanel } from '../common/GenerateHerePanel';
 import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
+import { BacklinksPanel } from '../common/BacklinksPanel';
 
 interface AdventureEditorProps {
   adventure: Adventure;
@@ -166,6 +167,10 @@ export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, cam
               placeholder="Cosmic Horror, Investigation, Desperate Survival"
             />
           </div>
+
+          {/* Backlinks Panel */}
+          <BacklinksPanel entityId={adventure.id} entityType="adventure" onNavigate={onNavigate} />
+
         </div>
       )}
 

@@ -674,7 +674,7 @@ const App: FC = () => {
             onNavigate={handleEntityNavigate}
         />
       );
-      if (selectedItem) return <ItemEditor item={selectedItem} onUpdate={campaignService.updateItem} onDelete={(id) => { campaignService.deleteItem(id); resetSelections(); }} isMockMode={isMockMode} />;
+      if (selectedItem) return <ItemEditor item={selectedItem} onUpdate={campaignService.updateItem} onDelete={(id) => { campaignService.deleteItem(id); resetSelections(); }} isMockMode={isMockMode} onNavigate={handleEntityNavigate} />;
 
       // If no specific item is selected, show the corresponding dashboard
       if (activeView === 'adventures') {
