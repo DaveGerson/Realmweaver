@@ -6,6 +6,7 @@ import { twMerge } from 'tailwind-merge';
 import { campaignService } from '../../services/campaignService';
 import { DiceRoller } from '../tools/DiceRoller';
 import { CombatTracker } from '../tools/CombatTracker';
+import { SecretsTracker } from '../tools/SecretsTracker';
 import { generateNpc } from '../../services/geminiService';
 import { rollDice } from '../../utils/diceUtils';
 import { estimatePcHp } from '../../utils/entityUtils';
@@ -80,6 +81,9 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
 
     // Combat Tracker slide-out state
     const [showCombatPanel, setShowCombatPanel] = useState(false);
+
+    // Secrets tracker state
+    const [showSecrets, setShowSecrets] = useState(false);
 
     // Quick NPC generator state
     const [showQuickNpc, setShowQuickNpc] = useState(false);
@@ -662,6 +666,19 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                             <Icons.UserPlus className="w-4 h-4 text-emerald-400" />
                             Quick NPC
                         </button>
+                        <button
+                            onClick={() => setShowSecrets(prev => !prev)}
+                            className={twMerge(
+                                "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
+                                showSecrets
+                                    ? "bg-amber-900/30 text-amber-300 border border-amber-700/50"
+                                    : "bg-slate-800 hover:bg-slate-700 text-slate-200"
+                            )}
+                        >
+                            <Icons.Lock className="w-4 h-4 text-amber-400" />
+                            Secrets & Clues
+                            <Icons.ChevronDown className={twMerge("w-3 h-3 ml-auto text-slate-500 transition-transform", showSecrets && "rotate-180")} />
+                        </button>
                     </div>
 
                     {/* Quick NPC Inline Form */}
@@ -784,6 +801,16 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                             {npcError && (
                                 <p className="text-xs text-red-400">{npcError}</p>
                             )}
+                        </div>
+                    )}
+
+                    {/* Secrets & Clues Panel */}
+                    {showSecrets && (
+                        <div className="border-t border-slate-800 flex-shrink-0" style={{ maxHeight: '400px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                            <SecretsTracker
+                                campaign={campaign}
+                                activeSessionId={campaign.activeSessionId}
+                            />
                         </div>
                     )}
 

@@ -71,6 +71,12 @@ import {
   Search,
   AtSign,
   MapPin,
+  Eye,
+  EyeOff,
+  Lock,
+  Unlock,
+  Theater,
+  SendHorizonal,
 } from 'lucide-react';
 
 export const Icons = {
@@ -144,6 +150,12 @@ export const Icons = {
   Search,
   AtSign,
   MapPin,
+  Eye,
+  EyeOff,
+  Lock,
+  Unlock,
+  Roleplay: Theater,
+  Send: SendHorizonal,
 };
 
 export const SceneIcon = ({ type, className }: { type: string, className?: string }) => {

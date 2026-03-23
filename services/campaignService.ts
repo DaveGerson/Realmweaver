@@ -20,7 +20,8 @@ import type {
     SettingType,
     Note,
     DiceRoll,
-    PlotSessionStatus
+    PlotSessionStatus,
+    Secret
 } from '../types/index';
 import { importCampaignFromJson } from './importExportService';
 import { parseCharacterSheetPdf } from './geminiService';
@@ -237,6 +238,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                                 relatedEntityIds: p.relatedEntityIds || p.keyNpcIds || [],
                             })),
                             notes: c.notes || [],
+                            secrets: c.secrets || [],
                             articles: (c.articles || []).map((a: any) => ({
                                 ...a,
                                 subArticleIds: a.subArticleIds || [],
@@ -869,6 +871,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     playerCharacters: [], 
                     plots: [],
                     notes: [],
+                    secrets: [],
                     activeEncounter: { id: crypto.randomUUID(), round: 1, turnIndex: 0, combatants: [] }
                 };
                 draft.campaigns.push(newCampaign);
@@ -1427,6 +1430,50 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 const campaign = getActiveCampaignFromState(draft);
                 if (campaign) {
                     campaign.notes = (campaign.notes || []).filter(n => n.id !== id);
+                }
+            });
+        },
+
+        // --- Secret CRUD ---
+        createSecret(newSecretData: Omit<Secret, 'id' | 'createdAt'>): string {
+            const newSecret: Secret = {
+                ...newSecretData,
+                id: crypto.randomUUID(),
+                createdAt: new Date().toISOString(),
+            };
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (campaign) {
+                    if (!campaign.secrets) campaign.secrets = [];
+                    campaign.secrets.push(newSecret);
+                }
+            });
+            return newSecret.id;
+        },
+        updateSecret(id: string, updates: Partial<Secret>) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign || !campaign.secrets) return;
+                const secret = campaign.secrets.find(s => s.id === id);
+                if (secret) Object.assign(secret, updates);
+            });
+        },
+        deleteSecret(id: string) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (campaign) {
+                    campaign.secrets = (campaign.secrets || []).filter(s => s.id !== id);
+                }
+            });
+        },
+        revealSecret(id: string, sessionId?: string) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign || !campaign.secrets) return;
+                const secret = campaign.secrets.find(s => s.id === id);
+                if (secret) {
+                    secret.isRevealed = true;
+                    if (sessionId) secret.revealedInSessionId = sessionId;
                 }
             });
         },

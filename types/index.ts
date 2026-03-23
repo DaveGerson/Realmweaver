@@ -19,3 +19,4 @@ export * from './RealmChat';
 export * from './Graph';
 export * from './Note';
 export * from './DiceRoll';
+export * from './Secret';

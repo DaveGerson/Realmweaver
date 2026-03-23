@@ -11,6 +11,7 @@ import type { PlayerCharacter } from './PlayerCharacter';
 import type { Plot } from './Plot';
 import type { Encounter } from './Encounter';
 import type { Note } from './Note';
+import type { Secret } from './Secret';
 
 export type SettingType = 'custom' | 'official';
 
@@ -30,6 +31,7 @@ export interface Campaign {
   playerCharacters: PlayerCharacter[];
   plots: Plot[];
   notes: Note[];
+  secrets?: Secret[];
   activeEncounter?: Encounter;
   activeSceneId?: string; // The ID of the scene currently being played in the session
   activeSessionId?: string; // The ID of the currently live session (Session Runner)

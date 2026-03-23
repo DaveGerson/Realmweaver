@@ -524,6 +524,15 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                         onClick={() => onSelectView('relationships')}
                     />
                     )}
+
+                    {!debouncedFilter && (
+                    <NavItem
+                        label="Secrets & Clues"
+                        icon="Lock"
+                        active={activeView === 'secrets'}
+                        onClick={() => onSelectView('secrets')}
+                    />
+                    )}
                 </div>
                 )}
 
