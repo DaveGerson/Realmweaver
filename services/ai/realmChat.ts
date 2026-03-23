@@ -139,3 +139,67 @@ ${approvedEntitiesLog.join('\n')}
         };
     }
 };
+
+const npcRoleplayResponseSchema = {
+    type: Type.OBJECT,
+    properties: {
+        dialogue: {
+            type: Type.STRING,
+            description: "The NPC's in-character dialogue response (2-4 sentences). Speak directly as the NPC in first person.",
+        },
+        moodCue: {
+            type: Type.STRING,
+            description: "A brief stage direction describing the NPC's physical action or emotional state (e.g., 'leans forward, voice dropping to a whisper'). No brackets needed.",
+        },
+    },
+    required: ['dialogue', 'moodCue'],
+};
+
+export const generateNpcRoleplay = async (
+    npcContext: string,
+    conversationHistory: Array<{ role: string; text: string }>,
+    userMessage: string,
+    campaignContext?: string
+): Promise<{ dialogue: string; moodCue: string }> => {
+    const systemInstruction = `You are roleplaying as the NPC described below. Stay fully in character at all times.
+
+${npcContext}
+
+**Roleplay Rules:**
+1. Speak in first person as the NPC. Never break character or refer to yourself as an AI.
+2. Reflect the NPC's personality, speech patterns, and emotional state in every response.
+3. Draw on their traits, motivations, and secrets when it feels natural — but don't reveal secrets unless pressed.
+4. Reference campaign events and other known characters organically if relevant.
+5. Keep your dialogue concise: 2-4 sentences maximum.
+6. Provide a mood cue that describes your physical action or emotional subtext (e.g., "drums fingers on the table, eyes darting to the door"). Do not include brackets.
+7. Return JSON with exactly two fields: "dialogue" and "moodCue".`;
+
+    const historyLines = conversationHistory
+        .map(msg => `${msg.role === 'user' ? 'Player' : 'NPC'}: ${msg.text}`)
+        .join('\n');
+
+    const prompt = historyLines
+        ? `Conversation so far:\n${historyLines}\n\nPlayer says: "${userMessage}"\n\nRespond as the NPC.`
+        : `Player says: "${userMessage}"\n\nRespond as the NPC.`;
+
+    try {
+        const rawResponse = await generateWithSchema(
+            prompt,
+            npcRoleplayResponseSchema,
+            systemInstruction,
+            {},
+            'gemini-2.5-flash',
+            campaignContext
+        );
+        return {
+            dialogue: rawResponse.dialogue || '',
+            moodCue: rawResponse.moodCue || '',
+        };
+    } catch (error) {
+        console.error("NPC Roleplay Error:", error);
+        return {
+            dialogue: "...",
+            moodCue: "seems distracted, saying nothing",
+        };
+    }
+};

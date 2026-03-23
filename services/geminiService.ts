@@ -142,6 +142,19 @@ export const analyzeSessionNotes = (notes: string, knownEntityNames: string[], c
     return aiDmCoach.analyzeSessionNotes(notes, knownEntityNames, campaignContext);
 }
 
+export const generateNpcRoleplay = (
+    npcContext: string,
+    conversationHistory: Array<{ role: string; text: string }>,
+    userMessage: string,
+    isMockMode: boolean = false,
+    campaignContext?: string
+): Promise<{ dialogue: string; moodCue: string }> => {
+    if (isMockMode) {
+        return mockService.generateNpcRoleplay(npcContext, conversationHistory, userMessage, campaignContext);
+    }
+    return aiRealmChat.generateNpcRoleplay(npcContext, conversationHistory, userMessage, campaignContext);
+};
+
 export const generateSessionRecap = (
     sessionNotes: string,
     plotSummaries: string,

@@ -433,6 +433,21 @@ export const generateSessionRecap = async (
     });
 };
 
+export const generateNpcRoleplay = async (
+    npcContext: string,
+    conversationHistory: Array<{ role: string; text: string }>,
+    userMessage: string,
+    campaignContext?: string
+): Promise<{ dialogue: string; moodCue: string }> => {
+    console.log(`[MOCK MODE] Called generateNpcRoleplay. Message: "${userMessage}"`);
+    logContext(campaignContext);
+    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    return Promise.resolve({
+        dialogue: "Well, well... another adventurer seeking favors. Tell me, what makes you think I should help you? I've heard many promises from your kind — most of them hollow.",
+        moodCue: "crosses arms, raises an eyebrow skeptically",
+    });
+};
+
 export const analyzeSessionNotes = async (notes: string, knownEntityNames: string[], campaignContext?: string, isMockMode?: boolean): Promise<{entries: {content: string, relatedEntityNames: string[]}[]}> => {
     console.log(`[MOCK MODE] Called analyzeSessionNotes with notes length: ${notes.length}`);
     await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
