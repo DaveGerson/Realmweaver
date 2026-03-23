@@ -105,7 +105,7 @@ export const PrepDocumentView: React.FC<PrepDocumentViewProps> = ({ adventure, c
   };
 
   return (
-    <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 space-y-4 animate-in fade-in duration-300">
+    <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 space-y-4 animate-fade-in">
       <div className="flex justify-between items-center">
         <p className="text-sm text-slate-400">
           A full Markdown document for your adventure. Copy this into your favorite notes app.

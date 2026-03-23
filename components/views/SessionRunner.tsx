@@ -674,7 +674,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                             {activeScene.readAloudText && (
                                 <div className="bg-amber-900/20 border border-amber-800/40 rounded-lg p-4">
                                     <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2">Read Aloud</h3>
-                                    <p className="text-amber-100 italic leading-relaxed whitespace-pre-wrap">
+                                    <p className="text-lg italic text-amber-100/90 leading-relaxed font-serif border-l-4 border-amber-700/40 pl-4 whitespace-pre-wrap">
                                         {onNavigate
                                             ? <LinkedText text={activeScene.readAloudText} onNavigate={onNavigate} />
                                             : activeScene.readAloudText

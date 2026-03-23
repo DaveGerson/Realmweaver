@@ -98,7 +98,7 @@ export const CombatTracker: React.FC<CombatTrackerProps> = ({ encounter, onUpdat
   const sortedCombatants = encounter.combatants; // Already sorted if user clicked sort, but we display as is for manual reordering support in future.
 
   return (
-    <div className="p-6 md:p-8 h-full flex flex-col overflow-hidden animate-in fade-in duration-300">
+    <div className="p-6 md:p-8 h-full flex flex-col overflow-hidden animate-fade-in">
         <header className="flex justify-between items-center mb-6 flex-shrink-0">
             <div className="flex items-center gap-3 text-amber-400">
                 <Icons.Combat className="w-8 h-8" />

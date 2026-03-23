@@ -47,7 +47,7 @@ const NoteCreator: React.FC<{ onNoteCreated: (data: Omit<Note, 'id' | 'createdAt
 
 export const NoteDashboard: React.FC<NoteDashboardProps> = ({ notes, onNoteCreated, onSelectNote }) => {
   return (
-    <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
+    <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1">
           <NoteCreator onNoteCreated={onNoteCreated} />

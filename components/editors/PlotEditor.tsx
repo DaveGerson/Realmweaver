@@ -109,7 +109,7 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, onUpdate, onDelete
   }, [campaign.sessionLogs, plot.id]);
 
   return (
-    <div className="p-6 md:p-8 h-full flex flex-col overflow-hidden animate-in fade-in duration-300">
+    <div className="p-6 md:p-8 h-full flex flex-col overflow-hidden animate-fade-in">
       <header className="flex flex-wrap justify-between items-start mb-6 flex-shrink-0 gap-3">
         <div className="space-y-2">
             <div className="flex items-center gap-3 text-amber-400">

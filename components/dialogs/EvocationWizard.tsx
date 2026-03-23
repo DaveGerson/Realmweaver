@@ -341,7 +341,7 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                                 </div>
                             )}
                             {hasGeneratedData && (
-                                <div className="space-y-4 animate-in fade-in duration-300">
+                                <div className="space-y-4 animate-fade-in">
                                     <ResultsSection title="NPCs" items={generatedData.npcs} selection={selection.npcs} onSelect={(i, c) => handleSelectionChange('npcs', i, c)} onEdit={(i) => setEditingEntity({ type: 'npcs', index: i })} />
                                     <ResultsSection title="Locations" items={generatedData.locations} selection={selection.locations} onSelect={(i, c) => handleSelectionChange('locations', i, c)} onEdit={(i) => setEditingEntity({ type: 'locations', index: i })} />
                                     <ResultsSection title="Factions" items={generatedData.factions} selection={selection.factions} onSelect={(i, c) => handleSelectionChange('factions', i, c)} onEdit={(i) => setEditingEntity({ type: 'factions', index: i })} />

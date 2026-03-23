@@ -366,7 +366,7 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
 }
 
   return (
-    <div className="p-6 md:p-8 h-full flex flex-col overflow-hidden animate-in fade-in duration-300">
+    <div className="p-6 md:p-8 h-full flex flex-col overflow-hidden animate-fade-in">
       
       {/* Header */}
       <header className="flex justify-between items-center mb-6 flex-shrink-0">

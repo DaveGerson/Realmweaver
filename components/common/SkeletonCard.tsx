@@ -28,7 +28,7 @@ export const SkeletonCardGrid: React.FC<SkeletonCardProps> = ({ count = 4, compa
 );
 
 export const SkeletonGeneratorOverlay: React.FC = () => (
-    <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm flex flex-col items-center justify-center rounded-xl z-10">
+    <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm flex flex-col items-center justify-center rounded-xl z-10 animate-fade-in">
         <div className="space-y-3 w-3/4">
             <SkeletonPulse className="h-6 w-1/2 mx-auto" />
             <SkeletonPulse className="h-4 w-full" />
@@ -36,6 +36,6 @@ export const SkeletonGeneratorOverlay: React.FC = () => (
             <SkeletonPulse className="h-4 w-3/4" />
             <SkeletonPulse className="h-3 w-1/3 mx-auto mt-4" />
         </div>
-        <p className="mt-4 text-sm text-slate-400 animate-pulse">Weaving into existence...</p>
+        <p className="mt-4 text-sm text-amber-400/80 animate-quill">Weaving into existence...</p>
     </div>
 );

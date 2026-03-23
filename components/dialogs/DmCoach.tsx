@@ -731,7 +731,7 @@ const RollableTableDisplay = ({ table, onSendToNotes }: { table: RollableTable; 
                 )}
             </div>
             {rollResult && (
-                <div className="mt-4 p-3 bg-indigo-900/30 border border-indigo-500/30 rounded-lg text-center animate-in fade-in duration-300">
+                <div className="mt-4 p-3 bg-indigo-900/30 border border-indigo-500/30 rounded-lg text-center animate-fade-in">
                     <p className="text-sm text-slate-400">You rolled a <span className="font-bold text-2xl text-white mx-1">{rollResult.roll}</span></p>
                     <p className="mt-2 text-md text-indigo-200">{rollResult.result}</p>
                 </div>

@@ -34,7 +34,7 @@ export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, cam
   };
 
   return (
-    <div className="p-6 md:p-8 h-full flex flex-col overflow-y-auto custom-scrollbar space-y-8 animate-in fade-in duration-300">
+    <div className="p-6 md:p-8 h-full flex flex-col overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
       <header className="space-y-4">
         <div className="flex items-center gap-3 text-indigo-400">
           <Icons.Adventures className="w-8 h-8" />
@@ -54,7 +54,7 @@ export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, cam
       </header>
       
       {activeTab === 'details' && (
-        <div className="space-y-6 bg-slate-900/50 p-6 rounded-xl border border-slate-800/50 animate-in fade-in duration-300">
+        <div className="space-y-6 bg-slate-900/50 p-6 rounded-xl border border-slate-800/50 animate-fade-in">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-slate-400 mb-1.5">Adventure Title</label>
