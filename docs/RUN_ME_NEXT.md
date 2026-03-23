@@ -1,85 +1,127 @@
 # Run Me Next — Pickup Instructions
 
-> **Last Updated:** 2026-03-21
-> **Branch:** feat/testing-and-phase-b
-> **Build:** Clean | **Tests:** 84 passing
+> **Last Updated:** 2026-03-22
+> **Branch:** main (clean)
+> **Build:** Clean (2356 modules) | **Unit Tests:** 97 passing | **E2E Tests:** 5 passing
 
 ---
 
-## What Was Completed This Session
+## What Was Completed (Phases A through E — ALL DONE)
 
-### Navigation Overhaul — Phase 1 + Phase 4a COMPLETE
+### This Session (2026-03-22) — 38 commits, 14,837 lines added
 
-Executed as an orchestrated chain (4 activities + gate). All delivered:
-
-| Feature | What | Files |
-|---------|------|-------|
-| **Nav Back Stack** | Navigation history (max 20), Back button in Breadcrumbs, sidebar resets stack | App.tsx, Breadcrumbs.tsx, Icons.tsx |
-| **Recent Items** | "Recent" section at top of sidebar, collapsible, max 5, type-colored icons | CampaignSidebar.tsx, App.tsx |
-| **EntityLinks in Editors** | Hover tooltips + click-to-navigate for all entity reference fields across 8 editors | All editors/*.tsx |
-| **LinkedText Auto-Linking** | Entity names in text fields auto-detected and rendered as clickable EntityLinks | LinkedText.tsx (NEW), 7 editors |
-| **All 9 Entity Types** | QuickCard + EntityLink support: npc, location, faction, item, adventure, article, plot, session-log, player-character | EntityQuickCard.tsx, EntityLink.tsx |
-
-Commits: `ad8e14d`, `6e110c0`, `5278278`
+| Phase | What Was Delivered |
+|-------|-------------------|
+| **Nav Overhaul 1-4** | Back stack, EntityLinks in all editors, LinkedText auto-linking, recent items, scene tooltips, expandable/editable QuickCard, tooltip hover fix |
+| **Phase 2** | Scene Resources Panel (inlined NPC/location in SceneEditor), Sidebar Favorites with pin/unpin |
+| **Phase 3** | Backlinks utility (`computeBacklinks`), "Referenced By" panels in 7 editors |
+| **Phase 4** | LinkedText auto-linking, Semantic graph edge labels |
+| **Phase C** | Session Prep Wizard, Event Auto-Capture, Voice Input, DM Coach Template Prompts, Beats Mode, Secrets & Clues Tracker, NPC Roleplay Simulator |
+| **Phase D** | Smart Context Builder (tiered), Plot Timeline, Continuity Checker (8 rules), Relationship Intelligence in SessionRunner |
+| **Phase E** | Rich Dashboard Cards, Tabbed Editor Layouts, Keyboard Shortcuts, Dark Fantasy Visual Polish, Mobile Responsiveness, DM Style Progressive Disclosure |
+| **Infra** | Playwright E2E testing (5 smoke tests), MCP browser tools, e2e-test-engineer + browser-simulator agents |
 
 ### Prior Sessions (Still Complete)
-- Phase A + A2 universal fixes (all done)
-- Phase B search & generation UX (B1-B6 all done)
-- Agent roster overhaul, testing knowledge pack, 84 Vitest tests
+- Phase A + A2 universal fixes
+- Phase B search & generation UX (B1-B6)
+- Agent roster, testing knowledge pack, Vitest infrastructure
 
 ---
 
 ## What To Do Next (In Order)
 
-### 1. Execute Navigation Overhaul — Phase 2: "Make Scenes Playable"
+### 1. E2E Test Coverage Expansion
+
+The Playwright E2E infrastructure is set up but only has 5 smoke tests. Before adding new features, expand test coverage for everything that was built:
 
 ```
-Execute Phase 2 of the navigation overhaul from .claude/team-context/plan.md
+Use the e2e-test-engineer agent to write comprehensive E2E tests covering:
+- Campaign creation flow with DM Style selector
+- Entity CRUD (create NPC, edit, delete)
+- Navigation: EntityLinks, back stack, recent items, pinning
+- Session Prep Wizard → Session Runner → Session End flow
+- DM Coach with all 4 modes (narrate, improvise, table, roleplay)
+- Secrets & Clues tracker
+- Continuity Checker
+- Mobile responsiveness (run against mobile-chrome project)
+- Keyboard shortcuts
 ```
 
-Phase 2 delivers:
-- **2a: Scene Resources Panel** — Inlines NPC traits/motivation/quotes and location secrets directly in SceneEditor for zero-click mid-session reference
-- **2b: Sidebar Favorites** — Pin/unpin entities (star icon), persisted in campaign state, "Pinned" section in sidebar
+### 2. Code Review Pass
 
-### 2. Phase 3: "Complete the Web"
+Run a code review across all Phase C-E changes. Focus on:
+- Performance with large campaigns (100+ entities)
+- Accessibility (ARIA labels, keyboard navigation, screen readers)
+- Consistency (naming conventions, icon usage, color palette)
+- Edge cases (empty campaigns, deleted entity references)
 
 ```
-Execute Phase 3 of the navigation overhaul from .claude/team-context/plan.md
+Use the code-reviewer agent to review all changes since Phase B
 ```
 
-Phase 3 delivers:
-- **3a: Backlinks Utility** — `computeBacklinks(entityId, campaign)` returns all entities that reference a given entity, grouped by type with relationship labels
-- **3b: "Referenced By" Panel** — Collapsible section in all editors showing inbound connections
+### 3. Phase F: Growth & Advanced AI
 
-### 3. Phase 4b: Semantic Graph Labels (Optional)
+```
+Execute Phase F from docs/IMPLEMENTATION_PLAN.md
+```
 
-Phase 4a (LinkedText auto-linking) is already complete. Remaining:
-- **4b:** Semantic labels on relationship graph edges ("member-of", "controlled-by")
+Phase F delivers 5 features (4 parallel + 1 sequential):
 
-### 4. Remaining Phases (C through G)
+| Item | What | Effort |
+|------|------|--------|
+| **F1: First Campaign Wizard** | Conversational onboarding: "Tell me about your world" → AI generates starter content | Medium |
+| **F2: Template Campaigns** | Pre-built starters: Classic Dungeon Crawl, Political Intrigue, Sandbox, One-Shot | Medium |
+| **F3: World Simulation Engine** | AI generates between-session events based on faction goals and NPC motivations | Large |
+| **F4: Content Style Matching** | AI learns DM's writing voice from existing entities, applies to all generation | Large |
+| **F5: Cross-Campaign Dashboard** | Top-level view of all campaigns with quick-switch, entity copy, pending loose ends | Large |
 
-After navigation overhaul, continue per `docs/IMPLEMENTATION_PLAN.md`:
-1. Orchestrator executes full phase
-2. You review completion report
-3. Merge to main
-4. Start next phase
+### 4. Phase G: Cloud & Collaboration (Future)
+
+Requires architectural planning before implementation:
+- Cloud provider evaluation (Supabase vs Firebase)
+- Database schema design + offline-first sync strategy
+- Auth flow, localStorage migration
+- Player Portal (read-only), GM Secrets, Interactive World Map
+
+---
+
+## Known Issues / Follow-ups
+
+- **FAB overlap with RealmChat**: The mobile floating action button and RealmChat widget may overlap at bottom-right — needs visual check
+- **BacklinksPanel in guided mode**: `isFeatureVisible('backlinks-panel')` infrastructure is in place but not yet wired into all editor components (editors would need dmStyle prop threading)
+- **Stale pinned entities**: Pinned items for deleted entities are silently hidden but not auto-cleaned from the array
+- **Article content truncation**: Expanded QuickCard edits only the first 500 chars of article content
 
 ---
 
 ## Key Commands
 
 ```bash
-npm run dev      # Start dev server on localhost:3000
-npm test         # Run all 84 Vitest tests
-npm run build    # Production build (verify zero TS errors)
+npm run dev           # Start dev server on localhost:3000
+npm test              # Run all 97 Vitest unit tests
+npm run test:e2e      # Run 5 Playwright E2E tests (headless)
+npm run test:e2e:headed  # Run E2E tests with visible browser
+npm run build         # Production build (verify zero TS errors)
 ```
 
 ## Key Documents
 
 | Document | Purpose |
 |----------|---------|
-| `.claude/team-context/plan.md` | **Navigation overhaul execution plan (4 phases, 10 steps)** |
-| `.claude/team-context/context.md` | **Shared context for agent delegation (entity cross-ref map, patterns)** |
-| `.claude/team-context/mission-log.md` | **Chain execution log with commits and status** |
-| `docs/IMPLEMENTATION_PLAN.md` | Sequenced 7-phase plan with all work packages |
+| `docs/IMPLEMENTATION_PLAN.md` | Master plan — Phases A-G with all work packages |
 | `CLAUDE.md` | Codebase conventions (always read first) |
+| `.claude/agents/e2e-test-engineer.md` | Playwright E2E test agent definition |
+| `.claude/agents/browser-simulator.md` | Browser user simulation agent definition |
+| `playwright.config.ts` | E2E test configuration (chromium + mobile-chrome) |
+
+## Available Agents
+
+| Agent | Use For |
+|-------|---------|
+| `e2e-test-engineer` | Writing Playwright browser tests for user workflow validation |
+| `browser-simulator` | Headless browser navigation, screenshots, visual verification |
+| `frontend-engineer--realmweaver` | All Realmweaver implementation tasks |
+| `test-engineer` | Unit/integration tests with Vitest |
+| `code-reviewer` | Code quality, consistency, performance review |
+| `visualization-expert` | D3/React Flow graph work |
+| `subject-matter-expert--ttrpg` | TTRPG domain knowledge validation |
