@@ -10,6 +10,8 @@ interface HeaderProps {
   onToggleMockMode: () => void;
   onToggleCoach: () => void;
   onToggleWizard: () => void;
+  onToggleContinuityChecker: () => void;
+  continuityIssueCount?: number;
   onSaveCampaign: () => void;
   onSwitchCampaign: () => void;
   onCreateNew: () => void;
@@ -20,12 +22,14 @@ interface HeaderProps {
   lastSavedAt?: string | null;
 }
 
-export const Header: React.FC<HeaderProps> = ({ 
-  activeCampaign, 
-  isMockMode, 
-  onToggleMockMode, 
-  onToggleCoach, 
-  onToggleWizard, 
+export const Header: React.FC<HeaderProps> = ({
+  activeCampaign,
+  isMockMode,
+  onToggleMockMode,
+  onToggleCoach,
+  onToggleWizard,
+  onToggleContinuityChecker,
+  continuityIssueCount = 0,
   onSaveCampaign,
   onSwitchCampaign,
   onCreateNew,
@@ -144,6 +148,21 @@ export const Header: React.FC<HeaderProps> = ({
 
           <div className="hidden sm:block h-6 w-px bg-slate-700"></div>
 
+          {/* Continuity Checker */}
+          <button
+            onClick={onToggleContinuityChecker}
+            className="relative flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-indigo-500 rounded-md p-1 sm:-m-1"
+            aria-label="Check campaign continuity"
+            title="Check Continuity"
+          >
+            <Icons.Factions className="w-5 h-5 text-indigo-400" />
+            <span className="hidden lg:inline">Continuity</span>
+            {continuityIssueCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[1.1rem] h-[1.1rem] flex items-center justify-center rounded-full bg-red-600 text-white text-[10px] font-bold leading-none px-0.5">
+                {continuityIssueCount > 99 ? '99+' : continuityIssueCount}
+              </span>
+            )}
+          </button>
           <button
             onClick={onToggleWizard}
             className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-indigo-500 rounded-md p-1 sm:-m-1"
