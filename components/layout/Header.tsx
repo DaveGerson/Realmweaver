@@ -4,6 +4,7 @@ import { Icons } from '../common/Icons';
 import type { Campaign } from '../../types/index';
 import type { SaveStatus } from '../../services/campaignService';
 import { getModifierSymbol } from '../../utils/keyboardShortcuts';
+import { isFeatureVisible } from '../../utils/dmStyleUtils';
 
 interface HeaderProps {
   activeCampaign: Campaign | null;
@@ -81,6 +82,11 @@ export const Header: React.FC<HeaderProps> = ({
   if (!activeCampaign) {
     return null; // Don't render header if no campaign is active
   }
+
+  const dmStyle = activeCampaign.dmStyle ?? 'standard';
+  const featureOverrides = activeCampaign.featureOverrides ?? {};
+  const showContinuityChecker = isFeatureVisible('continuity-checker', dmStyle, featureOverrides);
+  const showKeyboardShortcuts = isFeatureVisible('keyboard-shortcuts', dmStyle, featureOverrides);
 
   return (
     <>
@@ -170,6 +176,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="hidden sm:block h-6 w-px bg-slate-700"></div>
 
           {/* Continuity Checker */}
+          {showContinuityChecker && (
           <button
             onClick={onToggleContinuityChecker}
             className="relative flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-indigo-500 rounded-md p-1 sm:-m-1"
@@ -184,6 +191,7 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             )}
           </button>
+          )}
           <button
             onClick={onToggleWizard}
             className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-indigo-500 rounded-md p-1 sm:-m-1"
@@ -201,7 +209,7 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden lg:inline">Session Weaver</span>
           </button>
           {/* Keyboard Shortcuts Help */}
-          {onShowShortcutsHelp && (
+          {onShowShortcutsHelp && showKeyboardShortcuts && (
             <button
               onClick={onShowShortcutsHelp}
               className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-indigo-500 rounded-md p-1 sm:-m-1"

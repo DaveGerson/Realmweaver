@@ -890,8 +890,8 @@ const App: FC = () => {
 
                 {/* Sidebar Container */}
                 <div className={`
-                  fixed inset-y-0 left-0 z-50 w-72 bg-slate-900 border-r border-slate-800 transform transition-transform duration-200 ease-in-out
-                  md:relative md:translate-x-0
+                  fixed inset-y-0 left-0 z-50 w-72 bg-slate-900 border-r border-slate-800 transform transition-transform duration-200 ease-in-out flex-shrink-0
+                  md:relative md:translate-x-0 md:h-auto md:inset-y-auto
                   ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
                 `}>
                   <CampaignSidebar
@@ -926,6 +926,9 @@ const App: FC = () => {
                       setActiveGenerator(type);
                     }}
                     onReorderScene={campaignService.reorderScene}
+                    onSetDmStyle={campaignService.setDmStyle}
+                    onSetFeatureOverride={campaignService.setFeatureOverride}
+                    onClearFeatureOverride={campaignService.clearFeatureOverride}
                   />
                 </div>
 

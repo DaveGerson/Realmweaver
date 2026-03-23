@@ -11,7 +11,7 @@ interface ContentWrapperProps {
 export const ContentWrapper: React.FC<ContentWrapperProps> = ({ title, children, icon }) => {
     const Icon = icon ? Icons[icon] : null;
     return (
-        <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
+        <div className="p-4 md:p-6 lg:p-8 h-full overflow-y-auto custom-scrollbar space-y-6 md:space-y-8 animate-fade-in">
             <div className="flex items-center gap-3 text-amber-400">
                 {Icon && <Icon className="w-8 h-8" />}
                 <h1 className="text-3xl font-bold font-serif text-slate-100">{title}</h1>

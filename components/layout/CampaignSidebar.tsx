@@ -5,6 +5,8 @@ import { Icons, SceneIcon } from '../common/Icons';
 import type { EditorView, GeneratorType } from '../../App';
 import type { RecentItem, CommandPaletteEntityType } from '../common/CommandPalette';
 import { twMerge } from 'tailwind-merge';
+import { isFeatureVisible } from '../../utils/dmStyleUtils';
+import { DmStylePanel } from '../common/DmStylePanel';
 
 type SelectedIds = {
     adventure: string | null;
@@ -32,6 +34,9 @@ interface CampaignSidebarProps {
     pinnedEntities?: Array<{ type: string; id: string }>;
     onSelectPinned?: (type: string, id: string) => void;
     onUnpin?: (type: string, id: string) => void;
+    onSetDmStyle?: (style: import('../../types/index').DmStyle) => void;
+    onSetFeatureOverride?: (feature: string, visible: boolean) => void;
+    onClearFeatureOverride?: (feature: string) => void;
 }
 
 // Helper component for recursively rendering the article tree
@@ -144,6 +149,9 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
     pinnedEntities,
     onSelectPinned,
     onUnpin,
+    onSetDmStyle,
+    onSetFeatureOverride,
+    onClearFeatureOverride,
 }) => {
     const [expandedAdventures, setExpandedAdventures] = useState<Record<string, boolean>>({});
     const [expandedArticles, setExpandedArticles] = useState<Record<string, boolean>>({});
@@ -153,7 +161,15 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
     const [filterText, setFilterText] = useState('');
     const [debouncedFilter, setDebouncedFilter] = useState('');
     const [showAllRecent, setShowAllRecent] = useState(false);
+    const [showDmStylePanel, setShowDmStylePanel] = useState(false);
     const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Compute feature visibility from campaign's dmStyle + overrides
+    const dmStyle = campaign.dmStyle ?? 'standard';
+    const featureOverrides = campaign.featureOverrides ?? {};
+    const showRelationshipGraph = isFeatureVisible('relationship-graph', dmStyle, featureOverrides);
+    const showSecretsTracker = isFeatureVisible('secrets-tracker', dmStyle, featureOverrides);
+    const showCombatTracker = isFeatureVisible('combat-tracker', dmStyle, featureOverrides);
 
     const handleFilterChange = useCallback((value: string) => {
         setFilterText(value);
@@ -276,9 +292,29 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
 
     return (
         <aside className="w-full h-full bg-slate-900 flex-shrink-0 flex flex-col border-r border-slate-800">
-            <div className="p-4 border-b border-slate-800">
-                <h2 className="text-lg font-semibold font-serif truncate" title={campaign.title}>{campaign.title}</h2>
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between gap-2">
+                <h2 className="text-lg font-semibold font-serif truncate flex-1 min-w-0" title={campaign.title}>{campaign.title}</h2>
+                {(onSetDmStyle || onSetFeatureOverride) && (
+                    <button
+                        onClick={() => setShowDmStylePanel(true)}
+                        className="flex-shrink-0 p-1.5 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded-md transition-colors"
+                        title={`DM Style: ${dmStyle}`}
+                        aria-label="DM Style settings"
+                    >
+                        <Icons.Sliders className="w-4 h-4" />
+                    </button>
+                )}
             </div>
+            {showDmStylePanel && onSetDmStyle && onSetFeatureOverride && onClearFeatureOverride && (
+                <DmStylePanel
+                    dmStyle={dmStyle}
+                    featureOverrides={featureOverrides}
+                    onSetDmStyle={onSetDmStyle}
+                    onSetFeatureOverride={onSetFeatureOverride}
+                    onClearFeatureOverride={onClearFeatureOverride}
+                    onClose={() => setShowDmStylePanel(false)}
+                />
+            )}
             <nav className="flex-1 p-2 space-y-1 overflow-y-auto custom-scrollbar">
                 
                 {/* --- Active Session Runner Banner --- */}
@@ -442,7 +478,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                             <button
                             onClick={() => onSelectView('player-characters')}
                             className={twMerge(
-                                'flex items-center gap-3 text-sm transition-colors w-full',
+                                'flex items-center gap-3 text-sm transition-colors w-full min-h-[44px] md:min-h-0',
                                 activeView === 'player-characters' ? 'text-amber-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
                             )}
                             >
@@ -471,7 +507,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                     </div>
                     )}
 
-                    {!debouncedFilter && (
+                    {!debouncedFilter && showCombatTracker && (
                     <NavItem
                         label="Combat Tracker"
                         icon="Combat"
@@ -486,7 +522,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                             <button
                             onClick={() => onSelectView('plots')}
                             className={twMerge(
-                                'flex items-center gap-3 text-sm transition-colors w-full',
+                                'flex items-center gap-3 text-sm transition-colors w-full min-h-[44px] md:min-h-0',
                                 activeView === 'plots' ? 'text-amber-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
                             )}
                             >
@@ -516,7 +552,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                     </div>
                     )}
 
-                    {!debouncedFilter && (
+                    {!debouncedFilter && showRelationshipGraph && (
                     <NavItem
                         label="World Graph"
                         icon="Coach"
@@ -525,7 +561,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                     />
                     )}
 
-                    {!debouncedFilter && (
+                    {!debouncedFilter && showSecretsTracker && (
                     <NavItem
                         label="Secrets & Clues"
                         icon="Lock"
@@ -543,11 +579,11 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
 
                     {/* Adventures */}
                     <div className="space-y-1">
-                        <div className="flex items-center justify-between px-3 py-2 group">
+                        <div className="flex items-center justify-between px-3 py-1.5 group">
                             <button
                             onClick={() => onSelectView('adventures')}
                             className={twMerge(
-                                'flex items-center gap-3 text-sm transition-colors w-full',
+                                'flex items-center gap-3 text-sm transition-colors w-full min-h-[44px] md:min-h-0',
                                 activeView === 'adventures' ? 'text-amber-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
                             )}
                             >
@@ -631,7 +667,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                             <button
                                 onClick={() => onSelectView('lorebook')}
                                 className={twMerge(
-                                    'flex items-center gap-3 text-sm transition-colors w-full',
+                                    'flex items-center gap-3 text-sm transition-colors w-full min-h-[44px] md:min-h-0',
                                     activeView === 'lorebook' ? 'text-amber-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
                                 )}
                             >
@@ -684,7 +720,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                                     <button
                                         onClick={() => { onSelectView(group.view); toggleView(group.view); }}
                                         className={twMerge(
-                                            'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors',
+                                            'w-full flex items-center gap-3 px-3 py-2 min-h-[44px] md:min-h-0 text-sm rounded-md transition-colors',
                                             activeView === group.view ? 'bg-amber-600/20 text-amber-300' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
                                         )}
                                     >
@@ -728,7 +764,7 @@ const NavHeader = ({ label }: { label: string }) => <h3 className="px-3 pt-4 pb-
 const NavItem = ({ icon, label, active, onClick }: { icon: keyof typeof Icons, label: string, active: boolean, onClick: () => void }) => {
   const Icon = Icons[icon];
   return (
-    <button onClick={onClick} className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${active ? 'bg-amber-600/20 text-amber-300' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}>
+    <button onClick={onClick} className={`w-full flex items-center gap-3 px-3 py-2 min-h-[44px] md:min-h-0 md:py-2 text-sm rounded-md transition-colors ${active ? 'bg-amber-600/20 text-amber-300' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}>
       <Icon className="w-4 h-4" /> <span>{label}</span>
     </button>
   );

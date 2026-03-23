@@ -15,6 +15,7 @@ import { MentionInput } from '../common/MentionInput';
 import { EntityLink } from '../common/EntityLink';
 import { LinkedText } from '../common/LinkedText';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
+import { isFeatureVisible } from '../../utils/dmStyleUtils';
 
 // Browser speech recognition API types
 declare global {
@@ -79,6 +80,12 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
     onOpenCoach,
     onNavigate,
 }) => {
+    // Derive feature visibility from campaign's DM style settings
+    const _dmStyle = campaign.dmStyle ?? 'standard';
+    const _featureOverrides = campaign.featureOverrides ?? {};
+    const canShowCombatTracker = isFeatureVisible('combat-tracker', _dmStyle, _featureOverrides);
+    const canShowSecretsTracker = isFeatureVisible('secrets-tracker', _dmStyle, _featureOverrides);
+
     const [noteInput, setNoteInput] = useState('');
     const [noteTags, setNoteTags] = useState<string[]>([]);
     const [noteMentionedEntityIds, setNoteMentionedEntityIds] = useState<string[]>([]);
@@ -416,6 +423,12 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
         setIsRecording(true);
     }, [isRecording, hasSpeechRecognition]);
 
+    // Mobile tab state for SessionRunner
+    const [mobileTab, setMobileTab] = useState<'scenes' | 'active' | 'tools'>('active');
+
+    // Floating Action Button state (mobile only)
+    const [fabOpen, setFabOpen] = useState(false);
+
     // Add a beat to the current session
     const handleAddBeat = useCallback(() => {
         const title = beatInput.trim();
@@ -459,40 +472,67 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
     };
 
     return (
-        <div className="flex flex-col h-full bg-slate-950">
+        <div className="flex flex-col h-full bg-slate-950 relative">
             {/* Session Header */}
-            <div className="flex items-center justify-between px-6 py-3 bg-slate-900 border-b border-slate-700">
-                <div className="flex items-center gap-3">
-                    <Icons.Live className="w-5 h-5 text-red-400 animate-pulse" />
-                    <h1 className="text-lg font-bold text-white font-serif">{sessionLog.title}</h1>
+            <div className="flex items-center justify-between px-3 md:px-6 py-2 md:py-3 bg-slate-900 border-b border-slate-700 flex-shrink-0">
+                <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                    <Icons.Live className="w-4 h-4 md:w-5 md:h-5 text-red-400 animate-pulse flex-shrink-0" />
+                    <h1 className="text-base md:text-lg font-bold text-white font-serif truncate">{sessionLog.title}</h1>
                     {adventure && (
-                        <span className="text-sm text-slate-400">
+                        <span className="hidden sm:inline text-sm text-slate-400 truncate">
                             — {adventure.title}
                         </span>
                     )}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 md:gap-2 flex-shrink-0">
                     <button
                         onClick={onOpenCoach}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm transition-colors"
+                        className="hidden md:flex items-center gap-2 px-3 py-1.5 min-h-[36px] rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm transition-colors"
                     >
                         <Icons.Coach className="w-4 h-4" />
                         DM Coach
                     </button>
                     <button
                         onClick={handleEndSession}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm transition-colors"
+                        className="flex items-center gap-1.5 px-2 md:px-3 py-1.5 min-h-[36px] rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm transition-colors"
                     >
                         <Icons.Stop className="w-4 h-4" />
-                        End Session
+                        <span className="hidden sm:inline">End Session</span>
                     </button>
                 </div>
+            </div>
+
+            {/* Mobile Tab Bar — visible only below md */}
+            <div className="md:hidden flex-shrink-0 flex border-b border-slate-800 bg-slate-900">
+                {([
+                    { id: 'scenes' as const, label: 'Scenes', icon: <Icons.Scenes className="w-4 h-4" /> },
+                    { id: 'active' as const, label: 'Active', icon: <Icons.Play className="w-4 h-4" /> },
+                    { id: 'tools' as const, label: 'Tools', icon: <Icons.Sparkles className="w-4 h-4" /> },
+                ] as const).map(tab => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setMobileTab(tab.id)}
+                        className={twMerge(
+                            'flex-1 flex flex-col items-center gap-0.5 py-2 text-xs font-medium transition-colors min-h-[44px]',
+                            mobileTab === tab.id
+                                ? 'text-amber-400 border-b-2 border-amber-400'
+                                : 'text-slate-400 hover:text-slate-200'
+                        )}
+                    >
+                        {tab.icon}
+                        {tab.label}
+                    </button>
+                ))}
             </div>
 
             {/* Main 3-Column Layout */}
             <div className="flex-1 flex overflow-hidden">
                 {/* Left: Scene List + Beats */}
-                <div className="w-56 flex-shrink-0 bg-slate-900 border-r border-slate-800 overflow-y-auto p-3">
+                <div className={twMerge(
+                    "flex-shrink-0 bg-slate-900 border-r border-slate-800 overflow-y-auto p-3",
+                    "w-full md:w-56",
+                    mobileTab === 'scenes' ? "flex flex-col md:flex" : "hidden md:flex md:flex-col"
+                )}>
                     <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Scenes</h2>
                     <div className="space-y-1">
                         {plannedScenes.map((scene) => {
@@ -515,7 +555,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                                     <button
                                         onClick={() => handleSelectScene(scene.id)}
                                         className={twMerge(
-                                            "flex-1 flex items-start gap-2 px-2 py-2 text-left min-w-0",
+                                            "flex-1 flex items-start gap-2 px-2 py-2 min-h-[44px] text-left min-w-0",
                                             isActive
                                                 ? "text-amber-200"
                                                 : scene.status === 'completed'
@@ -631,7 +671,10 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                 </div>
 
                 {/* Center: Active Scene Panel */}
-                <div className="flex-1 overflow-y-auto p-6">
+                <div className={twMerge(
+                    "flex-1 overflow-y-auto p-4 md:p-6",
+                    mobileTab === 'active' ? "flex flex-col md:block" : "hidden md:block"
+                )}>
                     {activeScene ? (
                         <div className="max-w-3xl mx-auto space-y-6">
                             {/* Previously... Recap Banner */}
@@ -655,18 +698,18 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                             )}
 
                             {/* Scene Title */}
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-wrap">
                                     <SceneIcon type={activeScene.type} />
-                                    <h2 className="text-2xl font-bold text-white font-serif">{activeScene.title}</h2>
+                                    <h2 className="text-xl md:text-2xl font-bold text-white font-serif">{activeScene.title}</h2>
                                     <span className="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 uppercase">{activeScene.type}</span>
                                 </div>
                                 <button
                                     onClick={handleAdvanceScene}
-                                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm transition-colors"
+                                    className="flex-shrink-0 flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-2 min-h-[44px] rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm transition-colors"
                                 >
                                     <Icons.SkipForward className="w-4 h-4" />
-                                    Next Scene
+                                    <span className="hidden sm:inline">Next Scene</span>
                                 </button>
                             </div>
 
@@ -844,7 +887,11 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                 </div>
 
                 {/* Right: Quick Tools Panel */}
-                <div className="w-64 flex-shrink-0 bg-slate-900 border-l border-slate-800 flex flex-col overflow-y-auto">
+                <div className={twMerge(
+                    "flex-shrink-0 bg-slate-900 border-l border-slate-800 flex flex-col overflow-y-auto",
+                    "w-full md:w-64",
+                    mobileTab === 'tools' ? "flex md:flex" : "hidden md:flex"
+                )}>
                     <div className="p-3 border-b border-slate-800">
                         <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Quick Tools</h2>
                     </div>
@@ -852,21 +899,23 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                     <div className="p-3 space-y-2">
                         <button
                             onClick={onOpenCoach}
-                            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm transition-colors"
+                            className="w-full flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm transition-colors"
                         >
                             <Icons.Coach className="w-4 h-4 text-indigo-400" />
                             DM Coach
                         </button>
+                        {canShowCombatTracker && (
                         <button
-                            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm transition-colors"
+                            className="w-full flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm transition-colors"
                             onClick={handleOpenCombat}
                         >
                             <Icons.Combat className="w-4 h-4 text-red-400" />
                             Combat Tracker
                         </button>
+                        )}
                         <button
                             onClick={() => setShowDiceRoller(p => !p)}
-                            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm transition-colors"
+                            className="w-full flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm transition-colors"
                         >
                             <Icons.Dice className="w-4 h-4 text-amber-400" />
                             Dice Roller
@@ -878,7 +927,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                         <button
                             onClick={() => setShowQuickNpc(!showQuickNpc)}
                             className={twMerge(
-                                "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
+                                "w-full flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-lg text-sm transition-colors",
                                 showQuickNpc
                                     ? "bg-emerald-900/40 text-emerald-300 border border-emerald-700/50"
                                     : "bg-slate-800 hover:bg-slate-700 text-slate-200"
@@ -887,10 +936,11 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                             <Icons.UserPlus className="w-4 h-4 text-emerald-400" />
                             Quick NPC
                         </button>
+                        {canShowSecretsTracker && (
                         <button
                             onClick={() => setShowSecrets(prev => !prev)}
                             className={twMerge(
-                                "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
+                                "w-full flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-lg text-sm transition-colors",
                                 showSecrets
                                     ? "bg-amber-900/30 text-amber-300 border border-amber-700/50"
                                     : "bg-slate-800 hover:bg-slate-700 text-slate-200"
@@ -900,6 +950,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                             Secrets & Clues
                             <Icons.ChevronDown className={twMerge("w-3 h-3 ml-auto text-slate-500 transition-transform", showSecrets && "rotate-180")} />
                         </button>
+                        )}
                     </div>
 
                     {/* Quick NPC Inline Form */}
@@ -1026,7 +1077,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                     )}
 
                     {/* Secrets & Clues Panel */}
-                    {showSecrets && (
+                    {canShowSecretsTracker && showSecrets && (
                         <div className="border-t border-slate-800 flex-shrink-0" style={{ maxHeight: '400px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                             <SecretsTracker
                                 campaign={campaign}
@@ -1079,8 +1130,12 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                 </div>
             </div>
 
-            {/* Bottom: Running Log */}
-            <div className="h-48 md:h-56 flex-shrink-0 bg-slate-900 border-t border-slate-700 flex flex-col">
+            {/* Bottom: Running Log — hidden on mobile tools/scenes tab to maximize screen space */}
+            <div className={twMerge(
+                "flex-shrink-0 bg-slate-900 border-t border-slate-700 flex flex-col",
+                "h-44 md:h-56",
+                mobileTab === 'tools' || mobileTab === 'scenes' ? "hidden md:flex" : "flex"
+            )}>
                 <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800">
                     <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Running Log</h2>
                     <div className="flex items-center gap-3">
@@ -1207,6 +1262,70 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                 </div>
             </div>
 
+            {/* Floating Action Button — mobile only, visible on scenes/active tabs */}
+            {mobileTab !== 'tools' && (
+                <>
+                {fabOpen && (
+                    <div
+                        className="fixed inset-0 z-20 md:hidden"
+                        onClick={() => setFabOpen(false)}
+                    />
+                )}
+                <div className="fixed bottom-4 right-4 md:hidden z-30">
+                    {/* FAB menu */}
+                    {fabOpen && (
+                        <div className="absolute bottom-16 right-0 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-2 space-y-1 min-w-[180px]">
+                            <button
+                                onClick={() => { onOpenCoach(); setFabOpen(false); }}
+                                className="w-full flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-lg text-sm text-slate-200 hover:bg-slate-700 transition-colors"
+                            >
+                                <Icons.Coach className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                                DM Coach
+                            </button>
+                            <button
+                                onClick={() => { setShowDiceRoller(true); setMobileTab('tools'); setFabOpen(false); }}
+                                className="w-full flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-lg text-sm text-slate-200 hover:bg-slate-700 transition-colors"
+                            >
+                                <Icons.Dice className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                                Dice Roller
+                            </button>
+                            {canShowCombatTracker && (
+                            <button
+                                onClick={() => { handleOpenCombat(); setMobileTab('tools'); setFabOpen(false); }}
+                                className="w-full flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-lg text-sm text-slate-200 hover:bg-slate-700 transition-colors"
+                            >
+                                <Icons.Combat className="w-4 h-4 text-red-400 flex-shrink-0" />
+                                Combat Tracker
+                            </button>
+                            )}
+                            {canShowSecretsTracker && (
+                            <button
+                                onClick={() => { setShowSecrets(true); setMobileTab('tools'); setFabOpen(false); }}
+                                className="w-full flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-lg text-sm text-slate-200 hover:bg-slate-700 transition-colors"
+                            >
+                                <Icons.Lock className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                                Secrets & Clues
+                            </button>
+                            )}
+                        </div>
+                    )}
+                    {/* FAB button */}
+                    <button
+                        onClick={() => setFabOpen(p => !p)}
+                        className={twMerge(
+                            "w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-colors",
+                            fabOpen
+                                ? "bg-amber-500 text-white"
+                                : "bg-amber-600 hover:bg-amber-500 text-white"
+                        )}
+                        aria-label="Quick tools"
+                    >
+                        <Icons.Sparkles className={twMerge("w-6 h-6 transition-transform", fabOpen && "rotate-45")} />
+                    </button>
+                </div>
+                </>
+            )}
+
             {/* Session End Wizard */}
             {showEndWizard && (
                 <SessionEndWizard
@@ -1219,7 +1338,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
             )}
 
             {/* Combat Tracker Slide-out Panel */}
-            {showCombatPanel && (
+            {canShowCombatTracker && showCombatPanel && (
                 <>
                     {/* Backdrop */}
                     <div
