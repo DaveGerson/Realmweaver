@@ -624,7 +624,7 @@ const App: FC = () => {
       );
 
       if (selectedPlot) return <PlotEditor plot={selectedPlot} onUpdate={campaignService.updatePlot} onDelete={(id) => { campaignService.deletePlot(id); resetSelections(); }} isMockMode={isMockMode} onNavigate={handleEntityNavigate} />;
-      if (selectedScene && selectedAdventure) return <SceneEditor scene={selectedScene} allNpcs={activeCampaign.npcs} allLocations={activeCampaign.locations} onUpdate={(id, data) => campaignService.updateScene(selectedAdventure.id, id, data)} onDelete={(id) => { campaignService.deleteScene(selectedAdventure.id, id); setSelectedSceneId(null); }} isMockMode={isMockMode} isActiveScene={activeCampaign.activeSceneId === selectedScene.id} onSetActive={campaignService.setActiveScene} onNavigate={handleEntityNavigate} />;
+      if (selectedScene && selectedAdventure) return <SceneEditor scene={selectedScene} allNpcs={activeCampaign.npcs} allLocations={activeCampaign.locations} campaign={activeCampaign} onUpdate={(id, data) => campaignService.updateScene(selectedAdventure.id, id, data)} onDelete={(id) => { campaignService.deleteScene(selectedAdventure.id, id); setSelectedSceneId(null); }} isMockMode={isMockMode} isActiveScene={activeCampaign.activeSceneId === selectedScene.id} onSetActive={campaignService.setActiveScene} onNavigate={handleEntityNavigate} />;
       if (selectedAdventure) return <AdventureEditor adventure={selectedAdventure} campaign={activeCampaign} onUpdate={campaignService.updateAdventure} onNavigate={handleEntityNavigate} />;
 
       if (selectedArticle) return (
@@ -843,6 +843,9 @@ const App: FC = () => {
                     onSelect={handleSelect}
                     recentItems={recentItems}
                     onSelectRecent={(type, id) => handleSelect(type as Parameters<typeof handleSelect>[0], id)}
+                    pinnedEntities={activeCampaign?.pinnedEntities}
+                    onSelectPinned={(type, id) => handleSelect(type as Parameters<typeof handleSelect>[0], id)}
+                    onUnpin={(type, id) => campaignService.unpinEntity(type, id)}
                     onShowGenerator={(type) => {
                       if (type === 'scene') {
                         if (!selectedAdventureId) {

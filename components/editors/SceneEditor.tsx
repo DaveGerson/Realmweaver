@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import type { Scene, SceneType, NPC, Location, SkillCheck } from '../../types/index';
+import type { Campaign } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
@@ -11,11 +12,13 @@ import { EntityLink } from '../common/EntityLink';
 import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
+import { SceneResourcesPanel } from '../common/SceneResourcesPanel';
 
 interface SceneEditorProps {
   scene: Scene;
   allNpcs: NPC[];
   allLocations: Location[];
+  campaign?: Campaign;
   onUpdate: (id: string, updatedData: Partial<Scene>) => void;
   onDelete: (id: string) => void;
   isMockMode: boolean;
@@ -27,7 +30,7 @@ interface SceneEditorProps {
 
 const sceneTypeOptions: SceneType[] = ['combat', 'social', 'exploration', 'puzzle'];
 
-export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLocations, onUpdate, onDelete, isMockMode, campaignContext, isActiveScene, onSetActive, onNavigate }) => {
+export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLocations, campaign, onUpdate, onDelete, isMockMode, campaignContext, isActiveScene, onSetActive, onNavigate }) => {
   const [formData, setFormData] = useState(scene);
   const [isGenerating, setIsGenerating] = useState<keyof Omit<Scene, 'id' | 'type' | 'locationId' | 'npcIds' | 'skillChecks'> | null>(null);
   const [isGeneratingNpc, setIsGeneratingNpc] = useState(false);
@@ -348,6 +351,16 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
                 )) : <p className="text-xs text-slate-500 italic">No NPCs exist in this campaign yet.</p>}
             </div>
         </div>
+
+        {/* Scene Resources Panel — inline reference for linked NPCs and location */}
+        {campaign && (
+          <SceneResourcesPanel
+            npcIds={formData.npcIds}
+            locationId={formData.locationId}
+            campaign={campaign}
+            onNavigate={onNavigate}
+          />
+        )}
       </div>
     </div>
   );
