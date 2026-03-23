@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo, useCallback } from 'react';
-import type { Campaign, Scene, SessionLog, NPC, Combatant, CombatantType, Encounter, PlotSessionStatus, DiceRoll } from '../../types';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import type { Campaign, Scene, SessionLog, NPC, Combatant, CombatantType, Encounter, PlotSessionStatus, DiceRoll, Beat } from '../../types';
 import { Icons, SceneIcon } from '../common/Icons';
 import { twMerge } from 'tailwind-merge';
 import { campaignService } from '../../services/campaignService';
@@ -15,6 +15,14 @@ import { MentionInput } from '../common/MentionInput';
 import { EntityLink } from '../common/EntityLink';
 import { LinkedText } from '../common/LinkedText';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
+
+// Browser speech recognition API types
+declare global {
+    interface Window {
+        SpeechRecognition: new () => SpeechRecognition;
+        webkitSpeechRecognition: new () => SpeechRecognition;
+    }
+}
 
 /** Try to extract HP from a freeform NPC stats string. Returns null if not found. */
 const parseHpFromStats = (stats: string | undefined): number | null => {
@@ -96,6 +104,25 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
 
     // Skill check roll results state
     const [skillCheckRolls, setSkillCheckRolls] = useState<Record<number, { total: number; passed: boolean }>>({});
+
+    // Voice capture state
+    const recognitionRef = useRef<SpeechRecognition | null>(null);
+    const [isRecording, setIsRecording] = useState(false);
+    const hasSpeechRecognition = typeof window !== 'undefined' &&
+        (!!window.SpeechRecognition || !!window.webkitSpeechRecognition);
+
+    // Beat input state
+    const [beatInput, setBeatInput] = useState('');
+
+    // Stop speech recognition on unmount
+    useEffect(() => {
+        return () => {
+            if (recognitionRef.current) {
+                recognitionRef.current.abort();
+                recognitionRef.current = null;
+            }
+        };
+    }, []);
 
     // Plot session status tracking (persisted on sessionLog)
     const plotSessionStatus = sessionLog.plotProgressions || {};
@@ -255,6 +282,10 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
             campaignService.updateScene(adventure.id, activeScene.id, { npcIds: updatedNpcIds });
         }
 
+        // Auto-log NPC creation to running log
+        const savedName = npcEditMode ? npcEditData.name : npcPreview.name;
+        campaignService.addAutoEvent('npc-created', `NPC created: ${savedName}`);
+
         setNpcPreview(null);
         setNpcEditMode(false);
         setNpcPrompt('');
@@ -295,6 +326,69 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
             'unchanged';
         campaignService.updatePlotProgression(plotId, next);
     }, [plotSessionStatus]);
+
+    // End combat: archive encounter to session log and auto-log event
+    const handleEndCombat = useCallback(() => {
+        const encounter = campaign.activeEncounter;
+        if (!encounter) return;
+        const combatantCount = encounter.combatants.length;
+        const rounds = encounter.round;
+        campaignService.addAutoEvent(
+            'combat',
+            `Combat ended. ${combatantCount} combatant${combatantCount !== 1 ? 's' : ''}, ${rounds} round${rounds !== 1 ? 's' : ''}.`
+        );
+        // Archive the encounter
+        campaignService.updateEncounter({ ...encounter, combatants: [], round: 1, turnIndex: 0 });
+        setShowCombatPanel(false);
+    }, [campaign.activeEncounter]);
+
+    // Voice capture toggle
+    const handleToggleMic = useCallback(() => {
+        if (!hasSpeechRecognition) return;
+
+        if (isRecording) {
+            recognitionRef.current?.stop();
+            setIsRecording(false);
+            return;
+        }
+
+        const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognitionCtor();
+        recognition.continuous = true;
+        recognition.interimResults = false;
+        recognition.lang = 'en-US';
+
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                if (event.results[i].isFinal) {
+                    const transcript = event.results[i][0].transcript;
+                    setNoteInput(prev => (prev ? prev + ' ' : '') + transcript.trim());
+                }
+            }
+        };
+
+        recognition.onerror = () => {
+            setIsRecording(false);
+            recognitionRef.current = null;
+        };
+
+        recognition.onend = () => {
+            setIsRecording(false);
+            recognitionRef.current = null;
+        };
+
+        recognitionRef.current = recognition;
+        recognition.start();
+        setIsRecording(true);
+    }, [isRecording, hasSpeechRecognition]);
+
+    // Add a beat to the current session
+    const handleAddBeat = useCallback(() => {
+        const title = beatInput.trim();
+        if (!title) return;
+        campaignService.addBeat(title);
+        setBeatInput('');
+    }, [beatInput]);
 
     const sceneStatusIcon = (scene: Scene) => {
         switch (scene.status) {
@@ -363,7 +457,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
 
             {/* Main 3-Column Layout */}
             <div className="flex-1 flex overflow-hidden">
-                {/* Left: Scene List */}
+                {/* Left: Scene List + Beats */}
                 <div className="w-56 flex-shrink-0 bg-slate-900 border-r border-slate-800 overflow-y-auto p-3">
                     <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Scenes</h2>
                     <div className="space-y-1">
@@ -439,6 +533,67 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                             <p className="text-xs text-slate-400 leading-relaxed">{previousSession.recap.substring(0, 300)}{previousSession.recap.length > 300 ? '...' : ''}</p>
                         </div>
                     )}
+
+                    {/* Beats Section */}
+                    <div className="mt-6">
+                        <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Beats</h2>
+                        <div className="space-y-1">
+                            {(sessionLog.beats || []).map((beat: Beat) => (
+                                <div
+                                    key={beat.id}
+                                    className="flex items-start gap-2 group rounded-md px-1 py-1 hover:bg-slate-800/50"
+                                >
+                                    <button
+                                        onClick={() => campaignService.toggleBeatComplete(beat.id)}
+                                        className="flex-shrink-0 mt-0.5 text-slate-400 hover:text-amber-400 transition-colors"
+                                        title={beat.isCompleted ? 'Mark incomplete' : 'Mark complete'}
+                                    >
+                                        {beat.isCompleted
+                                            ? <Icons.CheckCircle className="w-4 h-4 text-green-400" />
+                                            : <div className="w-4 h-4 rounded border border-slate-600 hover:border-amber-500" />
+                                        }
+                                    </button>
+                                    <span className={twMerge(
+                                        "flex-1 text-xs leading-snug",
+                                        beat.isCompleted ? "line-through text-slate-600" : "text-slate-300"
+                                    )}>
+                                        {beat.title}
+                                        {beat.notes && (
+                                            <span className="block text-slate-500 not-italic mt-0.5">{beat.notes}</span>
+                                        )}
+                                    </span>
+                                    <button
+                                        onClick={() => campaignService.deleteBeat(beat.id)}
+                                        className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-slate-600 hover:text-red-400"
+                                        title="Delete beat"
+                                    >
+                                        <Icons.X className="w-3 h-3" />
+                                    </button>
+                                </div>
+                            ))}
+                            {(sessionLog.beats || []).length === 0 && (
+                                <p className="text-xs text-slate-600 italic px-1">No beats yet</p>
+                            )}
+                        </div>
+                        <div className="flex gap-1 mt-2">
+                            <input
+                                type="text"
+                                value={beatInput}
+                                onChange={(e) => setBeatInput(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') handleAddBeat(); }}
+                                placeholder="Add a beat..."
+                                className="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded-md px-2 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                            />
+                            <button
+                                onClick={handleAddBeat}
+                                disabled={!beatInput.trim()}
+                                className="flex-shrink-0 p-1 rounded-md bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-slate-300 transition-colors"
+                                title="Add beat"
+                            >
+                                <Icons.Plus className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Center: Active Scene Panel */}
@@ -955,6 +1110,26 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                             textareaClassName="bg-slate-800 border-slate-700 placeholder-slate-500 focus:border-amber-500 focus:ring-amber-500/30 py-1.5"
                             aria-label="Session note input"
                         />
+                        {hasSpeechRecognition && (
+                            <button
+                                onClick={handleToggleMic}
+                                title={isRecording ? 'Stop recording' : 'Start voice capture'}
+                                className={twMerge(
+                                    "flex-shrink-0 flex items-center justify-center w-9 rounded-lg transition-colors",
+                                    isRecording
+                                        ? "bg-red-600 hover:bg-red-500 text-white"
+                                        : "bg-slate-700 hover:bg-slate-600 text-slate-300"
+                                )}
+                            >
+                                {isRecording
+                                    ? <span className="relative flex items-center justify-center w-full h-full">
+                                        <Icons.MicOff className="w-4 h-4" />
+                                        <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                                    </span>
+                                    : <Icons.Mic className="w-4 h-4" />
+                                }
+                            </button>
+                        )}
                         <button
                             onClick={handleAddNote}
                             disabled={!noteInput.trim()}
@@ -992,12 +1167,24 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                                 <Icons.Combat className="w-5 h-5 text-red-400" />
                                 <h2 className="text-lg font-bold text-white font-serif">Combat Tracker</h2>
                             </div>
-                            <button
-                                onClick={() => setShowCombatPanel(false)}
-                                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
-                            >
-                                <Icons.X className="w-5 h-5" />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                {campaign.activeEncounter && campaign.activeEncounter.combatants.length > 0 && (
+                                    <button
+                                        onClick={handleEndCombat}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-600 text-white text-sm transition-colors"
+                                        title="End combat and log summary"
+                                    >
+                                        <Icons.Stop className="w-4 h-4" />
+                                        End Combat
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => setShowCombatPanel(false)}
+                                    className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                                >
+                                    <Icons.X className="w-5 h-5" />
+                                </button>
+                            </div>
                         </div>
                         <div className="flex-1 overflow-hidden">
                             {campaign.activeEncounter && (

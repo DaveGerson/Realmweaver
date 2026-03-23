@@ -21,7 +21,8 @@ import type {
     Note,
     DiceRoll,
     PlotSessionStatus,
-    Secret
+    Secret,
+    Beat
 } from '../types/index';
 import { importCampaignFromJson } from './importExportService';
 import { parseCharacterSheetPdf } from './geminiService';
@@ -1744,6 +1745,53 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 if (!session || !session.structuredNotes) return;
                 const note = session.structuredNotes.find(n => n.id === noteId);
                 if (note) note.isImportant = !note.isImportant;
+            });
+        },
+
+        // --- Beat Methods ---
+
+        addBeat(title: string, notes?: string): string {
+            const beatId = crypto.randomUUID();
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign || !campaign.activeSessionId) return;
+                const session = campaign.sessionLogs?.find(s => s.id === campaign.activeSessionId);
+                if (!session) return;
+                if (!session.beats) session.beats = [];
+                session.beats.push({ id: beatId, title, notes, isCompleted: false });
+            });
+            return beatId;
+        },
+
+        updateBeat(id: string, updates: Partial<Beat>): void {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign || !campaign.activeSessionId) return;
+                const session = campaign.sessionLogs?.find(s => s.id === campaign.activeSessionId);
+                if (!session?.beats) return;
+                const beat = session.beats.find(b => b.id === id);
+                if (beat) Object.assign(beat, updates);
+            });
+        },
+
+        deleteBeat(id: string): void {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign || !campaign.activeSessionId) return;
+                const session = campaign.sessionLogs?.find(s => s.id === campaign.activeSessionId);
+                if (!session?.beats) return;
+                session.beats = session.beats.filter(b => b.id !== id);
+            });
+        },
+
+        toggleBeatComplete(id: string): void {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign || !campaign.activeSessionId) return;
+                const session = campaign.sessionLogs?.find(s => s.id === campaign.activeSessionId);
+                if (!session?.beats) return;
+                const beat = session.beats.find(b => b.id === id);
+                if (beat) beat.isCompleted = !beat.isCompleted;
             });
         },
 

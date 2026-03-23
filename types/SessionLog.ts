@@ -3,6 +3,13 @@
 import type { Encounter } from './Encounter';
 import type { DiceRoll } from './DiceRoll';
 
+export interface Beat {
+  id: string;
+  title: string;
+  notes?: string;
+  isCompleted: boolean;
+}
+
 export type SessionStatus = 'planned' | 'active' | 'completed';
 
 export type PlotSessionStatus = 'advanced' | 'stalled' | 'unchanged';
@@ -47,6 +54,9 @@ export interface SessionLog {
 
   // Dice Rolls
   diceRolls?: DiceRoll[];
+
+  // Beats (lightweight freeform planning checklist)
+  beats?: Beat[];
 
   // Post-Session
   recap: string;
