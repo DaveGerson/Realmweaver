@@ -8,6 +8,7 @@ import * as aiDmCoach from './ai/dmCoach';
 import * as aiEvocationWizard from './ai/evocationWizard';
 import * as aiRealmChat from './ai/realmChat';
 import * as aiWorldSimulation from './ai/worldSimulation';
+import * as aiStyleMatching from './ai/styleMatching';
 import * as mockService from './ai/mockService';
 
 export const generateNpc = (prompt: string, useGroundedSearch: boolean = false, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<NPC, 'id' | 'factionId'>> => {
@@ -203,6 +204,17 @@ export const generateStarterAdventure = (
         return mockService.generateStarterAdventure(worldDescription, npcs, locations, campaignContext);
     }
     return aiEvocationWizard.generateStarterAdventure(worldDescription, npcs, locations, campaignContext);
+};
+
+export const analyzeWritingStyle = (
+    samples: string[],
+    isMockMode: boolean = false,
+    campaignContext?: string
+): Promise<string> => {
+    if (isMockMode) {
+        return mockService.analyzeWritingStyle(samples, campaignContext);
+    }
+    return aiStyleMatching.analyzeWritingStyle(samples, campaignContext);
 };
 
 export { WorldEvent };

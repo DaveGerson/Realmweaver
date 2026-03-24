@@ -603,6 +603,24 @@ export const generateStarterAdventure = async (worldDescription: string, npcs: A
     });
 };
 
+export const analyzeWritingStyle = async (
+    samples: string[],
+    campaignContext?: string
+): Promise<string> => {
+    console.log(`[MOCK MODE] Called analyzeWritingStyle with ${samples.length} samples.`);
+    logContext(campaignContext);
+    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY * 2));
+    return Promise.resolve(
+        'Terse, atmospheric prose with a preference for concrete sensory detail over abstraction. ' +
+        'Sentences run short and punchy in moments of tension, then expand into longer, image-laden ' +
+        'constructions during description. Vocabulary is accessible but precise — no archaic flourishes, ' +
+        'but a careful eye for the right word. Metaphors lean toward the mundane made strange: rot, ' +
+        'rust, smoke, and wet stone recur as anchors. Thematic preoccupations include fractured loyalty, ' +
+        'the weight of secrets, and the indifference of history to individual suffering. ' +
+        'Descriptions tend toward the oblique — readers infer more than they are told.'
+    );
+};
+
 export const generateWorldEvents = async (
     campaign: Campaign,
     daysPassed: number,

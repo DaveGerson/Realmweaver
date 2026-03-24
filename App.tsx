@@ -50,6 +50,7 @@ import { CommandPalette } from './components/common/CommandPalette';
 import type { RecentItem, CommandPaletteEntityType } from './components/common/CommandPalette';
 import { KeyboardShortcutsHelp } from './components/common/KeyboardShortcutsHelp';
 import { matchShortcut } from './utils/keyboardShortcuts';
+import { analyzeWritingStyle } from './services/geminiService';
 
 
 export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'combat' | 'relationships' | 'session-runner' | 'secrets';
@@ -196,6 +197,56 @@ const App: FC = () => {
       activeSessionId: activeCampaign.activeSessionId,
     });
   }, [activeCampaign]);
+
+  // Auto-generate style profile once entity count crosses 5 and no profile exists yet.
+  // Fire-and-forget: runs in background, does not block the UI.
+  useEffect(() => {
+    if (!activeCampaign) return;
+    if (activeCampaign.styleProfile) return; // Already has one
+
+    const totalEntities =
+      activeCampaign.npcs.length +
+      activeCampaign.locations.length +
+      activeCampaign.factions.length +
+      activeCampaign.items.length +
+      activeCampaign.articles.length +
+      activeCampaign.adventures.length;
+
+    if (totalEntities < 5) return;
+
+    // Collect text samples: first 10 NPC descriptions, first 5 location descriptions, first 3 adventure hooks
+    const samples: string[] = [
+      ...activeCampaign.npcs.slice(0, 10).map(n => n.description).filter(Boolean),
+      ...activeCampaign.locations.slice(0, 5).map(l => l.description).filter(Boolean),
+      ...activeCampaign.adventures.slice(0, 3).map(a => a.hook).filter(Boolean),
+    ] as string[];
+
+    if (samples.length === 0) return;
+
+    // Fire and forget
+    analyzeWritingStyle(samples, isMockMode, campaignContext)
+      .then(profile => {
+        if (profile) {
+          campaignService.setStyleProfile(profile);
+        }
+      })
+      .catch(err => {
+        console.warn('[StyleMatching] Auto-analysis failed:', err);
+      });
+  // We intentionally run this only when entity count milestone is crossed or campaign changes,
+  // not on every render. activeCampaign reference changes with every Immer update, so we
+  // stabilize on the campaign id and total entity count.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    activeCampaign?.id,
+    activeCampaign?.styleProfile,
+    (activeCampaign?.npcs.length ?? 0) +
+      (activeCampaign?.locations.length ?? 0) +
+      (activeCampaign?.factions.length ?? 0) +
+      (activeCampaign?.items.length ?? 0) +
+      (activeCampaign?.articles.length ?? 0) +
+      (activeCampaign?.adventures.length ?? 0),
+  ]);
 
   const resetSelections = () => {
     setSelectedNpcId(null);
@@ -873,7 +924,14 @@ const App: FC = () => {
       if (activeView === 'setting') {
           return (
               <ContentWrapper title="Campaign Setting" icon="Setting">
-                  <CampaignSettingEditor campaign={activeCampaign} onUpdate={campaignService.updateCampaign} />
+                  <CampaignSettingEditor
+                    campaign={activeCampaign}
+                    onUpdate={campaignService.updateCampaign}
+                    isMockMode={isMockMode}
+                    campaignContext={campaignContext}
+                    onSetStyleProfile={campaignService.setStyleProfile}
+                    onClearStyleProfile={campaignService.clearStyleProfile}
+                  />
               </ContentWrapper>
           );
       }

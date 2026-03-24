@@ -1166,6 +1166,24 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             });
         },
 
+        // --- Style Profile ---
+        setStyleProfile(profile: string) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (campaign) {
+                    campaign.styleProfile = profile;
+                }
+            });
+        },
+        clearStyleProfile() {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (campaign) {
+                    campaign.styleProfile = undefined;
+                }
+            });
+        },
+
         // --- Entity Actions (Creators return the new ID for selection) ---
         createNpc(newNpcData: Omit<NPC, 'id'>) {
             const newNpc: NPC = { ...newNpcData, id: crypto.randomUUID() };

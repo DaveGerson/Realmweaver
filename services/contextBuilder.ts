@@ -199,6 +199,11 @@ export function buildCampaignContext(options: ContextOptions): string {
   }
   tryAdd(identityLines.join('\n'));
 
+  // --- Style profile (Tier 1 — always included when present) ---
+  if (campaign.styleProfile && campaign.styleProfile.trim()) {
+    tryAdd(`WRITING STYLE: Generate content matching this DM's voice: ${campaign.styleProfile.trim()}`);
+  }
+
   // --- Active session recap ---
   const activeSession = findActiveSession();
   if (activeSession && hasBudget()) {
