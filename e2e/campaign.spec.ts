@@ -173,15 +173,18 @@ test('switch between campaigns shows correct data', async ({ page }) => {
   // Switch back to Campaign Alpha via the selector
   await openCampaignSelector(page);
 
-  // Both campaigns appear in the selector list
-  await expect(page.getByRole('heading', { name: 'Your Campaigns' })).toBeVisible();
+  // Both campaigns appear in the selector list (CrossCampaignDashboard heading)
+  await expect(page.getByRole('heading', { name: /all campaigns|your campaigns/i })).toBeVisible();
   await expect(page.getByText('Campaign Alpha')).toBeVisible();
   await expect(page.getByText('Campaign Beta')).toBeVisible();
 
   await page.screenshot({ path: 'e2e/screenshots/campaign-selector-both.png' });
 
-  // Click Campaign Alpha's name to load it
-  await page.getByText('Campaign Alpha').first().click();
+  // Click the "Continue" button on Campaign Alpha's card to load it.
+  // CrossCampaignDashboard uses a "Continue" button per card (the title h2 is not clickable).
+  // Locate the card by finding the heading, then navigating up to the card container to click Continue.
+  const alphaCard = page.locator('.group').filter({ hasText: 'Campaign Alpha' });
+  await alphaCard.getByRole('button', { name: /continue/i }).click();
   await expect(
     page.locator('aside').getByRole('heading', { name: 'Campaign Alpha' })
   ).toBeVisible({ timeout: 5000 });
@@ -207,20 +210,30 @@ test('delete campaign removes it from selector', async ({ page }) => {
   await openCampaignSelector(page);
   await expect(page.getByText('Doomed Campaign')).toBeVisible();
 
-  // deleteCampaign() calls window.confirm() — auto-accept it before clicking
-  page.once('dialog', (dialog) => dialog.accept());
-
-  // Delete button has aria-label "Delete campaign {title}"
-  const deleteBtn = page.getByRole('button', { name: /delete campaign doomed campaign/i });
+  // CrossCampaignDashboard uses a two-click confirm pattern (no window.confirm dialog).
+  // The delete button has an onBlur handler that resets confirmDelete to false.
+  // We find the button once (by aria-label in initial state), then click it twice
+  // as the SAME DOM element reference to avoid losing focus between clicks.
+  const doomedCard = page.locator('.group').filter({ hasText: 'Doomed Campaign' });
+  const deleteBtn = doomedCard.getByRole('button', { name: /^delete doomed campaign$/i });
+  await expect(deleteBtn).toBeVisible({ timeout: 3000 });
+  // Accept all window.confirm dialogs that fire during deletion
+  page.on('dialog', (d) => d.accept());
+  // First click → sets confirmDelete=true
   await deleteBtn.click();
+  // The component's two-click pattern: button is now in confirm state
+  const confirmBtn = doomedCard.getByRole('button', { name: /confirm delete/i });
+  await expect(confirmBtn).toBeVisible({ timeout: 2000 });
+  await confirmBtn.click();
 
   await page.screenshot({ path: 'e2e/screenshots/campaign-deleted.png' });
 
   // Campaign no longer in the list
   await expect(page.getByText('Doomed Campaign')).not.toBeVisible({ timeout: 5000 });
 
-  // With no campaigns, selector shows empty state OR app returns to welcome
-  const emptyState = page.getByText(/haven't created any campaigns/i);
+  // With no campaigns left, the dashboard shows the empty state message or the app
+  // returns to the welcome screen.
+  const emptyState = page.getByText(/no campaigns yet|haven't created any campaigns/i);
   const welcomeHeading = page.getByText(/welcome to realmweaver/i);
   await expect(emptyState.or(welcomeHeading)).toBeVisible({ timeout: 5000 });
 });
@@ -232,9 +245,13 @@ test('delete campaign removes it from selector', async ({ page }) => {
 test('campaign creator requires a title before submitting', async ({ page }) => {
   await gotoFresh(page);
 
-  // Navigate to the creator
+  // Navigate to the creator — Phase F shows template selector first
   await page.getByRole('button', { name: /create your first campaign/i }).click();
-  await expect(page.getByRole('heading', { name: 'Create Your Campaign' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /start with a template/i })).toBeVisible({ timeout: 5000 });
+
+  // Skip templates to reach the campaign form
+  await page.getByRole('button', { name: /start from scratch/i }).click();
+  await expect(page.getByRole('heading', { name: 'Create Your Campaign' })).toBeVisible({ timeout: 5000 });
 
   // Click submit with an empty title — HTML required attribute prevents submission
   await page.getByRole('button', { name: /weave campaign/i }).click();

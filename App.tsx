@@ -115,21 +115,6 @@ const App: FC = () => {
     }
   }, [appStatus, pendingTemplateData]);
 
-  // Auto-show First Campaign Wizard for new empty campaigns
-  useEffect(() => {
-    if (
-      activeCampaign &&
-      !activeCampaign.wizardDismissed &&
-      activeCampaign.npcs.length === 0 &&
-      activeCampaign.adventures.length === 0 &&
-      activeCampaign.locations.length === 0
-    ) {
-      setIsFirstCampaignWizardOpen(true);
-    } else {
-      setIsFirstCampaignWizardOpen(false);
-    }
-  }, [activeCampaign?.id]);
-
   // Global keyboard shortcut handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -177,6 +162,21 @@ const App: FC = () => {
 
   const activeCampaign = useMemo(() => campaigns.find(c => c.id === activeCampaignId), [campaigns, activeCampaignId]);
   const isOfficialSetting = activeCampaign?.settingType === 'official';
+
+  // Auto-show First Campaign Wizard for new empty campaigns
+  useEffect(() => {
+    if (
+      activeCampaign &&
+      !activeCampaign.wizardDismissed &&
+      activeCampaign.npcs.length === 0 &&
+      activeCampaign.adventures.length === 0 &&
+      activeCampaign.locations.length === 0
+    ) {
+      setIsFirstCampaignWizardOpen(true);
+    } else {
+      setIsFirstCampaignWizardOpen(false);
+    }
+  }, [activeCampaign?.id]);
 
   // Continuity issue count — debounced so it doesn't run on every state change
   // (Fix A-3: activeCampaign changes reference on every Immer update).
