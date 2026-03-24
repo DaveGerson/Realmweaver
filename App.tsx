@@ -51,7 +51,7 @@ import { CommandPalette } from './components/common/CommandPalette';
 import type { RecentItem, CommandPaletteEntityType } from './components/common/CommandPalette';
 import { KeyboardShortcutsHelp } from './components/common/KeyboardShortcutsHelp';
 import { matchShortcut } from './utils/keyboardShortcuts';
-import { analyzeWritingStyle } from './services/geminiService';
+import { analyzeWritingStyle } from './services/aiService';
 
 
 export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'combat' | 'relationships' | 'session-runner' | 'secrets';

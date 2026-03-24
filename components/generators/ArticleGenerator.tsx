@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import type { Article, NPC, Location, Faction } from '../../types/index';
-import { generateArticle } from '../../services/geminiService';
+import { generateArticle } from '../../services/aiService';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { SkeletonGeneratorOverlay } from '../common/SkeletonCard';
@@ -34,7 +34,7 @@ export const ArticleGenerator: React.FC<ArticleGeneratorProps> = ({ onArticleCre
     setIsLoading(true);
     setError(null);
     try {
-      const articleData = await generateArticle(prompt, isOfficialSetting, isMockMode, campaignContext);
+      const articleData = await generateArticle(prompt, isMockMode, campaignContext);
       const newArticle: Omit<Article, 'id'> = {
           ...articleData,
           parentArticleId: undefined,

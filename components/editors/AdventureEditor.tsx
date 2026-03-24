@@ -4,7 +4,7 @@ import type { Adventure, Campaign } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { PrepDocumentView } from './PrepDocumentView';
 import { RegenerateButton } from '../common/RegenerateButton';
-import { generateScene } from '../../services/geminiService';
+import { generateScene } from '../../services/aiService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
 import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService';
@@ -73,7 +73,7 @@ export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, cam
   const handleGenerateNextScene = async (prompt: string) => {
     setIsGeneratingScene(true);
     try {
-      const sceneData = await generateScene(prompt, false, isMockMode, campaignContext);
+      const sceneData = await generateScene(prompt, isMockMode, campaignContext);
       campaignService.createScene(adventure.id, {
         ...sceneData,
         locationId: undefined,

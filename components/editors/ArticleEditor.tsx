@@ -4,7 +4,6 @@ import type { Article, ArticleCategory } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
-import { generateEnhancedText } from '../../services/geminiService';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { RegenerateButton } from '../common/RegenerateButton';
 import { EntityLink } from '../common/EntityLink';
@@ -31,7 +30,6 @@ const categoryOptions: ArticleCategory[] = ['lore', 'history', 'cosmology'];
 
 export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticles, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(article);
-  const [isGenerating, setIsGenerating] = useState<keyof Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds' | 'category'> | null>(null);
   const campaign = campaignService.getState().campaigns.find(c => c.id === campaignService.getState().activeCampaignId)!;
 
   const allNpcs = campaign.npcs;
@@ -75,23 +73,6 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
         onDelete(article.id);
     }
   }
-
-  const handleAiGenerate = async (field: 'content') => {
-    setIsGenerating(field);
-    const context = `Article Title: ${formData.title}\nCategory: ${formData.category}`;
-    const prompt = `Based on the following article info, generate compelling content:\n\n${context}`;
-
-    try {
-      const result = await generateEnhancedText(prompt, undefined, isMockMode);
-      const updatedData = { [field]: result };
-      setFormData(prev => ({ ...prev, ...updatedData }));
-      onUpdate(article.id, updatedData);
-    } catch (error) {
-      console.error("AI generation failed:", error);
-    } finally {
-      setIsGenerating(null);
-    }
-  };
 
   const handleFieldRegenerate = (field: 'content') => (newValue: string) => {
     setFormData(prev => ({ ...prev, [field]: newValue }));
@@ -164,8 +145,6 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
           onChange={handleChange}
           onBlur={handleBlur}
           rows={15}
-          onAiGenerate={() => handleAiGenerate('content')}
-          isGenerating={isGenerating === 'content'}
           regenerateButton={<RegenerateButton fieldName="content" currentValue={formData.content} entityType="Article" entityContext={articleEntityContext} onRegenerate={handleFieldRegenerate('content')} isMockMode={isMockMode} campaignContext={campaignContext} />}
         />
         {formData.content && onNavigate && (

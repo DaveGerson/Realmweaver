@@ -4,7 +4,7 @@ import type { Location, LocationConnection, PointOfInterest, PoiInteraction, Loo
 import { Icons } from './Icons';
 import { Button } from './common/Button';
 import { AiTextarea } from './common/Textarea';
-import { generateEnhancedText, generatePoiFromLoot } from '../services/geminiService';
+import { generateEnhancedText, generatePoiFromLoot } from '../services/aiService';
 
 interface LocationEditorProps {
   location: Location;

@@ -7,7 +7,7 @@ import { campaignService } from '../../services/campaignService';
 import { DiceRoller } from '../tools/DiceRoller';
 import { CombatTracker } from '../tools/CombatTracker';
 import { SecretsTracker } from '../tools/SecretsTracker';
-import { generateNpc } from '../../services/geminiService';
+import { generateNpc } from '../../services/aiService';
 import { rollDice } from '../../utils/diceUtils';
 import { estimatePcHp } from '../../utils/entityUtils';
 import { SessionEndWizard } from '../dialogs/SessionEndWizard';
@@ -300,7 +300,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
         setNpcEditMode(false);
         try {
             const campaignContext = `Campaign: ${campaign.title}\nSetting: ${campaign.setting}`;
-            const npcData = await generateNpc(npcPrompt.trim(), false, isMockMode, campaignContext);
+            const npcData = await generateNpc(npcPrompt.trim(), isMockMode, campaignContext);
             setNpcPreview(npcData);
         } catch (err) {
             setNpcError(err instanceof Error ? err.message : 'Generation failed');

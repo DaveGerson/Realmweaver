@@ -1,7 +1,7 @@
 
 import { generateText } from './core';
 
-const MODEL_NAME = 'gemini-2.5-flash';
+const MODEL_NAME = 'standard';
 
 const STYLE_ANALYSIS_INSTRUCTIONS = `You are a literary analyst specializing in tabletop RPG content.
 You will receive writing samples from a Game Master's campaign notes — NPC descriptions, location write-ups, and adventure hooks.

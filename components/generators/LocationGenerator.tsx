@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import type { Location, Faction } from '../../types/index';
-import { generateLocation } from '../../services/geminiService';
+import { generateLocation } from '../../services/aiService';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { SkeletonGeneratorOverlay } from '../common/SkeletonCard';
@@ -32,7 +32,7 @@ export const LocationGenerator: React.FC<LocationGeneratorProps> = ({ onLocation
     setIsLoading(true);
     setError(null);
     try {
-      const locationData = await generateLocation(prompt, isOfficialSetting, isMockMode, campaignContext);
+      const locationData = await generateLocation(prompt, isMockMode, campaignContext);
       const newLocation: Omit<Location, 'id'> = {
           ...locationData,
           parentLocationId: undefined,

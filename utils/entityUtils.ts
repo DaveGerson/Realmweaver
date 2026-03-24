@@ -1,5 +1,5 @@
 
-import type { NPC, Location, Faction, Item, Article, Adventure, Scene, SessionLog, Plot, Campaign, PlayerCharacter } from '../types/index';
+import type { NPC, Location, Faction, Item, Article, Adventure, Scene, SessionLog, Plot, Note, Campaign, PlayerCharacter } from '../types/index';
 
 /**
  * Builds a campaign context string for AI generation functions.
@@ -39,6 +39,96 @@ export const buildCampaignContext = (campaign: Campaign): string => {
     }
     return lines.join('\n');
 };
+
+/**
+ * Builds a concise entity context string for per-field AI regeneration.
+ * Used as the `entityContext` prop on `RegenerateButton`.
+ *
+ * Each entity type includes its most relevant fields so the AI can
+ * produce coherent output that fits the existing entity. Fields that
+ * are empty/undefined are omitted to keep the context tight.
+ */
+export function buildEntityContext(entityType: string, entity: any, campaign?: Campaign): string {
+    switch (entityType) {
+        case 'npc': {
+            const e = entity as NPC;
+            const faction = e.factionId && campaign
+                ? campaign.factions.find(f => f.id === e.factionId)
+                : undefined;
+            return [
+                `Name: ${e.name}`,
+                e.description ? `Description: ${e.description}` : '',
+                e.traits ? `Traits: ${e.traits}` : '',
+                e.motivations ? `Motivations: ${e.motivations}` : '',
+                e.backstory ? `Backstory: ${e.backstory}` : '',
+                faction ? `Faction: ${faction.name}` : '',
+            ].filter(Boolean).join('\n');
+        }
+        case 'location': {
+            const e = entity as Location;
+            return [
+                `Name: ${e.name}`,
+                e.description ? `Description: ${e.description}` : '',
+                e.secrets ? `Secrets: ${e.secrets}` : '',
+            ].filter(Boolean).join('\n');
+        }
+        case 'faction': {
+            const e = entity as Faction;
+            return [
+                `Name: ${e.name}`,
+                e.description ? `Description: ${e.description}` : '',
+                e.goals ? `Goals: ${e.goals}` : '',
+                e.alignment ? `Alignment: ${e.alignment}` : '',
+                e.resources ? `Resources: ${e.resources}` : '',
+            ].filter(Boolean).join('\n');
+        }
+        case 'item': {
+            const e = entity as Item;
+            return [
+                `Name: ${e.name}`,
+                e.rarity ? `Rarity: ${e.rarity}` : '',
+                e.description ? `Description: ${e.description}` : '',
+                e.properties ? `Properties: ${e.properties}` : '',
+            ].filter(Boolean).join('\n');
+        }
+        case 'scene': {
+            const e = entity as Scene;
+            return [
+                `Title: ${e.title}`,
+                `Type: ${e.type}`,
+                e.readAloudText ? `Read-Aloud: ${e.readAloudText}` : '',
+                e.gmNotes ? `GM Notes: ${e.gmNotes}` : '',
+                e.rewards ? `Rewards: ${e.rewards}` : '',
+            ].filter(Boolean).join('\n');
+        }
+        case 'article': {
+            const e = entity as Article;
+            return [
+                `Title: ${e.title}`,
+                `Category: ${e.category}`,
+                e.content ? `Content summary: ${e.content.substring(0, 300)}` : '',
+            ].filter(Boolean).join('\n');
+        }
+        case 'plot': {
+            const e = entity as Plot;
+            return [
+                `Title: ${e.title}`,
+                `Status: ${e.status}`,
+                e.description ? `Description: ${e.description}` : '',
+            ].filter(Boolean).join('\n');
+        }
+        case 'note': {
+            const e = entity as Note;
+            return [
+                `Title: ${e.title}`,
+                e.tags && e.tags.length > 0 ? `Tags: ${e.tags.join(', ')}` : '',
+                e.content ? `Content: ${e.content.substring(0, 300)}` : '',
+            ].filter(Boolean).join('\n');
+        }
+        default:
+            return entity.name ? `Name: ${entity.name}` : '';
+    }
+}
 
 /**
  * Estimates PC hit points from character statistics.

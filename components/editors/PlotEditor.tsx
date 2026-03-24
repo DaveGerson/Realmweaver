@@ -4,7 +4,8 @@ import type { Plot, PlotStatus, SessionLog } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
-import { generateEnhancedText, generateScene } from '../../services/geminiService';
+import { generateScene } from '../../services/aiService';
+import { RegenerateButton } from '../common/RegenerateButton';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
 import { EntityLink } from '../common/EntityLink';
 import { LinkedText } from '../common/LinkedText';
@@ -23,7 +24,6 @@ interface PlotEditorProps {
 
 export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(plot);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingScene, setIsGeneratingScene] = useState(false);
   const campaign = campaignService.getState().campaigns.find(c => c.id === campaignService.getState().activeCampaignId)!;
 
@@ -56,21 +56,12 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, onUpdate, onDelete
     }
   }
   
-  const handleAiGenerate = async () => {
-    setIsGenerating(true);
-    const context = `Plot Title: ${formData.title}\nExisting Description: ${formData.description}`;
-    const prompt = `Expand on the following plot outline. Suggest twists, complications, and potential resolutions:\n\n${context}`;
-
-    try {
-      const result = await generateEnhancedText(prompt, undefined, isMockMode);
-      setFormData(prev => ({ ...prev, description: result }));
-      onUpdate(plot.id, { description: result });
-    } catch (error) {
-      console.error("AI generation failed:", error);
-    } finally {
-      setIsGenerating(false);
-    }
+  const handleFieldRegenerate = (field: 'description') => (newValue: string) => {
+    setFormData(prev => ({ ...prev, [field]: newValue }));
+    onUpdate(plot.id, { [field]: newValue });
   };
+
+  const plotEntityContext = `Title: ${formData.title}\nStatus: ${formData.status}${formData.description ? `\nDescription: ${formData.description}` : ''}`;
 
   // --- Generate Scene Advancing this Plot ---
   const targetAdventure = campaign.adventures[campaign.adventures.length - 1] ?? null;
@@ -82,7 +73,7 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, onUpdate, onDelete
     if (!targetAdventure) return;
     setIsGeneratingScene(true);
     try {
-      const sceneData = await generateScene(prompt, false, isMockMode, campaignContext);
+      const sceneData = await generateScene(prompt, isMockMode, campaignContext);
       campaignService.createScene(targetAdventure.id, {
         ...sceneData,
         locationId: undefined,
@@ -172,8 +163,7 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, onUpdate, onDelete
             onBlur={handleBlur}
             rows={8}
             placeholder="Describe the main conflict, key beats, and current state of this plot arc."
-            onAiGenerate={handleAiGenerate}
-            isGenerating={isGenerating}
+            regenerateButton={<RegenerateButton fieldName="description" currentValue={formData.description} entityType="Plot" entityContext={plotEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />}
             />
             {formData.description && onNavigate && (
                 <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">

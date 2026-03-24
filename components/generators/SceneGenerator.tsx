@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import type { Scene } from '../../types/index';
-import { generateScene } from '../../services/geminiService';
+import { generateScene } from '../../services/aiService';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 
@@ -25,7 +25,7 @@ export const SceneGenerator: React.FC<SceneGeneratorProps> = ({ onSceneCreated, 
     setIsLoading(true);
     setError(null);
     try {
-      const sceneData = await generateScene(prompt, isOfficialSetting, isMockMode, campaignContext);
+      const sceneData = await generateScene(prompt, isMockMode, campaignContext);
       const newScene: Omit<Scene, 'id'> = {
           ...sceneData,
           locationId: undefined,

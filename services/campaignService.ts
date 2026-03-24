@@ -26,7 +26,7 @@ import type {
     DmStyle
 } from '../types/index';
 import { importCampaignFromJson } from './importExportService';
-import { parseCharacterSheetPdf } from './geminiService';
+import { parseCharacterSheetPdf } from './aiService';
 
 type AppStatus = 'loading' | 'welcome' | 'selecting' | 'creating' | 'editing';
 export type SaveStatus = 'idle' | 'saved' | 'saving' | 'error';

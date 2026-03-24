@@ -3,7 +3,7 @@ import type { Scene, SceneType, NPC, Location, SkillCheck } from '../types/index
 import { Icons } from './Icons';
 import { Button } from './common/Button';
 import { AiTextarea } from './common/Textarea';
-import { generateEnhancedText } from '../services/geminiService';
+import { generateEnhancedText } from '../services/aiService';
 
 interface SceneEditorProps {
   scene: Scene;

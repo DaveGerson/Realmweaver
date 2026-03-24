@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { generateAdventure } from '../../services/geminiService';
+import { generateAdventure } from '../../services/aiService';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { SkeletonGeneratorOverlay } from '../common/SkeletonCard';
@@ -32,7 +32,7 @@ export const AdventureGenerator: React.FC<AdventureGeneratorProps> = ({ onAdvent
     setIsLoading(true);
     setError(null);
     try {
-      const adventureData = await generateAdventure(prompt, isOfficialSetting, isMockMode, campaignContext);
+      const adventureData = await generateAdventure(prompt, isMockMode, campaignContext);
       onAdventureCreated(adventureData);
       setPrompt('');
     } catch (err) {

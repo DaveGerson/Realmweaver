@@ -5,7 +5,7 @@ import type { Campaign } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
-import { generateEnhancedText, generateNpc } from '../../services/geminiService';
+import { generateNpc } from '../../services/aiService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
 import { RegenerateButton } from '../common/RegenerateButton';
 import { EntityLink } from '../common/EntityLink';
@@ -32,7 +32,6 @@ const sceneTypeOptions: SceneType[] = ['combat', 'social', 'exploration', 'puzzl
 
 export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLocations, campaign, onUpdate, onDelete, isMockMode, campaignContext, isActiveScene, onSetActive, onNavigate }) => {
   const [formData, setFormData] = useState(scene);
-  const [isGenerating, setIsGenerating] = useState<keyof Omit<Scene, 'id' | 'type' | 'locationId' | 'npcIds' | 'skillChecks'> | null>(null);
   const [isGeneratingNpc, setIsGeneratingNpc] = useState(false);
 
   useEffect(() => {
@@ -71,24 +70,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
     }
   }
   
-  const handleAiGenerate = async (field: keyof Omit<Scene, 'id' | 'type' | 'locationId' | 'npcIds' | 'skillChecks'>) => {
-    setIsGenerating(field);
-    const sceneContext = `Scene Title: ${formData.title}\nScene Type: ${formData.type}\nRead-Aloud Text: ${formData.readAloudText || 'Not specified'}`;
-    const prompt = `Based on the following scene info, generate compelling "${field}":\n\n${sceneContext}`;
-
-    try {
-      const result = await generateEnhancedText(prompt, undefined, isMockMode);
-      const updatedData = { [field]: result };
-      setFormData(prev => ({ ...prev, ...updatedData }));
-      onUpdate(scene.id, updatedData);
-    } catch (error) {
-      console.error("AI generation failed:", error);
-    } finally {
-      setIsGenerating(null);
-    }
-  };
-
-  const handleFieldRegenerate = (field: 'readAloudText' | 'gmNotes') => (newValue: string) => {
+  const handleFieldRegenerate = (field: 'readAloudText' | 'gmNotes' | 'rewards') => (newValue: string) => {
     setFormData(prev => ({ ...prev, [field]: newValue }));
     onUpdate(scene.id, { [field]: newValue });
   };
@@ -104,7 +86,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
   const handleGenerateNpcForScene = async (prompt: string) => {
     setIsGeneratingNpc(true);
     try {
-      const npcData = await generateNpc(prompt, false, isMockMode, campaignContext);
+      const npcData = await generateNpc(prompt, isMockMode, campaignContext);
       const newNpcId = campaignService.createNpc({ ...npcData, factionId: undefined, relationships: [], history: [] });
       const newNpcIds = [...formData.npcIds, newNpcId];
       setFormData(prev => ({ ...prev, npcIds: newNpcIds }));
@@ -208,8 +190,6 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
           onBlur={handleBlur}
           rows={5}
           placeholder="Evocative 'box text' to read to your players to set the scene."
-          onAiGenerate={() => handleAiGenerate('readAloudText')}
-          isGenerating={isGenerating === 'readAloudText'}
           regenerateButton={<RegenerateButton fieldName="readAloudText" currentValue={formData.readAloudText} entityType="Scene" entityContext={sceneEntityContext} onRegenerate={handleFieldRegenerate('readAloudText')} isMockMode={isMockMode} campaignContext={campaignContext} />}
         />
         {formData.readAloudText && onNavigate && (
@@ -226,8 +206,6 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
           onBlur={handleBlur}
           rows={8}
           placeholder="GM-only notes: scene goals, character motivations, potential outcomes, hidden details..."
-          onAiGenerate={() => handleAiGenerate('gmNotes')}
-          isGenerating={isGenerating === 'gmNotes'}
           regenerateButton={<RegenerateButton fieldName="gmNotes" currentValue={formData.gmNotes} entityType="Scene" entityContext={sceneEntityContext} onRegenerate={handleFieldRegenerate('gmNotes')} isMockMode={isMockMode} campaignContext={campaignContext} />}
         />
 
@@ -290,8 +268,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
           onBlur={handleBlur}
           rows={3}
           placeholder="Loot, treasure, gold, experience points, or other rewards."
-          onAiGenerate={() => handleAiGenerate('rewards')}
-          isGenerating={isGenerating === 'rewards'}
+          regenerateButton={<RegenerateButton fieldName="rewards" currentValue={formData.rewards} entityType="Scene" entityContext={sceneEntityContext} onRegenerate={handleFieldRegenerate('rewards')} isMockMode={isMockMode} campaignContext={campaignContext} />}
         />
 
 

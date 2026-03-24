@@ -2,7 +2,7 @@
 import React, { useState, useCallback } from 'react';
 import type { Campaign } from '../../types/index';
 import type { WorldEvent } from '../../services/ai/worldSimulation';
-import { generateWorldEvents } from '../../services/geminiService';
+import { generateWorldEvents } from '../../services/aiService';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { campaignService } from '../../services/campaignService';

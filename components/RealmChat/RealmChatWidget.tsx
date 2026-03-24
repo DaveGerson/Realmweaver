@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import type { Campaign, ChatMessage, DraftEntity, ModelTier, NPC, Location, Faction, Item, Adventure, Article } from '../../types/index';
-import { chatWithRealmWeaver } from '../../services/geminiService';
+import { chatWithRealmWeaver } from '../../services/aiService';
 import { twMerge } from 'tailwind-merge';
 import { buildCampaignContext } from '../../services/contextBuilder';
 import { LinkedText } from '../common/LinkedText';

@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import type { Faction, NPC, Location } from '../../types/index';
-import { generateFaction } from '../../services/geminiService';
+import { generateFaction } from '../../services/aiService';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { SkeletonGeneratorOverlay } from '../common/SkeletonCard';
@@ -32,7 +32,7 @@ export const FactionGenerator: React.FC<FactionGeneratorProps> = ({ onFactionCre
     setIsLoading(true);
     setError(null);
     try {
-      const factionData = await generateFaction(prompt, isOfficialSetting, isMockMode, campaignContext);
+      const factionData = await generateFaction(prompt, isMockMode, campaignContext);
       const newFaction: Omit<Faction, 'id'> = {
           ...factionData,
           leaderId: undefined,

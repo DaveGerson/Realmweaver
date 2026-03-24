@@ -2,7 +2,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { Campaign, SceneType, NPC, Location, Faction, Item, Adventure, AdventureForBatchAdd, Scene } from '../../types/index';
 import type { BatchAddData } from '../../types/index';
-import { generateCampaignFill, generateNpc, generateLocation, generateFaction, generateItem, generateAdventure, parseDocumentForEntities, generateChatResponse } from '../../services/geminiService';
+import { generateCampaignFill, generateNpc, generateLocation, generateFaction, generateItem, generateAdventure, parseDocumentForEntities, generateChatResponse } from '../../services/aiService';
+import { buildCampaignContext } from '../../services/contextBuilder';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { twMerge } from 'tailwind-merge';
@@ -75,15 +76,6 @@ type ChatMessage = {
     text: string;
 };
 
-const serializeCampaign = (campaign: Campaign): string => {
-    let context = `Title: ${campaign.title}\nSetting: ${campaign.setting}\n`;
-    if (campaign.npcs.length > 0) context += `NPCs: ${campaign.npcs.map(e => e.name).join(', ')}\n`;
-    if (campaign.locations.length > 0) context += `Locations: ${campaign.locations.map(e => e.name).join(', ')}\n`;
-    if (campaign.factions.length > 0) context += `Factions: ${campaign.factions.map(e => e.name).join(', ')}\n`;
-    if (campaign.items.length > 0) context += `Items: ${campaign.items.map(e => e.name).join(', ')}\n`;
-    if (campaign.adventures.length > 0) context += `Adventures: ${campaign.adventures.map(e => e.title).join(', ')}\n`;
-    return context;
-};
 
 const initialDetailedPrompts: DetailedPrompts = {
     npcs: [], locations: [], factions: [], adventures: [], items: []
@@ -151,7 +143,7 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
 
     const handleGenerate = async () => {
         resetGenerationState();
-        const campaignContext = useCampaignContext ? serializeCampaign(campaign) : undefined;
+        const campaignContext = useCampaignContext ? buildCampaignContext({ variant: 'generation', campaign }) : undefined;
 
         try {
             let data: BatchAddData | null = null;
@@ -169,14 +161,14 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                 case 'detailed':
                     setLoadingMessage('Generating from prompts...');
                     const detailedData: BatchAddData = { npcs: [], locations: [], factions: [], adventures: [], items: [] };
-                    const npcPromises = detailedPrompts.npcs.map(p => generateNpc(p.prompt, false, isMockMode, campaignContext).then(res => ({ ...res, factionId: p.linkId })));
-                    const locationPromises = detailedPrompts.locations.map(p => generateLocation(p.prompt, false, isMockMode, campaignContext).then(res => ({ ...res, parentLocationId: p.linkId })));
-                    const factionPromises = detailedPrompts.factions.map(p => generateFaction(p.prompt, false, isMockMode, campaignContext));
-                    const itemPromises = detailedPrompts.items.map(p => generateItem(p.prompt, false, isMockMode, campaignContext));
+                    const npcPromises = detailedPrompts.npcs.map(p => generateNpc(p.prompt, isMockMode, campaignContext).then(res => ({ ...res, factionId: p.linkId })));
+                    const locationPromises = detailedPrompts.locations.map(p => generateLocation(p.prompt, isMockMode, campaignContext).then(res => ({ ...res, parentLocationId: p.linkId })));
+                    const factionPromises = detailedPrompts.factions.map(p => generateFaction(p.prompt, isMockMode, campaignContext));
+                    const itemPromises = detailedPrompts.items.map(p => generateItem(p.prompt, isMockMode, campaignContext));
                     const adventurePromises = detailedPrompts.adventures.filter(adv => adv.prompt.trim() !== '' && adv.scenes.length > 0 && adv.scenes.some(s => s.prompt.trim() !== '')).map(adv => {
                         const scenesDescription = adv.scenes.filter(s => s.prompt.trim() !== '').map(s => `- Scene Prompt: "${s.prompt}"${s.type ? ` (Suggested Type: ${s.type})` : ''}`).join('\n');
                         const fullAdvPrompt = `Based on the following adventure concept, generate a complete adventure outline.\nAdventure Concept: "${adv.prompt}"\n\nThe adventure's structure must be built around the following user-provided scenes. Generate full, detailed scenes based on these prompts:\n${scenesDescription}`;
-                        return generateAdventure(fullAdvPrompt, false, isMockMode, campaignContext);
+                        return generateAdventure(fullAdvPrompt, isMockMode, campaignContext);
                     });
 
                     const [npcsResult, locationsResult, factionsResult, itemsResult, adventuresResult] = await Promise.all([Promise.all(npcPromises), Promise.all(locationPromises), Promise.all(factionPromises), Promise.all(itemPromises), Promise.all(adventurePromises)]);
@@ -311,7 +303,7 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                             {mode === 'simple' && <SimpleModeView prompt={simplePrompt} onPromptChange={setSimplePrompt} qualifiers={qualifiers} onQualifiersChange={setQualifiers} />}
                             {mode === 'detailed' && <DetailedModeView campaign={campaign} prompts={detailedPrompts} onPromptsChange={setDetailedPrompts} />}
                             {mode === 'ingest' && <IngestModeView text={ingestedText} onTextChange={setIngestedText} fileInputRef={fileInputRef} />}
-                            {mode === 'chat' && <ChatModeView history={chatHistory} onHistoryChange={setChatHistory} input={chatInput} onInputChange={setChatInput} campaignContext={useCampaignContext ? serializeCampaign(campaign) : undefined} isMockMode={isMockMode} />}
+                            {mode === 'chat' && <ChatModeView history={chatHistory} onHistoryChange={setChatHistory} input={chatInput} onInputChange={setChatInput} campaignContext={useCampaignContext ? buildCampaignContext({ variant: 'generation', campaign }) : undefined} isMockMode={isMockMode} />}
                         </div>
                         <div className="p-4 border-t border-slate-800">
                              {error && <p className="text-xs text-red-400 mb-2 text-center">{error}</p>}

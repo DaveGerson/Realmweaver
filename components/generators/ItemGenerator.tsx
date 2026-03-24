@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import type { Item } from '../../types/index';
-import { generateItem } from '../../services/geminiService';
+import { generateItem } from '../../services/aiService';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { SkeletonGeneratorOverlay } from '../common/SkeletonCard';
@@ -30,7 +30,7 @@ export const ItemGenerator: React.FC<ItemGeneratorProps> = ({ onItemCreated, isM
     setIsLoading(true);
     setError(null);
     try {
-      const itemData = await generateItem(prompt, isOfficialSetting, isMockMode, campaignContext);
+      const itemData = await generateItem(prompt, isMockMode, campaignContext);
       onItemCreated(itemData);
       setPrompt('');
     } catch (err) {

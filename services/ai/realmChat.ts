@@ -1,16 +1,15 @@
 
-import { Type } from "@google/genai";
 import type { ChatMessage, RealmChatResponse, ModelTier, DraftEntity } from '../../types/index';
 import { generateWithSchema } from './core';
 import { npcSchema, locationSchema, factionSchema, itemSchema, adventureWithScenesSchema, articleSchema } from './realmWeaver';
 
 // Define a super-schema that can contain any of the entity types
 const draftEntitySchema = {
-    type: Type.OBJECT,
+    type: 'object',
     properties: {
-        id: { type: Type.STRING, description: "A unique ID for this draft entity (e.g., 'draft-1'). Maintain this ID across turns for the same entity." },
-        type: { type: Type.STRING, enum: ['npc', 'location', 'faction', 'item', 'adventure', 'article'] },
-        status: { type: Type.STRING, enum: ['draft'], description: "Always 'draft' when coming from the AI." },
+        id: { type: 'string', description: "A unique ID for this draft entity (e.g., 'draft-1'). Maintain this ID across turns for the same entity." },
+        type: { type: 'string', enum: ['npc', 'location', 'faction', 'item', 'adventure', 'article'] },
+        status: { type: 'string', enum: ['draft'], description: "Always 'draft' when coming from the AI." },
         npcData: npcSchema,
         locationData: locationSchema,
         factionData: factionSchema,
@@ -22,16 +21,16 @@ const draftEntitySchema = {
 };
 
 const realmChatResponseSchema = {
-    type: Type.OBJECT,
+    type: 'object',
     properties: {
-        message: { type: Type.STRING, description: "The chat response to the user. Keep it conversational and helpful." },
-        suggestions: { 
-            type: Type.ARRAY, 
-            items: { type: Type.STRING }, 
-            description: "3 short, distinct suggestions for what the user might say next, or options for a guided flow." 
+        message: { type: 'string', description: "The chat response to the user. Keep it conversational and helpful." },
+        suggestions: {
+            type: 'array',
+            items: { type: 'string' },
+            description: "3 short, distinct suggestions for what the user might say next, or options for a guided flow."
         },
         draftEntities: {
-            type: Type.ARRAY,
+            type: 'array',
             items: draftEntitySchema,
             description: "A list of entities being created or updated. If editing an existing draft, use the same ID."
         }
@@ -41,10 +40,10 @@ const realmChatResponseSchema = {
 
 const mapTierToModel = (tier: ModelTier): string => {
     switch (tier) {
-        case 'performance': return 'gemini-flash-lite-latest';
-        case 'medium': return 'gemini-2.5-flash';
-        case 'quality': return 'gemini-3-pro-preview';
-        default: return 'gemini-2.5-flash';
+        case 'performance': return 'lite';
+        case 'medium': return 'standard';
+        case 'quality': return 'quality';
+        default: return 'standard';
     }
 };
 
@@ -105,22 +104,40 @@ ${approvedEntitiesLog.join('\n')}
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const rawResponse: any = await generateWithSchema(prompt, realmChatResponseSchema, systemInstruction, {}, modelName, campaignContext);
         
-        // Post-process to flatten the data structure for the app
+        // Post-process to flatten the data structure for the app.
+        // The model may return entity data in several formats:
+        //   1. Type-specific key: { npcData: {...} } (schema-enforced by Gemini)
+        //   2. Generic data key: { data: {...} } (common with schema-in-prompt)
+        //   3. Inline fields: { id, type, status, name, description, ... } (Claude CLI)
+        // We handle all three gracefully.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const processedDrafts: DraftEntity[] = (rawResponse.draftEntities || []).map((raw: any) => {
-            let data = {};
-            if (raw.type === 'npc') data = raw.npcData;
-            else if (raw.type === 'location') data = raw.locationData;
-            else if (raw.type === 'faction') data = raw.factionData;
-            else if (raw.type === 'item') data = raw.itemData;
-            else if (raw.type === 'adventure') data = raw.adventureData;
-            else if (raw.type === 'article') data = raw.articleData;
+            // Try type-specific key first (original Gemini pattern)
+            const typeKeyMap: Record<string, string> = {
+                npc: 'npcData', location: 'locationData', faction: 'factionData',
+                item: 'itemData', adventure: 'adventureData', article: 'articleData',
+            };
+            const typeKey = typeKeyMap[raw.type];
+            let data = typeKey ? raw[typeKey] : undefined;
+
+            // Fallback: generic "data" key
+            if (!data && raw.data && typeof raw.data === 'object') {
+                data = raw.data;
+            }
+
+            // Fallback: inline fields — extract everything except meta fields
+            if (!data || (typeof data === 'object' && Object.keys(data).length === 0)) {
+                const { id: _id, type: _type, status: _status, npcData: _n, locationData: _l, factionData: _f, itemData: _i, adventureData: _a, articleData: _ar, ...inlineFields } = raw;
+                if (Object.keys(inlineFields).length > 0) {
+                    data = inlineFields;
+                }
+            }
 
             return {
                 id: raw.id,
                 type: raw.type,
                 status: 'draft',
-                data: data
+                data: data || {}
             } as DraftEntity;
         });
 
@@ -141,14 +158,14 @@ ${approvedEntitiesLog.join('\n')}
 };
 
 const npcRoleplayResponseSchema = {
-    type: Type.OBJECT,
+    type: 'object',
     properties: {
         dialogue: {
-            type: Type.STRING,
+            type: 'string',
             description: "The NPC's in-character dialogue response (2-4 sentences). Speak directly as the NPC in first person.",
         },
         moodCue: {
-            type: Type.STRING,
+            type: 'string',
             description: "A brief stage direction describing the NPC's physical action or emotional state (e.g., 'leans forward, voice dropping to a whisper'). No brackets needed.",
         },
     },
@@ -188,7 +205,7 @@ ${npcContext}
             npcRoleplayResponseSchema,
             systemInstruction,
             {},
-            'gemini-2.5-flash',
+            'standard',
             campaignContext
         );
         return {

@@ -4,7 +4,6 @@ import type { Item, ItemRarity } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
-import { generateEnhancedText } from '../../services/geminiService';
 import { RegenerateButton } from '../common/RegenerateButton';
 import { BacklinksPanel } from '../common/BacklinksPanel';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
@@ -22,7 +21,6 @@ const rarityOptions: ItemRarity[] = ['common', 'uncommon', 'rare', 'very rare', 
 
 export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(item);
-  const [isGenerating, setIsGenerating] = useState<keyof Omit<Item, 'id' | 'rarity'> | null>(null);
 
   useEffect(() => {
     setFormData(item);
@@ -50,23 +48,6 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onUpdate, onDelete
         onDelete(item.id);
     }
   }
-
-  const handleAiGenerate = async (field: keyof Omit<Item, 'id' | 'rarity'>) => {
-    setIsGenerating(field);
-    const context = `Item Name: ${formData.name}\nRarity: ${formData.rarity}`;
-    const prompt = `Based on the following item info, generate a compelling "${field}":\n\n${context}`;
-
-    try {
-      const result = await generateEnhancedText(prompt, undefined, isMockMode);
-      const updatedData = { [field]: result };
-      setFormData(prev => ({ ...prev, ...updatedData }));
-      onUpdate(item.id, updatedData);
-    } catch (error) {
-      console.error("AI generation failed:", error);
-    } finally {
-      setIsGenerating(null);
-    }
-  };
 
   const handleFieldRegenerate = (field: keyof Omit<Item, 'id' | 'rarity'>) => (newValue: string) => {
     setFormData(prev => ({ ...prev, [field]: newValue }));
@@ -126,8 +107,6 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onUpdate, onDelete
           onBlur={handleBlur}
           rows={4}
           placeholder="A detailed description of the item's appearance and history."
-          onAiGenerate={() => handleAiGenerate('description')}
-          isGenerating={isGenerating === 'description'}
           regenerateButton={<RegenerateButton fieldName="description" currentValue={formData.description} entityType="Item" entityContext={itemEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />}
         />
 
@@ -139,8 +118,7 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onUpdate, onDelete
           onBlur={handleBlur}
           rows={4}
           placeholder="The item's mechanical properties, abilities, and rules for use."
-          onAiGenerate={() => handleAiGenerate('properties')}
-          isGenerating={isGenerating === 'properties'}
+          regenerateButton={<RegenerateButton fieldName="properties" currentValue={formData.properties} entityType="Item" entityContext={itemEntityContext} onRegenerate={handleFieldRegenerate('properties')} isMockMode={isMockMode} campaignContext={campaignContext} />}
         />
 
         {/* Backlinks Panel */}

@@ -4,18 +4,18 @@ import type { Note } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
-import { generateEnhancedText } from '../../services/geminiService';
+import { RegenerateButton } from '../common/RegenerateButton';
 
 interface NoteEditorProps {
   note: Note;
   onUpdate: (id: string, updatedData: Partial<Note>) => void;
   onDelete: (id: string) => void;
   isMockMode: boolean;
+  campaignContext?: string;
 }
 
-export const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete, isMockMode }) => {
+export const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete, isMockMode, campaignContext }) => {
   const [formData, setFormData] = useState(note);
-  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     setFormData(note);
@@ -51,21 +51,12 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete
     }
   }
   
-  const handleAiGenerate = async () => {
-    setIsGenerating(true);
-    const context = `Note Title: ${formData.title}\nExisting Content: ${formData.content}`;
-    const prompt = `Expand on the following note content. Be creative and detailed, but keep the style consistent with a campaign note:\n\n${context}`;
-
-    try {
-      const result = await generateEnhancedText(prompt, undefined, isMockMode);
-      setFormData(prev => ({ ...prev, content: prev.content + "\n\n" + result }));
-      onUpdate(note.id, { content: formData.content + "\n\n" + result });
-    } catch (error) {
-      console.error("AI generation failed:", error);
-    } finally {
-      setIsGenerating(false);
-    }
+  const handleFieldRegenerate = (field: 'content') => (newValue: string) => {
+    setFormData(prev => ({ ...prev, [field]: newValue }));
+    onUpdate(note.id, { [field]: newValue });
   };
+
+  const noteEntityContext = `Title: ${formData.title}${formData.tags.length > 0 ? `\nTags: ${formData.tags.join(', ')}` : ''}${formData.content ? `\nContent: ${formData.content.substring(0, 300)}` : ''}`;
 
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
@@ -118,8 +109,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete
           onBlur={handleBlur}
           rows={15}
           placeholder="Write your notes here..."
-          onAiGenerate={handleAiGenerate}
-          isGenerating={isGenerating}
+          regenerateButton={<RegenerateButton fieldName="content" currentValue={formData.content} entityType="Note" entityContext={noteEntityContext} onRegenerate={handleFieldRegenerate('content')} isMockMode={isMockMode} campaignContext={campaignContext} />}
         />
       </div>
     </div>

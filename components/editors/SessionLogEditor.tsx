@@ -7,9 +7,10 @@ import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { EntityLink } from '../common/EntityLink';
 import { campaignService } from '../../services/campaignService';
 import { AiTextarea } from '../common/Textarea';
-import { generateEnhancedText, analyzeSessionNotes } from '../../services/geminiService';
+import { generateEnhancedText, analyzeSessionNotes } from '../../services/aiService';
 import { twMerge } from 'tailwind-merge';
-import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
+import { startAudioTranscription } from '../../services/ai/audioTranscription';
+import type { AudioTranscriptionSession } from '../../services/ai/audioTranscription';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
 
 interface SessionLogEditorProps {
@@ -39,10 +40,12 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
   const [isLiveConnected, setIsLiveConnected] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState('');
   
-  // Refs for resource management (avoiding stale closures in effects)
-  const sessionPromiseRef = useRef<Promise<any> | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
+  // Ref for the active audio transcription session returned by the service module.
+  const audioSessionRef = useRef<AudioTranscriptionSession | null>(null);
+
+  // Transcript file import state
+  const [isImportingTranscript, setIsImportingTranscript] = useState(false);
+  const transcriptFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const campaign = campaignService.getState().campaigns.find(c => c.id === campaignService.getState().activeCampaignId)!;
   const activePlots = campaign.plots.filter(p => p.status === 'active');
@@ -51,28 +54,15 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
     setFormData(log);
   }, [log]);
 
-  // Clean up all resources on component unmount
+  // Clean up the audio transcription session on unmount
   useEffect(() => {
-      return () => {
-          // 1. Close Session
-          if (sessionPromiseRef.current) {
-              const promise = sessionPromiseRef.current;
-              // We don't nullify the ref here as the component is unmounting anyway
-              promise.then(session => {
-                  try { session.close(); } catch(e) { console.error("Error closing session on unmount", e); }
-              });
-          }
-          
-          // 2. Stop Audio Context
-          if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-              try { audioContextRef.current.close(); } catch(e) { console.error("Error closing AudioContext on unmount", e); }
-          }
-
-          // 3. Stop Mic Stream
-          if (mediaStreamRef.current) {
-              mediaStreamRef.current.getTracks().forEach(track => track.stop());
-          }
+    return () => {
+      if (audioSessionRef.current) {
+        audioSessionRef.current.stop().catch(e => {
+          console.error('Error stopping audio session on unmount', e);
+        });
       }
+    };
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -148,144 +138,108 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
 
   // --- Live API Integration ---
   const handleToggleLive = async () => {
-      if (isLiveConnected) {
-          // Disconnect Logic
-          
-          // 1. Close Session Connection
-          if (sessionPromiseRef.current) {
-              const promise = sessionPromiseRef.current;
-              sessionPromiseRef.current = null;
-              promise.then(session => session.close());
-          }
+    if (isLiveConnected) {
+      // Stop the session — the service module owns teardown of mic + audio context.
+      if (audioSessionRef.current) {
+        await audioSessionRef.current.stop();
+        audioSessionRef.current = null;
+      }
+      setIsLiveConnected(false);
 
-          // 2. Stop Audio Context
-          if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-              await audioContextRef.current.close();
-          }
-          audioContextRef.current = null;
-          
-          // 3. Stop Mic Stream
-          if (mediaStreamRef.current) {
-              mediaStreamRef.current.getTracks().forEach(track => track.stop());
-              mediaStreamRef.current = null;
-          }
-          
-          setIsLiveConnected(false);
+      // Flush accumulated transcript into running notes.
+      if (liveTranscript) {
+        const newNotes = (formData.runningNotes ? formData.runningNotes + '\n\n' : '') + `[AI Scribe]: ${liveTranscript}`;
+        setFormData(prev => ({ ...prev, runningNotes: newNotes }));
+        onUpdate(log.id, { runningNotes: newNotes });
+        setLiveTranscript('');
+      }
+      return;
+    }
 
-          // 4. Flush Transcript
-          if (liveTranscript) {
-              const newNotes = (formData.runningNotes ? formData.runningNotes + "\n\n" : "") + `[AI Scribe]: ${liveTranscript}`;
-              setFormData(prev => ({...prev, runningNotes: newNotes}));
-              onUpdate(log.id, { runningNotes: newNotes });
-              setLiveTranscript(''); // Clear buffer
-          }
-          return;
+    // Start a new session via the service module.
+    try {
+      const session = await startAudioTranscription({
+        gcpApiKey: campaign.gcpApiKey!,
+        onTranscript: (text) => setLiveTranscript(prev => prev + text),
+        onConnected: () => setIsLiveConnected(true),
+        onDisconnected: () => setIsLiveConnected(false),
+        onError: (err) => console.error('Gemini Live Error', err),
+      });
+      audioSessionRef.current = session;
+    } catch (err) {
+      console.error('Failed to start Live session', err);
+      setIsLiveConnected(false);
+      alert('Could not connect to AI service. Please check your GCP API key in Campaign Settings and try again.');
+    }
+  };
+
+  // --- Transcript File Import ---
+  const parseVtt = (content: string): string => {
+    const lines = content.split('\n');
+    const textLines: string[] = [];
+    // VTT lines that are timestamps look like "00:00:01.000 --> 00:00:04.000"
+    const timestampRe = /^\d{2}:\d{2}[\d:.]+\s+-->\s+\d{2}:\d{2}/;
+    let skipNext = false;
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed === 'WEBVTT' || trimmed === '') {
+        continue;
+      }
+      // Skip cue identifier lines (pure numeric or alphanumeric id before a timestamp block)
+      if (timestampRe.test(trimmed)) {
+        skipNext = false; // The next line(s) are cue text
+        continue;
+      }
+      // Skip NOTE / STYLE / REGION blocks
+      if (/^(NOTE|STYLE|REGION)\b/.test(trimmed)) {
+        skipNext = true;
+        continue;
+      }
+      if (skipNext) continue;
+      textLines.push(trimmed);
+    }
+    return textLines.join(' ').trim();
+  };
+
+  const handleTranscriptFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset the input so the same file can be re-imported if needed.
+    e.target.value = '';
+
+    setIsImportingTranscript(true);
+    try {
+      let text = '';
+
+      if (file.name.endsWith('.docx')) {
+        // TODO: Add a .docx parser library (e.g., mammoth) for full support.
+        // For now, attempt a raw text read — this will produce garbled output for
+        // binary .docx files but avoids pulling in an unvetted dependency.
+        text = '[DOCX import requires a parser library — see TODO in SessionLogEditor.tsx]\n\n';
+        text += await file.text();
+      } else if (file.name.endsWith('.vtt')) {
+        const raw = await file.text();
+        text = parseVtt(raw);
+      } else {
+        // .txt
+        text = await file.text();
       }
 
-      // Connect Logic
-      try {
-          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          mediaStreamRef.current = stream;
+      if (!text.trim()) return;
 
-          const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-          audioContextRef.current = audioCtx;
-
-          setIsLiveConnected(true); // Set UI state immediately
-
-          sessionPromiseRef.current = ai.live.connect({
-              model: 'gemini-2.5-flash-native-audio-preview-09-2025',
-              config: {
-                  responseModalities: [Modality.AUDIO], 
-                  speechConfig: {
-                      voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } }
-                  },
-                  inputAudioTranscription: {}, 
-                  systemInstruction: "You are a silent scribe for a Dungeon Master. Your ONLY job is to listen to the game session and transcribe what is said accurately into text. Do not speak. Do not interrupt.",
-              },
-              callbacks: {
-                  onopen: async () => {
-                      console.log("Gemini Live Connected");
-                      if (audioCtx.state === 'suspended') {
-                          await audioCtx.resume();
-                      }
-                      
-                      const source = audioCtx.createMediaStreamSource(stream);
-                      const processor = audioCtx.createScriptProcessor(4096, 1, 1);
-                      
-                      processor.onaudioprocess = (e) => {
-                          const inputData = e.inputBuffer.getChannelData(0);
-                          // Convert Float32 to Int16
-                          const l = inputData.length;
-                          const int16 = new Int16Array(l);
-                          for (let i = 0; i < l; i++) {
-                              int16[i] = inputData[i] * 32768;
-                          }
-                          
-                          // Custom base64 encode for raw audio bytes
-                          let binary = '';
-                          const bytes = new Uint8Array(int16.buffer);
-                          const len = bytes.byteLength;
-                          for (let i = 0; i < len; i++) {
-                              binary += String.fromCharCode(bytes[i]);
-                          }
-                          const base64Data = btoa(binary);
-
-                          // Send audio chunk
-                          if (sessionPromiseRef.current) {
-                              sessionPromiseRef.current.then(session => {
-                                  session.sendRealtimeInput({
-                                      media: {
-                                          mimeType: 'audio/pcm;rate=16000',
-                                          data: base64Data
-                                      }
-                                  });
-                              });
-                          }
-                      };
-                      
-                      source.connect(processor);
-                      processor.connect(audioCtx.destination);
-                  },
-                  onmessage: (msg: LiveServerMessage) => {
-                      // Handle Input Transcription (User/Players speaking)
-                      if (msg.serverContent?.inputTranscription) {
-                          const text = msg.serverContent.inputTranscription.text;
-                          if (text) {
-                              setLiveTranscript(prev => prev + text);
-                          }
-                      }
-                      // Note: We ignore model audio output because the system instruction tells it to be silent.
-                  },
-                  onclose: () => {
-                      console.log("Gemini Live Closed");
-                      setIsLiveConnected(false);
-                  },
-                  onerror: (err) => {
-                      console.error("Gemini Live Error", err);
-                      // Don't disable here immediately as retries might happen or it's non-fatal
-                  }
-              }
-          });
-          
-
-
-      } catch (err) {
-          console.error("Failed to start Live session", err);
-          setIsLiveConnected(false);
-          
-          if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-              audioContextRef.current.close();
-          }
-          audioContextRef.current = null;
-
-          if (mediaStreamRef.current) {
-              mediaStreamRef.current.getTracks().forEach(track => track.stop());
-              mediaStreamRef.current = null;
-          }
-          
-          alert("Could not connect to AI service. Please check console for details.");
-      }
+      const prefix = formData.runningNotes ? formData.runningNotes + '\n\n' : '';
+      const newNotes = prefix + `[Imported transcript — ${file.name}]:\n${text}`;
+      setFormData(prev => ({ ...prev, runningNotes: newNotes }));
+      onUpdate(log.id, { runningNotes: newNotes });
+      // Switch to scratchpad so the user sees the imported content immediately.
+      setActiveTab('scratchpad');
+    } catch (err) {
+      console.error('Transcript import failed', err);
+      alert('Failed to read the transcript file. See console for details.');
+    } finally {
+      setIsImportingTranscript(false);
+    }
   };
 
 
@@ -406,16 +360,45 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
         </div>
         <div className="flex gap-2 items-center">
             {formData.status === 'active' && (
-                <div className="mr-4">
-                    <Button 
-                        onClick={handleToggleLive} 
+                <div className="mr-4 flex items-center gap-2">
+                    {/* AI Scribe button — only shown when a GCP API key is configured */}
+                    {campaign.gcpApiKey ? (
+                        <Button
+                            onClick={handleToggleLive}
+                            size="sm"
+                            className={isLiveConnected ? "bg-red-500/20 text-red-300 border border-red-500/50 hover:bg-red-500/30" : "bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700"}
+                        >
+                            {isLiveConnected ? (
+                                <><span className="w-2 h-2 bg-red-500 rounded-full animate-pulse mr-2" /> Stop Scribe</>
+                            ) : (
+                                <><Icons.Mic className="w-4 h-4 mr-2" /> Enable AI Scribe</>
+                            )}
+                        </Button>
+                    ) : (
+                        <span className="text-xs text-slate-500 italic" title="Add a GCP API key in Campaign Settings to enable real-time transcription">
+                            AI Scribe (key required)
+                        </span>
+                    )}
+
+                    {/* Transcript file import */}
+                    <input
+                        ref={transcriptFileInputRef}
+                        type="file"
+                        accept=".txt,.vtt,.docx"
+                        className="hidden"
+                        onChange={handleTranscriptFileChange}
+                    />
+                    <Button
                         size="sm"
-                        className={isLiveConnected ? "bg-red-500/20 text-red-300 border border-red-500/50 hover:bg-red-500/30" : "bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700"}
+                        onClick={() => transcriptFileInputRef.current?.click()}
+                        disabled={isImportingTranscript}
+                        className="bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700"
+                        title="Import transcript (.txt, .vtt, .docx)"
                     >
-                        {isLiveConnected ? (
-                            <><span className="w-2 h-2 bg-red-500 rounded-full animate-pulse mr-2" /> Stop Scribe</>
+                        {isImportingTranscript ? (
+                            <Icons.Loader className="w-4 h-4 animate-spin" />
                         ) : (
-                            <><Icons.Coach className="w-4 h-4 mr-2" /> Enable AI Scribe</>
+                            <Icons.FileUp className="w-4 h-4" />
                         )}
                     </Button>
                 </div>

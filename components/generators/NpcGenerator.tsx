@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import type { NPC, Faction } from '../../types/index';
-import { generateNpc } from '../../services/geminiService';
+import { generateNpc } from '../../services/aiService';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { SkeletonGeneratorOverlay } from '../common/SkeletonCard';
@@ -21,7 +21,6 @@ interface NpcGeneratorProps {
 export const NpcGenerator: React.FC<NpcGeneratorProps> = ({ onNpcCreated, isMockMode, isOfficialSetting = false, factions = [], allNpcs = [], campaignContext }) => {
   const [mode, setMode] = useState<'quick' | 'chat'>('quick');
   const [prompt, setPrompt] = useState('');
-  const [useGroundedSearch, setUseGroundedSearch] = useState(isOfficialSetting);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,8 +32,7 @@ export const NpcGenerator: React.FC<NpcGeneratorProps> = ({ onNpcCreated, isMock
     setIsLoading(true);
     setError(null);
     try {
-      const shouldSearch = isOfficialSetting || useGroundedSearch;
-      const npcData = await generateNpc(prompt, shouldSearch, isMockMode, campaignContext);
+      const npcData = await generateNpc(prompt, isMockMode, campaignContext);
       const newNpc: Omit<NPC, 'id'> = {
           ...npcData,
           factionId: undefined
@@ -105,29 +103,11 @@ export const NpcGenerator: React.FC<NpcGeneratorProps> = ({ onNpcCreated, isMock
       <textarea
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
-        placeholder={useGroundedSearch || isOfficialSetting ? "e.g., Drizzt Do'Urden, Elminster" : "e.g., A gruff dwarven blacksmith..."}
+        placeholder={isOfficialSetting ? "e.g., Drizzt Do'Urden, Elminster" : "e.g., A gruff dwarven blacksmith..."}
         rows={5}
         className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none resize-y placeholder:text-slate-600"
         disabled={isLoading}
       />
-      <div className="flex items-center justify-between">
-         <label className="flex items-center text-xs text-slate-400 select-none">
-            <input 
-                type="checkbox"
-                checked={useGroundedSearch}
-                onChange={(e) => setUseGroundedSearch(e.target.checked)}
-                className="w-4 h-4 mr-2 bg-slate-800 border-slate-600 rounded text-indigo-600 focus:ring-indigo-500"
-                disabled={isLoading}
-            />
-            Use Google Search (Find Canon/Lore)
-        </label>
-        <div className="group relative">
-            <Icons.Help className="w-4 h-4 text-slate-500 cursor-help" />
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-900 text-slate-300 text-xs rounded-md p-2 border border-slate-700 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg">
-                Check this to generate an NPC based on established lore from official sources (e.g., Forgotten Realms). {isOfficialSetting ? "Recommended for your Official Setting." : ""}
-            </div>
-        </div>
-      </div>
       {error && <p className="text-xs text-red-400">{error}</p>}
       <Button onClick={handleQuickGenerate} disabled={isLoading || !prompt.trim()} size="lg" className="w-full mt-auto">
         {isLoading ? 'Generating...' : 'Generate NPC'}

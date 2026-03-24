@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Icons } from '@/components/common/Icons';
-import { generateEnhancedText } from '@/services/geminiService';
+import { generateEnhancedText } from '@/services/aiService';
 
 interface RegenerateButtonProps {
   fieldName: string;

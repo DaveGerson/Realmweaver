@@ -5,7 +5,7 @@ import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { twMerge } from 'tailwind-merge';
 import { campaignService } from '../../services/campaignService';
-import { generateSessionRecap } from '../../services/geminiService';
+import { generateSessionRecap } from '../../services/aiService';
 
 type WizardStep = 'recap' | 'plots' | 'loose-ends' | 'player-recap' | 'confirm';
 

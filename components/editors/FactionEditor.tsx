@@ -4,7 +4,7 @@ import type { Faction, NPC, Location } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
-import { generateEnhancedText, generateNpc } from '../../services/geminiService';
+import { generateNpc } from '../../services/aiService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
 import { RegenerateButton } from '../common/RegenerateButton';
 import { EntityLink } from '../common/EntityLink';
@@ -35,7 +35,6 @@ const FACTION_TABS: TabDefinition[] = [
 
 export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, allLocations = [], onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(faction);
-  const [isGenerating, setIsGenerating] = useState<keyof Omit<Faction, 'id' | 'leaderId' | 'memberIds'> | null>(null);
   const [isGeneratingMember, setIsGeneratingMember] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -74,24 +73,7 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
     }
   }
 
-  const handleAiGenerate = async (field: keyof Omit<Faction, 'id' | 'leaderId' | 'memberIds' | 'headquartersLocationId'>) => {
-    setIsGenerating(field);
-    const context = `Faction Name: ${formData.name}\nDescription: ${field === 'description' ? '[GENERATE THIS]' : formData.description || 'Not specified'}\nGoals: ${field === 'goals' ? '[GENERATE THIS]' : formData.goals || 'Not specified'}`;
-    const prompt = `Based on the following faction info, generate a compelling "${field}":\n\n${context}`;
-
-    try {
-      const result = await generateEnhancedText(prompt, undefined, isMockMode);
-      const updatedData = { [field]: result };
-      setFormData(prev => ({ ...prev, ...updatedData }));
-      onUpdate(faction.id, updatedData);
-    } catch (error) {
-      console.error("AI generation failed:", error);
-    } finally {
-      setIsGenerating(null);
-    }
-  };
-
-  const handleFieldRegenerate = (field: keyof Omit<Faction, 'id' | 'leaderId' | 'memberIds' | 'headquartersLocationId'>) => (newValue: string) => {
+  const handleFieldRegenerate = (field: keyof Omit<Faction, 'id' | 'leaderId' | 'memberIds' | 'headquartersLocationId' | 'alignment'>) => (newValue: string) => {
     setFormData(prev => ({ ...prev, [field]: newValue }));
     onUpdate(faction.id, { [field]: newValue });
   };
@@ -105,7 +87,7 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
     setIsGeneratingMember(true);
     const contextWithFaction = `${campaignContext || ''}\nFaction: ${faction.name}${faction.description ? ` — ${faction.description}` : ''}${faction.goals ? `\nFaction Goals: ${faction.goals}` : ''}`.trim();
     try {
-      const npcData = await generateNpc(prompt, false, isMockMode, contextWithFaction);
+      const npcData = await generateNpc(prompt, isMockMode, contextWithFaction);
       campaignService.createNpc({ ...npcData, factionId: faction.id, relationships: [], history: [] });
     } catch (error) {
       console.error('Failed to generate member NPC:', error);
@@ -172,8 +154,6 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
                 onBlur={handleBlur}
                 rows={4}
                 placeholder="The faction's purpose, public image, and typical members."
-                onAiGenerate={() => handleAiGenerate('description')}
-                isGenerating={isGenerating === 'description'}
                 regenerateButton={<RegenerateButton fieldName="description" currentValue={formData.description} entityType="Faction" entityContext={factionEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />}
               />
               {formData.description && onNavigate && (
@@ -191,8 +171,6 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
                 onBlur={handleBlur}
                 rows={3}
                 placeholder="The faction's primary short-term and long-term objectives."
-                onAiGenerate={() => handleAiGenerate('goals')}
-                isGenerating={isGenerating === 'goals'}
                 regenerateButton={<RegenerateButton fieldName="goals" currentValue={formData.goals} entityType="Faction" entityContext={factionEntityContext} onRegenerate={handleFieldRegenerate('goals')} isMockMode={isMockMode} campaignContext={campaignContext} />}
               />
               {formData.goals && onNavigate && (
@@ -210,8 +188,7 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
                 onBlur={handleBlur}
                 rows={3}
                 placeholder="Wealth, magic items, safehouses, connections, military might."
-                onAiGenerate={() => handleAiGenerate('resources')}
-                isGenerating={isGenerating === 'resources'}
+                regenerateButton={<RegenerateButton fieldName="resources" currentValue={formData.resources || ''} entityType="Faction" entityContext={factionEntityContext} onRegenerate={handleFieldRegenerate('resources')} isMockMode={isMockMode} campaignContext={campaignContext} />}
               />
 
               {/* Influence */}
@@ -223,8 +200,7 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
                 onBlur={handleBlur}
                 rows={3}
                 placeholder="Where do they hold sway? Who fears or respects them?"
-                onAiGenerate={() => handleAiGenerate('influence')}
-                isGenerating={isGenerating === 'influence'}
+                regenerateButton={<RegenerateButton fieldName="influence" currentValue={formData.influence || ''} entityType="Faction" entityContext={factionEntityContext} onRegenerate={handleFieldRegenerate('influence')} isMockMode={isMockMode} campaignContext={campaignContext} />}
               />
             </div>
           )}

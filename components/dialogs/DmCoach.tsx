@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import type { Campaign, NPC, RollableTable, RollableTableEntry } from '../../types/index';
-import { generateNarration, generateImprovisation, generateRollableTable, generateNpcRoleplay } from '../../services/geminiService';
+import { generateNarration, generateImprovisation, generateRollableTable, generateNpcRoleplay } from '../../services/aiService';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { MentionInput, buildMentionedEntityContext } from '../common/MentionInput';

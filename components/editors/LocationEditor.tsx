@@ -4,7 +4,7 @@ import type { Location, LocationConnection, PointOfInterest, PoiInteraction, Loo
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
-import { generateEnhancedText, generatePoiFromLoot, generateNpc } from '../../services/geminiService';
+import { generatePoiFromLoot, generateNpc } from '../../services/aiService';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { RegenerateButton } from '../common/RegenerateButton';
 import { EntityLink } from '../common/EntityLink';
@@ -29,8 +29,6 @@ interface LocationEditorProps {
   onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
 }
 
-type GenerationField = 'description' | 'secrets';
-
 const LOCATION_TABS: TabDefinition[] = [
   { id: 'overview',     label: 'Overview',     icon: Icons.Locations },
   { id: 'details',      label: 'Details',      icon: Icons.Puzzle },
@@ -40,7 +38,6 @@ const LOCATION_TABS: TabDefinition[] = [
 
 export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLocations, allFactions = [], onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(location);
-  const [isGenerating, setIsGenerating] = useState<GenerationField | null>(null);
   const [generatingPoiFor, setGeneratingPoiFor] = useState<string | null>(null);
   const [isGeneratingNpc, setIsGeneratingNpc] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
@@ -81,24 +78,7 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     onUpdate(location.id, { controllingFactionId: newFactionId });
   };
 
-  const handleAiGenerate = async (field: GenerationField) => {
-    setIsGenerating(field);
-    const context = `Location Name: ${formData.name}\nDescription: ${field === 'description' ? '[GENERATE THIS]' : formData.description}\nSecrets: ${field === 'secrets' ? '[GENERATE THIS]' : formData.secrets}`;
-    const prompt = `Based on the following location info, generate a compelling "${field}":\n\n${context}`;
-
-    try {
-      const result = await generateEnhancedText(prompt, undefined, isMockMode);
-      const updatedData = { [field]: result };
-      setFormData(prev => ({ ...prev, ...updatedData }));
-      onUpdate(location.id, updatedData);
-    } catch (error) {
-      console.error("AI generation failed:", error);
-    } finally {
-      setIsGenerating(null);
-    }
-  };
-
-  const handleFieldRegenerate = (field: GenerationField) => (newValue: string) => {
+  const handleFieldRegenerate = (field: 'description' | 'secrets') => (newValue: string) => {
     setFormData(prev => ({ ...prev, [field]: newValue }));
     onUpdate(location.id, { [field]: newValue });
   };
@@ -248,7 +228,7 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     setIsGeneratingNpc(true);
     const contextWithLocation = `${campaignContext || ''}\nCurrent Location: ${location.name}${location.description ? ` — ${location.description}` : ''}`.trim();
     try {
-      const npcData = await generateNpc(prompt, false, isMockMode, contextWithLocation);
+      const npcData = await generateNpc(prompt, isMockMode, contextWithLocation);
       campaignService.createNpc({ ...npcData, factionId: undefined, relationships: [], history: [] });
     } catch (error) {
       console.error('Failed to generate NPC at location:', error);
@@ -324,8 +304,6 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                 onChange={handleChange}
                 onBlur={handleBlur}
                 rows={5}
-                onAiGenerate={() => handleAiGenerate('description')}
-                isGenerating={isGenerating === 'description'}
                 regenerateButton={<RegenerateButton fieldName="description" currentValue={formData.description} entityType="Location" entityContext={locationEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />}
               />
               {formData.description && onNavigate && (
@@ -341,8 +319,6 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                 onChange={handleChange}
                 onBlur={handleBlur}
                 rows={3}
-                onAiGenerate={() => handleAiGenerate('secrets')}
-                isGenerating={isGenerating === 'secrets'}
                 regenerateButton={<RegenerateButton fieldName="secrets" currentValue={formData.secrets} entityType="Location" entityContext={locationEntityContext} onRegenerate={handleFieldRegenerate('secrets')} isMockMode={isMockMode} campaignContext={campaignContext} />}
               />
               {formData.secrets && onNavigate && (

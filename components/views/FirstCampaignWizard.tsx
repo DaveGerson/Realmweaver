@@ -7,7 +7,7 @@ import {
     generateStarterNpcs,
     generateStarterLocations,
     generateStarterAdventure,
-} from '@/services/geminiService';
+} from '@/services/aiService';
 import { campaignService } from '@/services/campaignService';
 
 // ── Types ──────────────────────────────────────────────────────────────────

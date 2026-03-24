@@ -4,7 +4,6 @@ import type { NPC, Faction, EntityRelationship, PlayerCharacter } from '../../ty
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
-import { generateEnhancedText } from '../../services/geminiService';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { RegenerateButton } from '../common/RegenerateButton';
 import { EntityLink } from '../common/EntityLink';
@@ -38,7 +37,6 @@ const NPC_TABS: TabDefinition[] = [
 
 export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [], playerCharacters = [], onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(npc);
-  const [isGenerating, setIsGenerating] = useState<keyof Omit<NPC, 'id' | 'factionId' | 'knowsPlayerHistory' | 'relationships' | 'history'> | null>(null);
   const [activeTab, setActiveTab] = useState('identity');
 
   const campaign = campaignService.getState().campaigns.find(c => c.id === campaignService.getState().activeCampaignId)!;
@@ -75,23 +73,6 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
         onDelete(npc.id);
     }
   }
-
-  const handleAiGenerate = async (field: keyof Omit<NPC, 'id' | 'factionId' | 'knowsPlayerHistory' | 'relationships' | 'history'>) => {
-    setIsGenerating(field);
-    const npcContext = `NPC Name: ${formData.name}\nDescription: ${formData.description || 'Not specified'}\nTraits: ${formData.traits || 'Not specified'}`;
-    const prompt = `Based on the following NPC info, generate a compelling "${field}":\n\n${npcContext}`;
-
-    try {
-      const result = await generateEnhancedText(prompt, undefined, isMockMode);
-      const updatedData = { [field]: result };
-      setFormData(prev => ({ ...prev, ...updatedData }));
-      onUpdate(npc.id, updatedData);
-    } catch (error) {
-      console.error("AI generation failed:", error);
-    } finally {
-      setIsGenerating(null);
-    }
-  };
 
   const handleFieldRegenerate = (field: keyof Omit<NPC, 'id' | 'factionId' | 'knowsPlayerHistory' | 'relationships' | 'history'>) => (newValue: string) => {
     setFormData(prev => ({ ...prev, [field]: newValue }));
@@ -199,8 +180,6 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                 onBlur={handleBlur}
                 rows={4}
                 placeholder="Physical appearance, typical attire, mannerisms..."
-                onAiGenerate={() => handleAiGenerate('description')}
-                isGenerating={isGenerating === 'description'}
                 regenerateButton={<RegenerateButton fieldName="description" currentValue={formData.description} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />}
               />
               {formData.description && onNavigate && (
@@ -218,8 +197,6 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                 onBlur={handleBlur}
                 rows={2}
                 placeholder="e.g., 'Taps fingers when impatient, speaks in riddles.'"
-                onAiGenerate={() => handleAiGenerate('traits')}
-                isGenerating={isGenerating === 'traits'}
                 regenerateButton={<RegenerateButton fieldName="traits" currentValue={formData.traits} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('traits')} isMockMode={isMockMode} campaignContext={campaignContext} />}
               />
             </div>
@@ -237,8 +214,6 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                 onBlur={handleBlur}
                 rows={2}
                 placeholder="What drives this character?"
-                onAiGenerate={() => handleAiGenerate('motivations')}
-                isGenerating={isGenerating === 'motivations'}
                 regenerateButton={<RegenerateButton fieldName="motivations" currentValue={formData.motivations} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('motivations')} isMockMode={isMockMode} campaignContext={campaignContext} />}
               />
               {formData.motivations && onNavigate && (
@@ -256,8 +231,6 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                 onBlur={handleBlur}
                 rows={3}
                 placeholder="What are they hiding? What important information do they know?"
-                onAiGenerate={() => handleAiGenerate('secrets')}
-                isGenerating={isGenerating === 'secrets'}
                 regenerateButton={<RegenerateButton fieldName="secrets" currentValue={formData.secrets} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('secrets')} isMockMode={isMockMode} campaignContext={campaignContext} />}
               />
               {formData.secrets && onNavigate && (
@@ -275,8 +248,6 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                 onBlur={handleBlur}
                 rows={2}
                 placeholder="A memorable line of dialogue that captures their personality."
-                onAiGenerate={() => handleAiGenerate('exampleQuote')}
-                isGenerating={isGenerating === 'exampleQuote'}
                 regenerateButton={<RegenerateButton fieldName="exampleQuote" currentValue={formData.exampleQuote} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('exampleQuote')} isMockMode={isMockMode} campaignContext={campaignContext} />}
               />
 
@@ -288,8 +259,6 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                 onChange={handleChange}
                 onBlur={handleBlur}
                 rows={5}
-                onAiGenerate={() => handleAiGenerate('backstory')}
-                isGenerating={isGenerating === 'backstory'}
                 regenerateButton={<RegenerateButton fieldName="backstory" currentValue={formData.backstory} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('backstory')} isMockMode={isMockMode} campaignContext={campaignContext} />}
               />
             </div>
@@ -306,8 +275,6 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                 onBlur={handleBlur}
                 rows={6}
                 placeholder="e.g., 'Veteran warrior (use Knight stat block)' or 'Skilled archer, but clumsy.'"
-                onAiGenerate={() => handleAiGenerate('stats')}
-                isGenerating={isGenerating === 'stats'}
                 regenerateButton={<RegenerateButton fieldName="stats" currentValue={formData.stats} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('stats')} isMockMode={isMockMode} campaignContext={campaignContext} />}
               />
             </div>
