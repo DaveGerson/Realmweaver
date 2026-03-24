@@ -20,13 +20,16 @@ export const TabLayout: React.FC<TabLayoutProps> = ({ tabs, activeTab, onTabChan
     <div className="flex flex-col">
       {/* Tab bar */}
       <div className="border-b border-slate-800 overflow-x-auto">
-        <nav className="-mb-px flex space-x-1 min-w-max">
+        <nav className="-mb-px flex space-x-1 min-w-max" role="tablist">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`panel-${tab.id}`}
                 onClick={() => onTabChange(tab.id)}
                 className={twMerge(
                   'flex items-center whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm focus:outline-none transition-colors',
@@ -44,7 +47,7 @@ export const TabLayout: React.FC<TabLayoutProps> = ({ tabs, activeTab, onTabChan
       </div>
 
       {/* Tab content */}
-      <div className="mt-6">
+      <div role="tabpanel" id={`panel-${activeTab}`} className="mt-6">
         {children}
       </div>
     </div>

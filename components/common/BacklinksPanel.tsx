@@ -162,7 +162,7 @@ export const BacklinksPanel: React.FC<BacklinksPanelProps> = ({
   const state = useSyncExternalStore(campaignService.subscribe, campaignService.getState);
   const campaign = useMemo(() => {
     return state.campaigns.find((c) => c.id === state.activeCampaignId) ?? null;
-  }, [state]);
+  }, [state.campaigns, state.activeCampaignId]);
 
   const backlinks = useMemo(() => {
     if (!campaign) return {};

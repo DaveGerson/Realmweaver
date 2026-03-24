@@ -19,15 +19,11 @@ export interface ContinuityIssue {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-let _issueCounter = 0;
-
-function makeId(ruleId: string): string {
-  return `${ruleId}-${++_issueCounter}`;
-}
+type MakeId = (ruleId: string) => string;
 
 // ─── Rule 1: Broken References (error) ───────────────────────────────────────
 
-function checkBrokenReferences(campaign: Campaign): ContinuityIssue[] {
+function checkBrokenReferences(campaign: Campaign, makeId: MakeId): ContinuityIssue[] {
   const issues: ContinuityIssue[] = [];
 
   const npcIds = new Set(campaign.npcs.map(n => n.id));
@@ -157,7 +153,7 @@ function checkBrokenReferences(campaign: Campaign): ContinuityIssue[] {
 
 // ─── Rule 2: Circular Location Hierarchy (error) ─────────────────────────────
 
-function checkCircularLocationHierarchy(campaign: Campaign): ContinuityIssue[] {
+function checkCircularLocationHierarchy(campaign: Campaign, makeId: MakeId): ContinuityIssue[] {
   const issues: ContinuityIssue[] = [];
   const parentMap = new Map<string, string>();
 
@@ -203,7 +199,7 @@ function checkCircularLocationHierarchy(campaign: Campaign): ContinuityIssue[] {
 
 // ─── Rule 3: Orphaned Entities (info) ────────────────────────────────────────
 
-function checkOrphanedEntities(campaign: Campaign): ContinuityIssue[] {
+function checkOrphanedEntities(campaign: Campaign, makeId: MakeId): ContinuityIssue[] {
   const issues: ContinuityIssue[] = [];
 
   // --- Orphaned NPCs ---
@@ -303,7 +299,7 @@ function checkOrphanedEntities(campaign: Campaign): ContinuityIssue[] {
 
 // ─── Rule 4: Empty Factions (warning) ────────────────────────────────────────
 
-function checkEmptyFactions(campaign: Campaign): ContinuityIssue[] {
+function checkEmptyFactions(campaign: Campaign, makeId: MakeId): ContinuityIssue[] {
   const issues: ContinuityIssue[] = [];
 
   for (const faction of campaign.factions) {
@@ -330,7 +326,7 @@ function checkEmptyFactions(campaign: Campaign): ContinuityIssue[] {
 
 // ─── Rule 5: Dormant Active Plots (warning) ───────────────────────────────────
 
-function checkDormantPlots(campaign: Campaign): ContinuityIssue[] {
+function checkDormantPlots(campaign: Campaign, makeId: MakeId): ContinuityIssue[] {
   const issues: ContinuityIssue[] = [];
 
   const activePlots = (campaign.plots ?? []).filter(p => p.status === 'active');
@@ -373,7 +369,7 @@ function checkDormantPlots(campaign: Campaign): ContinuityIssue[] {
 
 // ─── Rule 6: Scenes Without Content (info) ───────────────────────────────────
 
-function checkScenesWithoutContent(campaign: Campaign): ContinuityIssue[] {
+function checkScenesWithoutContent(campaign: Campaign, makeId: MakeId): ContinuityIssue[] {
   const issues: ContinuityIssue[] = [];
 
   for (const adventure of campaign.adventures) {
@@ -402,7 +398,7 @@ function checkScenesWithoutContent(campaign: Campaign): ContinuityIssue[] {
 
 // ─── Rule 7: Adventures Without Scenes (info) ────────────────────────────────
 
-function checkAdventuresWithoutScenes(campaign: Campaign): ContinuityIssue[] {
+function checkAdventuresWithoutScenes(campaign: Campaign, makeId: MakeId): ContinuityIssue[] {
   const issues: ContinuityIssue[] = [];
 
   for (const adventure of campaign.adventures) {
@@ -425,7 +421,7 @@ function checkAdventuresWithoutScenes(campaign: Campaign): ContinuityIssue[] {
 
 // ─── Rule 8: Duplicate Entity Names (warning) ─────────────────────────────────
 
-function checkDuplicateNames(campaign: Campaign): ContinuityIssue[] {
+function checkDuplicateNames(campaign: Campaign, makeId: MakeId): ContinuityIssue[] {
   const issues: ContinuityIssue[] = [];
 
   function findDuplicates<T extends { id: string; name: string }>(
@@ -471,19 +467,22 @@ function checkDuplicateNames(campaign: Campaign): ContinuityIssue[] {
 /**
  * Run all continuity rules against the campaign and return a flat list of issues.
  * Pure function — reads campaign data only, makes no changes.
+ *
+ * The ID counter is local to each call (Fix A-4) so concurrent invocations
+ * cannot produce duplicate IDs.
  */
 export function checkContinuity(campaign: Campaign): ContinuityIssue[] {
-  // Reset the counter so IDs are deterministic per run (not required but keeps tests clean).
-  _issueCounter = 0;
+  let counter = 0;
+  const makeId: MakeId = (ruleId: string) => `${ruleId}-${++counter}`;
 
   return [
-    ...checkBrokenReferences(campaign),
-    ...checkCircularLocationHierarchy(campaign),
-    ...checkOrphanedEntities(campaign),
-    ...checkEmptyFactions(campaign),
-    ...checkDormantPlots(campaign),
-    ...checkScenesWithoutContent(campaign),
-    ...checkAdventuresWithoutScenes(campaign),
-    ...checkDuplicateNames(campaign),
+    ...checkBrokenReferences(campaign, makeId),
+    ...checkCircularLocationHierarchy(campaign, makeId),
+    ...checkOrphanedEntities(campaign, makeId),
+    ...checkEmptyFactions(campaign, makeId),
+    ...checkDormantPlots(campaign, makeId),
+    ...checkScenesWithoutContent(campaign, makeId),
+    ...checkAdventuresWithoutScenes(campaign, makeId),
+    ...checkDuplicateNames(campaign, makeId),
   ];
 }

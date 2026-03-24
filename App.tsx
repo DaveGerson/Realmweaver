@@ -146,12 +146,16 @@ const App: FC = () => {
   const activeCampaign = useMemo(() => campaigns.find(c => c.id === activeCampaignId), [campaigns, activeCampaignId]);
   const isOfficialSetting = activeCampaign?.settingType === 'official';
 
-  // Continuity issue count — recomputed whenever the campaign changes. Only counts
-  // errors and warnings (info items don't warrant a badge).
-  const continuityIssueCount = useMemo(() => {
-    if (!activeCampaign) return 0;
-    const issues = checkContinuity(activeCampaign);
-    return issues.filter(i => i.severity === 'error' || i.severity === 'warning').length;
+  // Continuity issue count — debounced so it doesn't run on every state change
+  // (Fix A-3: activeCampaign changes reference on every Immer update).
+  const [continuityIssueCount, setContinuityIssueCount] = useState(0);
+  useEffect(() => {
+    if (!activeCampaign) { setContinuityIssueCount(0); return; }
+    const timer = setTimeout(() => {
+      const issues = checkContinuity(activeCampaign);
+      setContinuityIssueCount(issues.filter(i => i.severity === 'error' || i.severity === 'warning').length);
+    }, 5000);
+    return () => clearTimeout(timer);
   }, [activeCampaign]);
   const campaignContext = useMemo(() => {
     if (!activeCampaign) return undefined;

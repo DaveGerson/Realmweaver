@@ -140,6 +140,7 @@ const SecretCard: React.FC<SecretCardProps> = ({
           <button
             onClick={handleRevealToggle}
             title={secret.isRevealed ? 'Mark as unrevealed' : 'Reveal to players'}
+            aria-label={secret.isRevealed ? 'Mark as unrevealed' : 'Reveal to players'}
             className={twMerge(
               'p-1.5 rounded-md transition-colors',
               secret.isRevealed
@@ -158,6 +159,7 @@ const SecretCard: React.FC<SecretCardProps> = ({
             onClick={() => setExpanded(prev => !prev)}
             className="p-1.5 rounded-md text-slate-500 hover:text-slate-300 hover:bg-slate-700 transition-colors"
             title={expanded ? 'Collapse' : 'Expand'}
+            aria-label={expanded ? 'Collapse details' : 'Expand details'}
           >
             {expanded
               ? <Icons.ChevronUp className="w-4 h-4" />

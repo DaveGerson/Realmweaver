@@ -18,7 +18,7 @@
  *   list items, or anywhere body text appears.
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useSyncExternalStore } from 'react';
 import { EntityLink } from '@/components/common/EntityLink';
 import { campaignService } from '@/services/campaignService';
 import type { QuickCardEntityType } from '@/components/common/EntityQuickCard';
@@ -54,12 +54,10 @@ type Segment = PlainSegment | LinkSegment;
 const MIN_NAME_LENGTH = 3;
 
 /**
- * Collect all linkable entities from the active campaign and return them
+ * Collect all linkable entities from a campaign and return them
  * sorted longest-name-first so greedy matching prefers longer names.
  */
-function buildEntityEntries(): EntityEntry[] {
-  const state = campaignService.getState();
-  const campaign = state.campaigns.find(c => c.id === state.activeCampaignId);
+function buildEntityEntries(campaign: NonNullable<ReturnType<typeof campaignService.getState>['campaigns'][number]> | undefined): EntityEntry[] {
   if (!campaign) return [];
 
   const entries: EntityEntry[] = [];
@@ -178,13 +176,16 @@ function tokenize(text: string, entries: EntityEntry[]): Segment[] {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const LinkedText: React.FC<LinkedTextProps> = ({ text, onNavigate, className = '' }) => {
-  // useMemo with text as dependency — entity list is relatively stable so we
-  // only re-tokenize when the text itself changes.
+  // Subscribe to campaign state so the entity map stays current when entities
+  // are renamed or deleted (Fix A-1).
+  const state = useSyncExternalStore(campaignService.subscribe, campaignService.getState);
+  const campaign = state.campaigns.find(c => c.id === state.activeCampaignId);
+
   const segments = useMemo(() => {
     if (!text) return [];
-    const entries = buildEntityEntries();
+    const entries = buildEntityEntries(campaign);
     return tokenize(text, entries);
-  }, [text]);
+  }, [text, campaign]);
 
   if (!text) return null;
 

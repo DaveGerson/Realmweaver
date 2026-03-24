@@ -161,10 +161,18 @@ export const importCampaignFromJson = (file: File): Promise<Campaign> => {
                 const data = JSON.parse(result);
                 // Basic validation
                 if (data.id && data.title && Array.isArray(data.npcs)) {
-                    // Ensure sessionLogs exists for backward compatibility
-                    if (!data.sessionLogs) {
-                        data.sessionLogs = [];
-                    }
+                    // Normalize all entity arrays for backward compatibility
+                    // (Fix C-1: older exports may be missing fields added after initial release)
+                    data.locations = data.locations || [];
+                    data.factions = data.factions || [];
+                    data.items = data.items || [];
+                    data.adventures = data.adventures || [];
+                    data.articles = data.articles || [];
+                    data.sessionLogs = data.sessionLogs || [];
+                    data.playerCharacters = data.playerCharacters || [];
+                    data.plots = data.plots || [];
+                    data.notes = data.notes || [];
+                    data.secrets = data.secrets || [];
                     resolve(data as Campaign);
                 } else {
                     reject(new Error("Invalid campaign file format."));
