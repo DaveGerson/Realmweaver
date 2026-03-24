@@ -72,6 +72,9 @@ interface CreateCampaignOptions {
  * active campaign via the header dropdown.
  *
  * After submission, waits for the sidebar to show the new campaign's title.
+ *
+ * Flow (Phase F): Welcome → CampaignCreator (template-select step) →
+ *   click "Start From Scratch" → campaign-form step → fill form → submit.
  */
 export async function createCampaign(
   page: Page,
@@ -84,14 +87,19 @@ export async function createCampaign(
     setting = 'A dark fantasy world full of danger and mystery.',
   } = options;
 
-  // Navigate to the creator form if not already on it
+  // Navigate to the creator if not already there.
+  // The template-select step shows "Start With a Template?" heading.
+  // The campaign-form step shows "Create Your Campaign" heading.
+  const templateSelectHeading = page.getByRole('heading', { name: /start with a template/i });
   const creatorHeading = page.getByRole('heading', { name: 'Create Your Campaign' });
-  const isOnCreator = await creatorHeading.isVisible({ timeout: 500 }).catch(() => false);
 
-  if (!isOnCreator) {
-    // Welcome screen path
+  const isOnTemplateSelect = await templateSelectHeading.isVisible({ timeout: 500 }).catch(() => false);
+  const isOnCreatorForm = await creatorHeading.isVisible({ timeout: 500 }).catch(() => false);
+
+  if (!isOnTemplateSelect && !isOnCreatorForm) {
+    // Welcome screen path — button text unchanged
     const createFirstBtn = page.getByRole('button', { name: /create your first campaign/i });
-    // Selector screen path
+    // CrossCampaignDashboard path — the "Create new campaign" dashed card
     const selectorCreateBtn = page.getByRole('button', { name: /create new campaign/i });
 
     if (await createFirstBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
@@ -99,11 +107,20 @@ export async function createCampaign(
     } else if (await selectorCreateBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
       await selectorCreateBtn.click();
     } else {
-      // Already in editing mode — open the campaign dropdown in the header
+      // Already in editing mode — use header to start a new campaign
       await openCampaignDropdown(page);
       await page.getByRole('button', { name: /create new campaign/i }).click();
     }
+  }
 
+  // After any of the above paths we land on the template-select step.
+  // Skip it by clicking "Start From Scratch" unless we're already on the form.
+  if (!isOnCreatorForm) {
+    await expect(templateSelectHeading).toBeVisible({ timeout: 5000 });
+    // The skip link is a plain <button> with text "Start From Scratch — I'll build my own world"
+    // Use the button role scoped to the exact button text to avoid matching the
+    // descriptive paragraph that also contains "from scratch".
+    await page.getByRole('button', { name: /start from scratch/i }).click();
     await expect(creatorHeading).toBeVisible({ timeout: 5000 });
   }
 
@@ -135,6 +152,15 @@ export async function createCampaign(
   await expect(
     page.locator('aside').getByRole('heading', { name: title })
   ).toBeVisible({ timeout: 8000 });
+
+  // Dismiss the FirstCampaignWizard if it auto-opened for the empty campaign.
+  // It renders as a fixed full-screen overlay with a close button titled "Skip wizard".
+  const skipWizardBtn = page.locator('button[title="Skip wizard"]');
+  if (await skipWizardBtn.isVisible({ timeout: 500 }).catch(() => false)) {
+    await skipWizardBtn.click();
+    // Wait for the overlay to disappear
+    await expect(skipWizardBtn).not.toBeVisible({ timeout: 3000 });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -202,12 +228,16 @@ async function openCampaignDropdown(page: Page): Promise<void> {
 }
 
 /**
- * Navigate to the campaign selector via the header campaign dropdown.
+ * Navigate to the campaign selector (CrossCampaignDashboard) via the header
+ * campaign dropdown. Phase F replaced CampaignSelector with CrossCampaignDashboard;
+ * the heading is now "All Campaigns".
  */
 export async function openCampaignSelector(page: Page): Promise<void> {
   await openCampaignDropdown(page);
-  await page.getByRole('button', { name: /switch campaign/i }).click();
-  await expect(page.getByRole('heading', { name: 'Your Campaigns' })).toBeVisible({ timeout: 3000 });
+  // The dropdown has both "All Campaigns" and "Switch Campaign" (both call the same action).
+  // Use exact match on "All Campaigns" to avoid strict-mode violation.
+  await page.getByRole('button', { name: 'All Campaigns', exact: true }).click();
+  await expect(page.getByRole('heading', { name: /all campaigns|your campaigns/i })).toBeVisible({ timeout: 3000 });
 }
 
 // ---------------------------------------------------------------------------

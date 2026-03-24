@@ -35,3 +35,6 @@ dist-ssr
 playwright-report/
 test-results/
 blob-report/
+
+# E2E test screenshots
+e2e/screenshots/
