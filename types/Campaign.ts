@@ -39,4 +39,5 @@ export interface Campaign {
   pinnedEntities?: Array<{ type: string; id: string }>;
   dmStyle?: DmStyle; // Progressive disclosure setting for feature visibility
   featureOverrides?: Record<string, boolean>; // Per-feature manual overrides (bypasses dmStyle)
+  wizardDismissed?: boolean; // Set to true when the First Campaign Wizard has been dismissed or completed
 }

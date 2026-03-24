@@ -459,3 +459,145 @@ export const analyzeSessionNotes = async (notes: string, knownEntityNames: strin
         ]
     });
 }
+
+export const generateStarterNpcs = async (worldDescription: string, campaignContext?: string): Promise<Array<Omit<NPC, 'id' | 'factionId'>>> => {
+    console.log(`[MOCK MODE] Called generateStarterNpcs with worldDescription length: ${worldDescription.length}`);
+    logContext(campaignContext);
+    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    return Promise.resolve([
+        {
+            name: "Aldric the Innkeeper",
+            description: "A stout, weathered man with a salt-and-pepper beard and kind eyes creased by years of smiling at strangers.",
+            traits: "Remembers every face that passes through his door. Speaks in aphorisms.",
+            exampleQuote: "Trouble has a way of finding folk who aren't lookin' for it, and doubly so for those who are.",
+            backstory: "A retired soldier who bought the inn with his severance pay. He's seen enough bloodshed to last three lifetimes.",
+            motivations: "Keep his inn profitable and his regulars safe. He's the unofficial mayor of Main Street.",
+            secrets: "He shelters fugitives from the local lord in his cellar — he won't say why, but old loyalties die hard.",
+            stats: "Commoner with Veteran stats when pushed",
+            knowsPlayerHistory: [],
+            relationships: [],
+            history: []
+        },
+        {
+            name: "Serafine Dusk",
+            description: "A willowy woman in travel-stained robes, her silver-streaked hair pulled back under a wide-brimmed hat. Her eyes are mismatched: one green, one white as a cloud.",
+            traits: "Speaks to her familiar (an invisible cat) mid-conversation. Never walks through doorways without pausing.",
+            exampleQuote: "The dead are chattier than the living give them credit for.",
+            backstory: "A hedge witch who drifts from town to town trading in minor charms and grave-readings.",
+            motivations: "She's searching for the tomb of her mentor, who she believes left her a final message from beyond.",
+            secrets: "Her white eye can see spirits. The invisible cat is actually her dead mentor's soul, unable to move on.",
+            stats: "Mage (CR6), specializes in divination and necromancy",
+            knowsPlayerHistory: [],
+            relationships: [],
+            history: []
+        },
+        {
+            name: "Vorn Ashbane",
+            description: "Broad-shouldered and scarred, with close-cropped dark hair and the cautious posture of someone expecting an ambush.",
+            traits: "Stands with his back to walls. Barely speaks above a murmur. Unusually good with animals.",
+            exampleQuote: "I don't talk about what I've done. Or what I'll do if pushed.",
+            backstory: "Former enforcer for a thieves' guild he eventually betrayed. Now lays low in this frontier town.",
+            motivations: "Stay invisible. Survive. Maybe, eventually, atone.",
+            secrets: "He has the guild's ledger — a list of nobles who paid for murders — and they want it back.",
+            stats: "Assassin (CR8)",
+            knowsPlayerHistory: [],
+            relationships: [],
+            history: []
+        }
+    ]);
+};
+
+export const generateStarterLocations = async (worldDescription: string, npcs: Array<Omit<NPC, 'id' | 'factionId'>>, campaignContext?: string): Promise<Array<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>>> => {
+    console.log(`[MOCK MODE] Called generateStarterLocations with worldDescription length: ${worldDescription.length}`);
+    logContext(campaignContext);
+    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    return Promise.resolve([
+        {
+            name: "The Ashwood Inn",
+            description: "A two-story timber-frame building leaning slightly to the left, as if tired. Smoke-stained beams, a roaring hearth, and a dartboard with a wanted poster as the bulls-eye.",
+            secrets: "A hidden trapdoor beneath the bar rug leads to a cellar Aldric uses to shelter fugitives.",
+            loot: [],
+            connections: [],
+            pointsOfInterest: [
+                {
+                    id: crypto.randomUUID(),
+                    name: "The Notice Board",
+                    passivePerceptionDC: 10,
+                    description: "A corkboard thick with parchment: job postings, missing persons, and a hand-drawn map of the local ruins.",
+                    investigationChecks: [],
+                    interactions: []
+                }
+            ],
+            history: []
+        },
+        {
+            name: "The Warden's Gate",
+            description: "The crumbling remnant of an old fortification at the edge of town. Three of its four towers still stand. The local watch uses it as a guardhouse and holding cell.",
+            secrets: "The fourth tower's foundation leads to a pre-built smuggler's tunnel connecting to the forest.",
+            loot: [],
+            connections: [],
+            pointsOfInterest: [],
+            history: []
+        },
+        {
+            name: "The Sunken Chapel",
+            description: "A small stone chapel half-submerged into a hillside, its entrance nearly hidden by ivy. The faith that built it is long forgotten, but the stonework is immaculate.",
+            secrets: "Below the altar is a burial vault. One of the tombs is occupied by someone who was interred alive and did not stay dead.",
+            loot: [],
+            connections: [],
+            pointsOfInterest: [],
+            history: []
+        }
+    ]);
+};
+
+export const generateStarterAdventure = async (worldDescription: string, npcs: Array<Omit<NPC, 'id' | 'factionId'>>, locations: Array<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>>, campaignContext?: string): Promise<{ title: string; hook: string; theme: string; level: number; scenes: Array<{ title: string; type: string; readAloudText: string; gmNotes: string; rewards: string; npcIds: string[]; locationId?: string; status: string; skillChecks: [] }> }> => {
+    console.log(`[MOCK MODE] Called generateStarterAdventure`);
+    logContext(campaignContext);
+    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY * 2));
+    const npcName0 = npcs[0]?.name || 'The Innkeeper';
+    const npcName2 = npcs[2]?.name || 'The Stranger';
+    const locName0 = locations[0]?.name || 'The Inn';
+    const locName2 = locations[2]?.name || 'The Chapel';
+    return Promise.resolve({
+        title: "Ledger of the Dead",
+        hook: `${npcName0} finds a dead man slumped against the inn's back door at dawn. His pockets are empty save for a torn page from an encoded ledger — and someone is watching from the alleyway.`,
+        theme: "Mystery, Intrigue, Low-Level Danger",
+        level: 1,
+        scenes: [
+            {
+                title: "A Corpse Before Breakfast",
+                type: "social",
+                readAloudText: `The back door of ${locName0} opens onto the alley just as pale light catches the shape of a man crumpled against the wall. He's dead — and recently. The torn page in his fist bears a partial list of names in cipher.`,
+                gmNotes: `${npcName0} is visibly shaken. The dead man is a guild courier. The players can make a DC 12 Investigation check to find a second watcher's footprint in the mud.`,
+                rewards: "The partial ledger page, a guild medallion worth 5gp.",
+                npcIds: [],
+                locationId: undefined,
+                status: "planned",
+                skillChecks: []
+            },
+            {
+                title: "Questions in Dark Places",
+                type: "social",
+                readAloudText: `The name on the ledger points to ${npcName2}, who is currently nursing a drink alone at the far end of the bar. His eyes track you the moment you enter.`,
+                gmNotes: `${npcName2} knows exactly what the ledger is. He'll deny it at first (DC 14 Insight to catch the lie). If the players press carefully, he'll admit the guild is coming for him — and offer to trade information for passage out of town.`,
+                rewards: "The full story: the ledger, who it names, and why the guild wants it back.",
+                npcIds: [],
+                locationId: undefined,
+                status: "planned",
+                skillChecks: []
+            },
+            {
+                title: "Answers Beneath the Hill",
+                type: "exploration",
+                readAloudText: `${locName2} sits at the edge of the settlement, half-buried in the hillside. The ivy-choked door is ajar. Someone has been here recently — the lock has been forced from the inside.`,
+                gmNotes: `The guild sent an advance scout to retrieve a copy of the ledger buried here with an old contact. The scout is still inside — dead, with no visible wounds. The vault below holds the original ledger and something that should not be walking.`,
+                rewards: "The original ledger (enough to start a major plot thread), 40gp in old coin, and one uncommon magic item.",
+                npcIds: [],
+                locationId: undefined,
+                status: "planned",
+                skillChecks: []
+            }
+        ]
+    });
+};

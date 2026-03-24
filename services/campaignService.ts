@@ -906,6 +906,12 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 }
             });
         },
+        dismissWizard() {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (campaign) campaign.wizardDismissed = true;
+            });
+        },
         deleteCampaign(id: string) {
             if (window.confirm("Are you sure you want to permanently delete this campaign?")) {
                 updateState(draft => {

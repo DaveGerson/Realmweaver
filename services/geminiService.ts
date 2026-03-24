@@ -166,3 +166,39 @@ export const generateSessionRecap = (
     }
     return aiDmCoach.generateSessionRecap(sessionNotes, plotSummaries, campaignContext);
 };
+
+export const generateStarterNpcs = (
+    worldDescription: string,
+    isMockMode: boolean = false,
+    campaignContext?: string
+): Promise<Array<Omit<NPC, 'id' | 'factionId'>>> => {
+    if (isMockMode) {
+        return mockService.generateStarterNpcs(worldDescription, campaignContext);
+    }
+    return aiEvocationWizard.generateStarterNpcs(worldDescription, campaignContext);
+};
+
+export const generateStarterLocations = (
+    worldDescription: string,
+    npcs: Array<Omit<NPC, 'id' | 'factionId'>>,
+    isMockMode: boolean = false,
+    campaignContext?: string
+): Promise<Array<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>>> => {
+    if (isMockMode) {
+        return mockService.generateStarterLocations(worldDescription, npcs, campaignContext);
+    }
+    return aiEvocationWizard.generateStarterLocations(worldDescription, npcs, campaignContext);
+};
+
+export const generateStarterAdventure = (
+    worldDescription: string,
+    npcs: Array<Omit<NPC, 'id' | 'factionId'>>,
+    locations: Array<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>>,
+    isMockMode: boolean = false,
+    campaignContext?: string
+): Promise<AdventureForBatchAdd> => {
+    if (isMockMode) {
+        return mockService.generateStarterAdventure(worldDescription, npcs, locations, campaignContext);
+    }
+    return aiEvocationWizard.generateStarterAdventure(worldDescription, npcs, locations, campaignContext);
+};

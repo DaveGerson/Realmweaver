@@ -3,6 +3,7 @@ import React, { FC, useState, useEffect, useMemo, useSyncExternalStore } from 'r
 import type { Adventure, Scene } from './types/index';
 import { WelcomeScreen } from './components/views/WelcomeScreen';
 import { CampaignCreator } from './components/views/CampaignCreator';
+import { FirstCampaignWizard } from './components/views/FirstCampaignWizard';
 import { CampaignSelector } from './components/views/CampaignSelector';
 import { Header } from './components/layout/Header';
 import { CampaignSidebar } from './components/layout/CampaignSidebar';
@@ -86,6 +87,7 @@ const App: FC = () => {
   
   const [isCoachOpen, setIsCoachOpen] = useState(false);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [isFirstCampaignWizardOpen, setIsFirstCampaignWizardOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isContinuityCheckerOpen, setIsContinuityCheckerOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -98,6 +100,21 @@ const App: FC = () => {
   useEffect(() => {
     runSmokeTests(isMockMode).catch(err => console.error('Smoke tests failed:', err));
   }, [isMockMode]);
+
+  // Auto-show First Campaign Wizard for new empty campaigns
+  useEffect(() => {
+    if (
+      activeCampaign &&
+      !activeCampaign.wizardDismissed &&
+      activeCampaign.npcs.length === 0 &&
+      activeCampaign.adventures.length === 0 &&
+      activeCampaign.locations.length === 0
+    ) {
+      setIsFirstCampaignWizardOpen(true);
+    } else {
+      setIsFirstCampaignWizardOpen(false);
+    }
+  }, [activeCampaign?.id]);
 
   // Global keyboard shortcut handler
   useEffect(() => {
@@ -956,6 +973,20 @@ const App: FC = () => {
                   onNavigate={handleEntityNavigate}
                 />
 
+                {isFirstCampaignWizardOpen && (
+                  <FirstCampaignWizard
+                    worldSetting={activeCampaign.setting || ''}
+                    isMockMode={isMockMode}
+                    onDismiss={() => {
+                      campaignService.dismissWizard();
+                      setIsFirstCampaignWizardOpen(false);
+                    }}
+                    onComplete={(view) => {
+                      setIsFirstCampaignWizardOpen(false);
+                      handleSelectView(view);
+                    }}
+                  />
+                )}
                 {isCoachOpen && <DmCoach campaign={activeCampaign} activeContext={currentContext} onClose={() => setIsCoachOpen(false)} onSendToNotes={(content) => campaignService.addAutoEvent('coach-used', content)} isMockMode={isMockMode} onNavigate={handleEntityNavigate} />}
                 {isWizardOpen && <EvocationWizard 
                     campaign={activeCampaign} 

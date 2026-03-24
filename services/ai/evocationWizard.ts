@@ -1,6 +1,6 @@
 
 import { Type } from "@google/genai";
-import type { SkillCheck, BatchAddData, PlayerCharacter, AdventureForBatchAdd, Scene } from '../../types/index';
+import type { SkillCheck, BatchAddData, PlayerCharacter, AdventureForBatchAdd, Scene, NPC, Location } from '../../types/index';
 import { npcSchema, locationSchema, factionSchema, itemSchema, adventureWithScenesSchema } from './realmWeaver';
 import { generateWithSchema, generateChatCompletion } from './core';
 
@@ -186,4 +186,78 @@ export const generateChatResponse = async (history: { role: 'user' | 'model', te
     const contents = history.map(h => ({ role: h.role, parts: [{text: h.text}] }));
 
     return await generateChatCompletion(contents, systemInstruction, modelName, campaignContext);
+};
+
+// --- First Campaign Wizard ---
+
+const starterNpcsSchema = {
+    type: Type.OBJECT,
+    properties: {
+        npcs: {
+            type: Type.ARRAY,
+            description: "3 to 5 starter NPCs for the campaign world",
+            items: npcSchema,
+        }
+    },
+    required: ['npcs'],
+};
+
+const starterLocationsSchema = {
+    type: Type.OBJECT,
+    properties: {
+        locations: {
+            type: Type.ARRAY,
+            description: "2 to 3 starter locations for the campaign world",
+            items: locationSchema,
+        }
+    },
+    required: ['locations'],
+};
+
+export const generateStarterNpcs = async (worldDescription: string, campaignContext?: string): Promise<Array<Omit<NPC, 'id' | 'factionId'>>> => {
+    const instructions = `You are a master world-builder for tabletop RPGs. Based on the world description, generate 3 to 5 interesting starter NPCs who feel native to this world. Each NPC should have a distinct role in the community (innkeeper, merchant, guard, mage, etc.) and a compelling secret or motivation that a Game Master can use. Make them feel grounded and immediately useful for running the first session.`;
+    const result = await generateWithSchema(worldDescription, starterNpcsSchema, instructions, {}, 'gemini-2.5-flash', campaignContext);
+    const npcs: Array<Omit<NPC, 'id' | 'factionId'>> = (result.npcs || []).map((n: Omit<NPC, 'id' | 'factionId'>) => ({
+        ...n,
+        knowsPlayerHistory: [],
+        relationships: [],
+        history: [],
+    }));
+    return npcs;
+};
+
+export const generateStarterLocations = async (worldDescription: string, npcs: Array<Omit<NPC, 'id' | 'factionId'>>, campaignContext?: string): Promise<Array<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>>> => {
+    const npcList = npcs.map(n => `- ${n.name}: ${n.description}`).join('\n');
+    const prompt = `World description:\n${worldDescription}\n\nKey NPCs who inhabit this world:\n${npcList}`;
+    const instructions = `You are a master world-builder for tabletop RPGs. Based on the world description and its key NPCs, generate 2 to 3 starter locations. Each location should feel lived-in and relevant to the NPCs. Include at least one safe hub (tavern, inn, town square) and one location with a danger or mystery. Make them immediately usable for the first session.`;
+    const result = await generateWithSchema(prompt, starterLocationsSchema, instructions, {}, 'gemini-2.5-flash', campaignContext);
+    const locations: Array<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>> = (result.locations || []).map((l: Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>) => ({
+        ...l,
+        loot: l.loot || [],
+        connections: l.connections || [],
+        pointsOfInterest: l.pointsOfInterest || [],
+        history: l.history || [],
+    }));
+    return locations;
+};
+
+export const generateStarterAdventure = async (worldDescription: string, npcs: Array<Omit<NPC, 'id' | 'factionId'>>, locations: Array<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>>, campaignContext?: string): Promise<AdventureForBatchAdd> => {
+    const npcList = npcs.map(n => `- ${n.name}: ${n.motivations}`).join('\n');
+    const locList = locations.map(l => `- ${l.name}: ${l.description}`).join('\n');
+    const prompt = `World description:\n${worldDescription}\n\nNPCs:\n${npcList}\n\nLocations:\n${locList}`;
+    const instructions = `You are a master adventure designer for tabletop RPGs. Based on the world, its NPCs, and its locations, generate a complete starter adventure with 3 scenes. The adventure should naturally draw the players into the world, involve at least 2 of the NPCs, and use the key locations. Keep it approachable for level 1 characters. The adventure should have a clear beginning, middle, and end.`;
+    const result = await generateWithSchema(prompt, adventureWithScenesSchema, instructions, {}, 'gemini-2.5-flash', campaignContext);
+    const adventure: AdventureForBatchAdd = {
+        title: result.title || 'Starter Adventure',
+        hook: result.hook || '',
+        theme: result.theme || '',
+        level: result.level || 1,
+        scenes: (result.scenes || []).map((s: Scene) => ({
+            ...s,
+            skillChecks: (s.skillChecks || []).map((sc: Omit<typeof s.skillChecks[0], 'id'>) => ({ ...sc, id: crypto.randomUUID() })),
+            npcIds: s.npcIds || [],
+            status: s.status || 'planned',
+        })),
+    };
+    return adventure;
 };
