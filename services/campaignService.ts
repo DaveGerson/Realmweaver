@@ -933,10 +933,136 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 });
             }
         },
-        selectCampaign(id: string) { 
-            // Selection involves reading/UI changes mostly, but we track it via _internalUpdate to avoid marking "selecting" as a save-worthy event unless needed, 
+        selectCampaign(id: string) {
+            // Selection involves reading/UI changes mostly, but we track it via _internalUpdate to avoid marking "selecting" as a save-worthy event unless needed,
             // though saving activeCampaignId is good.
-            updateState(draft => { draft.activeCampaignId = id; draft.appStatus = 'editing'; }); 
+            updateState(draft => { draft.activeCampaignId = id; draft.appStatus = 'editing'; });
+        },
+
+        /**
+         * Deep-clones a campaign, generating new UUIDs for the campaign and all
+         * entity IDs (preserving internal cross-references with a remap table).
+         * Appends " (Copy)" to the title. Does NOT switch to the new campaign.
+         * Returns the new campaign ID.
+         */
+        duplicateCampaign(campaignId: string): string {
+            const source = state.campaigns.find(c => c.id === campaignId);
+            if (!source) return '';
+
+            // Build a full remap table: old ID → new ID for every entity
+            const idMap = new Map<string, string>();
+            const remap = (oldId: string | undefined): string | undefined => {
+                if (!oldId) return undefined;
+                if (!idMap.has(oldId)) idMap.set(oldId, crypto.randomUUID());
+                return idMap.get(oldId)!;
+            };
+            const remapRequired = (oldId: string): string => remap(oldId) as string;
+
+            const newCampaignId = crypto.randomUUID();
+
+            // Pre-register all entity IDs so cross-references resolve correctly
+            source.npcs.forEach(e => idMap.set(e.id, crypto.randomUUID()));
+            source.locations.forEach(e => idMap.set(e.id, crypto.randomUUID()));
+            source.factions.forEach(e => idMap.set(e.id, crypto.randomUUID()));
+            source.items.forEach(e => idMap.set(e.id, crypto.randomUUID()));
+            source.articles.forEach(e => idMap.set(e.id, crypto.randomUUID()));
+            source.adventures.forEach(adv => {
+                idMap.set(adv.id, crypto.randomUUID());
+                adv.scenes.forEach(s => idMap.set(s.id, crypto.randomUUID()));
+            });
+            source.sessionLogs?.forEach(e => idMap.set(e.id, crypto.randomUUID()));
+            source.playerCharacters?.forEach(e => idMap.set(e.id, crypto.randomUUID()));
+            source.plots?.forEach(e => idMap.set(e.id, crypto.randomUUID()));
+            source.notes?.forEach(e => idMap.set(e.id, crypto.randomUUID()));
+            source.secrets?.forEach(e => idMap.set(e.id, crypto.randomUUID()));
+
+            const newCampaign: Campaign = {
+                ...source,
+                id: newCampaignId,
+                title: `${source.title} (Copy)`,
+                // Reset session / encounter state — don't clone live state
+                activeSceneId: undefined,
+                activeSessionId: undefined,
+                activeEncounter: { id: crypto.randomUUID(), round: 1, turnIndex: 0, combatants: [] },
+                wizardDismissed: true, // Copied campaign is not "new"
+                pinnedEntities: [],
+
+                npcs: source.npcs.map(n => ({
+                    ...n,
+                    id: remapRequired(n.id),
+                    factionId: remap(n.factionId),
+                    history: n.history ?? [],
+                    relationships: (n.relationships ?? []).map(r => ({
+                        ...r,
+                        targetId: remap(r.targetId) ?? r.targetId,
+                    })),
+                })),
+
+                locations: source.locations.map(l => ({
+                    ...l,
+                    id: remapRequired(l.id),
+                    parentLocationId: remap(l.parentLocationId),
+                    subLocationIds: (l.subLocationIds ?? []).map(remapRequired),
+                    history: l.history ?? [],
+                })),
+
+                factions: source.factions.map(f => ({
+                    ...f,
+                    id: remapRequired(f.id),
+                    leaderId: remap(f.leaderId),
+                    memberIds: (f.memberIds ?? []).map(remapRequired),
+                    headquartersLocationId: remap(f.headquartersLocationId),
+                })),
+
+                items: source.items.map(i => ({ ...i, id: remapRequired(i.id) })),
+
+                articles: source.articles.map(a => ({
+                    ...a,
+                    id: remapRequired(a.id),
+                    parentArticleId: remap(a.parentArticleId),
+                    subArticleIds: (a.subArticleIds ?? []).map(remapRequired),
+                    relatedEntityIds: (a.relatedEntityIds ?? []).map(remapRequired),
+                })),
+
+                adventures: source.adventures.map(adv => ({
+                    ...adv,
+                    id: remapRequired(adv.id),
+                    scenes: adv.scenes.map(s => ({
+                        ...s,
+                        id: remapRequired(s.id),
+                        locationId: remap(s.locationId),
+                        npcIds: (s.npcIds ?? []).map(remapRequired),
+                    })),
+                })),
+
+                sessionLogs: (source.sessionLogs ?? []).map(l => ({
+                    ...l,
+                    id: remapRequired(l.id),
+                    // Clear "active" status — no live session in a copy
+                    status: (l.status === 'active' ? 'planning' : l.status) as typeof l.status,
+                })),
+
+                playerCharacters: (source.playerCharacters ?? []).map(pc => ({
+                    ...pc,
+                    id: remapRequired(pc.id),
+                })),
+
+                plots: (source.plots ?? []).map(p => ({
+                    ...p,
+                    id: remapRequired(p.id),
+                    relatedEntityIds: (p.relatedEntityIds ?? []).map(remapRequired),
+                })),
+
+                notes: (source.notes ?? []).map(n => ({ ...n, id: remapRequired(n.id) })),
+
+                secrets: (source.secrets ?? []).map(s => ({ ...s, id: remapRequired(s.id) })),
+            };
+
+            updateState(draft => {
+                draft.campaigns.push(newCampaign);
+            });
+
+            return newCampaignId;
         },
         async importCampaign(file: File): Promise<string> {
             try {

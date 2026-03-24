@@ -17,6 +17,7 @@ interface HeaderProps {
   continuityIssueCount?: number;
   onSaveCampaign: () => void;
   onSwitchCampaign: () => void;
+  onAllCampaigns?: () => void;
   onCreateNew: () => void;
   onImportCampaign: (file: File) => void;
   onShowExportModal: () => void;
@@ -38,6 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
   continuityIssueCount = 0,
   onSaveCampaign,
   onSwitchCampaign,
+  onAllCampaigns,
   onCreateNew,
   onImportCampaign,
   onShowExportModal,
@@ -115,6 +117,11 @@ export const Header: React.FC<HeaderProps> = ({
               {isMenuOpen && (
                   <div className="absolute top-full mt-2 w-60 bg-slate-800 border border-slate-700 rounded-md shadow-lg z-[60] animate-in fade-in duration-150">
                       <div className="p-1">
+                          {onAllCampaigns && (
+                              <button onClick={() => { onAllCampaigns(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-amber-300 hover:bg-slate-700 rounded-md transition-colors font-medium">
+                                  <Icons.AllCampaigns className="w-4 h-4" /> All Campaigns
+                              </button>
+                          )}
                           <button onClick={() => { onSwitchCampaign(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded-md transition-colors">
                               <Icons.Campaign className="w-4 h-4" /> Switch Campaign
                           </button>

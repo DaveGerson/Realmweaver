@@ -5,6 +5,7 @@ import { WelcomeScreen } from './components/views/WelcomeScreen';
 import { CampaignCreator } from './components/views/CampaignCreator';
 import { FirstCampaignWizard } from './components/views/FirstCampaignWizard';
 import { CampaignSelector } from './components/views/CampaignSelector';
+import { CrossCampaignDashboard } from './components/views/CrossCampaignDashboard';
 import { Header } from './components/layout/Header';
 import { CampaignSidebar } from './components/layout/CampaignSidebar';
 import { AdventureEditor } from './components/editors/AdventureEditor';
@@ -951,7 +952,16 @@ const App: FC = () => {
           />
         );
       case 'selecting':
-        return <CampaignSelector campaigns={campaigns} onSelect={campaignService.selectCampaign} onDelete={campaignService.deleteCampaign} onCreateNew={() => campaignService.prepareNewCampaign()} />;
+        return (
+          <CrossCampaignDashboard
+            campaigns={campaigns}
+            activeCampaignId={activeCampaignId}
+            onSwitchCampaign={campaignService.selectCampaign}
+            onCreateCampaign={() => campaignService.prepareNewCampaign()}
+            onDuplicateCampaign={(id) => campaignService.duplicateCampaign(id)}
+            onDeleteCampaign={campaignService.deleteCampaign}
+          />
+        );
       case 'editing':
       case 'loading':
         if (activeCampaign) {
@@ -968,6 +978,7 @@ const App: FC = () => {
                 continuityIssueCount={continuityIssueCount}
                 onSaveCampaign={campaignService.saveCampaign}
                 onSwitchCampaign={campaignService.switchToCampaignSelector}
+                onAllCampaigns={campaignService.switchToCampaignSelector}
                 onCreateNew={campaignService.startNewCampaignCreation}
                 onImportCampaign={handleImportCampaign}
                 onShowExportModal={() => setIsExportModalOpen(true)}

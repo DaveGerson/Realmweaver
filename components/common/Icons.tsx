@@ -81,6 +81,8 @@ import {
   Zap,
   SlidersHorizontal,
   Globe,
+  Copy,
+  LayoutGrid,
 } from 'lucide-react';
 
 export const Icons = {
@@ -164,6 +166,8 @@ export const Icons = {
   Zap,
   Sliders: SlidersHorizontal,
   WorldSim: Globe,
+  Duplicate: Copy,
+  AllCampaigns: LayoutGrid,
 };
 
 export const SceneIcon = ({ type, className }: { type: string, className?: string }) => {
