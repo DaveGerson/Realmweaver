@@ -1,6 +1,7 @@
 
-import type { NPC, Location, Faction, RollableTable, Item, Scene, SceneType, AdventureForBatchAdd, Article, PointOfInterest, PlayerCharacter, RealmChatResponse, ChatMessage, DraftEntity, ModelTier } from '../../types/index';
+import type { NPC, Location, Faction, RollableTable, Item, Scene, SceneType, AdventureForBatchAdd, Article, PointOfInterest, PlayerCharacter, RealmChatResponse, ChatMessage, DraftEntity, ModelTier, Campaign } from '../../types/index';
 import type { BatchAddData } from '../../types/index';
+import type { WorldEvent } from './worldSimulation';
 
 // --- Mock Data ---
 const mockNpcData: Omit<NPC, 'id' | 'factionId'> = {
@@ -600,4 +601,99 @@ export const generateStarterAdventure = async (worldDescription: string, npcs: A
             }
         ]
     });
+};
+
+export const generateWorldEvents = async (
+    campaign: Campaign,
+    daysPassed: number,
+    campaignContext?: string
+): Promise<WorldEvent[]> => {
+    console.log(`[MOCK MODE] Called generateWorldEvents. Days: ${daysPassed}, Campaign: "${campaign.title}"`);
+    logContext(campaignContext);
+    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY * 2));
+
+    // Use actual campaign entity IDs if available, otherwise fall back to placeholders
+    const firstFaction = campaign.factions[0];
+    const secondFaction = campaign.factions[1];
+    const firstNpc = campaign.npcs[0];
+    const firstLocation = campaign.locations[0];
+    const firstPlot = campaign.plots?.[0];
+
+    const timeLabel =
+        daysPassed === 1 ? '1 day' :
+        daysPassed < 7 ? `${daysPassed} days` :
+        daysPassed < 30 ? `${Math.round(daysPassed / 7)} week${Math.round(daysPassed / 7) > 1 ? 's' : ''}` :
+        `about ${Math.round(daysPassed / 30)} month${Math.round(daysPassed / 30) > 1 ? 's' : ''}`;
+
+    const events: WorldEvent[] = [
+        {
+            id: crypto.randomUUID(),
+            title: firstFaction
+                ? `${firstFaction.name} Tightens Its Grip`
+                : "The Shadow Guild Expands",
+            description: firstFaction
+                ? `Over the past ${timeLabel}, ${firstFaction.name} has moved aggressively to consolidate resources in the eastern trade districts. Several minor rivals have either been absorbed or quietly disappeared. Their public face remains charitable, but rumors of coercion are spreading among the merchant class.`
+                : `Over the past ${timeLabel}, a powerful guild has moved aggressively to consolidate resources. Rivals have disappeared, and whispers of coercion spread.`,
+            affectedEntityIds: firstFaction ? [firstFaction.id] : [],
+            affectedEntityTypes: firstFaction ? ['faction'] : [],
+            suggestedUpdates: firstFaction ? [
+                {
+                    entityId: firstFaction.id,
+                    entityType: 'faction',
+                    field: 'influence',
+                    currentValue: firstFaction.influence || 'Unknown influence',
+                    proposedValue: (firstFaction.influence || 'Unknown influence') + ' Now controls three additional trade posts in the eastern district; rival guilds have gone suspiciously quiet.',
+                },
+            ] : [],
+            severity: 'major',
+            category: 'faction',
+        },
+        {
+            id: crypto.randomUUID(),
+            title: firstNpc
+                ? `${firstNpc.name} Receives a Warning`
+                : "A Key Figure is Threatened",
+            description: firstNpc
+                ? `${firstNpc.name} received an unsigned letter — a single black feather and three words: "Your time ends." The message was found pinned to their door with a dagger of unusual make. They have become noticeably more guarded and are asking discreet questions about known assassins.`
+                : `A prominent figure in the campaign received an ominous threat. They have become noticeably more guarded and suspicious of strangers.`,
+            affectedEntityIds: firstNpc ? [firstNpc.id] : [],
+            affectedEntityTypes: firstNpc ? ['npc'] : [],
+            suggestedUpdates: firstNpc ? [
+                {
+                    entityId: firstNpc.id,
+                    entityType: 'npc',
+                    field: 'motivations',
+                    currentValue: firstNpc.motivations || 'Unknown motivations',
+                    proposedValue: (firstNpc.motivations || 'Unknown motivations') + ' Since the threatening letter arrived, has become increasingly paranoid and is quietly seeking protection or allies.',
+                },
+            ] : [],
+            severity: 'major',
+            category: 'npc',
+        },
+        {
+            id: crypto.randomUUID(),
+            title: firstLocation
+                ? `Unrest Near ${firstLocation.name}`
+                : "A Location Falls into Disrepair",
+            description: firstLocation
+                ? `Strange lights have been seen near ${firstLocation.name} at odd hours. Two travelers reported hearing voices from within when it should have been empty. Local superstition has grown, and foot traffic in the area has dropped sharply.`
+                : `Strange events have been reported near a key location. Local foot traffic has dropped sharply due to fear and superstition.`,
+            affectedEntityIds: firstLocation ? [firstLocation.id] : [],
+            affectedEntityTypes: firstLocation ? ['location'] : [],
+            suggestedUpdates: firstLocation ? [
+                {
+                    entityId: firstLocation.id,
+                    entityType: 'location',
+                    field: 'description',
+                    currentValue: firstLocation.description || 'No description',
+                    proposedValue: (firstLocation.description || 'No description') + ' Recently, strange lights and voices have been reported here at night, and locals are avoiding the area.',
+                },
+            ] : [],
+            severity: firstPlot ? 'minor' : 'minor',
+            category: 'location',
+        },
+    ];
+
+    // Only include events that have at least some campaign data to anchor them
+    return Promise.resolve(events);
 };

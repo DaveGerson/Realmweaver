@@ -12,6 +12,7 @@ interface HeaderProps {
   onToggleMockMode: () => void;
   onToggleCoach: () => void;
   onToggleWizard: () => void;
+  onToggleWorldSim: () => void;
   onToggleContinuityChecker: () => void;
   continuityIssueCount?: number;
   onSaveCampaign: () => void;
@@ -32,6 +33,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleMockMode,
   onToggleCoach,
   onToggleWizard,
+  onToggleWorldSim,
   onToggleContinuityChecker,
   continuityIssueCount = 0,
   onSaveCampaign,
@@ -199,6 +201,15 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Icons.Wizard className="w-5 h-5 text-indigo-400" />
             <span className="hidden lg:inline">Evocation Wizard</span>
+          </button>
+          <button
+            onClick={onToggleWorldSim}
+            className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-amber-500 rounded-md p-1 sm:-m-1"
+            aria-label="World Simulation — what happened off-screen?"
+            title="What happened off-screen?"
+          >
+            <Icons.WorldSim className="w-5 h-5 text-amber-400" />
+            <span className="hidden lg:inline">World Sim</span>
           </button>
            <button
               onClick={onToggleCoach}

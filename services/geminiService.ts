@@ -1,11 +1,13 @@
 
-import type { NPC, Location, Faction, RollableTable, Item, Scene, Adventure, Article, PointOfInterest, PlayerCharacter, RealmChatResponse, ChatMessage, DraftEntity, ModelTier } from '../types/index';
+import type { NPC, Location, Faction, RollableTable, Item, Scene, Adventure, Article, PointOfInterest, PlayerCharacter, RealmChatResponse, ChatMessage, DraftEntity, ModelTier, Campaign } from '../types/index';
 import type { BatchAddData, AdventureForBatchAdd } from '../types/index';
+import type { WorldEvent } from './ai/worldSimulation';
 
 import * as aiRealmWeaver from './ai/realmWeaver';
 import * as aiDmCoach from './ai/dmCoach';
 import * as aiEvocationWizard from './ai/evocationWizard';
 import * as aiRealmChat from './ai/realmChat';
+import * as aiWorldSimulation from './ai/worldSimulation';
 import * as mockService from './ai/mockService';
 
 export const generateNpc = (prompt: string, useGroundedSearch: boolean = false, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<NPC, 'id' | 'factionId'>> => {
@@ -201,4 +203,18 @@ export const generateStarterAdventure = (
         return mockService.generateStarterAdventure(worldDescription, npcs, locations, campaignContext);
     }
     return aiEvocationWizard.generateStarterAdventure(worldDescription, npcs, locations, campaignContext);
+};
+
+export { WorldEvent };
+
+export const generateWorldEvents = (
+    campaign: Campaign,
+    daysPassed: number,
+    isMockMode: boolean = false,
+    campaignContext?: string
+): Promise<WorldEvent[]> => {
+    if (isMockMode) {
+        return mockService.generateWorldEvents(campaign, daysPassed, campaignContext);
+    }
+    return aiWorldSimulation.generateWorldEvents(campaign, daysPassed, campaignContext);
 };

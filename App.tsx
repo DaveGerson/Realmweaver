@@ -26,6 +26,7 @@ import { RelationshipGraph } from './components/visualizers/RelationshipGraph';
 import { ContentWrapper } from './components/layout/ContentWrapper';
 import { DmCoach } from './components/dialogs/DmCoach';
 import { EvocationWizard } from './components/dialogs/EvocationWizard';
+import { WorldSimulationWizard } from './components/dialogs/WorldSimulationWizard';
 import { runSmokeTests } from './smokeTest';
 import { ExportModal } from './components/dialogs/ExportModal';
 import { ContinuityChecker } from './components/dialogs/ContinuityChecker';
@@ -87,6 +88,7 @@ const App: FC = () => {
   
   const [isCoachOpen, setIsCoachOpen] = useState(false);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [isWorldSimOpen, setIsWorldSimOpen] = useState(false);
   const [isFirstCampaignWizardOpen, setIsFirstCampaignWizardOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isContinuityCheckerOpen, setIsContinuityCheckerOpen] = useState(false);
@@ -150,6 +152,7 @@ const App: FC = () => {
           if (isContinuityCheckerOpen) { setIsContinuityCheckerOpen(false); break; }
           if (isCoachOpen) { setIsCoachOpen(false); break; }
           if (isWizardOpen) { setIsWizardOpen(false); break; }
+          if (isWorldSimOpen) { setIsWorldSimOpen(false); break; }
           if (isExportModalOpen) { setIsExportModalOpen(false); break; }
           break;
         case 'help':
@@ -160,7 +163,7 @@ const App: FC = () => {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isCommandPaletteOpen, isShortcutsHelpOpen, isContinuityCheckerOpen, isCoachOpen, isWizardOpen, isExportModalOpen]);
+  }, [isCommandPaletteOpen, isShortcutsHelpOpen, isContinuityCheckerOpen, isCoachOpen, isWizardOpen, isWorldSimOpen, isExportModalOpen]);
 
   // Track recently viewed entities (max 10, session-only)
   const trackRecentItem = (type: CommandPaletteEntityType, id: string, name: string) => {
@@ -902,6 +905,7 @@ const App: FC = () => {
                 onToggleMockMode={() => setIsMockMode(p => !p)}
                 onToggleCoach={() => setIsCoachOpen(p => !p)}
                 onToggleWizard={() => setIsWizardOpen(p => !p)}
+                onToggleWorldSim={() => setIsWorldSimOpen(p => !p)}
                 onToggleContinuityChecker={() => setIsContinuityCheckerOpen(p => !p)}
                 continuityIssueCount={continuityIssueCount}
                 onSaveCampaign={campaignService.saveCampaign}
@@ -1016,6 +1020,16 @@ const App: FC = () => {
                     }} 
                     isMockMode={isMockMode}
                 />}
+                {isWorldSimOpen && (
+                  <WorldSimulationWizard
+                    campaign={activeCampaign}
+                    isMockMode={isMockMode}
+                    onClose={() => setIsWorldSimOpen(false)}
+                    onApplyEvents={(_events) => {
+                      setIsWorldSimOpen(false);
+                    }}
+                  />
+                )}
                 {isExportModalOpen && <ExportModal
                   campaignTitle={activeCampaign.title}
                   onClose={() => setIsExportModalOpen(false)}

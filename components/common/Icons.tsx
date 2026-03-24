@@ -80,6 +80,7 @@ import {
   Keyboard,
   Zap,
   SlidersHorizontal,
+  Globe,
 } from 'lucide-react';
 
 export const Icons = {
@@ -162,6 +163,7 @@ export const Icons = {
   Keyboard,
   Zap,
   Sliders: SlidersHorizontal,
+  WorldSim: Globe,
 };
 
 export const SceneIcon = ({ type, className }: { type: string, className?: string }) => {
