@@ -63,7 +63,7 @@
 
 **Total prompt count**: 26 distinct system instructions + 4 component-level prompt templates = **30 prompts**
 **Total schemas**: 20 structured output definitions
-**Gemini SDK surface**: 1 file (`core.ts`, 130 lines)
+**Gemini SDK surface**: 1 file (`core.ts`, 130 lines) + 1 direct SDK use in `SessionLogEditor.tsx` (real-time audio via Gemini Live API)
 **New since initial audit**: worldSimulation.ts (1 prompt, 2 schemas), styleMatching.ts (1 prompt), evocationWizard.ts (+3 starter prompts, +2 schemas), contextBuilder.ts (style profile injection)
 
 ---
@@ -466,6 +466,92 @@ These are the prompts used within entity editors to AI-enhance individual fields
 
 ---
 
+### P7: World Simulation Engine
+
+> **Added post-initial-audit** — `services/ai/worldSimulation.ts` (new file, 195 lines)
+
+#### P7.1: World Event Generator
+- **File**: `services/ai/worldSimulation.ts:167-195`
+- **Class**: C (schema-bound analysis) — unique input/output shape
+- **Persona**: "a veteran tabletop RPG Game Master simulating the living world of a TTRPG campaign between sessions"
+- **Task**: "generate realistic, narratively interesting events that occur off-screen while the players are away"
+- **Schema**: `worldEventsSchema` → `{ events: WorldEvent[] }`
+- **Model**: `gemini-2.5-flash`
+- **Input construction** (`buildSimulationPrompt`, lines 96-165):
+  - Campaign title + setting
+  - Time elapsed (human-readable: "3 days", "about a month")
+  - Active factions with IDs, goals, influence
+  - Key NPCs (max 10) with IDs, motivations, secrets
+  - Unresolved plots (max 5) with IDs, descriptions
+  - Last 2 session recaps (300 char truncation) + loose ends
+- **Output**: Array of `WorldEvent` objects, each with:
+  - `title`, `description`, `severity` (minor/major/critical), `category` (faction/npc/location/plot/world)
+  - `affectedEntityIds[]`, `affectedEntityTypes[]` — references real campaign entity IDs
+  - `suggestedUpdates[]` — proposed field-level changes with `currentValue` → `proposedValue`
+- **Post-processing**: Adds `crypto.randomUUID()` IDs, ensures arrays exist
+- **Key constraint**: "Use the exact entity IDs from the provided campaign data"
+- **Facade**: `geminiService.ts:222-232` with mock mode support
+- **Note**: This is a **new pattern class** — generates *diffs* to existing entities rather than new entities. The `suggestedUpdates` structure is unique.
+
+---
+
+### P8: Style Matching
+
+> **Added post-initial-audit** — `services/ai/styleMatching.ts` (new file, 42 lines)
+
+#### P8.1: Writing Style Analyzer
+- **File**: `services/ai/styleMatching.ts:6-18` (instructions), `24-42` (function)
+- **Class**: B (freeform text generation)
+- **Persona**: "a literary analyst specializing in tabletop RPG content"
+- **Task**: "Analyze the DM's distinct voice and produce a concise style guide (200 words maximum)"
+- **Output**: Plain text style guide
+- **Model**: `gemini-2.5-flash`
+- **Input**: Writing samples from campaign (NPC descriptions, location write-ups, adventure hooks)
+- **Analysis focus**: Voice/tone, vocabulary level, sentence structure, metaphor use, thematic preferences, pacing
+- **Constraint**: "Output ONLY the style guide text. No preamble, no headers, no bullet points"
+- **Post-processing**: Truncates to 1200 chars (~200 words)
+- **Facade**: `geminiService.ts:209-218` with mock mode support
+- **Integration with context**: The resulting style profile is stored on `campaign.styleProfile` and injected into ALL prompts via `contextBuilder.ts` (Tier 1): `"WRITING STYLE: Generate content matching this DM's voice: {styleProfile}"`
+
+---
+
+### P3 Addendum: First Campaign Wizard (Starter Generators)
+
+> **Added post-initial-audit** — added to `services/ai/evocationWizard.ts` (76 new lines)
+
+#### P3.5: Starter NPCs Generator
+- **File**: `services/ai/evocationWizard.ts:219-232`
+- **Class**: A (entity generation, batch variant)
+- **Persona**: "a master world-builder for tabletop RPGs"
+- **Task**: "generate 3 to 5 interesting starter NPCs who feel native to this world"
+- **Schema**: `starterNpcsSchema` → `{ npcs: npcSchema[] }`
+- **Model**: `gemini-2.5-flash`
+- **Input**: World description text
+- **Constraint**: Distinct community roles, compelling secrets, immediately useful for first session
+- **Facade**: `geminiService.ts:173-182`
+
+#### P3.6: Starter Locations Generator
+- **File**: `services/ai/evocationWizard.ts:234-249`
+- **Class**: A (entity generation, batch variant)
+- **Persona**: Same
+- **Task**: "generate 2 to 3 starter locations"
+- **Schema**: `starterLocationsSchema` → `{ locations: locationSchema[] }`
+- **Model**: `gemini-2.5-flash`
+- **Input**: World description + NPC list (name + description)
+- **Constraint**: At least one safe hub, one danger/mystery location, feel lived-in
+
+#### P3.7: Starter Adventure Generator
+- **File**: `services/ai/evocationWizard.ts:251-263`
+- **Class**: A (entity generation, reuses `adventureWithScenesSchema`)
+- **Persona**: "a master adventure designer for tabletop RPGs"
+- **Task**: "generate a complete starter adventure with 3 scenes"
+- **Schema**: `adventureWithScenesSchema` (existing)
+- **Model**: `gemini-2.5-flash`
+- **Input**: World description + NPC list (name + motivations) + Location list (name + description)
+- **Constraint**: Involve 2+ NPCs, use key locations, approachable for level 1, clear beginning/middle/end
+
+---
+
 ## Schema Inventory
 
 ### Entity Schemas (from realmWeaver.ts)
@@ -505,6 +591,15 @@ These are the prompts used within entity editors to AI-enhance individual fields
 |--------|--------|---------|
 | `playerCharacterSchema` | Deeply nested (social, statistics, skills, actions) | PDF parser |
 | `campaignFillSchema` | 5 ARRAY (each uses entity schemas) | Campaign fill, document parsing |
+| `starterNpcsSchema` | 1 ARRAY (uses npcSchema) | First Campaign Wizard |
+| `starterLocationsSchema` | 1 ARRAY (uses locationSchema) | First Campaign Wizard |
+
+### World Simulation Schema (from worldSimulation.ts) — NEW
+
+| Schema | Fields | Used By |
+|--------|--------|---------|
+| `worldEventSchema` | title, description, affectedEntityIds[], affectedEntityTypes[], suggestedUpdates[{entityId, entityType, field, currentValue, proposedValue}], severity (enum), category (enum) | World sim |
+| `worldEventsSchema` | events[] (wraps worldEventSchema) | World sim |
 
 ---
 

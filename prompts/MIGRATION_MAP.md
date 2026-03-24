@@ -9,14 +9,20 @@
 | Layer | Files | Migration Effort | Notes |
 |-------|-------|-----------------|-------|
 | **Core API wrapper** | `core.ts` (130 lines) | REWRITE | Replace `@google/genai` with `@anthropic-ai/sdk` |
-| **Schema definitions** | All `ai/*.ts` (schemas) | MECHANICAL | `Type.STRING` → `{ type: "string" }` |
+| **Schema definitions** | All `ai/*.ts` (schemas) | MECHANICAL | `Type.STRING` → `{ type: "string" }` — 22 schemas across 5 files |
 | **Prompt text** | All `ai/*.ts` (instructions) | NONE | Model-agnostic, keep as-is |
 | **Service facade** | `geminiService.ts` | RENAME | Update imports, rename to `aiService.ts` |
 | **Mock service** | `mockService.ts` | NONE | No AI calls |
 | **Context builder** | `contextBuilder.ts` | NONE | Pure data, no SDK dependency |
+| **Real-time audio** | `SessionLogEditor.tsx` | **REWRITE** | Direct Gemini Live API for microphone transcription — no Claude equivalent |
 | **Components** | All generators, editors, dialogs | MINIMAL | Only import paths change |
 
-**Bottom line**: 1 file rewrite (`core.ts`), 1 mechanical conversion (schemas), everything else is prompt text and UI code that doesn't change.
+**Bottom line**: 2 file rewrites (`core.ts` + `SessionLogEditor.tsx` audio), 1 mechanical conversion (22 schemas across 5 files), everything else is prompt text and UI code that doesn't change.
+
+**Important discovery**: `SessionLogEditor.tsx` **bypasses the entire service layer** and directly imports `GoogleGenAI`, `LiveServerMessage`, and `Modality` from `@google/genai` for real-time audio streaming (microphone-to-notes). This uses `gemini-2.5-flash-native-audio-preview` via the Gemini Live API. Claude does not have an equivalent real-time audio streaming API — this feature would need to either:
+1. Keep using Gemini for audio transcription only (hybrid approach)
+2. Use a dedicated speech-to-text service (Whisper, Deepgram, etc.) and pipe text to Claude
+3. Be removed/deferred
 
 ---
 
@@ -175,8 +181,12 @@ Each schema needs `Type.*` → JSON Schema conversion. The work is mechanical:
 - [ ] `draftEntitySchema` (realmChat.ts:8-22)
 - [ ] `realmChatResponseSchema` (realmChat.ts:24-40)
 - [ ] `npcRoleplayResponseSchema` (realmChat.ts:143-156)
+- [ ] `worldEventSchema` (worldSimulation.ts:25-82)
+- [ ] `worldEventsSchema` (worldSimulation.ts:84-94)
+- [ ] `starterNpcsSchema` (evocationWizard.ts:193-202)
+- [ ] `starterLocationsSchema` (evocationWizard.ts:204-213)
 
-Total: 18 schemas. Remove `import { Type } from "@google/genai"` from 4 files.
+Total: 22 schemas. Remove `import { Type } from "@google/genai"` from 5 files.
 
 ---
 
@@ -235,6 +245,9 @@ Total: 18 schemas. Remove `import { Type } from "@google/genai"` from 4 files.
 | `services/ai/dmCoach.ts` | Schema conversion + model names | Same |
 | `services/ai/evocationWizard.ts` | Schema conversion + model names + multimodal | PDF input format |
 | `services/ai/realmChat.ts` | Schema conversion + model tier map | Update `mapTierToModel` |
+| `services/ai/worldSimulation.ts` | Schema conversion + model name | NEW FILE — `Type.*` → JSON Schema |
+| `services/ai/styleMatching.ts` | Model name only | NEW FILE — no schema (plain text) |
+| `components/editors/SessionLogEditor.tsx` | **REWRITE** (partial) | Direct Gemini SDK use for real-time audio (Live API). Uses `GoogleGenAI`, `LiveServerMessage`, `Modality` for microphone note-taking. No Claude equivalent for real-time audio streaming — needs alternative approach. |
 | `services/geminiService.ts` | Rename + cleanup | → `aiService.ts`, update imports |
 | `package.json` | Dependency swap | `@google/genai` → `@anthropic-ai/sdk` |
 | `vite.config.ts` | Env var | `GEMINI_API_KEY` → `ANTHROPIC_API_KEY` |
