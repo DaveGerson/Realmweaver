@@ -4,6 +4,7 @@
 > Maps each prompt by location, purpose, persona, schema, model tier, reusability class, and optimization notes.
 >
 > **Generated**: 2026-03-23
+> **Validated**: 2026-03-23 (post-refactor — added P7: World Simulation, P8: Style Matching, P3.5-3.7: Starter generators)
 
 ---
 
@@ -19,6 +20,8 @@
    - [P4: RealmChat (Conversational)](#p4-realmchat)
    - [P5: Field Enhancement (CRUD)](#p5-field-enhancement)
    - [P6: Context Injection](#p6-context-injection)
+   - [P7: World Simulation Engine](#p7-world-simulation-engine)
+   - [P8: Style Matching](#p8-style-matching)
 5. [Schema Inventory](#schema-inventory)
 6. [CRUD/Form Pattern Map](#crudform-pattern-map)
 7. [Optimization Recommendations](#optimization-recommendations)
@@ -43,9 +46,14 @@
 │  SERVICE LAYER (Prompts + Schemas live here)            │
 │  ┌──────────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ │
 │  │realmWeaver.ts│ │dmCoach.ts│ │evocation │ │realm   │ │
-│  │  7 prompts   │ │ 6 prompts│ │Wizard.ts │ │Chat.ts │ │
-│  │  8 schemas   │ │ 3 schemas│ │ 4 prompts│ │2 prompts│ │
+│  │  8 prompts   │ │ 6 prompts│ │Wizard.ts │ │Chat.ts │ │
+│  │  10 schemas  │ │ 3 schemas│ │ 7 prompts│ │2 prompts│ │
 │  └──────┬───────┘ └────┬─────┘ └────┬─────┘ └───┬────┘ │
+│  ┌──────────────────┐ ┌──────────────────┐              │
+│  │worldSimulation.ts│ │styleMatching.ts  │              │
+│  │  1 prompt         │ │  1 prompt        │              │
+│  │  2 schemas        │ │  (no schema)     │              │
+│  └──────┬────────────┘ └───────┬─────────┘              │
 ├─────────┴──────────────┴────────────┴────────────┴──────┤
 │  CORE LAYER                                             │
 │  core.ts — 3 functions, Gemini SDK, context injection   │
@@ -53,9 +61,10 @@
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Total prompt count**: 21 distinct system instructions + 4 component-level prompt templates = **25 prompts**
-**Total schemas**: 16 structured output definitions
+**Total prompt count**: 26 distinct system instructions + 4 component-level prompt templates = **30 prompts**
+**Total schemas**: 20 structured output definitions
 **Gemini SDK surface**: 1 file (`core.ts`, 130 lines)
+**New since initial audit**: worldSimulation.ts (1 prompt, 2 schemas), styleMatching.ts (1 prompt), evocationWizard.ts (+3 starter prompts, +2 schemas), contextBuilder.ts (style profile injection)
 
 ---
 

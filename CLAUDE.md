@@ -703,6 +703,39 @@ campaignService.linkSceneToLocation(sceneId, locationId);
 
 ---
 
+## Documentation Maintenance (MANDATORY)
+
+When completing work that changes the architecture, adds features, or modifies key patterns, **update the relevant documentation before committing**:
+
+| What Changed | Update These Docs |
+|-------------|------------------|
+| New component, service, or type | `docs/architecture/high-level-design.md` (feature map, project structure) |
+| Architecture pattern change | `docs/architecture/high-level-design.md` + `docs/architecture/technical-design.md` |
+| New entity type or data model change | `docs/architecture/high-level-design.md` (data model section) + `CLAUDE.md` (type system) |
+| New AI service function | `CLAUDE.md` (AI Service Integration section) |
+| New testing infrastructure | `docs/architecture/high-level-design.md` (testing strategy) |
+| Major feature completion | `README.md` (features table, project status) |
+
+### Documentation Structure
+
+```
+docs/
+├── architecture/
+│   ├── high-level-design.md       # System overview, diagrams, data model, feature map
+│   ├── technical-design.md        # Detailed technical design, patterns, subsystems
+│   └── implementation-plan.md     # Phased plan with work packages (Phases A-F)
+├── design/
+│   ├── dm-archetypes.md           # 5 DM personas driving feature prioritization
+│   └── session-cockpit-review.md  # 67 user stories and priority matrix
+└── USER_GUIDE.md                  # End-user guide
+```
+
+**README.md** at the project root is the public-facing entry point. Keep it concise, current, and linking to `docs/` for details.
+
+**CLAUDE.md** at the project root is the AI development guide. Keep it accurate as the codebase evolves.
+
+---
+
 ## Common Pitfalls
 
 1. **Creating files in `src/`** - There is no `src/` directory. All code lives at root.
@@ -716,3 +749,4 @@ campaignService.linkSceneToLocation(sceneId, locationId);
 9. **Missing `campaignContext`** - AI-generated content will be inconsistent with the campaign if context is not passed.
 10. **Not updating the `EditorView` type** - New views must be added to the union type in `App.tsx`.
 11. **Forgetting `EntityHistoryManager`** - Entities that support history (NPCs, Locations, etc.) should integrate the history tracking component.
+12. **Not updating documentation** - After significant work, update `docs/architecture/high-level-design.md`, `README.md`, and `CLAUDE.md` per the Documentation Maintenance section above.
