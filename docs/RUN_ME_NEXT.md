@@ -30,39 +30,39 @@
 
 ## What To Do Next (In Order)
 
+Each item has a detailed execution plan. Say the command shown to begin.
+
 ### 1. E2E Test Coverage Expansion
 
-The Playwright E2E infrastructure is set up but only has 5 smoke tests. Before adding new features, expand test coverage for everything that was built:
+**Plan:** [`docs/PLAN_E2E_TESTING.md`](PLAN_E2E_TESTING.md) — 8 test suites, 60+ tests, shared helpers
 
 ```
-Use the e2e-test-engineer agent to write comprehensive E2E tests covering:
-- Campaign creation flow with DM Style selector
-- Entity CRUD (create NPC, edit, delete)
-- Navigation: EntityLinks, back stack, recent items, pinning
-- Session Prep Wizard → Session Runner → Session End flow
-- DM Coach with all 4 modes (narrate, improvise, table, roleplay)
-- Secrets & Clues tracker
-- Continuity Checker
-- Mobile responsiveness (run against mobile-chrome project)
-- Keyboard shortcuts
+Execute the E2E test plan from docs/PLAN_E2E_TESTING.md
 ```
+
+- 8 suites: Campaign, Entity CRUD, Navigation, Session Runner, DM Tools, Editors, Mobile, DM Style
+- Suites 1-3 first (foundational), then 4-6 (features), then 7-8 (polish)
+- Shared helpers in `e2e/helpers.ts` for campaign creation, mock mode, navigation
 
 ### 2. Code Review Pass
 
-Run a code review across all Phase C-E changes. Focus on:
-- Performance with large campaigns (100+ entities)
-- Accessibility (ARIA labels, keyboard navigation, screen readers)
-- Consistency (naming conventions, icon usage, color palette)
-- Edge cases (empty campaigns, deleted entity references)
+**Plan:** [`docs/PLAN_CODE_REVIEW.md`](PLAN_CODE_REVIEW.md) — 4 parallel review tracks
 
 ```
-Use the code-reviewer agent to review all changes since Phase B
+Execute the code review plan from docs/PLAN_CODE_REVIEW.md
 ```
+
+- Track A: Performance (100+ entity scaling, render perf, useMemo audits)
+- Track B: Accessibility (ARIA, keyboard nav, focus management, touch targets)
+- Track C: Security (XSS, injection, localStorage limits, import validation)
+- Track D: Architecture (pattern consistency, dead code, decomposition candidates)
 
 ### 3. Phase F: Growth & Advanced AI
 
+**Plan:** [`docs/PLAN_PHASE_F.md`](PLAN_PHASE_F.md) — 5 features, 3 gates
+
 ```
-Execute Phase F from docs/IMPLEMENTATION_PLAN.md
+Execute Phase F from docs/PLAN_PHASE_F.md
 ```
 
 Phase F delivers 5 features (4 parallel + 1 sequential):
@@ -77,11 +77,20 @@ Phase F delivers 5 features (4 parallel + 1 sequential):
 
 ### 4. Phase G: Cloud & Collaboration (Future)
 
-Requires architectural planning before implementation:
-- Cloud provider evaluation (Supabase vs Firebase)
-- Database schema design + offline-first sync strategy
-- Auth flow, localStorage migration
-- Player Portal (read-only), GM Secrets, Interactive World Map
+**Plan:** [`docs/PLAN_PHASE_G.md`](PLAN_PHASE_G.md) — 8 steps, architecture decisions required first
+
+```
+Execute Phase G architecture planning from docs/PLAN_PHASE_G.md
+```
+
+**REQUIRES USER INPUT BEFORE STARTING** — 7 open design questions in the plan:
+1. Cloud provider (Supabase recommended)
+2. Offline support priority
+3. OAuth providers (Discord + Google recommended)
+4. Self-hosting requirement
+5. Player sharing scope
+6. Budget constraints
+7. World map priority
 
 ---
 
@@ -108,10 +117,12 @@ npm run build         # Production build (verify zero TS errors)
 
 | Document | Purpose |
 |----------|---------|
-| `docs/IMPLEMENTATION_PLAN.md` | Master plan — Phases A-G with all work packages |
 | `CLAUDE.md` | Codebase conventions (always read first) |
-| `.claude/agents/e2e-test-engineer.md` | Playwright E2E test agent definition |
-| `.claude/agents/browser-simulator.md` | Browser user simulation agent definition |
+| `docs/IMPLEMENTATION_PLAN.md` | Master plan — Phases A-G with all work packages |
+| **`docs/PLAN_E2E_TESTING.md`** | **E2E test expansion plan — 8 suites, 60+ tests** |
+| **`docs/PLAN_CODE_REVIEW.md`** | **Code review plan — 4 parallel tracks (perf, a11y, security, arch)** |
+| **`docs/PLAN_PHASE_F.md`** | **Phase F execution plan — 5 features, 3 gates** |
+| **`docs/PLAN_PHASE_G.md`** | **Phase G execution plan — cloud, auth, sync, sharing, maps** |
 | `playwright.config.ts` | E2E test configuration (chromium + mobile-chrome) |
 
 ## Available Agents
