@@ -1,0 +1,220 @@
+{
+  "title": "The Sunken Vault",
+  "settingType": "custom",
+  "setting": "A classic fantasy realm where adventurers delve into ancient ruins for glory and treasure. The frontier village of Ironhaven sits on the edge of civilisation, drawing fortune-seekers from across the land. Beneath the hills lies a network of dungeons built by a long-dead empire, still guarded by the traps and monsters left behind centuries ago.",
+  "npcs": [
+    {
+      "id": "tmpl-npc-dc-1",
+      "name": "Marta Stonehearth",
+      "description": "A stout, weathered woman in her fifties with calloused hands and a no-nonsense squint. She keeps the Rusty Pick tavern spotlessly clean and runs the local adventurers' guild from the common room.",
+      "traits": "Gruff but fair. Respects deeds over words. Has seen enough adventurers pass through to know which ones won't come back.",
+      "backstory": "A retired caravan guard who settled in Ironhaven after her partner died in a dungeon run twenty years ago. She keeps the adventurers' board as a tribute — someone has to make sure people know where the monsters are.",
+      "motivations": "Keep the village safe. Make sure adventurers go in prepared and don't leave widows behind.",
+      "secrets": "She knows the Sunken Vault contains something worth more than gold — a sealed vault door that the empire never opened. She's sent twelve parties in. None returned from the second level.",
+      "stats": "Commoner (veteran stats). Carries a shortsword under the bar. Has contacts with the local militia.",
+      "exampleQuote": "You want the job? The job is finding what's behind the bronze door. Last group who tried didn't come back. So maybe be better than they were.",
+      "factionId": null,
+      "knowsPlayerHistory": [],
+      "relationships": [],
+      "history": []
+    },
+    {
+      "id": "tmpl-npc-dc-2",
+      "name": "Brom the Twice-Dead",
+      "description": "A tall, lean man with a shaved head covered in faded tattoos — each one marking a dungeon he's cleared. He's missing two fingers on his left hand and moves with the careful economy of someone who has learned every careless gesture has a price.",
+      "traits": "Methodical. Speaks rarely but precisely. Has a dry, black sense of humour about death. Deeply superstitious about dungeon protocols.",
+      "backstory": "Brom has cleared seventeen dungeons and survived two near-fatal encounters — hence the name. He works as a guide-for-hire and tactical advisor, leading parties through the Sunken Vault's upper levels for a share of treasure.",
+      "motivations": "Survive long enough to retire. Pass on what he's learned so that fewer people die stupidly.",
+      "secrets": "He reached the bronze door once. Something on the other side spoke to him through the metal. He's never told anyone what it said. He won't go past the second level any more.",
+      "stats": "Scout/Veteran hybrid. AC 15, HP 52. Advantage on Perception and Stealth. Knows all traps on levels 1-2.",
+      "exampleQuote": "Don't touch the walls with the carvings. Don't split the party. Don't open the chest that's not locked. I've seen people die to all three.",
+      "factionId": null,
+      "knowsPlayerHistory": [],
+      "relationships": [],
+      "history": []
+    },
+    {
+      "id": "tmpl-npc-dc-3",
+      "name": "Varothos the Pale",
+      "description": "A lich who drifts through the vault's deepest chamber on a throne of fused bone. He was once the empire's arch-arcanist, the man who designed the vault and sealed himself inside it rather than watch his empire fall. His robes are immaculate despite being centuries old. His eye sockets glow with a cold violet light.",
+      "traits": "Coldly intellectual. Disdainful of 'the short-lived.' Views intruders as either curiosities or nuisances depending on what they say first.",
+      "backstory": "Varothos sealed his own phylactery inside the vault's deepest chamber when the empire fell, intending to sleep until it rose again. He has been waiting for six hundred years. The empire is not coming back, but he has not accepted this.",
+      "motivations": "Restore the empire. Or failing that, be left alone to his research. He is working on a ritual that could compel the scattered former subjects of the empire to return — whether they want to or not.",
+      "secrets": "His phylactery is a golden inkwell hidden inside a false brick in the fourth-level archive. He can be permanently destroyed only by finding and shattering it. He is actually capable of mercy — but only to those who address him by his full title.",
+      "stats": "Lich. AC 17, HP 135, CR 21. Legendary Resistances x3. Spellcasting (9th level). Paralyzing Touch +12 to hit (10d6 cold + paralyzed). Lair Actions in throne room.",
+      "exampleQuote": "You stand in the Grand Archive of the Varothan Compact. State your business with the Imperial Arch-Arcanist, or be catalogued among the uninvited dead.",
+      "factionId": null,
+      "knowsPlayerHistory": [],
+      "relationships": [],
+      "history": []
+    }
+  ],
+  "locations": [
+    {
+      "id": "tmpl-loc-dc-1",
+      "name": "Ironhaven",
+      "description": "A frontier village of several hundred souls, built where the road from the capital finally gives up and turns to dirt track. Timber-framed buildings cluster around the central market square. The Rusty Pick tavern sits at the crossroads. A wooden palisade marks the edge of the 'safe' land.",
+      "secrets": "Three of the village council members were hired by a merchant consortium to ensure the Sunken Vault remains unplundered — the empire's lost treasury is worth more intact as a location fee than looted.",
+      "subLocationIds": [],
+      "connections": [],
+      "loot": [],
+      "history": []
+    },
+    {
+      "id": "tmpl-loc-dc-2",
+      "name": "The Vault Entrance",
+      "description": "A weathered archway cut into a hillside two hours east of Ironhaven. The stonework is imperial — precise, interlocking, built to last. The doors have long since been torn off their hinges by some earlier expedition. Torch-marks on the stone ceiling above show the volume of traffic that has passed through over the years.",
+      "secrets": "The second set of stairs, concealed behind a sliding panel in the guardroom, bypasses the first level entirely and drops directly to level two — a route used only by imperial officials who knew the passphrase.",
+      "subLocationIds": ["tmpl-loc-dc-3"],
+      "parentLocationId": null,
+      "connections": [],
+      "loot": [],
+      "history": [],
+      "pointsOfInterest": [
+        {
+          "id": "tmpl-poi-dc-1",
+          "name": "Imperial Inscription",
+          "passivePerceptionDC": 12,
+          "description": "An inscription above the arch reads: 'Here lies the Varothan Archive. Enter in knowledge. Leave in ignorance at your peril.' Below it, in cruder script, someone has carved 'DON'T GO PAST THE SECOND DOOR.'",
+          "investigationChecks": [],
+          "interactions": []
+        }
+      ]
+    },
+    {
+      "id": "tmpl-loc-dc-3",
+      "name": "The Vault Chamber",
+      "description": "A vast underground hall lit by bioluminescent moss that the empire cultivated centuries ago and which has outlasted every other living thing inside. Rows of stone shelves hold clay tablets, copper scroll-cases, and the mummified remains of imperial scribes who apparently died at their desks. At the far end, a massive bronze door bears a stylised eye motif. The air is cold and smells of old stone.",
+      "secrets": "The bronze door opens only when a living creature speaks the phrase 'By the Compact, I bind my knowledge to the Archive' in the old imperial tongue. Behind it is Varothos's throne room. The clay tablets contain the complete tax records of a dead empire — useless commercially, priceless to historians.",
+      "parentLocationId": "tmpl-loc-dc-2",
+      "subLocationIds": [],
+      "connections": [],
+      "loot": [],
+      "history": [],
+      "pointsOfInterest": [
+        {
+          "id": "tmpl-poi-dc-2",
+          "name": "The Bronze Door",
+          "passivePerceptionDC": 10,
+          "description": "A ten-foot bronze door engraved with an open eye. The metal is cold to the touch even in summer. No visible lock or handle. Faint violet light leaks from the seams.",
+          "investigationChecks": [],
+          "interactions": []
+        }
+      ]
+    }
+  ],
+  "factions": [],
+  "adventures": [
+    {
+      "id": "tmpl-adv-dc-1",
+      "title": "Descent into the Sunken Vault",
+      "level": 3,
+      "hook": "Marta Stonehearth offers a substantial reward to any party willing to find out what happened to her last expedition — and what lies behind the bronze door on the second level.",
+      "theme": "Classic Dungeon Delve, Mystery, Boss Confrontation",
+      "scenes": [
+        {
+          "id": "tmpl-scene-dc-1",
+          "title": "The Rusty Pick Tavern",
+          "type": "social",
+          "status": "planned",
+          "readAloudText": "The Rusty Pick is fuller than usual tonight. Word has spread that Marta Stonehearth is hiring. A weathered woman behind the bar catches your eye the moment you walk in. 'Sit down,' she says. 'I'll get you a drink and tell you about the job. It pays well because it's dangerous. Everything that pays well is dangerous.'",
+          "gmNotes": "Marta gives the party the job briefing: find the missing expedition (six people, been gone 19 days), map what's on the second level, and bring back anything of value from behind the bronze door. She offers 50gp each upfront, 150gp each on return, plus a 10% share of any sellable finds. Brom the Twice-Dead is in the corner — he'll offer his services as guide for level 1-2 for a 15% cut. Let the party ask questions. Marta knows about the traps on level 1 (she's had them documented). She does NOT know what's on level 2.",
+          "skillChecks": [
+            {
+              "id": "tmpl-sc-dc-1",
+              "skill": "Insight",
+              "dc": 13,
+              "description": "Marta is hiding something about the bronze door — she looks away when she mentions it."
+            },
+            {
+              "id": "tmpl-sc-dc-2",
+              "skill": "Persuasion",
+              "dc": 14,
+              "description": "Negotiate better terms — success gets an extra 25gp each or a magic item from Marta's storage."
+            }
+          ],
+          "rewards": "",
+          "locationId": "tmpl-loc-dc-1",
+          "npcIds": ["tmpl-npc-dc-1", "tmpl-npc-dc-2"]
+        },
+        {
+          "id": "tmpl-scene-dc-2",
+          "title": "The Vault Entrance",
+          "type": "exploration",
+          "status": "planned",
+          "readAloudText": "The hillside swallows you. Imperial stonework frames a passage ten feet wide and twelve feet tall, descending at a gentle angle into darkness. Torch-char marks the ceiling. At the base of the entrance tunnel, the remains of what was once a guardhouse have been picked clean by decades of treasure hunters. Two corridors lead deeper into the hill.",
+          "gmNotes": "This is the transition scene. Brom (if present) gives the party a briefing on level 1 dangers: three pit traps (marked with scratches on the wall if they look), a pressure-plate corridor, and a nest of giant rats in the eastern wing. The missing expedition's camp is here — bedrolls, a burnt-out lantern, a trail of dried blood leading east. DC 13 Survival to track the blood trail.",
+          "skillChecks": [
+            {
+              "id": "tmpl-sc-dc-3",
+              "skill": "Survival",
+              "dc": 13,
+              "description": "Track the blood trail from the missing expedition to find what happened to them."
+            },
+            {
+              "id": "tmpl-sc-dc-4",
+              "skill": "Investigation",
+              "dc": 15,
+              "description": "Notice the false panel in the guardroom that conceals the shortcut staircase."
+            }
+          ],
+          "rewards": "The expedition's abandoned gear: rope, rations, a potion of healing, 15gp in scattered coins.",
+          "locationId": "tmpl-loc-dc-2",
+          "npcIds": ["tmpl-npc-dc-2"]
+        },
+        {
+          "id": "tmpl-scene-dc-3",
+          "title": "The Trapped Corridor",
+          "type": "puzzle",
+          "status": "planned",
+          "readAloudText": "The passage widens into a long hall. The floor is tiled in a chequerboard of white and grey stone. Every five feet, stone pillars bear carved imperial glyphs. At the far end, the bronze door stands before you. Halfway across the hall, you can see the remains of several people — or what's left of them after the traps went off.",
+          "gmNotes": "This is the dungeon skill challenge before the boss. The floor alternates safe tiles (white) and pressure plates (grey, trigger darts from the pillars — DC 15 Dex or 2d6 piercing). The glyphs on the pillars are navigation instructions in imperial script — DC 16 Arcana or DC 14 History to read them. The missing expedition died here: bodies of four people in the middle of the hall, killed by darts. Two more bodies are at the far end by the door — killed by something else, possibly the lich. The party must cross without triggering more darts.",
+          "skillChecks": [
+            {
+              "id": "tmpl-sc-dc-5",
+              "skill": "Arcana",
+              "dc": 16,
+              "description": "Read the imperial glyphs to identify the safe path across the tiles."
+            },
+            {
+              "id": "tmpl-sc-dc-6",
+              "skill": "Dexterity",
+              "dc": 15,
+              "description": "Avoid triggering the pressure-plate darts if the safe path isn't known."
+            }
+          ],
+          "rewards": "The missing expedition members' gear: crowbar, thieves' tools, a detailed map of level 1, and a note reading 'DOOR OPENED ITSELF. COLD VOICE INSIDE. DO NOT ENTER ALONE.'",
+          "locationId": "tmpl-loc-dc-3",
+          "npcIds": []
+        },
+        {
+          "id": "tmpl-scene-dc-4",
+          "title": "Audience with the Arch-Arcanist",
+          "type": "social",
+          "status": "planned",
+          "readAloudText": "The bronze door swings open before you touch it. Beyond is a vast chamber of polished black stone. At its centre, elevated on a dais of fused bone, sits a figure in pristine imperial robes. The violet light comes from him — from the cold fire burning in the hollows of his eyes. He does not rise. He simply watches you enter, and waits.",
+          "gmNotes": "Varothos is not immediately hostile. He has waited centuries for someone interesting to arrive. He will speak to the party — even answer questions — if they address him by his full title (Arch-Arcanist Varothos of the Varothan Compact). Key info he can reveal: the empire fell to internal betrayal, not invasion. His restoration ritual is complete — he needs only a living volunteer to serve as its anchor. Combat triggers if: party refuses to engage, mentions destroying the phylactery, or attempts to loot the chamber without permission. If the party plays him correctly, they can convince him the empire is truly gone (DC 18 Persuasion or DC 15 History with evidence) — he will pause the ritual for one year and allow them to leave with treasure as 'archival fees.'",
+          "skillChecks": [
+            {
+              "id": "tmpl-sc-dc-7",
+              "skill": "History",
+              "dc": 15,
+              "description": "Convince Varothos the empire is genuinely gone using historical knowledge."
+            },
+            {
+              "id": "tmpl-sc-dc-8",
+              "skill": "Persuasion",
+              "dc": 18,
+              "description": "Diplomatically defuse the situation and negotiate safe passage with treasure."
+            }
+          ],
+          "rewards": "Imperial Archive access: a spell scroll of Teleportation Circle, an imperial signet ring (500gp), a tome of ancient history (300gp), or combat rewards from the lich if fought.",
+          "locationId": "tmpl-loc-dc-3",
+          "npcIds": ["tmpl-npc-dc-3"]
+        }
+      ]
+    }
+  ],
+  "plots": [],
+  "items": []
+}

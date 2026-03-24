@@ -1,0 +1,249 @@
+{
+  "title": "The Festival of Shadows",
+  "settingType": "custom",
+  "setting": "A lively harvest festival in the village of Harrowfield turns sinister as an ancient curse awakens. The festival has been held every autumn for three hundred years — a week of food, music, and the ritual burning of an effigy to ward off winter. This year, the effigy is wrong. The straw is darker. The face looks like someone specific. And on the first night of the festival, the lights started going out one by one.",
+  "npcs": [
+    {
+      "id": "tmpl-npc-os-1",
+      "name": "Fenna Ashgrove, Festival Organiser",
+      "description": "A brisk woman of forty-five who has been managing the Harrowfield Harvest Festival for twenty years with the same methodical efficiency she applies to everything. She carries a clipboard in modern terms — a wax tablet and stylus — and her smile is the fixed kind that means she is handling a crisis and would prefer no one else notice.",
+      "traits": "Competent, controlling, and currently terrified in a way she will not admit. Provides information only when convinced it is necessary. Stubbornly believes this can be fixed before anyone else gets hurt.",
+      "backstory": "Fenna inherited the festival from her mother, who inherited it from her mother. The women of the Ashgrove family have organised the ritual for three generations. What Fenna knows, and has never told anyone, is that the ritual is not merely ceremonial. It is a binding. And this year, she made a mistake in the preparation.",
+      "motivations": "Fix what she broke without anyone finding out she broke it. Protect the village from the consequences. She will accept help only once she realises she cannot manage this alone.",
+      "secrets": "She substituted a component in the binding ritual three days ago — she ran out of the correct herb and used a similar-looking plant. The ritual bound the wrong thing: not the annual ward against winter, but a three-century-old curse that the original ritual was designed to contain. The effigy does have a specific face. It is her ancestor, the woman who first performed the ritual, who is now loose.",
+      "stats": "Commoner (capable adult). Has detailed knowledge of the ritual and the curse. Carries the family's ritual book, which contains the counter-ritual, in a locked box in her house.",
+      "exampleQuote": "The festival is fine. Everything is fine. If you could just stay in the marked areas and not ask about the lights, that would be very helpful.",
+      "factionId": null,
+      "knowsPlayerHistory": [],
+      "relationships": [],
+      "history": []
+    },
+    {
+      "id": "tmpl-npc-os-2",
+      "name": "The Mysterious Stranger",
+      "description": "A figure in a travelling cloak who appeared in the village two days before the festival began and has been present at every incident since, always at the edge of the scene. Face partially shadowed. Moves silently. Watches everything with the patience of someone who has been watching for a very long time.",
+      "traits": "Speaks in careful, considered sentences. Does not lie, but does not volunteer information. Has a quality of stillness that makes them seem slightly not-quite-present in the normal way of things.",
+      "backstory": "The Stranger is the last descendant of the woman whose face is on the effigy. They have been hunting the curse's manifestations for fifteen years, tracking it through a trail of autumn festivals where small things went wrong. They came to Harrowfield because they believed this year would be when it fully manifested. They were right.",
+      "motivations": "End the curse permanently, which requires the counter-ritual and the willing participation of a blood descendant of the original binding. That is them. The ritual will cost them their life. They have accepted this. They would prefer to see it done correctly.",
+      "secrets": "They know exactly what is coming and exactly how to stop it. They have not shared this because they needed to assess whether anyone in the village was capable of helping, and they have spent two days deciding the party are. They will tell everything they know once they make contact — they are tired of carrying this alone.",
+      "stats": "Ranger/Paladin hybrid. AC 16, HP 72. Has advantage on saving throws against curses and magical compulsion. Carries a silver-tipped spear that deals extra damage to undead and cursed entities. Will fight alongside the party in the final confrontation.",
+      "exampleQuote": "I know what is in the temple. I know what it wants. I know how to stop it. What I need to know is whether you are ready to hear all three of those things at once.",
+      "factionId": null,
+      "knowsPlayerHistory": [],
+      "relationships": [],
+      "history": []
+    },
+    {
+      "id": "tmpl-npc-os-3",
+      "name": "Mira Ashgrove, Cursed Spirit",
+      "description": "Three hundred years ago, Mira Ashgrove bound a winter spirit to the land of Harrowfield, sacrificing her own continued peace to do so. She was not consulted about this when the ritual was designed. She has had three centuries to consider how she feels about it. Her manifestation is a woman in harvest dress that is slightly too dark, whose face is visible only as a pale blur, and who leaves frost where she walks despite the autumn warmth.",
+      "traits": "Patient. Angry in a cold, reasoned way that has had centuries to become very specific. Not evil — she was wronged and she wants acknowledgment of that, not destruction. But she is not above destruction if denied.",
+      "backstory": "Mira was the first organiser of the Harrowfield festival. She designed the harvest ritual herself, which was supposed to be a celebration. Then the village elders decided the ritual would be better if it also served as a containment vessel for a local spirit, without telling her, and bound her to it as the anchor. She has been trapped in the land for three hundred years, able to stir only when the binding weakens.",
+      "motivations": "Be acknowledged. Be released. The curse she is spreading is not a weapon — it is her presence, bleeding out from the weakened binding into the physical world. She is not trying to destroy the village. She is trying to wake someone up enough to talk to her.",
+      "secrets": "She can be communicated with — not easily, but the crystal cave equivalent here is the old oak at the festival ground's centre, which was used in the original ritual. She will speak to someone who stands at its roots at midnight and addresses her by name. She will tell them what happened to her and what she needs. She will not cooperate with the counter-ritual unless whoever performs it acknowledges, on behalf of the village, that what was done to her was wrong.",
+      "stats": "Ghost (modified). AC 11, HP 58. Possession (DC 15 Cha or possessed). Horrifying Visage (DC 13 Wis or frightened 1 minute). Cannot be permanently destroyed — only contained or released. The ritual releases her. The alternative is re-binding, which she will resist violently.",
+      "exampleQuote": "I did not ask to be made a lock. I asked only to celebrate the harvest. They bound me without consent and called it sacrifice. Three hundred years I have waited for someone to say those words out loud.",
+      "factionId": null,
+      "knowsPlayerHistory": [],
+      "relationships": [],
+      "history": []
+    }
+  ],
+  "locations": [
+    {
+      "id": "tmpl-loc-os-1",
+      "name": "The Festival Grounds",
+      "description": "Harrowfield's central square expanded into the surrounding commons for the week of the festival. Stalls selling roasted nuts and spiced cider. A dancing square with musicians. A stage for the evening shows. And at the centre, the great bonfire pit where the effigy will burn at the ritual's conclusion — surrounding an oak tree so old it predates the village by centuries.",
+      "secrets": "The central oak is the original anchor point of Mira Ashgrove's binding. Standing at its roots at midnight allows communication with her. The effigy facing outward from the bonfire pit is an exact likeness of Mira's face — which Fenna recreated from a painting in the family archive without understanding what she was doing.",
+      "subLocationIds": [],
+      "connections": [],
+      "loot": [],
+      "history": [],
+      "pointsOfInterest": [
+        {
+          "id": "tmpl-poi-os-1",
+          "name": "The Festival Effigy",
+          "passivePerceptionDC": 13,
+          "description": "The effigy at the bonfire's centre is more carefully made than seems necessary — human-proportioned, with a painted face that is too specific to be generic. Anyone who has seen historical portraits would recognise it as a particular woman from three hundred years ago.",
+          "investigationChecks": [],
+          "interactions": []
+        },
+        {
+          "id": "tmpl-poi-os-2",
+          "name": "The Ancient Oak",
+          "passivePerceptionDC": 11,
+          "description": "An enormous old oak at the centre of the bonfire pit, its bark marked with carvings so old they have nearly been absorbed into the wood. Frost has formed on its lower bark despite above-freezing temperatures.",
+          "investigationChecks": [],
+          "interactions": []
+        }
+      ]
+    },
+    {
+      "id": "tmpl-loc-os-2",
+      "name": "The Abandoned Temple",
+      "description": "A stone structure at the edge of the village that was decommissioned a hundred years ago when the village's religious practice shifted. It has been used as storage for festival equipment since then, which means it is full of old effigy frames, bundled straw, banner poles, and in the back chamber, the village's oldest altar — still active, still resonant, the place where the original binding ritual was performed.",
+      "secrets": "The back chamber contains a sealed room that requires the ritual key (a carved wooden disk kept in Fenna's locked box) to open. Inside: a complete record of the original ritual, written by Mira herself, describing what was done to her and how it could be undone. The record has never been read by any living person.",
+      "subLocationIds": [],
+      "connections": [],
+      "loot": [],
+      "history": [],
+      "pointsOfInterest": [
+        {
+          "id": "tmpl-poi-os-3",
+          "name": "The Original Altar",
+          "passivePerceptionDC": 12,
+          "description": "A stone altar that has not been used for a century but shows no dust — something keeps it clean. The carvings around its base show harvest imagery that, on closer look, includes what appears to be a person being woven into the pattern of the land.",
+          "investigationChecks": [],
+          "interactions": []
+        },
+        {
+          "id": "tmpl-poi-os-4",
+          "name": "The Sealed Chamber Door",
+          "passivePerceptionDC": 15,
+          "description": "A section of back wall that doesn't quite match — the stone is the same but the mortar lines suggest a door. A circular depression in the centre is the exact size and shape of a carved wooden disk.",
+          "investigationChecks": [],
+          "interactions": []
+        }
+      ]
+    }
+  ],
+  "factions": [],
+  "adventures": [
+    {
+      "id": "tmpl-adv-os-1",
+      "title": "One Night at the Festival of Shadows",
+      "level": 3,
+      "hook": "You arrived in Harrowfield for the harvest festival. The food is good, the music is lively, and something is very wrong with the lights.",
+      "theme": "Mystery, Folk Horror, Moral Ambiguity, One-Shot",
+      "scenes": [
+        {
+          "id": "tmpl-scene-os-1",
+          "title": "Festival Arrival",
+          "type": "social",
+          "status": "planned",
+          "readAloudText": "Harrowfield smells of roasted apples and woodsmoke. The festival banner stretches between two buildings at the village entrance — orange and brown, a stylised sheaf of wheat. People are smiling. Children are running between the stalls. The bonfire at the centre of the square is not yet lit, but the effigy above it watches the crowd with a painted face that is, somehow, looking at you specifically.",
+          "gmNotes": "Arrival scene — let the party settle in and interact with the festival. Within 30 minutes of arrival: the inn's torches go out simultaneously and won't relight for 10 minutes. No wind. No obvious cause. The innkeeper pretends not to notice. Fenna Ashgrove is visible managing a stall near the central oak — if approached, she is politely busy and deflecting. The Mysterious Stranger can be spotted watching the oak from a distance (DC 14 Perception). This scene establishes the wrongness before it escalates.",
+          "skillChecks": [
+            {
+              "id": "tmpl-sc-os-1",
+              "skill": "Perception",
+              "dc": 14,
+              "description": "Notice the Mysterious Stranger observing the ancient oak with unusual intensity."
+            },
+            {
+              "id": "tmpl-sc-os-2",
+              "skill": "History",
+              "dc": 13,
+              "description": "Recognise the effigy face as matching historical portraits of a woman from three centuries ago."
+            }
+          ],
+          "rewards": "",
+          "locationId": "tmpl-loc-os-1",
+          "npcIds": ["tmpl-npc-os-1", "tmpl-npc-os-2"]
+        },
+        {
+          "id": "tmpl-scene-os-2",
+          "title": "Strange Occurrences",
+          "type": "exploration",
+          "status": "planned",
+          "readAloudText": "It's the third hour of the evening when the second incident happens. A child runs screaming from behind the festival stalls — she says a woman with no face touched her shoulder. The frost on the old oak's bark has spread. Three festival lanterns have gone out in a perfect triangle around the bonfire. People are starting to notice.",
+          "gmNotes": "Escalation scene. Mira's presence is intensifying as night approaches. The child (DC 12 Persuasion to calm her down) says the woman whispered: 'Tell them her name.' DC 13 Arcana: the frost pattern on the oak is a binding sigil, deteriorating. DC 14 Investigation at the lanterns: each went out from the inside, wicks intact. Fenna is now clearly frightened — a party member who watches her closely (DC 15 Insight) sees her consulting a small notebook and then putting it away quickly. The Stranger will make contact at this point if the party seems competent.",
+          "skillChecks": [
+            {
+              "id": "tmpl-sc-os-3",
+              "skill": "Arcana",
+              "dc": 13,
+              "description": "Identify the frost pattern on the oak as a deteriorating magical binding."
+            },
+            {
+              "id": "tmpl-sc-os-4",
+              "skill": "Insight",
+              "dc": 15,
+              "description": "Observe Fenna consulting her notebook and determine she knows more than she is saying."
+            }
+          ],
+          "rewards": "",
+          "locationId": "tmpl-loc-os-1",
+          "npcIds": ["tmpl-npc-os-2", "tmpl-npc-os-1"]
+        },
+        {
+          "id": "tmpl-scene-os-3",
+          "title": "Investigation",
+          "type": "exploration",
+          "status": "planned",
+          "readAloudText": "The Stranger takes you somewhere private. Or Fenna finally breaks and tells you what she did. Either way, the picture assembles itself: three hundred years of an imprisoned woman, a ritual conducted without consent, and a mistake made three days ago that has begun to unravel the binding. The abandoned temple at the village edge holds the answer. Someone has to go in there.",
+          "gmNotes": "Information-consolidation scene. The party learns the full story — either from the Stranger (who tells them everything they know) or from Fenna (who tells them half-truths that the Stranger can correct, or that Investigation can unpack from the ritual book fragments). The key information: Mira is not a monster, the counter-ritual requires a blood descendant to perform it, and there is a sealed room in the temple that contains Mira's own account of what happened. The ritual disk is in Fenna's locked box. Getting it requires either Fenna's cooperation (DC 16 Persuasion, or DC 14 with the Stranger's backing) or picking the lock (DC 15 Thieves' Tools). Inside the temple, they need to find the sealed chamber and read Mira's account.",
+          "skillChecks": [
+            {
+              "id": "tmpl-sc-os-5",
+              "skill": "Investigation",
+              "dc": 14,
+              "description": "In the temple back room, locate the sealed chamber door and identify the disk as the key."
+            },
+            {
+              "id": "tmpl-sc-os-6",
+              "skill": "Arcana",
+              "dc": 15,
+              "description": "Read and understand the ritual instructions in Mira's sealed account."
+            }
+          ],
+          "rewards": "Full knowledge of the ritual and Mira's history. The Stranger commits to the counter-ritual once the party has this information.",
+          "locationId": "tmpl-loc-os-2",
+          "npcIds": ["tmpl-npc-os-2", "tmpl-npc-os-1"]
+        },
+        {
+          "id": "tmpl-scene-os-4",
+          "title": "Temple Descent and the Midnight Conversation",
+          "type": "social",
+          "status": "planned",
+          "readAloudText": "Midnight. The festival has mostly emptied — most people have gone inside and are pretending nothing is happening. The oak at the centre of the festival grounds has turned white with frost. You stand at its roots. The Stranger stands behind you. You speak her name. And the darkness between the torches gathers into a shape, and the shape says: 'Finally. It has taken three hundred years for someone to say my name without fear.'",
+          "gmNotes": "The roleplay centrepiece of the one-shot. Mira manifests at the oak when her name is spoken at midnight. She is not immediately hostile. She wants to tell her story and be heard. If the party listens and engages respectfully, she will cooperate with the counter-ritual. If they try to attack or contain her, she will defend herself (use Ghost stats) and the ritual becomes significantly harder. Key moment: she will ask if the party — on behalf of the village — acknowledges that what was done to her was wrong. If they say yes genuinely, she weeps and says 'Thank you. I have waited longer than you know to hear that said.' This is the emotional pivot of the adventure. Combat is possible but represents a failure state — the counter-ritual can still be performed but requires a DC 20 check instead of DC 14.",
+          "skillChecks": [
+            {
+              "id": "tmpl-sc-os-7",
+              "skill": "Persuasion",
+              "dc": 12,
+              "description": "Speak to Mira respectfully and acknowledge her grievance — opens cooperative path."
+            },
+            {
+              "id": "tmpl-sc-os-8",
+              "skill": "Insight",
+              "dc": 13,
+              "description": "Understand what Mira actually needs (acknowledgment, not revenge) before she articulates it."
+            }
+          ],
+          "rewards": "Mira's cooperation with the counter-ritual, which makes the climax significantly less dangerous.",
+          "locationId": "tmpl-loc-os-1",
+          "npcIds": ["tmpl-npc-os-3", "tmpl-npc-os-2"]
+        },
+        {
+          "id": "tmpl-scene-os-5",
+          "title": "Climactic Confrontation",
+          "type": "combat",
+          "status": "planned",
+          "readAloudText": "The counter-ritual requires one thing the Stranger has been carrying their whole life: the willingness to complete it. They take their position at the altar. They begin to speak the words from Mira's account. The frost on the oak spreads to the ground, then retreats. The lights come back on, all at once. The effigy at the bonfire's base moves — and then stops. Mira looks at you across the festival grounds, and says: 'Begin.'",
+          "gmNotes": "The finale has two versions depending on earlier choices. COOPERATIVE: The Stranger performs the ritual (3 rounds, requires party protection from 1d4+1 shadows that emerge from the effigy — Mira's remaining bound fragments manifesting). DC 14 Arcana each round to assist the Stranger's ritual roll. Three successes before three failures. If successful: the binding dissolves, the Stranger is exhausted but alive (costs their health, not their life — Mira asked for release, not another sacrifice). HOSTILE (if Mira was not appeased): Same structure but DC 20, shadows are stronger (use Shadow stats rather than custom), and the Stranger has a 50% chance of not surviving the ritual. Either way: at completion, the oak's frost melts, the effigy burns naturally, and a warm light moves up from the ground into the sky. The festival resumes. The harvest is saved.",
+          "skillChecks": [
+            {
+              "id": "tmpl-sc-os-9",
+              "skill": "Arcana",
+              "dc": 14,
+              "description": "Assist the Stranger's counter-ritual to reduce the number of required successes."
+            },
+            {
+              "id": "tmpl-sc-os-10",
+              "skill": "Athletics",
+              "dc": 13,
+              "description": "Physically shield the Stranger from the manifesting shadows while the ritual completes."
+            }
+          ],
+          "rewards": "The village's gratitude (free lodging for life, a named day in their honour). The Stranger gifts the party their silver-tipped spear before departing — 'I won't need it any longer.' The ritual book remains with Fenna, who will use it correctly from now on.",
+          "locationId": "tmpl-loc-os-1",
+          "npcIds": ["tmpl-npc-os-2", "tmpl-npc-os-3"]
+        }
+      ]
+    }
+  ],
+  "plots": [],
+  "items": []
+}

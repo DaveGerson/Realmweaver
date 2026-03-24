@@ -4,9 +4,11 @@ import { Button } from '../common/Button';
 import { Icons } from '../common/Icons';
 import type { SettingType } from '../../types/index';
 import type { DmStyle } from '../../types/index';
+import { TEMPLATE_META, loadTemplateData, type TemplateMeta } from '../../data/templates/index';
 
 interface CampaignCreatorProps {
   onCreateCampaign: (title: string, setting: string, settingType: SettingType, officialSetting?: string, dmStyle?: DmStyle) => void;
+  onTemplateSelected?: (templateData: Record<string, unknown>) => void;
 }
 
 const OFFICIAL_SETTINGS = [
@@ -48,12 +50,198 @@ const DM_STYLE_OPTIONS: Array<{
   },
 ];
 
-export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampaign }) => {
+// --- Template Selector Step ---
+
+interface EntityCountBadgeProps {
+  count: number;
+  label: string;
+  icon: React.ReactNode;
+}
+
+const EntityCountBadge: React.FC<EntityCountBadgeProps> = ({ count, label, icon }) => {
+  if (count === 0) return null;
+  return (
+    <span className="inline-flex items-center gap-1 text-xs bg-stone-700 text-stone-300 rounded px-2 py-0.5">
+      {icon}
+      {count} {label}
+    </span>
+  );
+};
+
+interface TemplateCardProps {
+  meta: TemplateMeta;
+  onSelect: (id: string) => void;
+  isLoading: boolean;
+}
+
+const TemplateCard: React.FC<TemplateCardProps> = ({ meta, onSelect, isLoading }) => {
+  return (
+    <div className="flex flex-col bg-stone-800 border border-stone-700 rounded-lg p-4 gap-3 hover:border-stone-600 transition-colors">
+      <div>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h3 className="font-semibold text-stone-100 text-sm leading-tight">{meta.title}</h3>
+            <p className="text-amber-400 text-xs mt-0.5">{meta.subtitle}</p>
+          </div>
+          <span className="shrink-0 text-xs bg-stone-700 text-stone-400 rounded px-2 py-0.5 whitespace-nowrap">
+            {meta.playstyle}
+          </span>
+        </div>
+        <p className="text-stone-400 text-xs mt-2 leading-relaxed line-clamp-3">{meta.description}</p>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        <EntityCountBadge
+          count={meta.entityCounts.npcs}
+          label="NPCs"
+          icon={<Icons.NPCs className="w-3 h-3" />}
+        />
+        <EntityCountBadge
+          count={meta.entityCounts.locations}
+          label="Locations"
+          icon={<Icons.Locations className="w-3 h-3" />}
+        />
+        <EntityCountBadge
+          count={meta.entityCounts.factions}
+          label="Factions"
+          icon={<Icons.Factions className="w-3 h-3" />}
+        />
+        <EntityCountBadge
+          count={meta.entityCounts.adventures}
+          label={meta.entityCounts.adventures === 1 ? 'Adventure' : 'Adventures'}
+          icon={<Icons.Adventures className="w-3 h-3" />}
+        />
+        {meta.entityCounts.scenes > 0 && (
+          <EntityCountBadge
+            count={meta.entityCounts.scenes}
+            label="Scenes"
+            icon={<Icons.Scenes className="w-3 h-3" />}
+          />
+        )}
+        <EntityCountBadge
+          count={meta.entityCounts.plots}
+          label="Plots"
+          icon={<Icons.Plot className="w-3 h-3" />}
+        />
+      </div>
+
+      <Button
+        size="sm"
+        onClick={() => onSelect(meta.id)}
+        disabled={isLoading}
+        className="w-full mt-auto"
+      >
+        {isLoading ? (
+          <>
+            <Icons.Loader className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+            Loading...
+          </>
+        ) : (
+          <>
+            <Icons.Sparkles className="w-3.5 h-3.5 mr-1.5" />
+            Use This Template
+          </>
+        )}
+      </Button>
+    </div>
+  );
+};
+
+interface TemplateSelectorStepProps {
+  onTemplateChosen: (templateId: string) => Promise<void>;
+  onSkip: () => void;
+  loadingTemplateId: string | null;
+}
+
+const TemplateSelectorStep: React.FC<TemplateSelectorStepProps> = ({
+  onTemplateChosen,
+  onSkip,
+  loadingTemplateId,
+}) => {
+  return (
+    <div className="w-full max-w-3xl mx-auto animate-in fade-in duration-500">
+      <header className="text-center mb-6">
+        <Icons.Sparkles className="w-10 h-10 mx-auto text-amber-500" />
+        <h1 className="mt-3 text-2xl font-bold font-serif text-slate-100">Start With a Template?</h1>
+        <p className="mt-1 text-slate-400 text-sm">
+          Jump in with a pre-built world — NPCs, locations, and adventures ready to run.
+          Or start from scratch and build your own.
+        </p>
+      </header>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+        {TEMPLATE_META.map(meta => (
+          <TemplateCard
+            key={meta.id}
+            meta={meta}
+            onSelect={onTemplateChosen}
+            isLoading={loadingTemplateId === meta.id}
+          />
+        ))}
+      </div>
+
+      <div className="flex justify-center">
+        <button
+          onClick={onSkip}
+          className="text-sm text-stone-400 hover:text-stone-200 transition-colors underline underline-offset-2"
+        >
+          Start From Scratch — I'll build my own world
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// --- Main Campaign Creator ---
+
+type CreatorStep = 'template-select' | 'campaign-form';
+
+export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampaign, onTemplateSelected }) => {
+  const [step, setStep] = useState<CreatorStep>('template-select');
   const [title, setTitle] = useState('');
   const [settingType, setSettingType] = useState<SettingType>('official');
   const [officialSetting, setOfficialSetting] = useState(OFFICIAL_SETTINGS[0]);
   const [settingDescription, setSettingDescription] = useState('');
   const [dmStyle, setDmStyle] = useState<DmStyle>('standard');
+  const [loadingTemplateId, setLoadingTemplateId] = useState<string | null>(null);
+  const [templateError, setTemplateError] = useState<string | null>(null);
+
+  const handleTemplateChosen = async (templateId: string) => {
+    setLoadingTemplateId(templateId);
+    setTemplateError(null);
+    try {
+      const templateData = await loadTemplateData(templateId);
+      if (!templateData) {
+        setTemplateError('Failed to load template. Please try again.');
+        return;
+      }
+
+      // Pre-fill the form fields from the template
+      if (templateData.title && typeof templateData.title === 'string') {
+        setTitle(templateData.title);
+      }
+      if (templateData.setting && typeof templateData.setting === 'string') {
+        setSettingDescription(templateData.setting);
+      }
+      setSettingType('custom');
+
+      // Proceed to the campaign form step with template data attached
+      if (onTemplateSelected) {
+        onTemplateSelected(templateData);
+      }
+
+      setStep('campaign-form');
+    } catch (err) {
+      console.error('Template load error:', err);
+      setTemplateError('Failed to load template. Please try again.');
+    } finally {
+      setLoadingTemplateId(null);
+    }
+  };
+
+  const handleSkipTemplate = () => {
+    setStep('campaign-form');
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,6 +256,25 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampai
     }
   };
 
+  if (step === 'template-select') {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-4">
+        {templateError && (
+          <div className="mb-4 w-full max-w-3xl bg-red-900/30 border border-red-700 rounded-lg px-4 py-2 text-red-300 text-sm flex items-center gap-2">
+            <Icons.AlertTriangle className="w-4 h-4 shrink-0" />
+            {templateError}
+          </div>
+        )}
+        <TemplateSelectorStep
+          onTemplateChosen={handleTemplateChosen}
+          onSkip={handleSkipTemplate}
+          loadingTemplateId={loadingTemplateId}
+        />
+      </div>
+    );
+  }
+
+  // Campaign form step
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-2xl mx-auto animate-in fade-in duration-500">
@@ -80,6 +287,16 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampai
         </header>
 
         <form onSubmit={handleSubmit} className="bg-slate-900/50 p-8 rounded-xl border border-slate-800 space-y-6">
+          {/* Back to templates */}
+          <button
+            type="button"
+            onClick={() => setStep('template-select')}
+            className="flex items-center gap-1.5 text-xs text-stone-400 hover:text-stone-200 transition-colors"
+          >
+            <Icons.ChevronLeft className="w-3.5 h-3.5" />
+            Back to templates
+          </button>
+
           {/* Campaign Title */}
           <div>
             <label className="block text-sm font-medium text-slate-400 mb-1.5">Campaign Title</label>

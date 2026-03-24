@@ -1,0 +1,236 @@
+{
+  "title": "The Crown Conspiracy",
+  "settingType": "custom",
+  "setting": "A fractured kingdom where noble houses scheme for the throne. King Aldric III died without a named heir three months ago, leaving the Crown Council to govern in name while powerful factions manoeuvre for real control. The capital city of Veranth hums with spies, forged documents, and whispered meetings in candlelit rooms. Blood has not yet been shed openly — but the city holds its breath.",
+  "npcs": [
+    {
+      "id": "tmpl-npc-pi-1",
+      "name": "Queen Regent Isolde Veranth",
+      "description": "A tall woman in her early forties, impeccably dressed in mourning black that has somehow become a fashion statement. She carries herself with the quiet authority of someone who has spent twenty years being underestimated and has stopped finding it amusing.",
+      "traits": "Diplomatically ruthless. Never says anything she hasn't considered twice. Her silences communicate more than most people's speeches.",
+      "backstory": "Isolde married into the Veranth line at nineteen, spent two decades navigating a court that considered her a decorative import, and discovered that her husband had been slowly poisoned over the last two years of his reign — by someone on the Crown Council. She has said nothing publicly. She is building her case.",
+      "motivations": "Find the king's murderer. Secure the throne for an heir she controls before the Council installs someone who will marginalise her. Maintain stability to prevent civil war.",
+      "secrets": "She knows the king was poisoned. She does not yet know who ordered it. She has a legitimate heir hidden in a monastery outside the city — the king's illegitimate child, conceived before their marriage. She will only reveal this card when the timing is right.",
+      "stats": "Noble. Spellcasting (2 cantrips, 1st-level spells — minor illusion, friends, charm person 1/day). Surrounded by loyal guards. Not to be fought.",
+      "exampleQuote": "The Council speaks of stability. But stability and stasis are different things, and I have been patient long enough.",
+      "factionId": "tmpl-fac-pi-1",
+      "knowsPlayerHistory": [],
+      "relationships": [],
+      "history": []
+    },
+    {
+      "id": "tmpl-npc-pi-2",
+      "name": "Lord Caspian Drell, the Spymaster",
+      "description": "A small, unremarkable man who dresses like a middling clerk and has a gift for being present in rooms where he has no official reason to be. His eyes track movement constantly — not with the darting paranoia of a frightened man, but with the systematic attention of a craftsman surveying his work.",
+      "traits": "Affable surface over absolute calculation. Never gives information for free. Keeps track of debts — both financial and social — with the precision of a ledger.",
+      "backstory": "Drell has served three monarchs. He has outlasted all of them. His loyalty is famously for sale, but his asking price is always high enough to ensure only serious buyers can afford it — and serious buyers are much more reliable than desperate ones.",
+      "motivations": "Preserve his network. Ensure whoever takes the throne is someone he can work with. Profit from the transition without being visibly seen to profit.",
+      "secrets": "He has evidence of the queen's hidden heir. He has not used it yet — it is more valuable as leverage than as a weapon. He arranged the poisoning of a Council member last year to prevent a destabilising power grab, and considers this a reasonable act of statecraft.",
+      "stats": "Assassin stats (CR 8). Always has 2 agents within 300 feet. Never met in person without a prepared exit route.",
+      "exampleQuote": "Everyone has a price. The interesting question is what currency they prefer.",
+      "factionId": null,
+      "knowsPlayerHistory": [],
+      "relationships": [],
+      "history": []
+    },
+    {
+      "id": "tmpl-npc-pi-3",
+      "name": "Merchant Prince Aldous Grayne",
+      "description": "A florid, well-fed man of sixty who wears his wealth as visibly as possible — rings on every finger, a fur-lined coat in all weathers, a laugh that is designed to carry across rooms. Behind the performance is a man who has built his fortune on knowing exactly when to back the winning side.",
+      "traits": "Expansive generosity that is always tactical. Treats every conversation as a negotiation. His bonhomie is real — he genuinely likes people, especially people he's outmanoeuvred.",
+      "backstory": "Grayne's family have been the kingdom's primary grain traders for three generations. He has funded every faction at some point. He would cheerfully fund all sides simultaneously if he thought he could manage the exposure. He wants a weak monarch — easy to persuade, expensive to ignore.",
+      "motivations": "Ensure the next ruler owes him enough favours to make trade policy favourable. Prevent the Reform League from gaining too much power (they want to regulate merchant guilds). Avoid civil war, which is bad for commerce.",
+      "secrets": "He has been quietly funding the Reform League as a pressure mechanism against the Crown Loyalists, without the League's knowledge that his donations have strings. He arranged for the king's food shipments to be intercepted last year as a demonstration of leverage. He did not know the king was also being poisoned.",
+      "stats": "Noble. Employs a personal guard of six veterans. Has economic leverage over half the city's food supply.",
+      "exampleQuote": "Politics is just commerce by other means. And like commerce, it rewards those who understand the actual value of things.",
+      "factionId": "tmpl-fac-pi-2",
+      "knowsPlayerHistory": [],
+      "relationships": [],
+      "history": []
+    },
+    {
+      "id": "tmpl-npc-pi-4",
+      "name": "Captain Sera Holt",
+      "description": "A compact woman of thirty-five with close-cropped dark hair and the kind of stillness that comes from years of managing crises without showing them on her face. She commands the Palace Guard with genuine loyalty to the institution if not always to its current inhabitants.",
+      "traits": "Procedural. Respects competence above rank. Deeply uncomfortable with ambiguity but forces herself to operate in it. Will not break the law — but has a strict interpretation of what 'the law' requires.",
+      "backstory": "Holt worked her way up from a commoner's commission on the strength of two things: she never failed an assignment, and she never failed to report when someone asked her to do something illegal. This combination of reliability and integrity made her briefly unpopular and ultimately indispensable.",
+      "motivations": "Protect the Crown as an institution, not any individual wielding it. Prevent civil war. Identify and arrest whoever poisoned the king, as this falls squarely within her remit.",
+      "secrets": "She has three informants inside the Reform League and two inside the Crown Loyalists. She has been running a quiet investigation into the king's death for six weeks. She suspects Drell but cannot prove it. She will share what she knows with people she determines are genuinely trying to protect the kingdom.",
+      "stats": "Veteran (CR 3). Commands 40 palace guards. Can requisition city militia in emergencies.",
+      "exampleQuote": "I serve the Crown. Not the Queen. Not the Council. The Crown. There's a difference, and it matters.",
+      "factionId": "tmpl-fac-pi-1",
+      "knowsPlayerHistory": [],
+      "relationships": [],
+      "history": []
+    },
+    {
+      "id": "tmpl-npc-pi-5",
+      "name": "Vesper, the Rebel Informant",
+      "description": "A young person of indeterminate background who dresses in muted colours and speaks in a rapid, precise cadence that betrays a better education than their clothes suggest. They work as a dockside factor in public and as a Reform League intelligence courier in private.",
+      "traits": "Nervous energy that reads as incompetence but is actually hypervigilance. Deeply idealistic but increasingly aware that ideals require power to implement.",
+      "backstory": "Vesper's family were artisans displaced by Grayne's grain monopoly five years ago. They joined the Reform League for ideological reasons and proved unexpectedly gifted at intelligence work. They have recently discovered that Grayne has been funding the League as a control mechanism — and do not know what to do with this information.",
+      "motivations": "See the Reform League's policies enacted (guild rights, fairer trade tariffs, representation for non-noble commoners). Expose the corruption funding the League. Figure out who to trust.",
+      "secrets": "Has a copy of Grayne's funding ledger showing exactly how much he's contributed to the League and what he expects in return. Will share it with anyone who can convince them it won't be used to destroy the League entirely.",
+      "stats": "Spy (CR 1). Extremely well-connected within the dockside quarter. Knows three escape routes from any building in the merchant district.",
+      "exampleQuote": "The League isn't corrupt. But the money keeping us alive might be. I need to know if there's a way out of this that doesn't bury everything we've built.",
+      "factionId": "tmpl-fac-pi-2",
+      "knowsPlayerHistory": [],
+      "relationships": [],
+      "history": []
+    }
+  ],
+  "locations": [
+    {
+      "id": "tmpl-loc-pi-1",
+      "name": "Veranth Royal Palace",
+      "description": "A sprawling complex of towers and courtyards built over three centuries, each wing in a slightly different architectural style as successive rulers expanded and renovated. The public rooms are all marble floors and painted ceilings. The back corridors are narrow, practical, and riddled with the kind of hidden passages that get built when paranoia becomes a decorating philosophy.",
+      "secrets": "There are fourteen hidden passages in the palace, only seven of which are known to the current administration. The king's private study contains a locked box behind the fireplace that holds six months of correspondence with someone the king never publicly met.",
+      "subLocationIds": [],
+      "connections": [],
+      "loot": [],
+      "history": [],
+      "pointsOfInterest": [
+        {
+          "id": "tmpl-poi-pi-1",
+          "name": "The Crown Council Chamber",
+          "passivePerceptionDC": 12,
+          "description": "A circular room dominated by a long oval table of dark wood. The five council chairs are arranged around it with almost aggressive equality — no head position. The walls are hung with portraits of previous monarchs, each looking down with expressions of varying disapproval.",
+          "investigationChecks": [],
+          "interactions": []
+        }
+      ]
+    },
+    {
+      "id": "tmpl-loc-pi-2",
+      "name": "The Merchant Quarter",
+      "description": "The living heart of Veranth. Narrow streets packed with guild houses, counting rooms, trading floors, and the kind of coffee houses where serious business is done between the third and fourth cup. The air smells of spices, river water, and ink. Every conversation here is simultaneously a social exchange and a financial negotiation.",
+      "secrets": "Three of the largest guild houses have basements connected by tunnels dug during a previous civil war for exactly the kind of emergency that appears to be developing. Grayne knows about all of them. He commissioned the tunnels.",
+      "subLocationIds": [],
+      "connections": [],
+      "loot": [],
+      "history": []
+    },
+    {
+      "id": "tmpl-loc-pi-3",
+      "name": "The Safe House",
+      "description": "A nondescript warehouse near the south docks, three storeys tall, ostensibly used to store out-of-season textile goods. The ground floor is exactly what it claims to be. The second floor has been converted into a functional meeting space with good sightlines on the street. The third floor contains the Reform League's actual operational files.",
+      "secrets": "The warehouse owner is Drell's agent. Drell has a complete copy of everything stored on the third floor. He has not yet used this information — allowing the League to operate freely gives him intelligence on what the reformists are planning and who is funding them.",
+      "subLocationIds": [],
+      "connections": [],
+      "loot": [],
+      "history": []
+    }
+  ],
+  "factions": [
+    {
+      "id": "tmpl-fac-pi-1",
+      "name": "The Crown Loyalists",
+      "description": "The faction supporting the Queen Regent's authority and the principle of hereditary rule. Composed primarily of old noble families whose power derives from royal patent rather than commercial success. They view the Reform League as a commercial coup dressed up in populist rhetoric.",
+      "goals": "Install a monarch they control, or failing that, entrench the Queen Regent's authority long enough to find one. Suppress the Reform League's influence in the Council. Maintain the privileges of the hereditary nobility.",
+      "alignment": "Lawful Neutral",
+      "resources": "Court access, palace guard loyalty, hereditary land holdings, old money.",
+      "influence": "Strong within the palace. Weaker in the city's commercial districts.",
+      "memberIds": ["tmpl-npc-pi-1", "tmpl-npc-pi-4"],
+      "headquartersLocationId": "tmpl-loc-pi-1"
+    },
+    {
+      "id": "tmpl-fac-pi-2",
+      "name": "The Reform League",
+      "description": "A coalition of merchant guilds, artisan associations, and civic reformers who argue that hereditary rule has produced the current crisis and that the Council should include elected representatives from non-noble constituencies. They present themselves as the voice of the productive classes. They are substantially funded by Aldous Grayne, which most members do not know.",
+      "goals": "Win seats on the Crown Council. Pass legislation regulating monopoly trading practices. Establish guild representation in governance. Ensure the next monarch is constitutionally constrained.",
+      "alignment": "Neutral Good",
+      "resources": "Merchant funding (some of it poisoned), popular support in commercial districts, an effective intelligence network.",
+      "influence": "Strong in the merchant quarter and among artisan guilds. Growing in the city militias. Weak in the palace.",
+      "memberIds": ["tmpl-npc-pi-3", "tmpl-npc-pi-5"],
+      "headquartersLocationId": "tmpl-loc-pi-3"
+    }
+  ],
+  "adventures": [
+    {
+      "id": "tmpl-adv-pi-1",
+      "title": "The Succession Game",
+      "level": 5,
+      "hook": "The Queen Regent needs independent investigators — people with no existing faction allegiance — to quietly find out who killed her husband before the Crown Council uses the uncertainty to install a puppet monarch.",
+      "theme": "Political Intrigue, Investigation, Moral Ambiguity",
+      "scenes": [
+        {
+          "id": "tmpl-scene-pi-1",
+          "title": "Royal Audience",
+          "type": "social",
+          "status": "planned",
+          "readAloudText": "The queen receives you in a private study rather than a throne room, which tells you something. No court dress, no ceremony. A woman in mourning black sits behind a desk covered in papers, and she looks at you with the measuring regard of someone who has interviewed hundreds of people and has very little patience left for the ones who want to impress her.",
+          "gmNotes": "Isolde gives the party their brief: the king was poisoned over a period of months. The court physician attributed it to illness. Isolde had the body quietly re-examined by an independent physicker, who found residue of Shade's Veil — a slow-acting poison available only through certain underground connections. The party has three days before the Council forces a succession vote. She needs a name. She is offering significant payment (200gp each + access to palace resources) but cannot offer them official status — this investigation must be unofficial. Captain Holt can be a contact. Drell will be aware they are investigating within a day.",
+          "skillChecks": [
+            {
+              "id": "tmpl-sc-pi-1",
+              "skill": "Insight",
+              "dc": 15,
+              "description": "Isolde is more frightened than she appears — not for herself, but for someone she is protecting."
+            },
+            {
+              "id": "tmpl-sc-pi-2",
+              "skill": "Persuasion",
+              "dc": 14,
+              "description": "Negotiate for access to the king's private correspondence as part of the engagement."
+            }
+          ],
+          "rewards": "100gp advance payment, letter of introduction from the queen (grants access to palace staff), name of the physicker contact.",
+          "locationId": "tmpl-loc-pi-1",
+          "npcIds": ["tmpl-npc-pi-1", "tmpl-npc-pi-4"]
+        },
+        {
+          "id": "tmpl-scene-pi-2",
+          "title": "Following the Poison",
+          "type": "exploration",
+          "status": "planned",
+          "readAloudText": "Shade's Veil is not a common poison. Three places in Veranth would stock it: a discreet apothecary in the merchant quarter, a connected fence operating out of the docks, and the royal poison cabinet (under lock and the Queen's seal). One of these is where it came from. You have three days and at least two factions watching you.",
+          "gmNotes": "This is an investigation montage with decision points. The apothecary (DC 14 Persuasion or 200gp bribe) confirms selling a quantity three months ago to a man matching Drell's description — but says he was buying on behalf of a woman. The dockside fence (DC 16 Intimidation or a favour) has a transaction log — it shows no sale, but the log has a page torn out. The palace poison cabinet shows no inventory discrepancy — but DC 18 Investigation reveals a partial re-label on one bottle. Vesper can be encountered here — they've been tracking the same trail for the League and will share information if the party seems trustworthy.",
+          "skillChecks": [
+            {
+              "id": "tmpl-sc-pi-3",
+              "skill": "Investigation",
+              "dc": 16,
+              "description": "Piece together the chain of custody for the poison from multiple partial sources."
+            },
+            {
+              "id": "tmpl-sc-pi-4",
+              "skill": "Persuasion",
+              "dc": 14,
+              "description": "Convince Vesper that your goals align with the League's interests."
+            }
+          ],
+          "rewards": "Intelligence pointing toward the true conspiracy, Vesper as a potential ally, Grayne's ledger if Vesper is fully won over.",
+          "locationId": "tmpl-loc-pi-2",
+          "npcIds": ["tmpl-npc-pi-5", "tmpl-npc-pi-2"]
+        },
+        {
+          "id": "tmpl-scene-pi-3",
+          "title": "The Conspiracy Revealed",
+          "type": "social",
+          "status": "planned",
+          "readAloudText": "The threads lead here: a late-night meeting, evidence laid out, and across the table a person who knows you know. The question is what they do with that knowledge, and what you do with them.",
+          "gmNotes": "This is the confrontation scene — the exact participant depends on party investigation. If they've followed the evidence correctly, they have proof implicating Drell (ordered it) with Grayne as the indirect funder (who provided the financial means without intending a king's death). Multiple endings: Drell can be arrested (Captain Holt will execute the warrant), turned (he offers to serve the party as an asset if released — high-value but dangerous), or killed (triggers a power vacuum the party must manage). Grayne can be exposed (collapses the Reform League's funding), quietly pressured (he withdraws support for whoever the Council is about to install), or become an ally (his merchant network is extremely useful). Isolde's hidden heir can be revealed — this stabilises the succession but creates new tensions. The party's choices determine who rules Veranth.",
+          "skillChecks": [
+            {
+              "id": "tmpl-sc-pi-5",
+              "skill": "Persuasion",
+              "dc": 17,
+              "description": "Convince Drell that cooperation is more valuable to him than resistance."
+            },
+            {
+              "id": "tmpl-sc-pi-6",
+              "skill": "Insight",
+              "dc": 14,
+              "description": "Read the room and determine which outcome each person in the meeting would accept."
+            }
+          ],
+          "rewards": "200gp remaining payment from queen, ongoing access to royal court, a named favour from whichever major faction the party supports, or the enmity of those they oppose.",
+          "locationId": "tmpl-loc-pi-3",
+          "npcIds": ["tmpl-npc-pi-1", "tmpl-npc-pi-2", "tmpl-npc-pi-3"]
+        }
+      ]
+    }
+  ],
+  "plots": [],
+  "items": []
+}

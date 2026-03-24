@@ -95,11 +95,21 @@ const App: FC = () => {
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
   const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
   const [navStack, setNavStack] = useState<NavStackEntry[]>([]);
+  // Holds template data loaded in CampaignCreator; imported once campaign transitions to 'editing'
+  const [pendingTemplateData, setPendingTemplateData] = useState<Record<string, unknown> | null>(null);
 
 
   useEffect(() => {
     runSmokeTests(isMockMode).catch(err => console.error('Smoke tests failed:', err));
   }, [isMockMode]);
+
+  // When campaign transitions to 'editing' with pending template data, bulk-import the entities
+  useEffect(() => {
+    if (appStatus === 'editing' && pendingTemplateData) {
+      campaignService.importTemplateData(pendingTemplateData);
+      setPendingTemplateData(null);
+    }
+  }, [appStatus, pendingTemplateData]);
 
   // Auto-show First Campaign Wizard for new empty campaigns
   useEffect(() => {
@@ -873,7 +883,12 @@ const App: FC = () => {
       case 'welcome':
         return <WelcomeScreen onStart={() => campaignService.prepareNewCampaign()} />;
       case 'creating':
-        return <CampaignCreator onCreateCampaign={campaignService.createCampaign} />;
+        return (
+          <CampaignCreator
+            onCreateCampaign={campaignService.createCampaign}
+            onTemplateSelected={(templateData) => setPendingTemplateData(templateData)}
+          />
+        );
       case 'selecting':
         return <CampaignSelector campaigns={campaigns} onSelect={campaignService.selectCampaign} onDelete={campaignService.deleteCampaign} onCreateNew={() => campaignService.prepareNewCampaign()} />;
       case 'editing':

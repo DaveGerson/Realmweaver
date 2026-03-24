@@ -1,0 +1,158 @@
+{
+  "title": "The Untamed Wilds",
+  "settingType": "custom",
+  "setting": "A vast, uncharted wilderness dotted with ruins of a forgotten civilisation. Centuries ago, an advanced culture built great structures of carved stone and channelled rivers across the land. Then they vanished — completely, suddenly, inexplicably. The wilds have swallowed most of what they built, but not all of it. The frontier outpost of Thornkeep sits on the edge of the known world, serving as the base for expeditions into the unmapped territory beyond. Something in the deep wilds has begun to stir.",
+  "npcs": [
+    {
+      "id": "tmpl-npc-sb-1",
+      "name": "Ela Brightpath",
+      "description": "A wiry woman of forty with sun-darkened skin, a network of faded trail marks tattooed on her forearms (each one a path she's mapped), and the permanently alert posture of someone who has spent decades in places where relaxation gets you eaten.",
+      "traits": "Precise and economical. Doesn't waste words or movement. Genuinely loves the wilds in a way that goes beyond profession. Has a fierce protectiveness of the land she's mapped.",
+      "backstory": "Ela was born in Thornkeep and left at sixteen to map the territory the empire never got to. She's been doing it for twenty-four years. Her maps are the most accurate record of the wilds in existence, and she updates them constantly. She guides parties for the income and because she can't stop learning what's out there.",
+      "motivations": "Map the entire reach of the old civilisation's territory. Understand what happened to them — the ruins show no sign of invasion or disaster, only absence. Find the source of the disturbances that have been pushing dangerous creatures toward the outpost.",
+      "secrets": "She found something six months ago deep in the wilds — a structure unlike any other ruin, intact, sealed, with symbols on the door she's never seen before. She went back twice. Both times she felt something inside, waiting. She has not told anyone. She is trying to decide if she should open it.",
+      "stats": "Scout/Ranger hybrid. AC 15, HP 58. Advantage on Perception and Survival in wilderness. Can identify any creature native to the wilds. Knows all five locations in this template from personal experience.",
+      "exampleQuote": "The ruins don't scare me. What scares me is that something scared whatever lived in them badly enough to make them leave everything behind.",
+      "factionId": null,
+      "knowsPlayerHistory": [],
+      "relationships": [],
+      "history": []
+    },
+    {
+      "id": "tmpl-npc-sb-2",
+      "name": "Brother Aldus Wren",
+      "description": "An elderly man with a monk's tonsure, a surprisingly sturdy walking staff, and a habit of murmuring to himself that turns out, on closer listening, to be prayers in three different languages. He has lived alone in the wilds for eleven years.",
+      "traits": "Peacefully eccentric. Seems distracted but misses nothing. Has strong opinions about hospitality and will share his food, fire, and knowledge with anyone who sits down quietly.",
+      "backstory": "Wren was once a scholar at a prestigious archive. He found references to the lost civilisation in texts so old they were catalogued as mythology. He spent forty years trying to get funding for an expedition and eventually gave up on institutions and came out himself. He has been living in and around the ruins ever since, learning what he can.",
+      "motivations": "Understand the lost civilisation. Document their language, beliefs, and what happened to them. He believes they didn't disappear — he believes they transcended into something else, and the ruins are a record of how.",
+      "secrets": "He can read parts of the ancient script — enough to know that the sealed structure Ela found is a type of building the ancients called a 'resonance vault.' He knows what they were for. He won't share this until he trusts someone completely. What a resonance vault does to people who open it incorrectly is not something he wants on his conscience.",
+      "stats": "Sage/Druid hybrid. AC 12, HP 27. Speaks 6 languages including partial knowledge of ancient script. Can cast Identify, Comprehend Languages, and Commune (once/day). Unarmed is not the same as undefended.",
+      "exampleQuote": "They did not die. They changed. The question that keeps me awake is whether they changed willingly.",
+      "factionId": null,
+      "knowsPlayerHistory": [],
+      "relationships": [],
+      "history": []
+    },
+    {
+      "id": "tmpl-npc-sb-3",
+      "name": "Carven Moss, Traveling Merchant",
+      "description": "A portly man with an elaborate wagon, a team of two aged mules with names and distinct personalities, and a seemingly inexhaustible supply of things that are exactly what you need right now. He wears a coat with enough pockets to suggest he once lost something important and resolved to never be caught short again.",
+      "traits": "Cheerfully mercenary. Knows the value of everything and the price of everything, and the gap between those two numbers is where he lives. Genuinely sociable — he trades in information as readily as goods.",
+      "backstory": "Carven has been running supply routes to Thornkeep for fifteen years. He's the primary commercial lifeline between the outpost and the settled lands. He carries the mail, the medicine, and the rumours. He also keeps very careful track of what the expeditions bring back, because the right artefact sold to the right buyer is more valuable than any amount of ordinary commerce.",
+      "motivations": "Make a living. Make connections. Find the next valuable thing before anyone else does. Bring back news to his network of merchants in the settled lands who are increasingly interested in investing in the wilds.",
+      "secrets": "He has been quietly buying ancient artefacts from expedition members for three years and selling them to a consortium of scholars and collectors in the capital. He has no idea what several of the items he's sold actually do. Two of his buyers have gone missing.",
+      "stats": "Commoner with connections. Has contacts in every settlement within 200 miles. His wagon has a hidden compartment containing goods worth 800gp. He employs a bodyguard who is better than she looks.",
+      "exampleQuote": "If you found it in the wilds and you want to sell it, I'm the man to see. If you found it in the wilds and something found you, I'm also the man to see — but for different goods.",
+      "factionId": null,
+      "knowsPlayerHistory": [],
+      "relationships": [],
+      "history": []
+    },
+    {
+      "id": "tmpl-npc-sb-4",
+      "name": "Sir Edric of the Empty Road",
+      "description": "A knight errant of indeterminate origin who has been wandering the wilds for two years, knight's oath fulfilled to no lord and no cause. He travels in practical gear, carries an expensive sword he clearly knows how to use, and has the slightly too-still quality of someone who has seen significant combat and learned to regulate his reactions rather than feel them.",
+      "traits": "Honourable to a fault. Struggles with the absence of a clear purpose. Fights extremely well. Overthinks everything that isn't combat and underthinks the things he should be strategic about.",
+      "backstory": "Edric served a lord who turned out to be a villain. When he discovered this, he fulfilled his oath, confronted the lord, lost, and survived by accident. He has been walking ever since, unsure what a knight's honour means when the institutions it's built around are corrupt.",
+      "motivations": "Find something worth fighting for. Understand whether a person can be honourable in a world where honour keeps being weaponised. Currently following the disturbances toward their source because someone has to and everyone else seems to be moving away from them.",
+      "secrets": "He knows his former lord is still alive — and is behind the commercial interest in the wilds. He doesn't know what the lord is looking for, but he knows it's connected to the increasing monster activity near the ruins. He is walking into a confrontation he is not prepared for and can probably not survive alone.",
+      "stats": "Veteran (CR 3). AC 18 (plate). HP 65. Proficient in all martial weapons. Has advantage on saves against being frightened. Carries a longsword +1 he doesn't know is magical.",
+      "exampleQuote": "I am not wandering. I am following. There is a difference. The trail just hasn't told me where it ends yet.",
+      "factionId": null,
+      "knowsPlayerHistory": [],
+      "relationships": [],
+      "history": []
+    }
+  ],
+  "locations": [
+    {
+      "id": "tmpl-loc-sb-1",
+      "name": "Thornkeep",
+      "description": "A frontier outpost of perhaps three hundred permanent inhabitants and a fluctuating population of expedition members, traders, scholars, and the professionally curious. Built around a central tower of solid stone (origin unclear — possibly ancient, possibly not), the town has grown outward in rings of increasingly improvised construction. The Wanderer's Rest inn serves as the social hub, job board, and unofficial intelligence clearinghouse.",
+      "secrets": "The central tower predates the town and is built in a style inconsistent with both the lost civilisation and any known current culture. The current innkeeper has found a trapdoor under the cellar floor that she has not opened because she heard something move below it.",
+      "subLocationIds": [],
+      "connections": [],
+      "loot": [],
+      "history": []
+    },
+    {
+      "id": "tmpl-loc-sb-2",
+      "name": "The Whispering Forest",
+      "description": "A dense woodland of massive old-growth trees whose canopy is so thick that midday looks like twilight inside it. The forest has a reputation for disorienting travellers and seems to actively resist mapping — landmarks shift, paths loop, and compasses behave strangely near the centre. The trees themselves make sounds in still air: a low, continuous sound that resembles breathing.",
+      "secrets": "The forest is built on a network of ancient root-chambers, tunnels dug by the lost civilisation below the forest floor. These tunnels are how they moved between their major sites unseen. The disorientation effect is caused by an intact ancient navigation-suppression field designed to prevent enemies from mapping their movements. People who camp in the forest centre sometimes wake with knowledge they didn't have before — fragments of an ancient language, or images of the civilisation in its prime.",
+      "subLocationIds": [],
+      "connections": [],
+      "loot": [],
+      "history": []
+    },
+    {
+      "id": "tmpl-loc-sb-3",
+      "name": "The Ancient Ruins",
+      "description": "A complex of collapsed stone structures covering roughly two square miles. Most of what remains are foundations and the lower halves of walls, but the stone is worked with extraordinary precision — joints fitted so tightly that no mortar was needed. Carvings on the surviving walls depict a civilisation in what appears to be a voluntary processional — not fleeing, not celebrating, simply walking away in an organised fashion.",
+      "secrets": "The ruins are not simply the remnants of buildings. They are the upper surface of a much larger structure that extends fifty feet below ground. The lower levels are intact. They have not been explored. The carvings' processional leads, if followed, directly to the sealed resonance vault that Ela found.",
+      "subLocationIds": [],
+      "connections": [],
+      "loot": [],
+      "history": [],
+      "pointsOfInterest": [
+        {
+          "id": "tmpl-poi-sb-1",
+          "name": "The Processional Wall",
+          "passivePerceptionDC": 12,
+          "description": "A fifty-foot section of wall with carvings showing hundreds of figures walking in the same direction. They carry nothing. Their expressions, visible on the more intact faces, are calm. At the end of the procession, the wall is blank — as if the carving was never finished, or was deliberately left incomplete.",
+          "investigationChecks": [],
+          "interactions": []
+        }
+      ]
+    },
+    {
+      "id": "tmpl-loc-sb-4",
+      "name": "The Crystal Cave",
+      "description": "A natural cave system whose walls have been covered over centuries in formations of pale blue crystal. The crystals resonate with sound — speaking inside the cave creates harmonic echoes that can last for minutes. Some of the formations are shaped in ways that seem deliberate, though whether by the ancient civilisation or by some natural process is unclear.",
+      "secrets": "The crystal formations are a recording medium. Speaking the right phrase in the ancient language activates them, replaying spoken records deposited by the civilisation centuries ago. Brother Wren has partially deciphered enough to know this, but not enough to know what phrase activates a specific formation.",
+      "subLocationIds": [],
+      "connections": [],
+      "loot": [],
+      "history": [],
+      "pointsOfInterest": [
+        {
+          "id": "tmpl-poi-sb-2",
+          "name": "The Speaking Formation",
+          "passivePerceptionDC": 14,
+          "description": "A cluster of crystals shaped unmistakably like a figure in mid-speech, mouth open. When struck lightly, it vibrates for far longer than physics should allow, and the resonance has an almost vocal quality.",
+          "investigationChecks": [],
+          "interactions": []
+        }
+      ]
+    },
+    {
+      "id": "tmpl-loc-sb-5",
+      "name": "The Mountain Pass",
+      "description": "The only reliable route through the range of hills that separates the explored wilds from the truly unknown territory beyond. The pass is wide enough for a wagon but steep enough to require care. Ancient waymarkers — stone pillars carved with distance measurements in a script only Brother Wren can partially read — line the route at regular intervals.",
+      "secrets": "The waymarkers are also seismic sensors. When activated (deliberately or by significant ground vibration), they transmit to a central monitoring point somewhere beyond the pass. Something in the deep wilds has been receiving these signals and responding to the increased expedition activity by sending things back the other way.",
+      "subLocationIds": [],
+      "connections": [],
+      "loot": [],
+      "history": []
+    }
+  ],
+  "factions": [],
+  "adventures": [],
+  "plots": [
+    {
+      "id": "tmpl-plot-sb-1",
+      "title": "Something Ancient Stirs",
+      "description": "Monster attacks near the frontier have tripled in the last six months. The creatures are being displaced — something is pushing them toward settled land. Ela's sealed vault, the sealed resonance vault she found in the deep wilds, appears to be at the centre of the disturbances. Something inside it has been active for six months. The same six months as the monster displacement. Nobody has connected these facts yet. Except possibly Brother Wren, who is saying nothing.",
+      "status": "active",
+      "relatedEntityIds": ["tmpl-npc-sb-1", "tmpl-npc-sb-2", "tmpl-loc-sb-3", "tmpl-loc-sb-5"]
+    },
+    {
+      "id": "tmpl-plot-sb-2",
+      "title": "The Missing Caravan",
+      "description": "A supply caravan — fourteen people, two wagons, supplies for the winter — left the settled lands eight weeks ago and has not arrived at Thornkeep. The route is known and well-travelled. Carven Moss is the one who's noticed: it carried medical supplies he was expecting and goods from two of his buyers who have gone missing. Somewhere on the caravan road, something happened. No survivors have arrived. No distress signals. Just absence.",
+      "status": "active",
+      "relatedEntityIds": ["tmpl-npc-sb-3", "tmpl-loc-sb-1"]
+    }
+  ],
+  "items": []
+}

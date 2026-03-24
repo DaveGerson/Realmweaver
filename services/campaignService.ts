@@ -976,6 +976,149 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             });
         },
 
+        /**
+         * Bulk-imports template data into the active campaign.
+         * Remaps template IDs to fresh UUIDs and creates all entities in a single
+         * state update so that the campaign is populated immediately after creation.
+         * Template JSON may contain: npcs, locations, factions, adventures, plots, items.
+         */
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        importTemplateData(templateData: any) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign) return;
+
+                // Build an ID-remap table so cross-references stay consistent
+                const idMap = new Map<string, string>();
+                const remap = (oldId: string | undefined | null): string | undefined => {
+                    if (!oldId) return undefined;
+                    if (!idMap.has(oldId)) idMap.set(oldId, crypto.randomUUID());
+                    return idMap.get(oldId);
+                };
+
+                // Override title/setting from template
+                if (templateData.title) campaign.title = templateData.title;
+                if (templateData.setting) campaign.setting = templateData.setting;
+                if (templateData.settingType) campaign.settingType = templateData.settingType;
+
+                // --- NPCs ---
+                const rawNpcs: any[] = templateData.npcs || [];
+                rawNpcs.forEach((n: any) => {
+                    const newId = remap(n.id)!;
+                    const npc: NPC = {
+                        id: newId,
+                        name: n.name || 'Unnamed NPC',
+                        description: n.description || '',
+                        traits: n.traits || '',
+                        backstory: n.backstory || '',
+                        motivations: n.motivations || '',
+                        secrets: n.secrets || '',
+                        stats: n.stats || '',
+                        exampleQuote: n.exampleQuote || '',
+                        factionId: n.factionId ? remap(n.factionId) : undefined,
+                        knowsPlayerHistory: [],
+                        relationships: [],
+                        history: [],
+                    };
+                    campaign.npcs.push(npc);
+                });
+
+                // --- Factions ---
+                const rawFactions: any[] = templateData.factions || [];
+                rawFactions.forEach((f: any) => {
+                    const newId = remap(f.id)!;
+                    const faction: Faction = {
+                        id: newId,
+                        name: f.name || 'Unnamed Faction',
+                        description: f.description || '',
+                        goals: f.goals || '',
+                        alignment: f.alignment,
+                        resources: f.resources,
+                        influence: f.influence,
+                        memberIds: (f.memberIds || []).map((mid: string) => remap(mid)).filter(Boolean) as string[],
+                        headquartersLocationId: f.headquartersLocationId ? remap(f.headquartersLocationId) : undefined,
+                        leaderId: f.leaderId ? remap(f.leaderId) : undefined,
+                    };
+                    campaign.factions.push(faction);
+                });
+
+                // Back-fill faction membership on NPCs now that both arrays are populated
+                campaign.factions.forEach(faction => {
+                    faction.memberIds.forEach(memberId => {
+                        const npc = campaign.npcs.find(n => n.id === memberId);
+                        if (npc && !npc.factionId) npc.factionId = faction.id;
+                    });
+                });
+
+                // --- Locations ---
+                const rawLocations: any[] = templateData.locations || [];
+                rawLocations.forEach((l: any) => {
+                    const newId = remap(l.id)!;
+                    const location: Location = {
+                        id: newId,
+                        name: l.name || 'Unnamed Location',
+                        description: l.description || '',
+                        secrets: l.secrets || '',
+                        loot: [],
+                        parentLocationId: l.parentLocationId ? remap(l.parentLocationId) : undefined,
+                        subLocationIds: (l.subLocationIds || []).map((sid: string) => remap(sid)).filter(Boolean) as string[],
+                        connections: [],
+                        pointsOfInterest: (l.pointsOfInterest || []).map((poi: any) => ({
+                            ...poi,
+                            id: crypto.randomUUID(),
+                            investigationChecks: poi.investigationChecks || [],
+                            interactions: poi.interactions || [],
+                        })),
+                        controllingFactionId: l.controllingFactionId ? remap(l.controllingFactionId) : undefined,
+                        history: [],
+                    };
+                    campaign.locations.push(location);
+                });
+
+                // --- Adventures (with Scenes) ---
+                const rawAdventures: any[] = templateData.adventures || [];
+                rawAdventures.forEach((a: any) => {
+                    const advId = crypto.randomUUID();
+                    const adventure: Adventure = {
+                        id: advId,
+                        title: a.title || 'Untitled Adventure',
+                        level: a.level || 1,
+                        hook: a.hook || '',
+                        theme: a.theme || '',
+                        scenes: (a.scenes || []).map((s: any) => ({
+                            id: crypto.randomUUID(),
+                            title: s.title || 'Untitled Scene',
+                            type: s.type || 'exploration',
+                            status: 'planned' as const,
+                            readAloudText: s.readAloudText || '',
+                            gmNotes: s.gmNotes || '',
+                            skillChecks: (s.skillChecks || []).map((sc: any) => ({
+                                ...sc,
+                                id: crypto.randomUUID(),
+                            })),
+                            rewards: s.rewards || '',
+                            locationId: s.locationId ? remap(s.locationId) : undefined,
+                            npcIds: (s.npcIds || []).map((nid: string) => remap(nid)).filter(Boolean) as string[],
+                        })),
+                    };
+                    campaign.adventures.push(adventure);
+                });
+
+                // --- Plots ---
+                const rawPlots: any[] = templateData.plots || [];
+                rawPlots.forEach((p: any) => {
+                    const plot: Plot = {
+                        id: crypto.randomUUID(),
+                        title: p.title || 'Untitled Plot',
+                        description: p.description || '',
+                        status: p.status || 'active',
+                        relatedEntityIds: (p.relatedEntityIds || []).map((eid: string) => remap(eid)).filter(Boolean) as string[],
+                    };
+                    campaign.plots.push(plot);
+                });
+            });
+        },
+
         // --- Pinned entities ---
         pinEntity(type: string, id: string) {
             updateState(draft => {
