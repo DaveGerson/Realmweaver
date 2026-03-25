@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import type { Item, ItemRarity } from '../../types/index';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
@@ -21,6 +22,7 @@ const rarityOptions: ItemRarity[] = ['common', 'uncommon', 'rare', 'very rare', 
 
 export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(item);
+  const { confirm } = useConfirmDialog();
 
   useEffect(() => {
     setFormData(item);
@@ -43,9 +45,10 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onUpdate, onDelete
     onUpdate(item.id, { [name]: value as ItemRarity });
   };
 
-  const handleDelete = () => {
-    if (window.confirm(`Are you sure you want to delete ${item.name}? This action cannot be undone.`)) {
-        onDelete(item.id);
+  const handleDelete = async () => {
+    const confirmed = await confirm('Delete Item', `Are you sure you want to delete ${item.name}? This action cannot be undone.`, { variant: 'danger' });
+    if (confirmed) {
+      onDelete(item.id);
     }
   }
 

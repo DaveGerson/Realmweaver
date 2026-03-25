@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Scene, SceneType, NPC, Location, SkillCheck } from '../../types/index';
 import type { Campaign } from '../../types/index';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
@@ -33,6 +34,7 @@ const sceneTypeOptions: SceneType[] = ['combat', 'social', 'exploration', 'puzzl
 export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLocations, campaign, onUpdate, onDelete, isMockMode, campaignContext, isActiveScene, onSetActive, onNavigate }) => {
   const [formData, setFormData] = useState(scene);
   const [isGeneratingNpc, setIsGeneratingNpc] = useState(false);
+  const { confirm } = useConfirmDialog();
 
   useEffect(() => {
     setFormData(scene);
@@ -64,9 +66,10 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
     onUpdate(scene.id, { npcIds: newNpcIds });
   };
 
-  const handleDelete = () => {
-    if (window.confirm(`Are you sure you want to delete the scene "${scene.title}"? This action cannot be undone.`)) {
-        onDelete(scene.id);
+  const handleDelete = async () => {
+    const confirmed = await confirm('Delete Scene', `Are you sure you want to delete the scene "${scene.title}"? This action cannot be undone.`, { variant: 'danger' });
+    if (confirmed) {
+      onDelete(scene.id);
     }
   }
   
@@ -247,9 +250,9 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({ scene, allNpcs, allLoc
                             className="col-span-6 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500"
                         />
                         <div className="col-span-1 text-right">
-                           <button onClick={() => handleDeleteSkillCheck(sc.id)} className="text-slate-500 hover:text-red-400 p-1 rounded transition-colors">
-                             <Icons.Trash className="w-4 h-4" />
-                           </button>
+                            <Button variant="icon" onClick={() => handleDeleteSkillCheck(sc.id)} className="text-slate-500 hover:text-red-400" aria-label="Delete skill check">
+                                <Icons.Trash className="w-4 h-4" />
+                            </Button>
                         </div>
                     </div>
                 ))}

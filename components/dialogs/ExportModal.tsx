@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Icons } from '../common/Icons';
+import { DialogShell } from '../common/DialogShell';
 
 interface ExportModalProps {
   onClose: () => void;
@@ -11,7 +12,7 @@ interface ExportModalProps {
 
 export const ExportModal: React.FC<ExportModalProps> = ({ onClose, onExportJson, onExportObsidian, campaignTitle }) => {
   return (
-    <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm z-30 flex items-center justify-center p-4" aria-modal="true" role="dialog">
+    <DialogShell isOpen={true} onClose={onClose} ariaLabel="Export Campaign">
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl animate-in fade-in zoom-in-95 duration-300 relative">
         <header className="flex items-center justify-between p-4 border-b border-slate-800">
           <div className="flex items-center gap-3">
@@ -40,7 +41,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ onClose, onExportJson,
             </div>
         </div>
       </div>
-    </div>
+    </DialogShell>
   );
 };
 

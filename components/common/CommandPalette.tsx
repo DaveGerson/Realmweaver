@@ -2,6 +2,17 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Icons } from '@/components/common/Icons';
 import type { NPC, Location, Faction, Item, Adventure, Article, SessionLog, Plot, PlayerCharacter } from '@/types/index';
+import { ENTITY_TYPE_CONFIG } from '@/utils/entityUtils';
+
+// Scene result type for palette (scenes are derived from adventures, not passed as a separate prop)
+interface SceneResult {
+  type: 'scene';
+  id: string;
+  name: string;
+  subtitle?: string;
+  adventureId: string;
+  adventureTitle: string;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -16,7 +27,8 @@ export type CommandPaletteEntityType =
   | 'article'
   | 'session-log'
   | 'plot'
-  | 'player-character';
+  | 'player-character'
+  | 'scene';
 
 export interface RecentItem {
   type: CommandPaletteEntityType;
@@ -76,16 +88,31 @@ interface CommandPaletteProps {
 // Constants
 // ---------------------------------------------------------------------------
 
+// Derive palette config from the centralized ENTITY_TYPE_CONFIG.
+// colorClass and textClass are composed from the canonical color name so there
+// is a single place to change entity colors across the whole app.
+function makePaletteConfig(type: CommandPaletteEntityType): { label: string; colorClass: string; textClass: string; icon: keyof typeof Icons } {
+  const base = ENTITY_TYPE_CONFIG[type];
+  const c = base.color;
+  return {
+    label: base.label.replace(/s$/, ''), // strip plural for badge ("NPCs" → "NPC")
+    colorClass: `bg-${c}-500/10 border-${c}-500/30`,
+    textClass: `text-${c}-400`,
+    icon: base.icon as keyof typeof Icons,
+  };
+}
+
 const ENTITY_CONFIG: Record<CommandPaletteEntityType, { label: string; colorClass: string; textClass: string; icon: keyof typeof Icons }> = {
-  npc: { label: 'NPC', colorClass: 'bg-amber-500/10 border-amber-500/30', textClass: 'text-amber-400', icon: 'NPCs' },
-  location: { label: 'Location', colorClass: 'bg-emerald-500/10 border-emerald-500/30', textClass: 'text-emerald-400', icon: 'Locations' },
-  faction: { label: 'Faction', colorClass: 'bg-violet-500/10 border-violet-500/30', textClass: 'text-violet-400', icon: 'Factions' },
-  item: { label: 'Item', colorClass: 'bg-sky-500/10 border-sky-500/30', textClass: 'text-sky-400', icon: 'Items' },
-  adventure: { label: 'Adventure', colorClass: 'bg-orange-500/10 border-orange-500/30', textClass: 'text-orange-400', icon: 'Adventures' },
-  article: { label: 'Article', colorClass: 'bg-cyan-500/10 border-cyan-500/30', textClass: 'text-cyan-400', icon: 'BookCopy' },
-  'session-log': { label: 'Session', colorClass: 'bg-rose-500/10 border-rose-500/30', textClass: 'text-rose-400', icon: 'SessionLog' },
-  plot: { label: 'Plot', colorClass: 'bg-yellow-500/10 border-yellow-500/30', textClass: 'text-yellow-400', icon: 'Plot' },
-  'player-character': { label: 'Character', colorClass: 'bg-teal-500/10 border-teal-500/30', textClass: 'text-teal-400', icon: 'PlayerCharacters' },
+  npc:              makePaletteConfig('npc'),
+  location:         makePaletteConfig('location'),
+  faction:          makePaletteConfig('faction'),
+  item:             makePaletteConfig('item'),
+  adventure:        makePaletteConfig('adventure'),
+  article:          { ...makePaletteConfig('article'), label: 'Article' },
+  'session-log':    { ...makePaletteConfig('session-log'), label: 'Session' },
+  plot:             makePaletteConfig('plot'),
+  'player-character': { ...makePaletteConfig('player-character'), label: 'Character' },
+  scene: { label: 'Scene', colorClass: 'bg-red-500/10 border-red-500/30', textClass: 'text-red-400', icon: 'Scenes' },
 };
 
 // ---------------------------------------------------------------------------
@@ -170,7 +197,7 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, isActive, onSelect, onM
       <button
         ref={ref}
         className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors min-h-[44px] ${
-          isActive ? 'bg-amber-600/20 text-stone-100' : 'text-stone-300 hover:bg-stone-700/50'
+          isActive ? 'bg-amber-600/20 text-slate-100' : 'text-slate-300 hover:bg-slate-700/50'
         }`}
         onClick={() => onSelect(result)}
         onMouseEnter={onMouseEnter}
@@ -180,7 +207,7 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, isActive, onSelect, onM
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium truncate">{data.label}</div>
           {data.description && (
-            <div className="text-xs text-stone-500 truncate mt-0.5">{data.description}</div>
+            <div className="text-xs text-slate-500 truncate mt-0.5">{data.description}</div>
           )}
         </div>
         <Icons.ChevronRight className={`w-4 h-4 flex-shrink-0 transition-opacity ${isActive ? 'opacity-100 text-amber-400' : 'opacity-0'}`} />
@@ -196,7 +223,7 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, isActive, onSelect, onM
     <button
       ref={ref}
       className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors min-h-[44px] ${
-        isActive ? 'bg-amber-600/20 text-stone-100' : 'text-stone-300 hover:bg-stone-700/50'
+        isActive ? 'bg-amber-600/20 text-slate-100' : 'text-slate-300 hover:bg-slate-700/50'
       }`}
       onClick={() => onSelect(result)}
       onMouseEnter={onMouseEnter}
@@ -206,7 +233,7 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, isActive, onSelect, onM
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium truncate">{data.name}</div>
         {data.subtitle && (
-          <div className="text-xs text-stone-500 truncate mt-0.5">{data.subtitle}</div>
+          <div className="text-xs text-slate-500 truncate mt-0.5">{data.subtitle}</div>
         )}
       </div>
       <span className={`text-xs px-1.5 py-0.5 rounded border flex-shrink-0 ${config.colorClass} ${config.textClass}`}>
@@ -229,7 +256,7 @@ const ResultGroup: React.FC<ResultGroupProps> = ({ label, results, activeIndex, 
   if (results.length === 0) return null;
   return (
     <div>
-      <div className="px-4 py-1.5 text-xs font-semibold text-stone-500 uppercase tracking-wider bg-stone-900/50">
+      <div className="px-4 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-900/50">
         {label}
       </div>
       {results.map((result, localIdx) => {
@@ -305,6 +332,17 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     { id: 'view-combat', label: 'Combat Tracker', description: 'Open the combat tracker', onSelect: () => { onNavigateTo('combat'); onClose(); } },
   ], [onNavigateTo, onOpenCoach, onClose]);
 
+  // Build map from scene ID -> parent adventure ID for scene navigation
+  const sceneAdventureMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const adv of adventures) {
+      for (const scene of adv.scenes ?? []) {
+        map.set(scene.id, adv.id);
+      }
+    }
+    return map;
+  }, [adventures]);
+
   // Build all searchable entities
   const allEntities: EntityResult[] = useMemo(() => {
     const results: EntityResult[] = [];
@@ -329,6 +367,18 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     push('session-log', sessionLogs);
     push('plot', plots);
     push('player-character', playerCharacters);
+
+    // Scenes are derived from adventures, not passed as a separate prop
+    for (const adv of adventures) {
+      for (const scene of adv.scenes ?? []) {
+        results.push({
+          type: 'scene',
+          id: scene.id,
+          name: scene.title,
+          subtitle: `${adv.title} — ${scene.type}`,
+        });
+      }
+    }
 
     return results;
   }, [npcs, locations, factions, items, adventures, articles, sessionLogs, plots, playerCharacters]);
@@ -396,10 +446,16 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         case 'session-log': onSelectSessionLog(id); break;
         case 'plot': onSelectPlot(id); break;
         case 'player-character': onSelectPlayerCharacter(id); break;
+        case 'scene': {
+          // Navigate to the parent adventure
+          const advId = sceneAdventureMap.get(id);
+          if (advId) onSelectAdventure(advId);
+          break;
+        }
       }
       onClose();
     }
-  }, [onSelectNpc, onSelectLocation, onSelectFaction, onSelectItem, onSelectAdventure, onSelectArticle, onSelectSessionLog, onSelectPlot, onSelectPlayerCharacter, onClose]);
+  }, [onSelectNpc, onSelectLocation, onSelectFaction, onSelectItem, onSelectAdventure, onSelectArticle, onSelectSessionLog, onSelectPlot, onSelectPlayerCharacter, onClose, sceneAdventureMap]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     switch (e.key) {
@@ -484,13 +540,13 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     >
       {/* Panel */}
       <div
-        className="w-full max-w-xl bg-stone-900 border border-stone-700 rounded-xl shadow-2xl overflow-hidden flex flex-col"
+        className="w-full max-w-xl bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden flex flex-col"
         style={{ maxHeight: '75vh' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Search input row */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-stone-700 flex-shrink-0">
-          <Icons.Search className="w-5 h-5 text-stone-400 flex-shrink-0" />
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-700 flex-shrink-0">
+          <Icons.Search className="w-5 h-5 text-slate-400 flex-shrink-0" />
           <input
             ref={inputRef}
             type="text"
@@ -498,19 +554,19 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             onChange={e => { setQuery(e.target.value); setActiveIndex(0); }}
             onKeyDown={handleKeyDown}
             placeholder="Search entities, type to filter..."
-            className="flex-1 bg-transparent text-stone-100 placeholder-stone-500 text-base outline-none min-w-0"
+            className="flex-1 bg-transparent text-slate-100 placeholder-slate-500 text-base outline-none min-w-0"
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck={false}
           />
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded border border-stone-600 text-stone-400 text-xs font-mono">
+            <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded border border-slate-600 text-slate-400 text-xs font-mono">
               ESC
             </kbd>
             <button
               onClick={onClose}
-              className="p-1 rounded text-stone-400 hover:text-stone-200 hover:bg-stone-700 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center sm:hidden"
+              className="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center sm:hidden"
               type="button"
               aria-label="Close"
             >
@@ -522,7 +578,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         {/* Results */}
         <div className="overflow-y-auto flex-1">
           {isEmpty && (
-            <div className="px-4 py-8 text-center text-stone-500 text-sm">
+            <div className="px-4 py-8 text-center text-slate-500 text-sm">
               {hasQuery ? `No results for "${query}"` : 'No recent items. Start typing to search.'}
             </div>
           )}
@@ -542,17 +598,17 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
         {/* Footer hint */}
         {!isEmpty && (
-          <div className="flex items-center gap-4 px-4 py-2 border-t border-stone-800 flex-shrink-0">
-            <span className="flex items-center gap-1 text-xs text-stone-500">
-              <kbd className="inline-flex items-center px-1 py-0.5 rounded border border-stone-700 text-stone-400 text-xs font-mono">↑↓</kbd>
+          <div className="flex items-center gap-4 px-4 py-2 border-t border-slate-800 flex-shrink-0">
+            <span className="flex items-center gap-1 text-xs text-slate-500">
+              <kbd className="inline-flex items-center px-1 py-0.5 rounded border border-slate-700 text-slate-400 text-xs font-mono">↑↓</kbd>
               navigate
             </span>
-            <span className="flex items-center gap-1 text-xs text-stone-500">
-              <kbd className="inline-flex items-center px-1 py-0.5 rounded border border-stone-700 text-stone-400 text-xs font-mono">↵</kbd>
+            <span className="flex items-center gap-1 text-xs text-slate-500">
+              <kbd className="inline-flex items-center px-1 py-0.5 rounded border border-slate-700 text-slate-400 text-xs font-mono">↵</kbd>
               select
             </span>
-            <span className="flex items-center gap-1 text-xs text-stone-500 ml-auto">
-              <kbd className="inline-flex items-center px-1 py-0.5 rounded border border-stone-700 text-stone-400 text-xs font-mono">ESC</kbd>
+            <span className="flex items-center gap-1 text-xs text-slate-500 ml-auto">
+              <kbd className="inline-flex items-center px-1 py-0.5 rounded border border-slate-700 text-slate-400 text-xs font-mono">ESC</kbd>
               close
             </span>
           </div>

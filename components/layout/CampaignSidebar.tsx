@@ -7,6 +7,11 @@ import type { RecentItem, CommandPaletteEntityType } from '../common/CommandPale
 import { twMerge } from 'tailwind-merge';
 import { isFeatureVisible } from '../../utils/dmStyleUtils';
 import { DmStylePanel } from '../common/DmStylePanel';
+import { ENTITY_TYPE_CONFIG } from '../../utils/entityUtils';
+import { SidebarSearch } from './sidebar/SidebarSearch';
+import { ArticleTreeItem } from './sidebar/ArticleTreeItem';
+import { PinnedEntities } from './sidebar/PinnedEntities';
+import { RecentItems } from './sidebar/RecentItems';
 
 type SelectedIds = {
     adventure: string | null;
@@ -39,103 +44,6 @@ interface CampaignSidebarProps {
     onClearFeatureOverride?: (feature: string) => void;
 }
 
-// Helper component for recursively rendering the article tree
-const ArticleTreeItem: React.FC<{
-    article: Article;
-    allArticles: Article[];
-    selectedId: string | null;
-    onSelect: (id: string) => void;
-    expandedArticles: Record<string, boolean>;
-    toggleArticle: (id: string) => void;
-}> = ({ article, allArticles, selectedId, onSelect, expandedArticles, toggleArticle }) => {
-    const childArticles = allArticles.filter(a => a.parentArticleId === article.id);
-    const isExpanded = !!expandedArticles[article.id];
-
-    return (
-        <div>
-            <div className="flex items-center group">
-                {childArticles.length > 0 ? (
-                    <button onClick={() => toggleArticle(article.id)} className="p-1 mr-1 text-slate-500 hover:text-slate-300">
-                        <Icons.ChevronDown className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
-                    </button>
-                ) : (
-                    <div className="w-5 mr-1 flex-shrink-0" /> // Placeholder for alignment
-                )}
-                <button
-                    onClick={() => onSelect(article.id)}
-                    className={twMerge(
-                        'flex-grow text-left text-sm truncate px-2 py-1.5 rounded-md flex items-center transition-all duration-100 min-w-0',
-                        selectedId === article.id ? 'bg-slate-700 text-white' : 'hover:bg-slate-800 text-slate-400'
-                    )}
-                    title={article.title}
-                >
-                    <Icons.Scenes className="w-4 h-4 mr-2 flex-shrink-0"/>
-                    <span className="truncate">{article.title}</span>
-                </button>
-            </div>
-            {isExpanded && childArticles.length > 0 && (
-                <div className="pl-4 border-l border-slate-700 ml-[10px] mt-1 space-y-0.5">
-                    {childArticles.map(child => (
-                        <ArticleTreeItem
-                            key={child.id}
-                            article={child}
-                            allArticles={allArticles}
-                            selectedId={selectedId}
-                            onSelect={onSelect}
-                            expandedArticles={expandedArticles}
-                            toggleArticle={toggleArticle}
-                        />
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-};
-
-
-// Map entity type to icon key from Icons
-const RECENT_TYPE_ICON: Record<CommandPaletteEntityType, keyof typeof Icons> = {
-    npc: 'NPCs',
-    location: 'Locations',
-    faction: 'Factions',
-    item: 'Items',
-    adventure: 'Adventures',
-    article: 'BookCopy',
-    'session-log': 'SessionLog',
-    plot: 'Plot',
-    'player-character': 'PlayerCharacters',
-};
-
-// Map entity type to Tailwind text color class (matches EntityLink / CommandPalette colors)
-const RECENT_TYPE_COLOR: Record<CommandPaletteEntityType, string> = {
-    npc: 'text-amber-400',
-    location: 'text-emerald-400',
-    faction: 'text-violet-400',
-    item: 'text-sky-400',
-    adventure: 'text-orange-400',
-    article: 'text-cyan-400',
-    'session-log': 'text-rose-400',
-    plot: 'text-yellow-400',
-    'player-character': 'text-teal-400',
-};
-
-// Resolve display name for a pinned entity from the campaign data.
-// Returns null if the entity no longer exists (e.g. was deleted).
-function resolvePinnedEntityName(campaign: Campaign, type: string, id: string): string | null {
-    switch (type) {
-        case 'npc': return campaign.npcs.find(e => e.id === id)?.name ?? null;
-        case 'location': return campaign.locations.find(e => e.id === id)?.name ?? null;
-        case 'faction': return campaign.factions.find(e => e.id === id)?.name ?? null;
-        case 'item': return campaign.items.find(e => e.id === id)?.name ?? null;
-        case 'adventure': return campaign.adventures.find(e => e.id === id)?.title ?? null;
-        case 'article': return campaign.articles.find(e => e.id === id)?.title ?? null;
-        case 'session-log': return campaign.sessionLogs?.find(e => e.id === id)?.title ?? null;
-        case 'player-character': return campaign.playerCharacters?.find(e => e.id === id)?.characterSocial?.characterName ?? null;
-        case 'plot': return campaign.plots?.find(e => e.id === id)?.title ?? null;
-        default: return null;
-    }
-}
-
 export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
     campaign,
     activeView,
@@ -160,7 +68,6 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
     });
     const [filterText, setFilterText] = useState('');
     const [debouncedFilter, setDebouncedFilter] = useState('');
-    const [showAllRecent, setShowAllRecent] = useState(false);
     const [showDmStylePanel, setShowDmStylePanel] = useState(false);
     const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -177,6 +84,11 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
         filterTimerRef.current = setTimeout(() => {
             setDebouncedFilter(value.toLowerCase().trim());
         }, 100);
+    }, []);
+
+    const handleFilterClear = useCallback(() => {
+        setFilterText('');
+        setDebouncedFilter('');
     }, []);
 
     useEffect(() => {
@@ -197,7 +109,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
     const toggleArticle = (articleId: string) => {
         setExpandedArticles(prev => ({ ...prev, [articleId]: !prev[articleId] }));
     };
-    
+
     const toggleView = (view: EditorView) => {
         setExpandedViews(prev => ({ ...prev, [view]: !prev[view] }));
     };
@@ -209,7 +121,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
         if (view === 'items' && selectedIds.item) return true;
         return !!expandedViews[view];
     };
-    
+
     // --- Drag and Drop Handlers ---
     const handleDragStart = (e: React.DragEvent, adventureId: string, sceneId: string) => {
         e.dataTransfer.setData('application/json', JSON.stringify({ adventureId, sceneId }));
@@ -250,7 +162,6 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
         document.querySelectorAll('.border-amber-500').forEach(el => el.classList.remove('border-t-2', 'border-amber-500', '-mt-0.5'));
     };
 
-
     const entityGroups: {
         label: string,
         icon: keyof typeof Icons,
@@ -264,7 +175,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
         { label: "Factions", icon: 'Factions', view: 'factions', generatorType: 'faction', items: campaign.factions, selectedId: selectedIds.faction },
         { label: "Items", icon: 'Items', view: 'items', generatorType: 'item', items: campaign.items, selectedId: selectedIds.item },
     ];
-    
+
     const topLevelArticles = campaign.articles.filter(a => !a.parentArticleId);
 
     // --- Filtered lists for search ---
@@ -316,7 +227,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                 />
             )}
             <nav className="flex-1 p-2 space-y-1 overflow-y-auto custom-scrollbar">
-                
+
                 {/* --- Active Session Runner Banner --- */}
                 {campaign.activeSessionId && (() => {
                     const activeSession = campaign.sessionLogs?.find(s => s.id === campaign.activeSessionId);
@@ -342,100 +253,28 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                 })()}
 
                 {/* --- Search/Filter --- */}
-                <div className="mb-3 px-1">
-                    <div className="relative">
-                        <Icons.Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
-                        <input
-                            type="text"
-                            value={filterText}
-                            onChange={(e) => handleFilterChange(e.target.value)}
-                            placeholder="Filter entities..."
-                            className="w-full bg-slate-800 border border-slate-700 rounded-md pl-8 pr-7 py-1.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-500 focus:border-slate-500"
-                        />
-                        {filterText && (
-                            <button
-                                onClick={() => { setFilterText(''); setDebouncedFilter(''); }}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
-                            >
-                                <Icons.X className="w-3.5 h-3.5" />
-                            </button>
-                        )}
-                    </div>
-                </div>
+                <SidebarSearch
+                    filterText={filterText}
+                    onFilterChange={handleFilterChange}
+                    onClear={handleFilterClear}
+                />
 
                 {/* --- Pinned Entities --- */}
-                {pinnedEntities && pinnedEntities.length > 0 && !debouncedFilter && (
-                <div className="mb-4">
-                    <div className="flex items-center gap-1.5 px-3 pt-3 pb-1">
-                        <Icons.Star className="w-3.5 h-3.5 text-amber-500" />
-                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pinned</h3>
-                    </div>
-                    <div className="space-y-0.5">
-                        {pinnedEntities.slice(0, 15).map(pinned => {
-                            const iconKey = RECENT_TYPE_ICON[pinned.type as CommandPaletteEntityType];
-                            const Icon = iconKey ? Icons[iconKey] : Icons.Star;
-                            const colorClass = RECENT_TYPE_COLOR[pinned.type as CommandPaletteEntityType] ?? 'text-stone-400';
-                            const name = resolvePinnedEntityName(campaign, pinned.type, pinned.id);
-                            if (!name) return null;
-                            return (
-                                <div key={`${pinned.type}-${pinned.id}`} className="flex items-center group">
-                                    <button
-                                        onClick={() => onSelectPinned?.(pinned.type, pinned.id)}
-                                        className="flex-1 flex items-center gap-2 px-3 py-1.5 text-sm rounded-md text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors min-w-0"
-                                        title={name}
-                                    >
-                                        <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${colorClass}`} />
-                                        <span className="truncate">{name}</span>
-                                    </button>
-                                    <button
-                                        onClick={() => onUnpin?.(pinned.type, pinned.id)}
-                                        className="flex-shrink-0 mr-2 p-1 text-slate-600 hover:text-slate-300 opacity-0 group-hover:opacity-100 transition-all"
-                                        title="Unpin"
-                                        aria-label={`Unpin ${name}`}
-                                    >
-                                        <Icons.X className="w-3 h-3" />
-                                    </button>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
+                {pinnedEntities && !debouncedFilter && onSelectPinned && onUnpin && (
+                    <PinnedEntities
+                        campaign={campaign}
+                        pinnedEntities={pinnedEntities}
+                        onSelectPinned={onSelectPinned}
+                        onUnpin={onUnpin}
+                    />
                 )}
 
                 {/* --- Recent Items --- */}
-                {recentItems.length > 0 && !debouncedFilter && (
-                <div className="mb-4">
-                    <div className="flex items-center gap-1.5 px-3 pt-3 pb-1">
-                        <Icons.Clock className="w-3.5 h-3.5 text-slate-500" />
-                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Recent</h3>
-                    </div>
-                    <div className="space-y-0.5">
-                        {(showAllRecent ? recentItems : recentItems.slice(0, 5)).map(item => {
-                            const iconKey = RECENT_TYPE_ICON[item.type];
-                            const Icon = Icons[iconKey];
-                            const colorClass = RECENT_TYPE_COLOR[item.type];
-                            return (
-                                <button
-                                    key={`${item.type}-${item.id}`}
-                                    onClick={() => onSelectRecent?.(item.type, item.id)}
-                                    className="w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-md text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
-                                    title={item.name}
-                                >
-                                    <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${colorClass}`} />
-                                    <span className="truncate">{item.name}</span>
-                                </button>
-                            );
-                        })}
-                        {recentItems.length > 5 && (
-                            <button
-                                onClick={() => setShowAllRecent(prev => !prev)}
-                                className="w-full text-left text-xs text-slate-500 hover:text-slate-300 px-3 py-1 transition-colors"
-                            >
-                                {showAllRecent ? 'Show less' : `Show ${recentItems.length - 5} more...`}
-                            </button>
-                        )}
-                    </div>
-                </div>
+                {!debouncedFilter && onSelectRecent && (
+                    <RecentItems
+                        recentItems={recentItems}
+                        onSelectRecent={onSelectRecent}
+                    />
                 )}
 
                 {/* --- Bucket 1: Campaign State (Maintenance & History) --- */}
@@ -443,7 +282,6 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                 <div className="mb-6">
                     <NavHeader label="Campaign State" />
 
-                    {(!debouncedFilter || filteredSessionLogs.length > 0) && (
                     <div className="space-y-1">
                         <NavItem
                             label="Session Timeline"
@@ -452,27 +290,31 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                             onClick={() => onSelectView('session-logs')}
                         />
                         <div className="pl-4 border-l border-slate-700 ml-5 space-y-1">
-                            {filteredSessionLogs.slice(0, debouncedFilter ? undefined : 5).map(log => (
-                                <button
-                                    key={log.id}
-                                    onClick={() => onSelect('session-log', log.id)}
-                                    className={twMerge(
-                                        'w-full text-left text-sm truncate px-2 py-1.5 rounded-md flex items-center transition-all duration-100',
-                                        selectedIds.sessionLog === log.id ? 'bg-slate-700 text-white' : 'hover:bg-slate-800 text-slate-400'
+                            {debouncedFilter && filteredSessionLogs.length === 0 ? (
+                                <p className="px-2 py-1 text-xs text-slate-600 italic">No results</p>
+                            ) : (
+                                <>
+                                    {filteredSessionLogs.slice(0, debouncedFilter ? undefined : 5).map(log => (
+                                        <button
+                                            key={log.id}
+                                            onClick={() => onSelect('session-log', log.id)}
+                                            className={twMerge(
+                                                'w-full text-left text-sm truncate px-2 py-1.5 rounded-md flex items-center transition-all duration-100',
+                                                selectedIds.sessionLog === log.id ? 'bg-slate-700 text-white' : 'hover:bg-slate-800 text-slate-400'
+                                            )}
+                                            title={log.title}
+                                        >
+                                            {log.title}
+                                        </button>
+                                    ))}
+                                    {!debouncedFilter && (campaign.sessionLogs || []).length > 5 && (
+                                        <button onClick={() => onSelectView('session-logs')} className="text-xs text-slate-500 hover:text-slate-300 pl-2">View all logs...</button>
                                     )}
-                                    title={log.title}
-                                >
-                                    {log.title}
-                                </button>
-                            ))}
-                            {!debouncedFilter && (campaign.sessionLogs || []).length > 5 && (
-                                <button onClick={() => onSelectView('session-logs')} className="text-xs text-slate-500 hover:text-slate-300 pl-2">View all logs...</button>
+                                </>
                             )}
                         </div>
                     </div>
-                    )}
 
-                    {(!debouncedFilter || filteredPlayerCharacters.length > 0) && (
                     <div className="space-y-1 mt-1">
                         <div className="flex items-center justify-between px-3 py-2 group">
                             <button
@@ -490,22 +332,25 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                             </button>
                         </div>
                         <div className="pl-4 border-l border-slate-700 ml-5 space-y-1">
-                            {filteredPlayerCharacters.map(pc => (
-                                <button
-                                    key={pc.id}
-                                    onClick={() => onSelect('player-character', pc.id)}
-                                    className={twMerge(
-                                        'w-full text-left text-sm truncate px-2 py-1.5 rounded-md flex items-center transition-all duration-100',
-                                        selectedIds.playerCharacter === pc.id ? 'bg-slate-700 text-white' : 'hover:bg-slate-800 text-slate-400'
-                                    )}
-                                    title={pc.characterSocial.characterName}
-                                >
-                                    {pc.characterSocial.characterName}
-                                </button>
-                            ))}
+                            {debouncedFilter && filteredPlayerCharacters.length === 0 ? (
+                                <p className="px-2 py-1 text-xs text-slate-600 italic">No results</p>
+                            ) : (
+                                filteredPlayerCharacters.map(pc => (
+                                    <button
+                                        key={pc.id}
+                                        onClick={() => onSelect('player-character', pc.id)}
+                                        className={twMerge(
+                                            'w-full text-left text-sm truncate px-2 py-1.5 rounded-md flex items-center transition-all duration-100',
+                                            selectedIds.playerCharacter === pc.id ? 'bg-slate-700 text-white' : 'hover:bg-slate-800 text-slate-400'
+                                        )}
+                                        title={pc.characterSocial.characterName}
+                                    >
+                                        {pc.characterSocial.characterName}
+                                    </button>
+                                ))
+                            )}
                         </div>
                     </div>
-                    )}
 
                     {!debouncedFilter && showCombatTracker && (
                     <NavItem
@@ -516,7 +361,6 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                     />
                     )}
 
-                    {(!debouncedFilter || filteredPlots.length > 0) && (
                     <div className="space-y-1 mt-1">
                         <div className="flex items-center justify-between px-3 py-2 group">
                             <button
@@ -534,28 +378,31 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                             </button>
                         </div>
                         <div className="pl-4 border-l border-slate-700 ml-5 space-y-0.5">
-                            {filteredPlots.map(plot => (
-                                <button
-                                    key={plot.id}
-                                    onClick={() => onSelect('plot', plot.id)}
-                                    className={twMerge(
-                                        'w-full text-left text-sm truncate px-2 py-1.5 rounded-md flex items-center transition-all duration-100',
-                                        selectedIds.plot === plot.id ? 'bg-slate-700 text-white' : 'hover:bg-slate-800 text-slate-400'
-                                    )}
-                                    title={plot.title}
-                                >
-                                    <Icons.Plot className="w-3 h-3 mr-2 flex-shrink-0"/>
-                                    <span className="truncate">{plot.title}</span>
-                                </button>
-                            ))}
+                            {debouncedFilter && filteredPlots.length === 0 ? (
+                                <p className="px-2 py-1 text-xs text-slate-600 italic">No results</p>
+                            ) : (
+                                filteredPlots.map(plot => (
+                                    <button
+                                        key={plot.id}
+                                        onClick={() => onSelect('plot', plot.id)}
+                                        className={twMerge(
+                                            'w-full text-left text-sm truncate px-2 py-1.5 rounded-md flex items-center transition-all duration-100',
+                                            selectedIds.plot === plot.id ? 'bg-slate-700 text-white' : 'hover:bg-slate-800 text-slate-400'
+                                        )}
+                                        title={plot.title}
+                                    >
+                                        <Icons.Plot className="w-3 h-3 mr-2 flex-shrink-0"/>
+                                        <span className="truncate">{plot.title}</span>
+                                    </button>
+                                ))
+                            )}
                         </div>
                     </div>
-                    )}
 
                     {!debouncedFilter && showRelationshipGraph && (
                     <NavItem
                         label="World Graph"
-                        icon="Coach"
+                        icon="WorldGraph"
                         active={activeView === 'relationships'}
                         onClick={() => onSelectView('relationships')}
                     />

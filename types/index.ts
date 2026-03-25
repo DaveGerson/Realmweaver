@@ -1,5 +1,6 @@
 
 // FIX: This file had placeholder content. Creating a barrel file to export all types.
+export * from './common';
 export * from './Adventure';
 export * from './Article';
 export * from './NPC';

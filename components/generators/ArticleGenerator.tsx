@@ -92,7 +92,7 @@ export const ArticleGenerator: React.FC<ArticleGeneratorProps> = ({ onArticleCre
       {isLoading && <SkeletonGeneratorOverlay />}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-            <Icons.Wizard className="w-7 h-7 text-indigo-400" />
+            <Icons.Wizard className="w-7 h-7 text-amber-400" />
             <h2 className="text-2xl font-bold font-serif text-slate-100">Lore Article Generator</h2>
         </div>
         <Button variant="secondary" size="sm" onClick={() => setMode('chat')}>
@@ -102,14 +102,14 @@ export const ArticleGenerator: React.FC<ArticleGeneratorProps> = ({ onArticleCre
 
       <p className="text-sm text-slate-400 flex-grow">
         Describe a piece of lore, a historical event, or a cosmological concept for your world.
-        {isOfficialSetting && <span className="block mt-1 text-indigo-400 text-xs">Google Search enabled for canon accuracy.</span>}
+        {isOfficialSetting && <span className="block mt-1 text-amber-400 text-xs">Google Search enabled for canon accuracy.</span>}
       </p>
       <textarea
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
         placeholder="e.g., The creation myth of the world"
         rows={5}
-        className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 outline-none resize-y placeholder:text-slate-600"
+        className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-amber-500 outline-none resize-y placeholder:text-slate-600"
         disabled={isLoading}
       />
       {error && <p className="text-xs text-red-400">{error}</p>}

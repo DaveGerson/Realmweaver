@@ -81,7 +81,7 @@ const GROUP_CONFIG: Record<string, GroupConfig> = {
 
 const DEFAULT_GROUP_CONFIG: GroupConfig = {
   icon: Icons.FileText,
-  colorClass: 'text-stone-400',
+  colorClass: 'text-slate-400',
   label: 'Other',
 };
 
@@ -109,7 +109,7 @@ const BacklinkGroup: React.FC<BacklinkGroupProps> = ({ entityType, entries, onNa
       <div className={`flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider ${config.colorClass}`}>
         <GroupIcon className="w-3.5 h-3.5 flex-shrink-0" />
         <span>{config.label}</span>
-        <span className="ml-auto text-stone-500 font-normal normal-case tracking-normal">
+        <span className="ml-auto text-slate-500 font-normal normal-case tracking-normal">
           {entries.length}
         </span>
       </div>
@@ -126,9 +126,9 @@ const BacklinkGroup: React.FC<BacklinkGroupProps> = ({ entityType, entries, onNa
                 onNavigate={onNavigate}
               />
             ) : (
-              <span className="text-stone-300">{entry.name}</span>
+              <span className="text-slate-300">{entry.name}</span>
             )}
-            <span className="text-stone-500 text-xs">({entry.relationshipLabel})</span>
+            <span className="text-slate-500 text-xs">({entry.relationshipLabel})</span>
           </li>
         ))}
       </ul>
@@ -138,7 +138,7 @@ const BacklinkGroup: React.FC<BacklinkGroupProps> = ({ entityType, entries, onNa
         <button
           type="button"
           onClick={() => setExpanded((prev) => !prev)}
-          className="pl-5 text-xs text-stone-400 hover:text-stone-200 transition-colors"
+          className="pl-5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
         >
           {expanded
             ? 'Show fewer'
@@ -173,33 +173,33 @@ export const BacklinksPanel: React.FC<BacklinksPanelProps> = ({
   const totalCount = groupEntries.reduce((sum, [, entries]) => sum + entries.length, 0);
 
   return (
-    <div className="rounded-lg border border-stone-700 bg-stone-800 overflow-hidden">
+    <div className="rounded-lg border border-slate-700 bg-slate-800 overflow-hidden">
       {/* Panel header — always visible, acts as collapse toggle */}
       <button
         type="button"
         onClick={() => setIsCollapsed((prev) => !prev)}
-        className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-stone-700/50 transition-colors"
+        className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-slate-700/50 transition-colors"
         aria-expanded={!isCollapsed}
       >
-        <Icons.Link className="w-4 h-4 text-stone-400 flex-shrink-0" />
-        <span className="text-sm font-semibold text-stone-200 flex-1">Referenced By</span>
+        <Icons.Link className="w-4 h-4 text-slate-400 flex-shrink-0" />
+        <span className="text-sm font-semibold text-slate-200 flex-1">Referenced By</span>
         {totalCount > 0 && (
-          <span className="text-xs bg-stone-700 text-stone-300 rounded-full px-2 py-0.5 font-mono">
+          <span className="text-xs bg-slate-700 text-slate-300 rounded-full px-2 py-0.5 font-mono">
             {totalCount}
           </span>
         )}
         {isCollapsed ? (
-          <Icons.ChevronDown className="w-4 h-4 text-stone-400" />
+          <Icons.ChevronDown className="w-4 h-4 text-slate-400" />
         ) : (
-          <Icons.ChevronUp className="w-4 h-4 text-stone-400" />
+          <Icons.ChevronUp className="w-4 h-4 text-slate-400" />
         )}
       </button>
 
       {/* Panel body */}
       {!isCollapsed && (
-        <div className="px-4 pb-4 pt-1 border-t border-stone-700">
+        <div className="px-4 pb-4 pt-1 border-t border-slate-700">
           {groupEntries.length === 0 ? (
-            <p className="text-sm text-stone-500 italic py-2">
+            <p className="text-sm text-slate-500 italic py-2">
               No other entities reference this one.
             </p>
           ) : (

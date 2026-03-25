@@ -89,7 +89,7 @@ export const NpcGenerator: React.FC<NpcGeneratorProps> = ({ onNpcCreated, isMock
       {isLoading && <SkeletonGeneratorOverlay />}
       <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Icons.Wizard className="w-7 h-7 text-indigo-400" />
+            <Icons.Wizard className="w-7 h-7 text-amber-400" />
             <h2 className="text-2xl font-bold font-serif text-slate-100">NPC Generator</h2>
           </div>
           <Button variant="secondary" size="sm" onClick={() => setMode('chat')}>
@@ -105,7 +105,7 @@ export const NpcGenerator: React.FC<NpcGeneratorProps> = ({ onNpcCreated, isMock
         onChange={(e) => setPrompt(e.target.value)}
         placeholder={isOfficialSetting ? "e.g., Drizzt Do'Urden, Elminster" : "e.g., A gruff dwarven blacksmith..."}
         rows={5}
-        className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none resize-y placeholder:text-slate-600"
+        className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500 outline-none resize-y placeholder:text-slate-600"
         disabled={isLoading}
       />
       {error && <p className="text-xs text-red-400">{error}</p>}

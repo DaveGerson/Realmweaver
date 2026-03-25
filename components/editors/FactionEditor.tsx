@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import type { Faction, NPC, Location } from '../../types/index';
+import type { Faction, NPC, Location, Campaign } from '../../types/index';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
@@ -20,6 +21,7 @@ interface FactionEditorProps {
   faction: Faction;
   allNpcs: NPC[];
   allLocations?: Location[];
+  campaign?: Campaign;
   onUpdate: (id: string, updatedData: Partial<Faction>) => void;
   onDelete: (id: string) => void;
   isMockMode: boolean;
@@ -33,12 +35,11 @@ const FACTION_TABS: TabDefinition[] = [
   { id: 'connections',  label: 'Connections',  icon: Icons.Link },
 ];
 
-export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, allLocations = [], onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
+export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, allLocations = [], campaign, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(faction);
   const [isGeneratingMember, setIsGeneratingMember] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
-
-  const campaign = campaignService.getState().campaigns.find(c => c.id === campaignService.getState().activeCampaignId)!;
+  const { confirm } = useConfirmDialog();
 
   // Reset to first tab when the entity changes
   useEffect(() => {
@@ -67,9 +68,10 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
     onUpdate(faction.id, { [name]: newLocationId });
   };
 
-  const handleDelete = () => {
-    if (window.confirm(`Are you sure you want to delete the faction "${faction.name}"? This will unassign all its members.`)) {
-        onDelete(faction.id);
+  const handleDelete = async () => {
+    const confirmed = await confirm('Delete Faction', `Are you sure you want to delete the faction "${faction.name}"? This will unassign all its members.`, { variant: 'danger' });
+    if (confirmed) {
+      onDelete(faction.id);
     }
   }
 
@@ -275,15 +277,17 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
               <BacklinksPanel entityId={faction.id} entityType="faction" onNavigate={onNavigate} />
 
               {/* History Manager */}
-              <EntityHistoryManager
-                  subjectId={faction.id}
-                  subjectType="faction"
-                  campaign={campaign}
-                  onUpdateEntity={(type, id, changes) => {
-                      if (type === 'npc') campaignService.updateNpc(id, changes);
-                      if (type === 'location') campaignService.updateLocation(id, changes);
-                  }}
-              />
+              {campaign && (
+                <EntityHistoryManager
+                    subjectId={faction.id}
+                    subjectType="faction"
+                    campaign={campaign}
+                    onUpdateEntity={(type, id, changes) => {
+                        if (type === 'npc') campaignService.updateNpc(id, changes);
+                        if (type === 'location') campaignService.updateLocation(id, changes);
+                    }}
+                />
+              )}
             </div>
           )}
 

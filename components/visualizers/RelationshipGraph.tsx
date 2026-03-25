@@ -18,14 +18,13 @@ const TYPE_COLORS: Record<string, string> = {
   [EntityType.ADVENTURE]: '#3b82f6',// Blue-500
   [EntityType.SCENE]: '#ef4444',    // Red-500
   [EntityType.ARTICLE]: '#06b6d4',  // Cyan-500
-  [EntityType.QUEST]: '#ec4899',    // Pink-500
-  [EntityType.EVENT]: '#eab308',    // Yellow-500
 };
 
 export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, onNodeSelect }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [filters, setFilters] = useState<Record<EntityType, boolean>>({
+  const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
+  const [filters, setFilters] = useState<Partial<Record<EntityType, boolean>>>({
       [EntityType.NPC]: true,
       [EntityType.FACTION]: true,
       [EntityType.LOCATION]: true,
@@ -33,8 +32,6 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
       [EntityType.SCENE]: true,
       [EntityType.ARTICLE]: true,
       [EntityType.ITEM]: false,
-      [EntityType.QUEST]: false,
-      [EntityType.EVENT]: false,
   });
 
   const { nodes, links } = useMemo(() => {
@@ -167,8 +164,10 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
         .on("zoom", (event) => {
             g.attr("transform", event.transform);
         });
-    
+
     svg.call(zoom);
+    // Store zoom behavior for external reset
+    zoomRef.current = zoom;
 
     // Create mutable copies for D3 to mutate
     const simulationNodes = nodes.map(n => ({...n}));
@@ -195,12 +194,12 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
       .attr("stroke-opacity", 0.6)
       .attr("stroke-width", 1.5);
 
-    // Edge label text — subtle, stone-500 equivalent, small font
+    // Edge label text — subtle, slate-500 equivalent, small font
     const linkLabel = linkGroup.append("text")
       .text((d: GraphLink) => d.label ?? '')
       .attr("text-anchor", "middle")
       .attr("dominant-baseline", "middle")
-      .attr("fill", "#78716c") // stone-500
+      .attr("fill", "#78716c") // slate-500
       .attr("font-size", "9px")
       .attr("font-family", "sans-serif")
       .style("pointer-events", "none")
@@ -303,6 +302,12 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
       setFilters(prev => ({...prev, [type]: !prev[type]}));
   }
 
+  const handleResetView = () => {
+      if (svgRef.current && zoomRef.current) {
+          d3.select(svgRef.current).call(zoomRef.current.transform, d3.zoomIdentity);
+      }
+  };
+
   return (
     <div className="w-full h-full rounded-lg overflow-hidden bg-slate-950 border border-slate-700 shadow-inner relative" ref={containerRef}>
       <div className="absolute top-4 left-4 z-10 bg-slate-900/80 backdrop-blur p-2 rounded-lg border border-slate-800 flex flex-col gap-2 shadow-xl">
@@ -314,6 +319,18 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
             <FilterToggle label="Scenes" color={TYPE_COLORS[EntityType.SCENE]} active={filters[EntityType.SCENE]} onClick={() => toggleFilter(EntityType.SCENE)} />
             <FilterToggle label="Lore" color={TYPE_COLORS[EntityType.ARTICLE]} active={filters[EntityType.ARTICLE]} onClick={() => toggleFilter(EntityType.ARTICLE)} />
             <FilterToggle label="Items" color={TYPE_COLORS[EntityType.ITEM]} active={filters[EntityType.ITEM]} onClick={() => toggleFilter(EntityType.ITEM)} />
+            <div className="border-t border-slate-700 mt-1 pt-1">
+                <button
+                    onClick={handleResetView}
+                    className="flex items-center gap-2 px-2 py-1 rounded text-xs font-medium transition-all w-full bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 hover:text-amber-300"
+                    title="Reset pan and zoom to initial view"
+                >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Reset View
+                </button>
+            </div>
         </div>
       <svg ref={svgRef} className="w-full h-full"></svg>
     </div>

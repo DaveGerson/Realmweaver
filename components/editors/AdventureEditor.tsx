@@ -7,6 +7,7 @@ import { RegenerateButton } from '../common/RegenerateButton';
 import { generateScene } from '../../services/aiService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
 import { LinkedText } from '../common/LinkedText';
+import { textareaBaseClasses } from '../common/Textarea';
 import { campaignService } from '../../services/campaignService';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
 import { BacklinksPanel } from '../common/BacklinksPanel';
@@ -148,7 +149,7 @@ export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, cam
                   onChange={handleChange}
                   onBlur={handleBlur}
                   rows={2}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600 resize-y"
+                  className={`w-full px-3 py-2 transition-all placeholder:text-slate-600 ${textareaBaseClasses}`}
                   placeholder="A mysterious artifact is discovered, but it's part of a key to an ancient, powerful prison..."
                 />
                 {formData.hook && onNavigate && (

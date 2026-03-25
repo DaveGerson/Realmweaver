@@ -61,7 +61,7 @@ interface EntityCountBadgeProps {
 const EntityCountBadge: React.FC<EntityCountBadgeProps> = ({ count, label, icon }) => {
   if (count === 0) return null;
   return (
-    <span className="inline-flex items-center gap-1 text-xs bg-stone-700 text-stone-300 rounded px-2 py-0.5">
+    <span className="inline-flex items-center gap-1 text-xs bg-slate-700 text-slate-300 rounded px-2 py-0.5">
       {icon}
       {count} {label}
     </span>
@@ -76,18 +76,18 @@ interface TemplateCardProps {
 
 const TemplateCard: React.FC<TemplateCardProps> = ({ meta, onSelect, isLoading }) => {
   return (
-    <div className="flex flex-col bg-stone-800 border border-stone-700 rounded-lg p-4 gap-3 hover:border-stone-600 transition-colors">
+    <div className="flex flex-col bg-slate-800 border border-slate-700 rounded-lg p-4 gap-3 hover:border-slate-600 transition-colors">
       <div>
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h3 className="font-semibold text-stone-100 text-sm leading-tight">{meta.title}</h3>
+            <h3 className="font-semibold text-slate-100 text-sm leading-tight">{meta.title}</h3>
             <p className="text-amber-400 text-xs mt-0.5">{meta.subtitle}</p>
           </div>
-          <span className="shrink-0 text-xs bg-stone-700 text-stone-400 rounded px-2 py-0.5 whitespace-nowrap">
+          <span className="shrink-0 text-xs bg-slate-700 text-slate-400 rounded px-2 py-0.5 whitespace-nowrap">
             {meta.playstyle}
           </span>
         </div>
-        <p className="text-stone-400 text-xs mt-2 leading-relaxed line-clamp-3">{meta.description}</p>
+        <p className="text-slate-400 text-xs mt-2 leading-relaxed line-clamp-3">{meta.description}</p>
       </div>
 
       <div className="flex flex-wrap gap-1.5">
@@ -183,7 +183,7 @@ const TemplateSelectorStep: React.FC<TemplateSelectorStepProps> = ({
       <div className="flex justify-center">
         <button
           onClick={onSkip}
-          className="text-sm text-stone-400 hover:text-stone-200 transition-colors underline underline-offset-2"
+          className="text-sm text-slate-400 hover:text-slate-200 transition-colors underline underline-offset-2"
         >
           Start From Scratch — I'll build my own world
         </button>
@@ -291,7 +291,7 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampai
           <button
             type="button"
             onClick={() => setStep('template-select')}
-            className="flex items-center gap-1.5 text-xs text-stone-400 hover:text-stone-200 transition-colors"
+            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
           >
             <Icons.ChevronLeft className="w-3.5 h-3.5" />
             Back to templates
@@ -398,7 +398,7 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampai
                           ? 'bg-amber-600 text-white'
                           : option.value === 'guided'
                           ? 'bg-slate-600 text-slate-300'
-                          : 'bg-indigo-600 text-white',
+                          : 'bg-amber-600 text-white',
                       ].join(' ')}>
                         {option.badge}
                       </span>

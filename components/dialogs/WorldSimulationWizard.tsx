@@ -7,6 +7,7 @@ import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { campaignService } from '../../services/campaignService';
 import { twMerge } from 'tailwind-merge';
+import { DialogShell } from '../common/DialogShell';
 
 interface WorldSimulationWizardProps {
   campaign: Campaign;
@@ -144,8 +145,8 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
   const approvedCount = events.filter(e => approvedIds.has(e.id)).length;
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-2 sm:p-4" role="dialog" aria-modal="true" aria-label="World Simulation Wizard">
-      <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+    <DialogShell isOpen={true} onClose={onClose} ariaLabel="World Simulation Wizard" className="w-full max-w-2xl mx-2 sm:mx-4">
+      <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-700 flex-shrink-0">
           <div className="flex items-center gap-3">
@@ -429,6 +430,6 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
           )}
         </div>
       </div>
-    </div>
+    </DialogShell>
   );
 };

@@ -334,7 +334,7 @@ export const MentionInput: React.FC<MentionInputProps> = ({
     'aria-haspopup': 'listbox' as const,
     className: twMerge(
       'w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm',
-      'focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none',
+      'focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500 outline-none',
       'placeholder:text-slate-600 text-slate-100',
       'disabled:opacity-50 disabled:cursor-not-allowed',
       textareaClassName,
@@ -371,7 +371,7 @@ export const MentionInput: React.FC<MentionInputProps> = ({
           aria-label="Entity mentions"
           className={twMerge(
             'absolute z-50 w-full min-w-[240px] max-h-60 overflow-y-auto',
-            'bg-stone-800 border border-stone-600 rounded-lg shadow-lg',
+            'bg-slate-800 border border-slate-600 rounded-lg shadow-lg',
             dropdownAbove ? 'bottom-full mb-1' : 'top-full mt-1',
           )}
         >
@@ -382,9 +382,9 @@ export const MentionInput: React.FC<MentionInputProps> = ({
             return (
               <div key={type}>
                 {/* Group header */}
-                <div className="px-3 py-1 flex items-center gap-1.5 bg-stone-900/60 border-b border-stone-700">
+                <div className="px-3 py-1 flex items-center gap-1.5 bg-slate-900/60 border-b border-slate-700">
                   <TypeIcon className={twMerge('w-3 h-3', meta.dropdownIcon)} />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                     {meta.label}
                   </span>
                 </div>
@@ -407,8 +407,8 @@ export const MentionInput: React.FC<MentionInputProps> = ({
                         'w-full flex items-center gap-2 px-4 py-2 text-sm text-left transition-colors',
                         'min-h-[44px]', // touch target
                         isActive
-                          ? 'bg-stone-700 text-stone-100'
-                          : 'text-stone-300 hover:bg-stone-700/60',
+                          ? 'bg-slate-700 text-slate-100'
+                          : 'text-slate-300 hover:bg-slate-700/60',
                       )}
                     >
                       <span
@@ -433,11 +433,11 @@ export const MentionInput: React.FC<MentionInputProps> = ({
       {isOpen && filtered.length === 0 && query.length > 0 && (
         <div
           className={twMerge(
-            'absolute z-50 w-full bg-stone-800 border border-stone-600 rounded-lg shadow-lg px-4 py-3',
+            'absolute z-50 w-full bg-slate-800 border border-slate-600 rounded-lg shadow-lg px-4 py-3',
             dropdownAbove ? 'bottom-full mb-1' : 'top-full mt-1',
           )}
         >
-          <p className="text-sm text-stone-500 italic">No entities match "{query}"</p>
+          <p className="text-sm text-slate-500 italic">No entities match "{query}"</p>
         </div>
       )}
     </div>

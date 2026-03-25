@@ -83,6 +83,7 @@ import {
   Globe,
   Copy,
   LayoutGrid,
+  GitGraph,
 } from 'lucide-react';
 
 export const Icons = {
@@ -168,6 +169,7 @@ export const Icons = {
   WorldSim: Globe,
   Duplicate: Copy,
   AllCampaigns: LayoutGrid,
+  WorldGraph: GitGraph,
 };
 
 export const SceneIcon = ({ type, className }: { type: string, className?: string }) => {

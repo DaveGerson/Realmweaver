@@ -2,6 +2,29 @@
 import type { NPC, Location, Faction, Item, Article, Adventure, Scene, SessionLog, Plot, Note, Campaign, PlayerCharacter } from '../types/index';
 
 /**
+ * Centralized entity type configuration.
+ * Single source of truth for icons, accent colors, and labels used across
+ * CrossCampaignDashboard, EntityQuickCard, CommandPalette, and CampaignSidebar.
+ *
+ * `color` is a Tailwind color name (without variant) — consumers derive the
+ * specific shade they need (e.g. `text-${color}-400`, `bg-${color}-900/60`).
+ */
+export const ENTITY_TYPE_CONFIG: Record<string, { icon: string; color: string; label: string }> = {
+  npc:             { icon: 'NPCs',            color: 'amber',   label: 'NPCs' },
+  location:        { icon: 'Locations',       color: 'emerald', label: 'Locations' },
+  faction:         { icon: 'Factions',        color: 'violet',  label: 'Factions' },
+  item:            { icon: 'Items',           color: 'sky',     label: 'Items' },
+  adventure:       { icon: 'Adventures',      color: 'orange',  label: 'Adventures' },
+  article:         { icon: 'BookCopy',        color: 'cyan',    label: 'Articles' },
+  sessionLog:      { icon: 'SessionLog',      color: 'rose',    label: 'Session Logs' },
+  'session-log':   { icon: 'SessionLog',      color: 'rose',    label: 'Session Logs' },
+  playerCharacter: { icon: 'PlayerCharacters', color: 'teal',   label: 'Player Characters' },
+  'player-character': { icon: 'PlayerCharacters', color: 'teal', label: 'Player Characters' },
+  plot:            { icon: 'Plot',            color: 'yellow',  label: 'Plots' },
+  note:            { icon: 'FileText',        color: 'slate',   label: 'Notes' },
+};
+
+/**
  * Builds a campaign context string for AI generation functions.
  * Keeps it concise (entity names only) to avoid token bloat while
  * giving the AI enough awareness to maintain consistency.

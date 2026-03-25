@@ -1,6 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import type { SessionLog, SessionLogEntry } from '../../types';
+import type { SessionLog, SessionLogEntry, Campaign } from '../../types';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { useToast } from '@/hooks/useToast';
 import { Icons, SceneIcon } from '../common/Icons';
 import { Button } from '../common/Button';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
@@ -12,9 +14,11 @@ import { twMerge } from 'tailwind-merge';
 import { startAudioTranscription } from '../../services/ai/audioTranscription';
 import type { AudioTranscriptionSession } from '../../services/ai/audioTranscription';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
+import { BacklinksPanel } from '../common/BacklinksPanel';
 
 interface SessionLogEditorProps {
   log: SessionLog;
+  campaign: Campaign;
   onUpdate: (id: string, updatedData: Partial<SessionLog>) => void;
   onDelete: (id: string) => void;
   isMockMode: boolean;
@@ -29,17 +33,19 @@ declare global {
   }
 }
 
-export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdate, onDelete, isMockMode, onGoLive, onNavigate }) => {
+export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaign, onUpdate, onDelete, isMockMode, onGoLive, onNavigate }) => {
   const [formData, setFormData] = useState(log);
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState<'structured' | 'scratchpad'>('structured');
   const [newNoteContent, setNewNoteContent] = useState('');
   const [newNoteTags, setNewNoteTags] = useState<string[]>([]);
-  
+  const { confirm } = useConfirmDialog();
+  const { addToast } = useToast();
+
   // Live API State
   const [isLiveConnected, setIsLiveConnected] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState('');
-  
+
   // Ref for the active audio transcription session returned by the service module.
   const audioSessionRef = useRef<AudioTranscriptionSession | null>(null);
 
@@ -47,7 +53,6 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
   const [isImportingTranscript, setIsImportingTranscript] = useState(false);
   const transcriptFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const campaign = campaignService.getState().campaigns.find(c => c.id === campaignService.getState().activeCampaignId)!;
   const activePlots = campaign.plots.filter(p => p.status === 'active');
 
   useEffect(() => {
@@ -94,9 +99,10 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
       onUpdate(log.id, { relatedPlotIds: updated });
   }
 
-  const handleDelete = () => {
-    if (window.confirm(`Are you sure you want to delete the log "${log.title}"? This action cannot be undone.`)) {
-        onDelete(log.id);
+  const handleDelete = async () => {
+    const confirmed = await confirm('Delete Session Log', `Are you sure you want to delete the log "${log.title}"? This action cannot be undone.`, { variant: 'danger' });
+    if (confirmed) {
+      onDelete(log.id);
     }
   }
 
@@ -110,15 +116,13 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
 
       // Ensure we stop recording if active before closing
       if (isLiveConnected) {
-          await handleToggleLive(); 
+          await handleToggleLive();
       }
-      
-      // Use a small timeout to allow UI updates to flush if needed, but primarily ensure logic is sound
-      setTimeout(() => {
-          if(window.confirm("Are you sure you want to end the session? This will move it to the archive.")) {
-              onUpdate(log.id, { status: 'completed' });
-          }
-      }, 50);
+
+      const confirmed = await confirm('End Session', 'Are you sure you want to end the session? This will move it to the archive.', { variant: 'danger', confirmLabel: 'End Session' });
+      if (confirmed) {
+          onUpdate(log.id, { status: 'completed' });
+      }
   }
 
   const handleAiGenerateRecap = async () => {
@@ -169,7 +173,7 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
     } catch (err) {
       console.error('Failed to start Live session', err);
       setIsLiveConnected(false);
-      alert('Could not connect to AI service. Please check your GCP API key in Campaign Settings and try again.');
+      addToast('Could not connect to AI service. Please check your GCP API key in Campaign Settings and try again.', 'error');
     }
   };
 
@@ -236,7 +240,7 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
       setActiveTab('scratchpad');
     } catch (err) {
       console.error('Transcript import failed', err);
-      alert('Failed to read the transcript file. See console for details.');
+      addToast('Failed to read the transcript file. See console for details.', 'error');
     } finally {
       setIsImportingTranscript(false);
     }
@@ -313,7 +317,7 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
         }
     } catch (e) {
         console.error("Analysis failed", e);
-        alert("Failed to analyze notes. See console.");
+        addToast("Failed to analyze notes. See console.", 'error');
     } finally {
         setIsGenerating(false);
     }
@@ -384,7 +388,7 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
                     <input
                         ref={transcriptFileInputRef}
                         type="file"
-                        accept=".txt,.vtt,.docx"
+                        accept=".txt,.vtt"
                         className="hidden"
                         onChange={handleTranscriptFileChange}
                     />
@@ -621,7 +625,7 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
                             </div>
                         )}
                         <div className="absolute bottom-4 right-4 flex gap-2">
-                            <Button onClick={handleAnalyzeNotes} disabled={isGenerating || !formData.runningNotes.trim()} className="bg-indigo-600/90 hover:bg-indigo-500 shadow-lg">
+                            <Button onClick={handleAnalyzeNotes} disabled={isGenerating || !formData.runningNotes.trim()} className="bg-amber-600/90 hover:bg-amber-500 shadow-lg">
                                 {isGenerating ? <Icons.Sparkles className="w-4 h-4 mr-2 animate-spin" /> : <Icons.Sparkles className="w-4 h-4 mr-2" />}
                                 Process into Log
                             </Button>
@@ -715,7 +719,7 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
                   </div>
               </div>
 
-              <EntityHistoryManager 
+              <EntityHistoryManager
                 subjectId={log.id}
                 subjectType="session"
                 campaign={campaign}
@@ -724,6 +728,9 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, onUpdat
                     if (type === 'location') campaignService.updateLocation(id, changes);
                 }}
             />
+
+              {/* Backlinks Panel */}
+              <BacklinksPanel entityId={log.id} entityType="session-log" onNavigate={onNavigate} />
           </div>
       </div>
     </div>

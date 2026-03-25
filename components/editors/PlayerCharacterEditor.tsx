@@ -1,25 +1,31 @@
 
 import React, { useState, useEffect } from 'react';
 import type { PlayerCharacter, AbilityScores, Skills, ProficiencyLevel } from '../../types/index';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
+import { BacklinksPanel } from '../common/BacklinksPanel';
+import type { QuickCardEntityType } from '../common/EntityQuickCard';
 
 interface PlayerCharacterEditorProps {
   pc: PlayerCharacter;
   onUpdate: (id: string, updatedData: Partial<PlayerCharacter>) => void;
   onDelete: (id: string) => void;
+  onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
 }
 
-export const PlayerCharacterEditor: React.FC<PlayerCharacterEditorProps> = ({ pc, onUpdate, onDelete }) => {
+export const PlayerCharacterEditor: React.FC<PlayerCharacterEditorProps> = ({ pc, onUpdate, onDelete, onNavigate }) => {
   const [formData, setFormData] = useState(pc);
+  const { confirm } = useConfirmDialog();
 
   useEffect(() => {
     setFormData(pc);
   }, [pc]);
 
-  const handleDelete = () => {
-    if (window.confirm(`Are you sure you want to delete ${pc.characterSocial.characterName}?`)) {
-        onDelete(pc.id);
+  const handleDelete = async () => {
+    const confirmed = await confirm('Delete Character', `Are you sure you want to delete ${pc.characterSocial.characterName}?`, { variant: 'danger' });
+    if (confirmed) {
+      onDelete(pc.id);
     }
   };
 
@@ -69,7 +75,7 @@ export const PlayerCharacterEditor: React.FC<PlayerCharacterEditorProps> = ({ pc
                         {Object.entries(formData.characterStatistics.skills).map(([skill, proficiency]) => (
                             <div key={skill} className="flex justify-between items-center p-1 rounded">
                                 <span className="text-slate-300 capitalize">{skill.replace(/_/g, ' ')}</span>
-                                <span className={`font-semibold text-xs px-2 py-0.5 rounded-full ${proficiency === 'proficient' ? 'bg-green-800 text-green-200' : proficiency === 'expertise' ? 'bg-indigo-800 text-indigo-200' : 'text-slate-500'}`}>{proficiency}</span>
+                                <span className={`font-semibold text-xs px-2 py-0.5 rounded-full ${proficiency === 'proficient' ? 'bg-green-800 text-green-200' : proficiency === 'expertise' ? 'bg-amber-800 text-amber-200' : 'text-slate-500'}`}>{proficiency}</span>
                             </div>
                         ))}
                      </div>
@@ -100,6 +106,9 @@ export const PlayerCharacterEditor: React.FC<PlayerCharacterEditorProps> = ({ pc
                 </div>
             </div>
         </div>
+
+        {/* Backlinks Panel */}
+        <BacklinksPanel entityId={pc.id} entityType="player-character" onNavigate={onNavigate} />
     </div>
   );
 };

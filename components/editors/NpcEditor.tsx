@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import type { NPC, Faction, EntityRelationship, PlayerCharacter } from '../../types/index';
+import type { NPC, Faction, EntityRelationship, PlayerCharacter, Campaign } from '../../types/index';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
@@ -21,6 +22,7 @@ interface NpcEditorProps {
   playerCharacters?: PlayerCharacter[];
   sessionLogs?: any[];
   articles?: any[];
+  campaign?: Campaign;
   onUpdate: (id: string, updatedData: Partial<NPC>) => void;
   onDelete: (id: string) => void;
   isMockMode: boolean;
@@ -35,11 +37,10 @@ const NPC_TABS: TabDefinition[] = [
   { id: 'connections',  label: 'Connections',   icon: Icons.Link },
 ];
 
-export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [], playerCharacters = [], onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
+export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [], playerCharacters = [], campaign: campaignProp, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(npc);
   const [activeTab, setActiveTab] = useState('identity');
-
-  const campaign = campaignService.getState().campaigns.find(c => c.id === campaignService.getState().activeCampaignId)!;
+  const { confirm } = useConfirmDialog();
 
   // Reset to first tab when the entity changes
   useEffect(() => {
@@ -68,9 +69,10 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
     onUpdate(npc.id, { [name]: newFactionId });
   };
 
-  const handleDelete = () => {
-    if (window.confirm(`Are you sure you want to delete ${npc.name}? This action cannot be undone.`)) {
-        onDelete(npc.id);
+  const handleDelete = async () => {
+    const confirmed = await confirm('Delete NPC', `Are you sure you want to delete ${npc.name}? This action cannot be undone.`, { variant: 'danger' });
+    if (confirmed) {
+      onDelete(npc.id);
     }
   }
 
@@ -334,9 +336,9 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                                       className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500 resize-y"
                                   />
                               </div>
-                              <button onClick={() => handleDeleteRelationship(index)} className="text-slate-500 hover:text-red-400 p-1 rounded transition-colors">
+                              <Button variant="icon" onClick={() => handleDeleteRelationship(index)} className="text-slate-500 hover:text-red-400" aria-label="Delete relationship">
                                   <Icons.Trash className="w-4 h-4" />
-                              </button>
+                              </Button>
                           </div>
                       ))}
                       {(!formData.relationships || formData.relationships.length === 0) && (
@@ -346,15 +348,17 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
               </div>
 
               {/* History Manager */}
-              <EntityHistoryManager
-                  subjectId={npc.id}
-                  subjectType="npc"
-                  campaign={campaign}
-                  onUpdateEntity={(type, id, changes) => {
-                      if (type === 'npc') campaignService.updateNpc(id, changes);
-                      if (type === 'location') campaignService.updateLocation(id, changes);
-                  }}
-              />
+              {campaignProp && (
+                <EntityHistoryManager
+                    subjectId={npc.id}
+                    subjectType="npc"
+                    campaign={campaignProp}
+                    onUpdateEntity={(type, id, changes) => {
+                        if (type === 'npc') campaignService.updateNpc(id, changes);
+                        if (type === 'location') campaignService.updateLocation(id, changes);
+                    }}
+                />
+              )}
 
               {/* Backlinks Panel */}
               <BacklinksPanel entityId={npc.id} entityType="npc" onNavigate={onNavigate} />

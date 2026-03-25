@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import type { Campaign } from '../../types/index';
 import type { DmStyle } from '../../types/CampaignSetting';
 import { Icons } from '../common/Icons';
+import { Button } from '../common/Button';
+import { ENTITY_TYPE_CONFIG } from '../../utils/entityUtils';
 
 interface CrossCampaignDashboardProps {
   campaigns: Campaign[];
@@ -93,11 +95,11 @@ const CampaignCard: React.FC<CampaignCardProps> = ({ campaign, onSwitch, onDupli
   };
 
   return (
-    <div className="flex flex-col bg-stone-800 border border-stone-700 rounded-lg overflow-hidden hover:border-amber-600/50 transition-colors group">
+    <div className="flex flex-col bg-slate-800 border border-slate-700 rounded-lg overflow-hidden hover:border-amber-600/50 transition-colors group">
       {/* Card header */}
       <div className="p-4 pb-3 flex-1">
         <div className="flex items-start justify-between gap-2 mb-1">
-          <h2 className="text-lg font-bold font-serif text-stone-100 group-hover:text-amber-400 transition-colors leading-tight line-clamp-2">
+          <h2 className="text-lg font-bold font-serif text-slate-100 group-hover:text-amber-400 transition-colors leading-tight line-clamp-2">
             {campaign.title}
           </h2>
           <span className={`flex-shrink-0 text-xs font-medium px-2 py-0.5 rounded-full border ${DM_STYLE_COLORS[dmStyle]}`}>
@@ -107,41 +109,39 @@ const CampaignCard: React.FC<CampaignCardProps> = ({ campaign, onSwitch, onDupli
 
         {/* Setting */}
         {settingLabel && (
-          <p className="text-sm text-stone-400 line-clamp-1 mb-3">{settingLabel}</p>
+          <p className="text-sm text-slate-400 line-clamp-1 mb-3">{settingLabel}</p>
         )}
 
-        {/* Entity count badges */}
+        {/* Entity count badges — colors derived from ENTITY_TYPE_CONFIG */}
         <div className="flex flex-wrap gap-1.5 mb-3">
-          <CountBadge
-            label="NPCs"
-            count={campaign.npcs.length}
-            colorClass="bg-blue-900/50 text-blue-300 border-blue-700/50"
-          />
-          <CountBadge
-            label="Locations"
-            count={campaign.locations.length}
-            colorClass="bg-green-900/50 text-green-300 border-green-700/50"
-          />
-          <CountBadge
-            label="Factions"
-            count={campaign.factions.length}
-            colorClass="bg-red-900/50 text-red-300 border-red-700/50"
-          />
-          <CountBadge
-            label="Adventures"
-            count={campaign.adventures.length}
-            colorClass="bg-purple-900/50 text-purple-300 border-purple-700/50"
-          />
+          {(
+            [
+              { key: 'npc',       count: campaign.npcs.length },
+              { key: 'location',  count: campaign.locations.length },
+              { key: 'faction',   count: campaign.factions.length },
+              { key: 'adventure', count: campaign.adventures.length },
+            ] as const
+          ).map(({ key, count }) => {
+            const c = ENTITY_TYPE_CONFIG[key].color;
+            return (
+              <CountBadge
+                key={key}
+                label={ENTITY_TYPE_CONFIG[key].label}
+                count={count}
+                colorClass={`bg-${c}-900/50 text-${c}-300 border-${c}-700/50`}
+              />
+            );
+          })}
         </div>
 
         {/* Session info */}
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-400">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
           {sessionCount > 0 && (
             <span className="flex items-center gap-1">
               <Icons.SessionLog className="w-3.5 h-3.5" />
               {sessionCount} session{sessionCount !== 1 ? 's' : ''}
               {lastSessionDate && (
-                <span className="text-stone-500"> &middot; Last: {formatDate(lastSessionDate)}</span>
+                <span className="text-slate-500"> &middot; Last: {formatDate(lastSessionDate)}</span>
               )}
             </span>
           )}
@@ -155,39 +155,40 @@ const CampaignCard: React.FC<CampaignCardProps> = ({ campaign, onSwitch, onDupli
       </div>
 
       {/* Card footer — actions */}
-      <div className="px-4 py-3 border-t border-stone-700 flex items-center gap-2">
-        <button
+      <div className="px-4 py-3 border-t border-slate-700 flex items-center gap-2">
+        <Button
+          variant="primary"
+          size="sm"
           onClick={onSwitch}
-          className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-md bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium transition-colors"
+          className="flex-1"
         >
-          <Icons.Play className="w-3.5 h-3.5" />
+          <Icons.Play className="w-3.5 h-3.5 mr-1.5" />
           Continue
-        </button>
+        </Button>
 
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={onDuplicate}
-          className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-stone-700 hover:bg-stone-600 text-stone-200 text-sm transition-colors"
           title="Duplicate campaign"
           aria-label={`Duplicate ${campaign.title}`}
         >
           <Icons.Duplicate className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Duplicate</span>
-        </button>
+          <span className="hidden sm:inline ml-1.5">Duplicate</span>
+        </Button>
 
-        <button
+        <Button
+          variant={confirmDelete ? 'danger' : 'secondary'}
+          size="sm"
           onClick={handleDeleteClick}
           onBlur={() => setConfirmDelete(false)}
-          className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors ${
-            confirmDelete
-              ? 'bg-red-600 hover:bg-red-500 text-white'
-              : 'bg-stone-700 hover:bg-red-900/60 text-stone-400 hover:text-red-300'
-          }`}
+          className={confirmDelete ? '' : 'text-slate-400 hover:bg-red-900/60 hover:text-red-300'}
           title={confirmDelete ? 'Click again to confirm deletion' : 'Delete campaign'}
           aria-label={confirmDelete ? `Confirm delete ${campaign.title}` : `Delete ${campaign.title}`}
         >
           <Icons.Trash className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">{confirmDelete ? 'Confirm' : 'Delete'}</span>
-        </button>
+          <span className="hidden sm:inline ml-1.5">{confirmDelete ? 'Confirm' : 'Delete'}</span>
+        </Button>
       </div>
     </div>
   );
@@ -198,13 +199,13 @@ const CampaignCard: React.FC<CampaignCardProps> = ({ campaign, onSwitch, onDupli
 const CreateNewCard: React.FC<{ onClick: () => void }> = ({ onClick }) => (
   <button
     onClick={onClick}
-    className="flex flex-col items-center justify-center gap-3 p-6 border-2 border-dashed border-stone-600 rounded-lg hover:border-amber-500 hover:bg-stone-800/50 transition-all group min-h-[180px]"
+    className="flex flex-col items-center justify-center gap-3 p-6 border-2 border-dashed border-slate-600 rounded-lg hover:border-amber-500 hover:bg-slate-800/50 transition-all group min-h-[180px]"
     aria-label="Create new campaign"
   >
-    <div className="w-12 h-12 rounded-full bg-stone-700 group-hover:bg-amber-600/20 flex items-center justify-center transition-colors">
-      <Icons.Plus className="w-6 h-6 text-stone-400 group-hover:text-amber-400 transition-colors" />
+    <div className="w-12 h-12 rounded-full bg-slate-700 group-hover:bg-amber-600/20 flex items-center justify-center transition-colors">
+      <Icons.Plus className="w-6 h-6 text-slate-400 group-hover:text-amber-400 transition-colors" />
     </div>
-    <span className="text-stone-400 group-hover:text-amber-400 font-medium transition-colors">
+    <span className="text-slate-400 group-hover:text-amber-400 font-medium transition-colors">
       Create New Campaign
     </span>
   </button>
@@ -234,15 +235,15 @@ export const CrossCampaignDashboard: React.FC<CrossCampaignDashboardProps> = ({
   });
 
   return (
-    <div className="flex-1 overflow-y-auto bg-stone-900 p-4 sm:p-6 lg:p-8">
+    <div className="flex-1 overflow-y-auto bg-slate-900 p-4 sm:p-6 lg:p-8">
       <div className="max-w-6xl mx-auto">
         {/* Page header */}
         <div className="mb-6 sm:mb-8">
           <div className="flex items-center gap-3 mb-1">
             <Icons.AllCampaigns className="w-7 h-7 text-amber-400" />
-            <h1 className="text-2xl sm:text-3xl font-bold font-serif text-stone-100">All Campaigns</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold font-serif text-slate-100">All Campaigns</h1>
           </div>
-          <p className="text-stone-400 text-sm sm:text-base ml-10">
+          <p className="text-slate-400 text-sm sm:text-base ml-10">
             {campaigns.length === 0
               ? 'No campaigns yet. Create your first one below.'
               : `${campaigns.length} campaign${campaigns.length !== 1 ? 's' : ''} — select one to continue your story.`}

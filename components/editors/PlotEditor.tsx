@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Plot, PlotStatus, SessionLog } from '../../types/index';
+import type { Plot, PlotStatus, SessionLog, Campaign } from '../../types/index';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
@@ -15,6 +16,7 @@ import { BacklinksPanel } from '../common/BacklinksPanel';
 
 interface PlotEditorProps {
   plot: Plot;
+  campaign: Campaign;
   onUpdate: (id: string, updatedData: Partial<Plot>) => void;
   onDelete: (id: string) => void;
   isMockMode: boolean;
@@ -22,10 +24,10 @@ interface PlotEditorProps {
   onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
 }
 
-export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
+export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, campaign, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(plot);
   const [isGeneratingScene, setIsGeneratingScene] = useState(false);
-  const campaign = campaignService.getState().campaigns.find(c => c.id === campaignService.getState().activeCampaignId)!;
+  const { confirm } = useConfirmDialog();
 
   useEffect(() => {
     setFormData(plot);
@@ -50,9 +52,10 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, onUpdate, onDelete
       onUpdate(plot.id, { relatedEntityIds: updated });
   }
 
-  const handleDelete = () => {
-    if (window.confirm(`Are you sure you want to delete this plot arc?`)) {
-        onDelete(plot.id);
+  const handleDelete = async () => {
+    const confirmed = await confirm('Delete Plot Arc', 'Are you sure you want to delete this plot arc?', { variant: 'danger' });
+    if (confirmed) {
+      onDelete(plot.id);
     }
   }
   

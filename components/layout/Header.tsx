@@ -111,7 +111,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="h-6 w-px bg-slate-700 hidden sm:block"></div>
           <div className="relative" ref={menuRef}>
               <button onClick={() => setIsMenuOpen(p => !p)} className="flex items-center gap-2 group">
-                  <span className="text-md font-semibold text-slate-300 group-hover:text-white transition-colors truncate max-w-[150px] sm:max-w-xs">{activeCampaign.title}</span>
+                  <span className="text-base font-semibold text-slate-300 group-hover:text-white transition-colors truncate max-w-[150px] sm:max-w-xs">{activeCampaign.title}</span>
                   <Icons.ChevronDown className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isMenuOpen ? 'rotate-180' : ''}`} />
               </button>
               {isMenuOpen && (
@@ -164,8 +164,8 @@ export const Header: React.FC<HeaderProps> = ({
           >
              {saveStatus === 'saving' && (
                  <>
-                    <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-indigo-400">Saving...</span>
+                    <div className="w-3 h-3 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-amber-400">Saving...</span>
                  </>
              )}
              {saveStatus === 'saved' && (
@@ -188,11 +188,11 @@ export const Header: React.FC<HeaderProps> = ({
           {showContinuityChecker && (
           <button
             onClick={onToggleContinuityChecker}
-            className="relative flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-indigo-500 rounded-md p-1 sm:-m-1"
+            className="relative flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-amber-500 rounded-md p-1 sm:-m-1"
             aria-label="Check campaign continuity"
             title="Check Continuity"
           >
-            <Icons.Factions className="w-5 h-5 text-indigo-400" />
+            <Icons.Factions className="w-5 h-5 text-amber-400" />
             <span className="hidden lg:inline">Continuity</span>
             {continuityIssueCount > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[1.1rem] h-[1.1rem] flex items-center justify-center rounded-full bg-red-600 text-white text-[10px] font-bold leading-none px-0.5">
@@ -203,10 +203,10 @@ export const Header: React.FC<HeaderProps> = ({
           )}
           <button
             onClick={onToggleWizard}
-            className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-indigo-500 rounded-md p-1 sm:-m-1"
+            className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-amber-500 rounded-md p-1 sm:-m-1"
             aria-label="Toggle Evocation Wizard"
           >
-            <Icons.Wizard className="w-5 h-5 text-indigo-400" />
+            <Icons.Wizard className="w-5 h-5 text-amber-400" />
             <span className="hidden lg:inline">Evocation Wizard</span>
           </button>
           <button
@@ -220,17 +220,17 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
            <button
               onClick={onToggleCoach}
-              className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-indigo-500 rounded-md p-1 sm:-m-1"
+              className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-amber-500 rounded-md p-1 sm:-m-1"
               aria-label="Toggle Session Weaver"
             >
-            <Icons.Coach className="w-5 h-5 text-indigo-400" />
+            <Icons.Coach className="w-5 h-5 text-amber-400" />
             <span className="hidden lg:inline">Session Weaver</span>
           </button>
           {/* Keyboard Shortcuts Help */}
           {onShowShortcutsHelp && showKeyboardShortcuts && (
             <button
               onClick={onShowShortcutsHelp}
-              className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-indigo-500 rounded-md p-1 sm:-m-1"
+              className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-amber-500 rounded-md p-1 sm:-m-1"
               aria-label="Keyboard shortcuts"
               title="Keyboard shortcuts (?)"
             >
@@ -239,16 +239,17 @@ export const Header: React.FC<HeaderProps> = ({
           )}
 
           <div className="flex items-center gap-2 sm:gap-3">
-              <span className={`hidden md:inline text-xs font-medium ${isMockMode ? 'text-indigo-400' : 'text-slate-500'}`}>
+              <span className={`hidden md:inline text-xs font-medium ${isMockMode ? 'text-amber-400' : 'text-slate-500'}`}>
                 Mock Mode
               </span>
               <button
                 onClick={onToggleMockMode}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900 ${
-                  isMockMode ? 'bg-indigo-600' : 'bg-slate-700'
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-slate-900 ${
+                  isMockMode ? 'bg-amber-600' : 'bg-slate-700'
                 }`}
                 role="switch"
                 aria-checked={isMockMode}
+                aria-label="Mock Mode"
               >
                 <span
                   aria-hidden="true"

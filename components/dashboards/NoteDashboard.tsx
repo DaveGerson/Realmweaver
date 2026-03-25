@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Note } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
@@ -46,6 +46,18 @@ const NoteCreator: React.FC<{ onNoteCreated: (data: Omit<Note, 'id' | 'createdAt
 }
 
 export const NoteDashboard: React.FC<NoteDashboardProps> = ({ notes, onNoteCreated, onSelectNote }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const filteredNotes = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    const sorted = [...notes].sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
+    if (!q) return sorted;
+    return sorted.filter(n =>
+      n.title.toLowerCase().includes(q) ||
+      n.content?.toLowerCase().includes(q) ||
+      n.tags.some(t => t.toLowerCase().includes(q))
+    );
+  }, [notes, searchTerm]);
+
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -53,9 +65,21 @@ export const NoteDashboard: React.FC<NoteDashboardProps> = ({ notes, onNoteCreat
           <NoteCreator onNoteCreated={onNoteCreated} />
         </div>
         <div className="lg:col-span-2">
-          <h2 className="text-2xl font-bold font-serif text-slate-200 mb-4">Campaign Notes</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <h2 className="text-2xl font-bold font-serif text-slate-200">Campaign Notes</h2>
+            <div className="relative max-w-xs w-full sm:w-auto">
+              <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                placeholder="Search notes..."
+                className="w-full bg-slate-800 border border-slate-700 rounded-md pl-9 pr-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
+              />
+            </div>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {notes.sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()).map(note => (
+            {filteredNotes.map(note => (
               <button 
                 key={note.id} 
                 onClick={() => onSelectNote(note.id)}
@@ -76,6 +100,12 @@ export const NoteDashboard: React.FC<NoteDashboardProps> = ({ notes, onNoteCreat
                 </div>
               </button>
             ))}
+            {filteredNotes.length === 0 && notes.length > 0 && (
+                <div className="sm:col-span-2 text-center py-8">
+                    <Icons.Search className="w-8 h-8 mx-auto mb-2 text-slate-700" />
+                    <p className="text-slate-400">No notes match "{searchTerm}"</p>
+                </div>
+            )}
             {notes.length === 0 && (
                 <div className="sm:col-span-2 text-center py-10 text-slate-500">
                     <Icons.Notes className="w-12 h-12 mx-auto mb-2" />

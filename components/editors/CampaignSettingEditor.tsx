@@ -235,7 +235,7 @@ export const CampaignSettingEditor: React.FC<CampaignSettingEditorProps> = ({
               <button
                 onClick={handleRegenerateStyle}
                 disabled={isAnalyzing || !canGenerateStyle}
-                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-stone-700 hover:bg-stone-600 text-stone-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isAnalyzing ? (
                   <Icons.Loader className="w-3 h-3 animate-spin" />
@@ -247,7 +247,7 @@ export const CampaignSettingEditor: React.FC<CampaignSettingEditorProps> = ({
               <button
                 onClick={handleClearStyle}
                 disabled={isAnalyzing}
-                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-stone-700 hover:bg-stone-600 text-stone-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <Icons.X className="w-3 h-3" />
                 Clear

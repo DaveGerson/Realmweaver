@@ -53,6 +53,17 @@ export interface ContextOptions {
    * Used to locate the entity in the campaign data.
    */
   focusEntityType?: string;
+  /**
+   * Currently selected entities in the editor UI. When provided, a
+   * "CURRENT USER FOCUS" section is appended to the context so the AI
+   * knows what the DM is actively looking at. Used by the DM Coach.
+   */
+  focusSelection?: {
+    selectedNpcId?: string | null;
+    selectedLocationId?: string | null;
+    selectedSceneId?: string | null;
+    selectedAdventureId?: string | null;
+  };
 }
 
 /**
@@ -69,6 +80,7 @@ export function buildCampaignContext(options: ContextOptions): string {
     maxTokenEstimate = 4000,
     focusEntityId,
     focusEntityType,
+    focusSelection,
   } = options;
 
   const maxChars = maxTokenEstimate * 4; // 1 token ≈ 4 chars
@@ -395,6 +407,38 @@ export function buildCampaignContext(options: ContextOptions): string {
         .slice(-5) // Most recent 5 entries
         .map(e => `  - ${trunc(e.summary, 100)}`);
       tryAdd(['Focus Entity History (recent):', ...histLines].join('\n'));
+    }
+  }
+
+  // --- Current user focus (editor selection) ---
+  if (focusSelection && hasBudget()) {
+    const { selectedNpcId: focusNpcId, selectedLocationId: focusLocId, selectedSceneId: focusSceneId, selectedAdventureId: focusAdvId } = focusSelection;
+
+    let selectionContext = '';
+
+    if (focusSceneId && focusAdvId) {
+      const focusAdv = campaign.adventures.find(a => a.id === focusAdvId);
+      const focusScene = focusAdv?.scenes.find(s => s.id === focusSceneId);
+      if (focusScene && focusAdv && focusScene.id !== activeSceneId) {
+        selectionContext += `USER IS VIEWING SCENE: "${focusScene.title}" (Adventure: ${focusAdv.title})\n`;
+        if (focusScene.gmNotes) selectionContext += `Notes: ${trunc(focusScene.gmNotes, 200)}\n`;
+      }
+    } else if (focusLocId) {
+      const focusLoc = campaign.locations.find(l => l.id === focusLocId);
+      if (focusLoc) {
+        selectionContext += `USER IS VIEWING LOCATION: "${focusLoc.name}"\n`;
+        if (focusLoc.description) selectionContext += `Desc: ${trunc(firstSentences(focusLoc.description, 1), 200)}\n`;
+      }
+    } else if (focusNpcId) {
+      const focusNpc = campaign.npcs.find(n => n.id === focusNpcId);
+      if (focusNpc) {
+        selectionContext += `USER IS VIEWING NPC: "${focusNpc.name}"\n`;
+        if (focusNpc.traits) selectionContext += `Traits: ${trunc(focusNpc.traits, 150)}\n`;
+      }
+    }
+
+    if (selectionContext) {
+      tryAdd(`--- CURRENT USER FOCUS ---\n${selectionContext}`);
     }
   }
 

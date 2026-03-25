@@ -73,11 +73,12 @@ interface DmCoachProps {
   activeContext?: string;
   onClose: () => void;
   onSendToNotes?: (content: string) => void;
+  onResultGenerated?: (content: string) => void;
   isMockMode: boolean;
   onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
 }
 
-export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClose, onSendToNotes, isMockMode, onNavigate }) => {
+export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClose, onSendToNotes, onResultGenerated, isMockMode, onNavigate }) => {
     const [activeTool, setActiveTool] = useState<CoachTool>('narrate');
     const [prompt, setPrompt] = useState('');
     const [mentionedEntityIds, setMentionedEntityIds] = useState<string[]>([]);
@@ -155,6 +156,12 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClo
         try {
             const resultData = await currentTool!.action(prompt, campaignContext, useLiteModel, isMockMode);
             setResult(resultData);
+            if (onResultGenerated) {
+                const textContent = typeof resultData === 'string'
+                    ? resultData
+                    : `[Table] ${(resultData as import('@/types').RollableTable).title}`;
+                onResultGenerated(textContent);
+            }
         } catch (err) {
             setError('Failed to get a response from the AI. Please try again.');
             console.error(err);
@@ -272,7 +279,7 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClo
         <aside className="absolute inset-y-0 right-0 w-full max-w-md bg-slate-900/80 backdrop-blur-md border-l border-slate-800 z-10 flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
             <header className="flex items-center justify-between p-4 border-b border-slate-800 flex-shrink-0">
                 <div className="flex items-center gap-3">
-                    <Icons.Coach className="w-6 h-6 text-indigo-400" />
+                    <Icons.Coach className="w-6 h-6 text-amber-400" />
                     <h2 className="text-lg font-bold font-serif">Session Weaver</h2>
                 </div>
                  <div className="flex items-center gap-3">
@@ -298,9 +305,9 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClo
                             </button>
                         </>
                     )}
-                    <button onClick={onClose} className="p-1 rounded-md hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
+                    <Button variant="icon" onClick={onClose} aria-label="Close DM Coach">
                         <Icons.X className="w-5 h-5" />
-                    </button>
+                    </Button>
                 </div>
             </header>
 
@@ -358,7 +365,7 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClo
                 <div className="flex-1 flex flex-col p-4 pt-0 overflow-y-auto custom-scrollbar">
                     {/* Active Context Hint */}
                     {activeContext && (
-                         <div className="mb-4 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-md text-xs text-indigo-300">
+                         <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-md text-xs text-amber-300">
                             <span className="font-bold uppercase tracking-wider block mb-1">Active Context:</span>
                             <span className="line-clamp-3">{activeContext.split('\n').filter(line => !line.startsWith('Campaign:') && !line.startsWith('Setting:')).join(' ')}</span>
                          </div>
@@ -377,7 +384,7 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClo
                             rows={5}
                             disabled={isLoading}
                             aria-label="DM Coach prompt"
-                            textareaClassName="bg-slate-950 border-slate-700 focus:ring-indigo-500/50 focus:border-indigo-500 placeholder:text-slate-600"
+                            textareaClassName="bg-slate-950 border-slate-700 focus:ring-amber-500/50 focus:border-amber-500 placeholder:text-slate-600"
                         />
                         <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none" aria-label="Prompt suggestions">
                             {chips.map((chip) => (
@@ -386,7 +393,7 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClo
                                     type="button"
                                     disabled={isLoading}
                                     onClick={() => setPrompt(chip)}
-                                    className="flex-shrink-0 px-2.5 py-1 rounded-full text-xs bg-stone-700 text-stone-300 hover:bg-stone-600 hover:text-stone-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                                    className="flex-shrink-0 px-2.5 py-1 rounded-full text-xs bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
                                 >
                                     {chip}
                                 </button>
@@ -468,7 +475,7 @@ const RoleplayPanel: React.FC<RoleplayPanelProps> = ({
                         id="npc-selector"
                         value={selectedNpcId}
                         onChange={e => onSelectNpc(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
                     >
                         <option value="">— Choose an NPC —</option>
                         {campaign.npcs.map(npc => (
@@ -596,13 +603,13 @@ const RoleplayPanel: React.FC<RoleplayPanelProps> = ({
                         onKeyDown={onKeyDown}
                         placeholder={selectedNpc ? `Say something to ${selectedNpc.name}...` : 'Select an NPC first'}
                         disabled={!selectedNpc || isLoading}
-                        className="flex-1 bg-slate-950 border border-slate-700 text-slate-200 rounded-md px-3 py-2 text-sm placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-1 bg-slate-950 border border-slate-700 text-slate-200 rounded-md px-3 py-2 text-sm placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
                         aria-label="Roleplay message input"
                     />
                     <button
                         onClick={onSend}
                         disabled={!selectedNpc || isLoading || !input.trim()}
-                        className="flex-shrink-0 p-2 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        className="flex-shrink-0 p-2 rounded-md bg-amber-600 hover:bg-amber-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         aria-label="Send message"
                         title="Send (Enter)"
                     >
@@ -731,9 +738,9 @@ const RollableTableDisplay = ({ table, onSendToNotes }: { table: RollableTable; 
                 )}
             </div>
             {rollResult && (
-                <div className="mt-4 p-3 bg-indigo-900/30 border border-indigo-500/30 rounded-lg text-center animate-fade-in">
+                <div className="mt-4 p-3 bg-amber-900/30 border border-amber-500/30 rounded-lg text-center animate-fade-in">
                     <p className="text-sm text-slate-400">You rolled a <span className="font-bold text-2xl text-white mx-1">{rollResult.roll}</span></p>
-                    <p className="mt-2 text-md text-indigo-200">{rollResult.result}</p>
+                    <p className="mt-2 text-md text-amber-200">{rollResult.result}</p>
                 </div>
             )}
         </div>
@@ -751,7 +758,7 @@ const ToolButton = ({ label, icon: Icon, isActive, onClick }: { label: string; i
         onClick={onClick}
         className={twMerge(
             'flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium rounded-md transition-colors',
-            isActive ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800'
+            isActive ? 'bg-amber-600 text-white' : 'text-slate-300 hover:bg-slate-800'
         )}
     >
         <Icon className="w-3.5 h-3.5" />

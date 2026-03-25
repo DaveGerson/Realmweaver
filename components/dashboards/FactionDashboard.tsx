@@ -1,12 +1,13 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import type { Faction, NPC, Location } from '../../types/index';
 import { FactionGenerator } from '../generators/FactionGenerator';
 import { EntityChatGenerator } from '../generators/EntityChatGenerator';
 import { FactionEditor } from '../editors/FactionEditor';
 import { Icons } from '../common/Icons';
-import { Button } from '../common/Button';
+import { EntityCreationPanel } from '../common/EntityCreationPanel';
 import { createDefaultFaction } from '../../utils/entityUtils';
+import { useEntitySearch } from '../../hooks/useEntitySearch';
 
 const FACTION_PROMPT_CHIPS = [
   'A thieves\' guild',
@@ -27,7 +28,7 @@ interface FactionDashboardProps {
 }
 
 export const FactionDashboard: React.FC<FactionDashboardProps> = ({ factions, npcs = [], locations = [], onFactionCreated, onSelectFaction, isMockMode, isOfficialSetting, campaignContext }) => {
-  const [creationMode, setCreationMode] = useState<'chat' | 'form'>('chat');
+  const { filteredEntities: filteredFactions, searchTerm, setSearchTerm } = useEntitySearch(factions, ['name', 'description', 'goals']);
 
   const handleFactionCreated = (data: any) => {
     const { id, ...factionData } = data;
@@ -41,75 +42,57 @@ export const FactionDashboard: React.FC<FactionDashboardProps> = ({ factions, np
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
       {/* Creation Area */}
-      <div className="space-y-3">
-        {/* Mode toggle header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Icons.Sparkles className="w-5 h-5 text-indigo-400" />
-            <h2 className="text-lg font-bold font-serif text-slate-100">
-              {creationMode === 'chat' ? 'Create via Chat' : 'Faction Generator'}
-            </h2>
-          </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setCreationMode(creationMode === 'chat' ? 'form' : 'chat')}
-          >
-            {creationMode === 'chat' ? (
-              <>
-                <Icons.FileText className="w-4 h-4 mr-2" />
-                Switch to form
-              </>
-            ) : (
-              <>
-                <Icons.Chat className="w-4 h-4 mr-2" />
-                Switch to chat
-              </>
+      <EntityCreationPanel
+        entityLabel="Faction"
+        chatPanel={
+          <EntityChatGenerator
+            entityType="faction"
+            isMockMode={isMockMode}
+            campaignContext={campaignContext}
+            onEntityCreated={handleFactionCreated}
+            initialData={createDefaultFaction()}
+            promptChips={FACTION_PROMPT_CHIPS}
+            renderPreview={(data, onUpdate) => (
+              <FactionEditor
+                faction={{ ...data, id: 'preview' }}
+                allNpcs={npcs}
+                allLocations={locations}
+                onUpdate={(_, updates) => onUpdate(updates)}
+                onDelete={() => {}}
+                isMockMode={isMockMode}
+              />
             )}
-          </Button>
-        </div>
-
-        {/* Creation panel */}
-        {creationMode === 'chat' ? (
-          <div className="h-[480px] border border-slate-800 rounded-xl overflow-hidden">
-            <EntityChatGenerator
-              entityType="faction"
-              isMockMode={isMockMode}
-              campaignContext={campaignContext}
-              onEntityCreated={handleFactionCreated}
-              initialData={createDefaultFaction()}
-              promptChips={FACTION_PROMPT_CHIPS}
-              renderPreview={(data, onUpdate) => (
-                <FactionEditor
-                  faction={{ ...data, id: 'preview' }}
-                  allNpcs={npcs}
-                  allLocations={locations}
-                  onUpdate={(_, updates) => onUpdate(updates)}
-                  onDelete={() => {}}
-                  isMockMode={isMockMode}
-                />
-              )}
-            />
-          </div>
-        ) : (
-          <div className="relative min-h-[400px]">
-            <FactionGenerator
-              onFactionCreated={onFactionCreated}
-              isMockMode={isMockMode}
-              isOfficialSetting={isOfficialSetting}
-              npcs={npcs}
-              allLocations={locations}
-              campaignContext={campaignContext}
-            />
-          </div>
-        )}
-      </div>
+          />
+        }
+        formPanel={
+          <FactionGenerator
+            onFactionCreated={onFactionCreated}
+            isMockMode={isMockMode}
+            isOfficialSetting={isOfficialSetting}
+            npcs={npcs}
+            allLocations={locations}
+            campaignContext={campaignContext}
+          />
+        }
+      />
 
       {/* Entity List */}
       <div>
-        <h2 className="text-2xl font-bold font-serif text-slate-200 mb-4">Existing Factions ({factions.length})</h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <h2 className="text-2xl font-bold font-serif text-slate-200">Existing Factions ({factions.length})</h2>
+          <div className="relative max-w-xs w-full sm:w-auto">
+            <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Search factions..."
+              className="w-full bg-slate-800 border border-slate-700 rounded-md pl-9 pr-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
+            />
+          </div>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {factions.map(faction => {
+          {filteredFactions.map(faction => {
             const leader = npcs.find(n => n.id === faction.leaderId);
             const goalsSnippet = faction.goals ? faction.goals.slice(0, 80) + (faction.goals.length > 80 ? '…' : '') : '';
             const memberCount = faction.memberIds?.length ?? 0;
@@ -138,6 +121,12 @@ export const FactionDashboard: React.FC<FactionDashboardProps> = ({ factions, np
               </button>
             );
           })}
+          {filteredFactions.length === 0 && factions.length > 0 && (
+            <div className="md:col-span-2 xl:col-span-3 text-center py-10">
+              <Icons.Search className="w-10 h-10 mx-auto mb-3 text-slate-700" />
+              <p className="text-slate-400">No factions match "{searchTerm}"</p>
+            </div>
+          )}
           {factions.length === 0 && (
             <div className="md:col-span-2 xl:col-span-3 text-center py-16">
               <Icons.Factions className="w-16 h-16 mx-auto mb-4 text-slate-700" />

@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import type { Note } from '../../types/index';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
@@ -16,6 +17,7 @@ interface NoteEditorProps {
 
 export const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete, isMockMode, campaignContext }) => {
   const [formData, setFormData] = useState(note);
+  const { confirm } = useConfirmDialog();
 
   useEffect(() => {
     setFormData(note);
@@ -45,9 +47,10 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete
       }
   };
 
-  const handleDelete = () => {
-    if (window.confirm(`Are you sure you want to delete this note?`)) {
-        onDelete(note.id);
+  const handleDelete = async () => {
+    const confirmed = await confirm('Delete Note', 'Are you sure you want to delete this note?', { variant: 'danger' });
+    if (confirmed) {
+      onDelete(note.id);
     }
   }
   

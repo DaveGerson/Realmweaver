@@ -45,9 +45,9 @@ const NpcCard: React.FC<NpcCardProps> = ({ npc, factionName, factionId, onNaviga
   const nav = onNavigate as ((t: QuickCardEntityType, id: string) => void) | undefined;
 
   return (
-    <div className="bg-stone-800 border border-stone-700 rounded-lg p-3 space-y-1.5">
+    <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 space-y-1.5">
       {/* Name */}
-      <div className="font-semibold text-stone-100 leading-tight">
+      <div className="font-semibold text-slate-100 leading-tight">
         {nav ? (
           <EntityLink
             entityType="npc"
@@ -80,14 +80,14 @@ const NpcCard: React.FC<NpcCardProps> = ({ npc, factionName, factionId, onNaviga
 
       {/* Traits */}
       {npc.traits && (
-        <p className="text-xs text-stone-400 leading-snug line-clamp-1" title={npc.traits}>
+        <p className="text-xs text-slate-400 leading-snug line-clamp-1" title={npc.traits}>
           {npc.traits}
         </p>
       )}
 
       {/* Motivation */}
       {npc.motivations && (
-        <p className="text-xs text-stone-500 italic leading-snug line-clamp-1" title={npc.motivations}>
+        <p className="text-xs text-slate-500 italic leading-snug line-clamp-1" title={npc.motivations}>
           {npc.motivations}
         </p>
       )}
@@ -105,7 +105,7 @@ const NpcCard: React.FC<NpcCardProps> = ({ npc, factionName, factionId, onNaviga
       {/* Stats reference */}
       {npc.stats && (
         <p
-          className="text-xs text-stone-500 font-mono leading-snug line-clamp-1"
+          className="text-xs text-slate-500 font-mono leading-snug line-clamp-1"
           title={npc.stats}
         >
           {npc.stats}
@@ -129,9 +129,9 @@ const LocationCard: React.FC<LocationCardProps> = ({ location, onNavigate }) => 
   const readAloudSnippet = firstSentences(location.description, 2);
 
   return (
-    <div className="bg-stone-800 border border-stone-700 rounded-lg p-3 space-y-2">
+    <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 space-y-2">
       {/* Name */}
-      <div className="font-semibold text-stone-100 leading-tight">
+      <div className="font-semibold text-slate-100 leading-tight">
         {nav ? (
           <EntityLink
             entityType="location"
@@ -199,20 +199,20 @@ export const SceneResourcesPanel: React.FC<SceneResourcesPanelProps> = ({
   const hasContent = npcs.length > 0 || location !== undefined;
 
   return (
-    <div className="border border-stone-700 rounded-lg overflow-hidden">
+    <div className="border border-slate-700 rounded-lg overflow-hidden">
       {/* Panel header — always visible, toggles body */}
       <button
         type="button"
         onClick={() => setIsExpanded(prev => !prev)}
-        className="w-full flex items-center justify-between px-4 py-2.5 bg-stone-800 hover:bg-stone-750 transition-colors text-left group"
+        className="w-full flex items-center justify-between px-4 py-2.5 bg-slate-800 hover:bg-slate-700 transition-colors text-left group"
       >
         <div className="flex items-center gap-2">
           <Icons.Scenes className="w-4 h-4 text-amber-400 flex-shrink-0" />
-          <span className="text-sm font-semibold text-stone-200 group-hover:text-stone-100 transition-colors">
+          <span className="text-sm font-semibold text-slate-200 group-hover:text-slate-100 transition-colors">
             Scene Resources
           </span>
           {hasContent && (
-            <span className="text-xs text-stone-500">
+            <span className="text-xs text-slate-500">
               {[npcs.length > 0 && `${npcs.length} NPC${npcs.length !== 1 ? 's' : ''}`, location && '1 location']
                 .filter(Boolean)
                 .join(', ')}
@@ -220,17 +220,17 @@ export const SceneResourcesPanel: React.FC<SceneResourcesPanelProps> = ({
           )}
         </div>
         {isExpanded ? (
-          <Icons.ChevronUp className="w-4 h-4 text-stone-400 flex-shrink-0" />
+          <Icons.ChevronUp className="w-4 h-4 text-slate-400 flex-shrink-0" />
         ) : (
-          <Icons.ChevronDown className="w-4 h-4 text-stone-400 flex-shrink-0" />
+          <Icons.ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
         )}
       </button>
 
       {/* Panel body */}
       {isExpanded && (
-        <div className="bg-stone-900/50 p-4 space-y-4">
+        <div className="bg-slate-900/50 p-4 space-y-4">
           {!hasContent && (
-            <p className="text-sm text-stone-500 italic text-center py-2">
+            <p className="text-sm text-slate-500 italic text-center py-2">
               No NPCs or location linked to this scene.
             </p>
           )}
@@ -238,7 +238,7 @@ export const SceneResourcesPanel: React.FC<SceneResourcesPanelProps> = ({
           {/* NPC section */}
           {npcs.length > 0 && (
             <div>
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2 flex items-center gap-1.5">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1.5">
                 <Icons.NPCs className="w-3.5 h-3.5" />
                 NPCs Involved
               </h4>
@@ -265,7 +265,7 @@ export const SceneResourcesPanel: React.FC<SceneResourcesPanelProps> = ({
           {/* Location section */}
           {location && (
             <div>
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2 flex items-center gap-1.5">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1.5">
                 <Icons.Locations className="w-3.5 h-3.5" />
                 Location
               </h4>

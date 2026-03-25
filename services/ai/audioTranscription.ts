@@ -17,6 +17,7 @@ export interface AudioTranscriptionSession {
   stop: () => Promise<void>;
 }
 
+// Intentionally uses Gemini-specific model — excluded from Claude provider abstraction (deferred audio migration)
 const LIVE_MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
 const SYSTEM_INSTRUCTION =
   'You are a silent scribe for a Dungeon Master. Your ONLY job is to listen to the game session and transcribe what is said accurately into text. Do not speak. Do not interrupt.';

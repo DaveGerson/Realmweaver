@@ -137,7 +137,7 @@ export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
             {/* Chat Column */}
             <div className="w-1/3 flex flex-col border-r border-slate-800 min-w-[300px] bg-slate-950/30">
                 <div className="p-3 border-b border-slate-800 flex items-center gap-2 bg-slate-900/50">
-                    <Icons.Chat className="w-4 h-4 text-indigo-400" />
+                    <Icons.Chat className="w-4 h-4 text-amber-400" />
                     <span className="text-sm font-semibold text-slate-200">Chat Assistant</span>
                 </div>
 
@@ -146,7 +146,7 @@ export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
                         <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                              <div className={twMerge(
                                 "max-w-[90%] p-3 rounded-lg text-sm whitespace-pre-wrap",
-                                msg.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-200 border border-slate-700'
+                                msg.role === 'user' ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-200 border border-slate-700'
                              )}>
                                 {msg.text}
                             </div>
@@ -157,7 +157,7 @@ export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
                                             key={i}
                                             onClick={() => handleSend(s)}
                                             disabled={isLoading}
-                                            className="text-xs bg-slate-800 border border-indigo-500/30 text-indigo-300 px-2 py-1 rounded-full hover:bg-indigo-900/50 transition-colors text-left"
+                                            className="text-xs bg-slate-800 border border-amber-500/30 text-amber-300 px-2 py-1 rounded-full hover:bg-amber-900/50 transition-colors text-left"
                                         >
                                             {s}
                                         </button>
@@ -185,7 +185,7 @@ export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
                                     key={i}
                                     onClick={() => handleSend(chip)}
                                     disabled={isLoading}
-                                    className="text-xs bg-indigo-900/40 border border-indigo-700/50 text-indigo-300 px-2.5 py-1 rounded-full hover:bg-indigo-800/50 hover:border-indigo-600/70 transition-colors disabled:opacity-50 disabled:pointer-events-none min-h-[28px]"
+                                    className="text-xs bg-amber-900/40 border border-amber-700/50 text-amber-300 px-2.5 py-1 rounded-full hover:bg-amber-800/50 hover:border-amber-600/70 transition-colors disabled:opacity-50 disabled:pointer-events-none min-h-[28px]"
                                 >
                                     {chip}
                                 </button>
@@ -199,7 +199,7 @@ export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                             placeholder="Type a message..."
-                            className="flex-1 bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 outline-none text-slate-200 placeholder:text-slate-500"
+                            className="flex-1 bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-amber-500 outline-none text-slate-200 placeholder:text-slate-500"
                             disabled={isLoading}
                         />
                         <Button onClick={() => handleSend()} disabled={isLoading || !input.trim()} size="sm">
@@ -213,7 +213,7 @@ export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
             <div className="w-2/3 flex flex-col bg-slate-900">
                  <div className="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
                     <div className="flex items-center gap-2">
-                        <Icons.Sparkles className="w-4 h-4 text-indigo-400" />
+                        <Icons.Sparkles className="w-4 h-4 text-amber-400" />
                         <span className="text-sm font-semibold text-slate-200">Live Preview</span>
                     </div>
                     <Button size="sm" onClick={handleFinalize} className="bg-green-600 hover:bg-green-500">

@@ -9,6 +9,8 @@ import {
     generateStarterAdventure,
 } from '@/services/aiService';
 import { campaignService } from '@/services/campaignService';
+import { DialogShell } from '@/components/common/DialogShell';
+import { getWintersDaughterTemplate } from '@/utils/demoTemplates';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -51,9 +53,9 @@ interface ProgressBarProps {
 }
 
 const ProgressBar: React.FC<ProgressBarProps> = ({ step, totalSteps }) => {
-    const pct = Math.round(((step - 1) / (totalSteps - 1)) * 100);
+    const pct = Math.round((step / totalSteps) * 100);
     return (
-        <div className="w-full bg-stone-700 rounded-full h-1.5 mb-6">
+        <div className="w-full bg-slate-700 rounded-full h-1.5 mb-6">
             <div
                 className="bg-amber-500 h-1.5 rounded-full transition-all duration-500"
                 style={{ width: `${pct}%` }}
@@ -71,26 +73,26 @@ interface NpcCardProps {
 const NpcCard: React.FC<NpcCardProps> = ({ npc, onUpdate, onRemove }) => {
     const [expanded, setExpanded] = useState(false);
     return (
-        <div className="bg-stone-800 border border-stone-700 rounded-lg p-4 space-y-3">
+        <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 space-y-3">
             <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">
                     <input
                         value={npc.name}
                         onChange={e => onUpdate(npc._key, 'name', e.target.value)}
-                        className="w-full bg-stone-900 border border-stone-600 rounded-md px-3 py-1.5 text-stone-100 font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500"
+                        className="w-full bg-slate-900 border border-slate-600 rounded-md px-3 py-1.5 text-slate-100 font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500"
                         placeholder="NPC name"
                     />
                 </div>
                 <button
                     onClick={() => setExpanded(p => !p)}
-                    className="text-stone-400 hover:text-stone-200 p-1 flex-shrink-0"
+                    className="text-slate-400 hover:text-slate-200 p-1 flex-shrink-0"
                     title={expanded ? 'Collapse' : 'Expand'}
                 >
                     {expanded ? <Icons.ChevronUp className="w-4 h-4" /> : <Icons.ChevronDown className="w-4 h-4" />}
                 </button>
                 <button
                     onClick={() => onRemove(npc._key)}
-                    className="text-stone-500 hover:text-red-400 p-1 flex-shrink-0"
+                    className="text-slate-500 hover:text-red-400 p-1 flex-shrink-0"
                     title="Remove NPC"
                 >
                     <Icons.Trash className="w-4 h-4" />
@@ -101,45 +103,45 @@ const NpcCard: React.FC<NpcCardProps> = ({ npc, onUpdate, onRemove }) => {
                 value={npc.description}
                 onChange={e => onUpdate(npc._key, 'description', e.target.value)}
                 rows={2}
-                className="w-full bg-stone-900 border border-stone-600 rounded-md px-3 py-1.5 text-stone-300 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 resize-none"
+                className="w-full bg-slate-900 border border-slate-600 rounded-md px-3 py-1.5 text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 resize-none"
                 placeholder="Physical description..."
             />
 
             {expanded && (
                 <div className="space-y-2 pt-1">
                     <div>
-                        <label className="block text-xs text-stone-400 mb-1">Traits</label>
+                        <label className="block text-xs text-slate-400 mb-1">Traits</label>
                         <input
                             value={npc.traits}
                             onChange={e => onUpdate(npc._key, 'traits', e.target.value)}
-                            className="w-full bg-stone-900 border border-stone-600 rounded-md px-3 py-1.5 text-stone-300 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                            className="w-full bg-slate-900 border border-slate-600 rounded-md px-3 py-1.5 text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                             placeholder="Distinctive personality traits..."
                         />
                     </div>
                     <div>
-                        <label className="block text-xs text-stone-400 mb-1">Motivations</label>
+                        <label className="block text-xs text-slate-400 mb-1">Motivations</label>
                         <input
                             value={npc.motivations}
                             onChange={e => onUpdate(npc._key, 'motivations', e.target.value)}
-                            className="w-full bg-stone-900 border border-stone-600 rounded-md px-3 py-1.5 text-stone-300 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                            className="w-full bg-slate-900 border border-slate-600 rounded-md px-3 py-1.5 text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                             placeholder="What do they want?"
                         />
                     </div>
                     <div>
-                        <label className="block text-xs text-stone-400 mb-1">Secret</label>
+                        <label className="block text-xs text-slate-400 mb-1">Secret</label>
                         <input
                             value={npc.secrets}
                             onChange={e => onUpdate(npc._key, 'secrets', e.target.value)}
-                            className="w-full bg-stone-900 border border-stone-600 rounded-md px-3 py-1.5 text-stone-300 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                            className="w-full bg-slate-900 border border-slate-600 rounded-md px-3 py-1.5 text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                             placeholder="What are they hiding?"
                         />
                     </div>
                     <div>
-                        <label className="block text-xs text-stone-400 mb-1">Example Quote</label>
+                        <label className="block text-xs text-slate-400 mb-1">Example Quote</label>
                         <input
                             value={npc.exampleQuote}
                             onChange={e => onUpdate(npc._key, 'exampleQuote', e.target.value)}
-                            className="w-full bg-stone-900 border border-stone-600 rounded-md px-3 py-1.5 text-stone-300 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                            className="w-full bg-slate-900 border border-slate-600 rounded-md px-3 py-1.5 text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                             placeholder='"A memorable line of dialogue..."'
                         />
                     </div>
@@ -158,26 +160,26 @@ interface LocationCardProps {
 const LocationCard: React.FC<LocationCardProps> = ({ loc, onUpdate, onRemove }) => {
     const [expanded, setExpanded] = useState(false);
     return (
-        <div className="bg-stone-800 border border-stone-700 rounded-lg p-4 space-y-3">
+        <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 space-y-3">
             <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">
                     <input
                         value={loc.name}
                         onChange={e => onUpdate(loc._key, 'name', e.target.value)}
-                        className="w-full bg-stone-900 border border-stone-600 rounded-md px-3 py-1.5 text-stone-100 font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500"
+                        className="w-full bg-slate-900 border border-slate-600 rounded-md px-3 py-1.5 text-slate-100 font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500"
                         placeholder="Location name"
                     />
                 </div>
                 <button
                     onClick={() => setExpanded(p => !p)}
-                    className="text-stone-400 hover:text-stone-200 p-1 flex-shrink-0"
+                    className="text-slate-400 hover:text-slate-200 p-1 flex-shrink-0"
                     title={expanded ? 'Collapse' : 'Expand'}
                 >
                     {expanded ? <Icons.ChevronUp className="w-4 h-4" /> : <Icons.ChevronDown className="w-4 h-4" />}
                 </button>
                 <button
                     onClick={() => onRemove(loc._key)}
-                    className="text-stone-500 hover:text-red-400 p-1 flex-shrink-0"
+                    className="text-slate-500 hover:text-red-400 p-1 flex-shrink-0"
                     title="Remove location"
                 >
                     <Icons.Trash className="w-4 h-4" />
@@ -188,17 +190,17 @@ const LocationCard: React.FC<LocationCardProps> = ({ loc, onUpdate, onRemove }) 
                 value={loc.description}
                 onChange={e => onUpdate(loc._key, 'description', e.target.value)}
                 rows={2}
-                className="w-full bg-stone-900 border border-stone-600 rounded-md px-3 py-1.5 text-stone-300 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 resize-none"
+                className="w-full bg-slate-900 border border-slate-600 rounded-md px-3 py-1.5 text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 resize-none"
                 placeholder="Describe this location..."
             />
 
             {expanded && (
                 <div>
-                    <label className="block text-xs text-stone-400 mb-1">Secret / Hidden Detail</label>
+                    <label className="block text-xs text-slate-400 mb-1">Secret / Hidden Detail</label>
                     <input
                         value={loc.secrets}
                         onChange={e => onUpdate(loc._key, 'secrets', e.target.value)}
-                        className="w-full bg-stone-900 border border-stone-600 rounded-md px-3 py-1.5 text-stone-300 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                        className="w-full bg-slate-900 border border-slate-600 rounded-md px-3 py-1.5 text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                         placeholder="What's hidden here?"
                     />
                 </div>
@@ -418,22 +420,22 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
     // ── Render ────────────────────────────────────────────────────────────
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-            <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-stone-900 border border-stone-700 rounded-xl shadow-2xl">
+        <DialogShell isOpen={true} onClose={onDismiss} ariaLabel="Campaign Setup Wizard" className="relative w-full max-w-2xl mx-4">
+            <div className="relative w-full max-h-[90vh] flex flex-col bg-slate-900 border border-slate-700 rounded-xl shadow-2xl">
 
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 pt-6 pb-2 flex-shrink-0">
                     <div>
-                        <p className="text-xs font-medium text-amber-400 uppercase tracking-widest mb-1">
+                        <p className="text-xs font-medium text-amber-400 uppercase tracking-widest mb-1" aria-current="step">
                             Step {step} of 5
                         </p>
-                        <h2 className="text-xl font-bold font-serif text-stone-100">
+                        <h2 className="text-xl font-bold font-serif text-slate-100">
                             {stepLabels[step]}
                         </h2>
                     </div>
                     <button
                         onClick={onDismiss}
-                        className="text-stone-500 hover:text-stone-300 transition-colors ml-4 flex-shrink-0"
+                        className="text-slate-500 hover:text-slate-300 transition-colors ml-4 flex-shrink-0"
                         title="Skip wizard"
                     >
                         <Icons.X className="w-5 h-5" />
@@ -458,31 +460,75 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
                     {/* ── STEP 1 ─────────────────────────────────────────── */}
                     {step === 1 && (
                         <div className="space-y-4">
-                            <p className="text-stone-400 text-sm">
+                            <p className="text-slate-400 text-sm">
                                 Describe your world in a few sentences. The more vivid, the better — themes, tone, conflicts, and atmosphere all help the AI generate content that fits.
                             </p>
+
+                            {/* Demo template quick-fill */}
+                            <div className="bg-slate-800/60 border border-slate-700 rounded-lg px-4 py-3">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-semibold text-amber-400 uppercase tracking-wide mb-0.5">
+                                            Try a Demo World
+                                        </p>
+                                        <p className="text-xs text-slate-400 leading-relaxed">
+                                            Load <span className="text-slate-300 font-medium">Winter's Daughter</span> — a dark fairy-tale dungeon crawl set in Dolmenwood.
+                                            Pre-fills the description so you can explore the full workflow.
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setWorldDescription(getWintersDaughterTemplate().setting)}
+                                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-200 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-md transition-colors"
+                                    >
+                                        <Icons.Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                                        Load
+                                    </button>
+                                </div>
+                            </div>
+
                             <textarea
                                 value={worldDescription}
                                 onChange={e => setWorldDescription(e.target.value)}
                                 rows={7}
                                 autoFocus
-                                className="w-full bg-stone-800 border border-stone-600 rounded-lg px-4 py-3 text-stone-100 text-sm placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 resize-none"
+                                className={`w-full bg-slate-800 border rounded-lg px-4 py-3 text-slate-100 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 resize-none transition-colors ${
+                                    worldDescription.trim().length > 0 && worldDescription.trim().length < 20
+                                        ? 'border-red-600 focus:border-red-500'
+                                        : 'border-slate-600 focus:border-amber-500'
+                                }`}
                                 placeholder="A dark medieval kingdom where ancient dragons stir beneath forgotten mountains..."
                             />
-                            <p className="text-xs text-stone-500">
-                                Minimum 20 characters. Your campaign setting description is pre-filled above if you set one during creation.
-                            </p>
+
+                            {/* Character counter row */}
+                            <div className="flex items-center justify-between">
+                                {worldDescription.trim().length > 0 && worldDescription.trim().length < 20 ? (
+                                    <p className="text-xs text-red-400 flex items-center gap-1">
+                                        <Icons.AlertTriangle className="w-3.5 h-3.5" />
+                                        Minimum 20 characters required
+                                    </p>
+                                ) : (
+                                    <p className="text-xs text-slate-500">
+                                        Your campaign setting description is pre-filled above if you set one during creation.
+                                    </p>
+                                )}
+                                <p className={`text-xs ml-4 flex-shrink-0 ${
+                                    worldDescription.trim().length < 20 ? 'text-slate-500' : 'text-slate-400'
+                                }`}>
+                                    {worldDescription.trim().length} / 20 min
+                                </p>
+                            </div>
                         </div>
                     )}
 
                     {/* ── STEP 2 ─────────────────────────────────────────── */}
                     {step === 2 && (
                         <div className="space-y-4">
-                            <p className="text-stone-400 text-sm">
+                            <p className="text-slate-400 text-sm">
                                 Here are your starter NPCs. Edit any fields directly, remove NPCs you don't want, or regenerate for a fresh set.
                             </p>
                             {npcDrafts.length === 0 && (
-                                <p className="text-stone-500 text-sm italic text-center py-4">
+                                <p className="text-slate-500 text-sm italic text-center py-4">
                                     No NPCs — regenerate to add some, or click Next to skip.
                                 </p>
                             )}
@@ -502,11 +548,11 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
                     {/* ── STEP 3 ─────────────────────────────────────────── */}
                     {step === 3 && (
                         <div className="space-y-4">
-                            <p className="text-stone-400 text-sm">
+                            <p className="text-slate-400 text-sm">
                                 These locations were chosen to fit your world and cast. Edit or remove as needed.
                             </p>
                             {locationDrafts.length === 0 && (
-                                <p className="text-stone-500 text-sm italic text-center py-4">
+                                <p className="text-slate-500 text-sm italic text-center py-4">
                                     No locations — regenerate to add some, or click Next to skip.
                                 </p>
                             )}
@@ -526,50 +572,50 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
                     {/* ── STEP 4 ─────────────────────────────────────────── */}
                     {step === 4 && adventureDraft && (
                         <div className="space-y-4">
-                            <p className="text-stone-400 text-sm">
+                            <p className="text-slate-400 text-sm">
                                 Your first adventure. Edit the title and hook, then approve it to save everything.
                             </p>
 
                             <div className="space-y-3">
                                 <div>
-                                    <label className="block text-xs font-medium text-stone-400 mb-1">Adventure Title</label>
+                                    <label className="block text-xs font-medium text-slate-400 mb-1">Adventure Title</label>
                                     <input
                                         value={adventureDraft.title}
                                         onChange={e => setAdventureDraft(d => d ? { ...d, title: e.target.value } : d)}
-                                        className="w-full bg-stone-800 border border-stone-600 rounded-md px-3 py-2 text-stone-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500"
+                                        className="w-full bg-slate-800 border border-slate-600 rounded-md px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-stone-400 mb-1">Hook</label>
+                                    <label className="block text-xs font-medium text-slate-400 mb-1">Hook</label>
                                     <textarea
                                         value={adventureDraft.hook}
                                         onChange={e => setAdventureDraft(d => d ? { ...d, hook: e.target.value } : d)}
                                         rows={3}
-                                        className="w-full bg-stone-800 border border-stone-600 rounded-md px-3 py-2 text-stone-300 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 resize-none"
+                                        className="w-full bg-slate-800 border border-slate-600 rounded-md px-3 py-2 text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 resize-none"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-stone-400 mb-2">
+                                    <label className="block text-xs font-medium text-slate-400 mb-2">
                                         Scenes ({adventureDraft.scenes?.length ?? 0})
                                     </label>
                                     <div className="space-y-2">
                                         {(adventureDraft.scenes ?? []).map((scene, i) => (
                                             <div
                                                 key={i}
-                                                className="bg-stone-800 border border-stone-700 rounded-lg px-4 py-3"
+                                                className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-3"
                                             >
                                                 <div className="flex items-center gap-2 mb-1">
-                                                    <span className="text-xs text-stone-500 font-mono">
+                                                    <span className="text-xs text-slate-500 font-mono">
                                                         {i + 1}
                                                     </span>
-                                                    <span className="text-sm font-medium text-stone-200">
+                                                    <span className="text-sm font-medium text-slate-200">
                                                         {scene.title}
                                                     </span>
-                                                    <span className="ml-auto text-xs text-stone-500 capitalize bg-stone-700 px-2 py-0.5 rounded-full">
+                                                    <span className="ml-auto text-xs text-slate-500 capitalize bg-slate-700 px-2 py-0.5 rounded-full">
                                                         {scene.type}
                                                     </span>
                                                 </div>
-                                                <p className="text-xs text-stone-400 leading-relaxed line-clamp-2">
+                                                <p className="text-xs text-slate-400 leading-relaxed line-clamp-2">
                                                     {scene.readAloudText}
                                                 </p>
                                             </div>
@@ -588,24 +634,24 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
                                     <Icons.CheckCircle className="w-8 h-8 text-amber-400" />
                                 </div>
                             </div>
-                            <p className="text-center text-stone-300 text-sm">
+                            <p className="text-center text-slate-300 text-sm">
                                 Your world is ready. Here's what was added to your campaign:
                             </p>
                             <div className="grid grid-cols-3 gap-4">
-                                <div className="bg-stone-800 border border-stone-700 rounded-lg p-4 text-center">
+                                <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center">
                                     <p className="text-3xl font-bold text-amber-400">{savedCounts.npcs}</p>
-                                    <p className="text-xs text-stone-400 mt-1">NPCs</p>
+                                    <p className="text-xs text-slate-400 mt-1">NPCs</p>
                                 </div>
-                                <div className="bg-stone-800 border border-stone-700 rounded-lg p-4 text-center">
+                                <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center">
                                     <p className="text-3xl font-bold text-amber-400">{savedCounts.locations}</p>
-                                    <p className="text-xs text-stone-400 mt-1">Locations</p>
+                                    <p className="text-xs text-slate-400 mt-1">Locations</p>
                                 </div>
-                                <div className="bg-stone-800 border border-stone-700 rounded-lg p-4 text-center">
+                                <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center">
                                     <p className="text-3xl font-bold text-amber-400">{savedCounts.scenes}</p>
-                                    <p className="text-xs text-stone-400 mt-1">Scenes</p>
+                                    <p className="text-xs text-slate-400 mt-1">Scenes</p>
                                 </div>
                             </div>
-                            <p className="text-center text-xs text-stone-500">
+                            <p className="text-center text-xs text-slate-500">
                                 1 adventure created. You can edit everything from the sidebar.
                             </p>
                         </div>
@@ -613,16 +659,28 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
                 </div>
 
                 {/* Footer — actions */}
-                <div className="flex-shrink-0 px-6 py-4 border-t border-stone-800 flex flex-col sm:flex-row items-center gap-3">
+                <div className="flex-shrink-0 px-6 py-4 border-t border-slate-800 flex flex-col sm:flex-row items-center gap-3">
 
-                    {/* Skip link — shown on all steps except 5 */}
+                    {/* Cancel / skip — shown on all steps except 5.
+                        On step 1 this reads as "Back to campaigns" (explicit cancel).
+                        On later steps it becomes a softer skip link. */}
                     {step !== 5 && (
-                        <button
-                            onClick={onDismiss}
-                            className="text-xs text-stone-500 hover:text-stone-300 sm:mr-auto"
-                        >
-                            Skip — I'll build my own
-                        </button>
+                        step === 1 ? (
+                            <button
+                                onClick={onDismiss}
+                                className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 sm:mr-auto transition-colors"
+                            >
+                                <Icons.ArrowLeft className="w-3.5 h-3.5" />
+                                Back to campaigns
+                            </button>
+                        ) : (
+                            <button
+                                onClick={onDismiss}
+                                className="text-xs text-slate-500 hover:text-slate-300 sm:mr-auto"
+                            >
+                                Skip — I'll build my own
+                            </button>
+                        )
                     )}
 
                     {/* Back button — steps 2-4 */}
@@ -630,7 +688,7 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
                         <button
                             onClick={() => setStep(s => (s - 1) as WizardStep)}
                             disabled={isLoading}
-                            className="flex items-center gap-1.5 px-4 py-2 text-sm text-stone-300 bg-stone-800 hover:bg-stone-700 border border-stone-600 rounded-lg transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1.5 px-4 py-2 text-sm text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg transition-colors disabled:opacity-50"
                         >
                             <Icons.ChevronLeft className="w-4 h-4" />
                             Back
@@ -663,7 +721,7 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
                             <button
                                 onClick={handleRegenerateNpcs}
                                 disabled={isLoading}
-                                className="flex items-center gap-1.5 px-3 py-2 text-sm text-stone-300 bg-stone-800 hover:bg-stone-700 border border-stone-600 rounded-lg transition-colors disabled:opacity-50"
+                                className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg transition-colors disabled:opacity-50"
                                 title="Regenerate all NPCs"
                             >
                                 {isLoading ? (
@@ -698,7 +756,7 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
                             <button
                                 onClick={handleRegenerateLocations}
                                 disabled={isLoading}
-                                className="flex items-center gap-1.5 px-3 py-2 text-sm text-stone-300 bg-stone-800 hover:bg-stone-700 border border-stone-600 rounded-lg transition-colors disabled:opacity-50"
+                                className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg transition-colors disabled:opacity-50"
                                 title="Regenerate all locations"
                             >
                                 {isLoading ? (
@@ -733,7 +791,7 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
                             <button
                                 onClick={handleRegenerateAdventure}
                                 disabled={isLoading}
-                                className="flex items-center gap-1.5 px-3 py-2 text-sm text-stone-300 bg-stone-800 hover:bg-stone-700 border border-stone-600 rounded-lg transition-colors disabled:opacity-50"
+                                className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg transition-colors disabled:opacity-50"
                                 title="Regenerate adventure"
                             >
                                 {isLoading ? (
@@ -758,7 +816,7 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
                         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:ml-auto">
                             <button
                                 onClick={() => onComplete('npcs')}
-                                className="flex items-center justify-center gap-2 px-4 py-2 text-sm text-stone-300 bg-stone-800 hover:bg-stone-700 border border-stone-600 rounded-lg transition-colors"
+                                className="flex items-center justify-center gap-2 px-4 py-2 text-sm text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg transition-colors"
                             >
                                 <Icons.NPCs className="w-4 h-4" />
                                 Explore Your World
@@ -774,6 +832,6 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
                     )}
                 </div>
             </div>
-        </div>
+        </DialogShell>
     );
 };
