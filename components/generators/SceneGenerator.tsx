@@ -1,23 +1,44 @@
 
 import React, { useState } from 'react';
-import type { Scene } from '../../types/index';
-import { generateScene } from '../../services/aiService';
-import { Icons } from '../common/Icons';
-import { Button } from '../common/Button';
+import type { Scene, NPC, Location } from '@/types/index';
+import { generateScene } from '@/services/aiService';
+import { Icons } from '@/components/common/Icons';
+import { Button } from '@/components/common/Button';
+import { SkeletonGeneratorOverlay } from '@/components/common/SkeletonCard';
+import { EntityChatGenerator } from '@/components/generators/EntityChatGenerator';
+import { SceneEditor } from '@/components/editors/SceneEditor';
+import { createDefaultScene } from '@/utils/entityUtils';
 
 interface SceneGeneratorProps {
   onSceneCreated: (scene: Omit<Scene, 'id'>) => void;
   isMockMode: boolean;
   isOfficialSetting?: boolean;
+  allNpcs?: NPC[];
+  allLocations?: Location[];
   campaignContext?: string;
 }
 
-export const SceneGenerator: React.FC<SceneGeneratorProps> = ({ onSceneCreated, isMockMode, isOfficialSetting = false, campaignContext }) => {
+const PROMPT_CHIPS = [
+  'A tense negotiation with a rival faction',
+  'An ambush in a narrow mountain pass',
+  'A mysterious discovery in ancient ruins',
+  'A daring escape from a collapsing dungeon',
+];
+
+export const SceneGenerator: React.FC<SceneGeneratorProps> = ({
+  onSceneCreated,
+  isMockMode,
+  isOfficialSetting = false,
+  allNpcs = [],
+  allLocations = [],
+  campaignContext,
+}) => {
+  const [mode, setMode] = useState<'quick' | 'chat'>('quick');
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleGenerate = async () => {
+  const handleQuickGenerate = async () => {
     if (!prompt.trim()) {
       setError('Please enter a prompt.');
       return;
@@ -27,10 +48,10 @@ export const SceneGenerator: React.FC<SceneGeneratorProps> = ({ onSceneCreated, 
     try {
       const sceneData = await generateScene(prompt, isMockMode, campaignContext);
       const newScene: Omit<Scene, 'id'> = {
-          ...sceneData,
-          locationId: undefined,
-          npcIds: []
-      }
+        ...sceneData,
+        locationId: undefined,
+        npcIds: [],
+      };
       onSceneCreated(newScene);
       setPrompt('');
     } catch (err) {
@@ -39,44 +60,94 @@ export const SceneGenerator: React.FC<SceneGeneratorProps> = ({ onSceneCreated, 
       setIsLoading(false);
     }
   };
-  
-  return (
-    <div className="relative bg-slate-900/50 p-4 rounded-lg border border-slate-800 space-y-3">
-      {isLoading && (
-        <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg z-10 transition-opacity duration-300 animate-in fade-in">
-          <Icons.Sparkles className="w-8 h-8 text-amber-400 animate-spin" />
-          <p className="mt-2 text-sm text-slate-300">Generating Scene...</p>
+
+  if (mode === 'chat') {
+    return (
+      <div className="absolute inset-0 z-20 bg-slate-950 p-6 flex flex-col animate-in fade-in zoom-in-95 duration-200">
+        <div className="mb-4 flex justify-between items-center flex-shrink-0">
+          <Button variant="ghost" size="sm" onClick={() => setMode('quick')}>
+            <Icons.ChevronDown className="w-4 h-4 mr-2 rotate-90" /> Back to Quick Generator
+          </Button>
+          <h2 className="text-lg font-bold font-serif text-slate-100">Conversational Creator</h2>
         </div>
-      )}
-      <div className="flex items-center gap-2">
-        <Icons.Sparkles className="w-5 h-5 text-amber-400" />
-        <h3 className="text-md font-semibold text-slate-200 font-serif">Generate New Scene</h3>
+        <div className="flex-1 min-h-0 border border-slate-800 rounded-xl shadow-2xl overflow-hidden bg-slate-900">
+          <EntityChatGenerator
+            entityType="scene"
+            isMockMode={isMockMode}
+            campaignContext={campaignContext}
+            onEntityCreated={(data) => {
+              const { id, ...sceneData } = data;
+              onSceneCreated(sceneData);
+              setMode('quick');
+            }}
+            initialData={createDefaultScene()}
+            renderPreview={(data, onUpdate) => (
+              <SceneEditor
+                scene={{ ...data, id: 'preview' }}
+                allNpcs={allNpcs}
+                allLocations={allLocations}
+                onUpdate={(_, updates) => onUpdate(updates)}
+                onDelete={() => {}}
+                isMockMode={isMockMode}
+              />
+            )}
+          />
+        </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="relative bg-slate-900 p-6 rounded-xl border border-slate-800 space-y-4 h-full flex flex-col">
+      {isLoading && <SkeletonGeneratorOverlay />}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Icons.Wizard className="w-7 h-7 text-amber-400" />
+          <h2 className="text-2xl font-bold font-serif text-slate-100">Scene Generator</h2>
+        </div>
+        <Button variant="secondary" size="sm" onClick={() => setMode('chat')}>
+          <Icons.Chat className="w-4 h-4 mr-2" /> Create via Chat
+        </Button>
+      </div>
+
       <p className="text-sm text-slate-400">
-        Describe a situation. (e.g., "A tense negotiation with a goblin chief")
-        {isOfficialSetting && <span className="block mt-1 text-amber-400 text-xs">Google Search enabled.</span>}
+        Describe a situation, and the AI will build a complete scene with read-aloud text and GM notes.
+        {isOfficialSetting && (
+          <span className="block mt-1 text-amber-400 text-xs">Google Search enabled for canon accuracy.</span>
+        )}
       </p>
+
       <textarea
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
-        placeholder="Enter scene prompt here..."
-        rows={3}
+        placeholder="e.g., A tense negotiation with a goblin chief"
+        rows={5}
         className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500 outline-none resize-y placeholder:text-slate-600"
         disabled={isLoading}
       />
+
+      <div className="flex flex-wrap gap-2">
+        {PROMPT_CHIPS.map((chip) => (
+          <button
+            key={chip}
+            type="button"
+            onClick={() => setPrompt(chip)}
+            disabled={isLoading}
+            className="bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm rounded-full px-3 py-1 transition-colors disabled:opacity-50"
+          >
+            {chip}
+          </button>
+        ))}
+      </div>
+
       {error && <p className="text-xs text-red-400">{error}</p>}
-      <Button onClick={handleGenerate} disabled={isLoading} className="w-full">
-        {isLoading ? (
-          <>
-            <Icons.Coach className="w-4 h-4 mr-2 animate-spin" />
-            Generating...
-          </>
-        ) : (
-          <>
-            <Icons.Scenes className="w-4 h-4 mr-2" />
-            Create Scene
-          </>
-        )}
+      <Button
+        onClick={handleQuickGenerate}
+        disabled={isLoading || !prompt.trim()}
+        size="lg"
+        className="w-full mt-auto"
+      >
+        {isLoading ? 'Generating...' : 'Generate Scene'}
       </Button>
     </div>
   );

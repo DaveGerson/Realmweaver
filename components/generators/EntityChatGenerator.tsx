@@ -7,7 +7,7 @@ import { chatWithRealmWeaver } from '../../services/aiService';
 import { twMerge } from 'tailwind-merge';
 
 interface EntityChatGeneratorProps {
-  entityType: 'npc' | 'location' | 'faction' | 'item' | 'adventure' | 'article';
+  entityType: 'npc' | 'location' | 'faction' | 'item' | 'adventure' | 'article' | 'scene';
   onEntityCreated: (data: any) => void;
   renderPreview: (data: any, onUpdate: (data: any) => void) => React.ReactNode;
   initialData: any;
@@ -59,6 +59,7 @@ export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
           case 'item': return 'Item';
           case 'adventure': return 'Adventure';
           case 'article': return 'Article';
+          case 'scene': return 'Scene';
           default: return 'Entity';
       }
   }

@@ -7,11 +7,12 @@ import { Icons } from '../common/Icons';
 interface PlayerCharacterDashboardProps {
   playerCharacters: PlayerCharacter[];
   onImport: (file: File) => Promise<void>;
+  onPlayerCharacterCreated?: (pc: PlayerCharacter) => void;
   onSelectPlayerCharacter: (id: string) => void;
   isMockMode: boolean;
 }
 
-export const PlayerCharacterDashboard: React.FC<PlayerCharacterDashboardProps> = ({ playerCharacters, onImport, onSelectPlayerCharacter, isMockMode }) => {
+export const PlayerCharacterDashboard: React.FC<PlayerCharacterDashboardProps> = ({ playerCharacters, onImport, onPlayerCharacterCreated, onSelectPlayerCharacter, isMockMode }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const filteredPCs = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -28,7 +29,7 @@ export const PlayerCharacterDashboard: React.FC<PlayerCharacterDashboardProps> =
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1">
-          <PlayerCharacterImporter onImport={onImport} isMockMode={isMockMode} />
+          <PlayerCharacterImporter onImport={onImport} onPlayerCharacterCreated={onPlayerCharacterCreated} isMockMode={isMockMode} />
           {/* A "Create from Scratch" component could be added here in the future */}
         </div>
         <div className="lg:col-span-2">

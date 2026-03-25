@@ -321,6 +321,12 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
             );
           }
         }}
+        onPlayerCharacterCreated={(pc) => {
+          campaignService.createPlayerCharacter(pc);
+          onResetSelections();
+          onSetActiveView('player-characters');
+          onSetSelectedPlayerCharacterId(pc.id);
+        }}
         onSelectPlayerCharacter={(id) => {
           onResetSelections();
           onSetActiveView('player-characters');
