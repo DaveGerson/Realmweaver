@@ -1,10 +1,11 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import type { Campaign } from '../../types/index';
 import type { DmStyle } from '../../types/CampaignSetting';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { ENTITY_TYPE_CONFIG } from '../../utils/entityUtils';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 
 interface CrossCampaignDashboardProps {
   campaigns: Campaign[];
@@ -75,7 +76,7 @@ interface CampaignCardProps {
 }
 
 const CampaignCard: React.FC<CampaignCardProps> = ({ campaign, onSwitch, onDuplicate, onDelete }) => {
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const { confirm } = useConfirmDialog();
 
   const dmStyle: DmStyle = campaign.dmStyle ?? 'standard';
   const lastSessionDate = getLastSessionDate(campaign);
@@ -85,13 +86,13 @@ const CampaignCard: React.FC<CampaignCardProps> = ({ campaign, onSwitch, onDupli
     ? campaign.officialSetting
     : campaign.setting;
 
-  const handleDeleteClick = () => {
-    if (confirmDelete) {
-      onDelete();
-      setConfirmDelete(false);
-    } else {
-      setConfirmDelete(true);
-    }
+  const handleDeleteClick = async () => {
+    const ok = await confirm(
+      `Delete "${campaign.title}"?`,
+      'This will permanently delete the campaign and all its content. This action cannot be undone.',
+      { variant: 'danger', confirmLabel: 'Delete Campaign', cancelLabel: 'Cancel' }
+    );
+    if (ok) onDelete();
   };
 
   return (
@@ -178,16 +179,15 @@ const CampaignCard: React.FC<CampaignCardProps> = ({ campaign, onSwitch, onDupli
         </Button>
 
         <Button
-          variant={confirmDelete ? 'danger' : 'secondary'}
+          variant="secondary"
           size="sm"
           onClick={handleDeleteClick}
-          onBlur={() => setConfirmDelete(false)}
-          className={confirmDelete ? '' : 'text-slate-400 hover:bg-red-900/60 hover:text-red-300'}
-          title={confirmDelete ? 'Click again to confirm deletion' : 'Delete campaign'}
-          aria-label={confirmDelete ? `Confirm delete ${campaign.title}` : `Delete ${campaign.title}`}
+          className="text-slate-400 hover:bg-red-900/60 hover:text-red-300"
+          title="Delete campaign"
+          aria-label={`Delete ${campaign.title}`}
         >
           <Icons.Trash className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline ml-1.5">{confirmDelete ? 'Confirm' : 'Delete'}</span>
+          <span className="hidden sm:inline ml-1.5">Delete</span>
         </Button>
       </div>
     </div>

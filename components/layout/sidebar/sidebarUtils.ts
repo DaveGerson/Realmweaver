@@ -7,17 +7,27 @@ import { Icons } from '@/components/common/Icons';
 // ─── Icon / colour maps derived from ENTITY_TYPE_CONFIG ─────────────────────
 // Shared by PinnedEntities and RecentItems
 
-export const RECENT_TYPE_ICON: Record<CommandPaletteEntityType, keyof typeof Icons> = Object.fromEntries(
-  (Object.keys(ENTITY_TYPE_CONFIG) as string[])
-    .filter(k => k !== 'sessionLog' && k !== 'playerCharacter' && k !== 'note')
-    .map(k => [k, ENTITY_TYPE_CONFIG[k].icon as keyof typeof Icons])
-) as Record<CommandPaletteEntityType, keyof typeof Icons>;
+// Build maps from ENTITY_TYPE_CONFIG for all hyphenated keys used by CommandPaletteEntityType,
+// then layer in the extra entries that ENTITY_TYPE_CONFIG doesn't have (scene).
+const _baseIconEntries = Object.entries(ENTITY_TYPE_CONFIG).map(
+  ([k, v]) => [k, v.icon as keyof typeof Icons]
+);
 
-export const RECENT_TYPE_COLOR: Record<CommandPaletteEntityType, string> = Object.fromEntries(
-  (Object.keys(ENTITY_TYPE_CONFIG) as string[])
-    .filter(k => k !== 'sessionLog' && k !== 'playerCharacter' && k !== 'note')
-    .map(k => [k, `text-${ENTITY_TYPE_CONFIG[k].color}-400`])
-) as Record<CommandPaletteEntityType, string>;
+export const RECENT_TYPE_ICON: Record<CommandPaletteEntityType, keyof typeof Icons> = {
+  ...Object.fromEntries(_baseIconEntries),
+  // scene is not in ENTITY_TYPE_CONFIG — use the Scenes icon
+  scene: 'Scenes' as keyof typeof Icons,
+} as Record<CommandPaletteEntityType, keyof typeof Icons>;
+
+const _baseColorEntries = Object.entries(ENTITY_TYPE_CONFIG).map(
+  ([k, v]) => [k, `text-${v.color}-400`]
+);
+
+export const RECENT_TYPE_COLOR: Record<CommandPaletteEntityType, string> = {
+  ...Object.fromEntries(_baseColorEntries),
+  // scene is not in ENTITY_TYPE_CONFIG — use orange to match adventures
+  scene: 'text-orange-400',
+} as Record<CommandPaletteEntityType, string>;
 
 // ─── Pinned entity name resolution ───────────────────────────────────────────
 // Returns null if the entity no longer exists (e.g. was deleted).

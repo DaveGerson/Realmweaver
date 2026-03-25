@@ -11,6 +11,7 @@ import { DmCoach } from './components/dialogs/DmCoach';
 import { EvocationWizard } from './components/dialogs/EvocationWizard';
 import { WorldSimulationWizard } from './components/dialogs/WorldSimulationWizard';
 import { ExportModal } from './components/dialogs/ExportModal';
+import type { ExportEntityCounts } from './components/dialogs/ExportModal';
 import { ContinuityChecker } from './components/dialogs/ContinuityChecker';
 import { RealmChatWidget } from './components/RealmChat/RealmChatWidget';
 import { Breadcrumbs } from './components/common/Breadcrumbs';
@@ -198,6 +199,16 @@ const App: FC = () => {
       activeSessionId: activeCampaign.activeSessionId,
     });
   }, [activeCampaign]);
+
+  // --- Active scene NPC IDs for DM Coach NPC grouping (H16) ---
+  const activeSceneNpcIds = useMemo(() => {
+    if (!activeCampaign?.activeSceneId) return [];
+    const adventure = activeCampaign.adventures.find(a =>
+        a.scenes.some(s => s.id === activeCampaign.activeSceneId)
+    );
+    const scene = adventure?.scenes.find(s => s.id === activeCampaign.activeSceneId);
+    return scene?.npcIds ?? [];
+  }, [activeCampaign?.activeSceneId, activeCampaign?.adventures]);
 
   // --- DM Coach context — includes current user selection for richer in-session help ---
   const coachContext = useMemo(() => {
@@ -470,6 +481,7 @@ const App: FC = () => {
                     <DmCoach
                       campaign={activeCampaign}
                       activeContext={coachContext}
+                      activeSceneNpcIds={activeSceneNpcIds}
                       onClose={() => setIsCoachOpen(false)}
                       onSendToNotes={(content) => campaignService.addAutoEvent('coach-used', content)}
                       onResultGenerated={(content) => campaignService.addAutoEvent('coach-used', content)}
@@ -514,8 +526,19 @@ const App: FC = () => {
                     <ExportModal
                       campaignTitle={activeCampaign.title}
                       onClose={() => setIsExportModalOpen(false)}
-                      onExportJson={() => { exportCampaignAsJson(activeCampaign); setIsExportModalOpen(false); }}
-                      onExportObsidian={() => { exportCampaignAsObsidian(activeCampaign); setIsExportModalOpen(false); }}
+                      onExportJson={() => exportCampaignAsJson(activeCampaign)}
+                      onExportObsidian={() => exportCampaignAsObsidian(activeCampaign)}
+                      entityCounts={{
+                        npcs: activeCampaign.npcs.length,
+                        locations: activeCampaign.locations.length,
+                        factions: activeCampaign.factions.length,
+                        items: activeCampaign.items.length,
+                        adventures: activeCampaign.adventures.length,
+                        articles: activeCampaign.articles.length,
+                        sessionLogs: (activeCampaign.sessionLogs ?? []).length,
+                        plots: (activeCampaign.plots ?? []).length,
+                        playerCharacters: (activeCampaign.playerCharacters ?? []).length,
+                      } satisfies ExportEntityCounts}
                     />
                   </ErrorBoundary>
                 )}

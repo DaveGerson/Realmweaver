@@ -353,7 +353,7 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampai
               </select>
               <p className="text-xs text-amber-400 mt-1.5 flex items-center gap-1">
                 <Icons.Sparkles className="w-3 h-3" />
-                Official settings use Google Search to find canon lore.
+                Official settings use AI-assisted canon knowledge for lore generation.
               </p>
             </div>
           )}
