@@ -290,9 +290,9 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                     </div>
                 </header>
 
-                <div className="flex-1 flex overflow-hidden">
+                <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
                     {/* --- Left Panel: Controls --- */}
-                    <div className="w-1/2 border-r border-slate-800 flex flex-col">
+                    <div className="w-full lg:w-1/2 border-b lg:border-b-0 lg:border-r border-slate-800 flex flex-col">
                         <div className="p-4 border-b border-slate-800">
                             <div className="grid grid-cols-4 gap-2 bg-slate-950 p-1 rounded-lg border border-slate-800/50">
                                 <ModeButton label="Simple" icon={Icons.Sparkles} isActive={mode === 'simple'} onClick={() => setMode('simple')} />
@@ -316,7 +316,7 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                     </div>
 
                     {/* --- Right Panel: Results --- */}
-                    <div className="w-1/2 flex flex-col">
+                    <div className="w-full lg:w-1/2 flex flex-col">
                         <div className="p-4 border-b border-slate-800 flex-shrink-0">
                             <h3 className="text-lg font-semibold font-serif text-slate-200">Generated Entities</h3>
                         </div>
@@ -707,7 +707,7 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({ title, items, selection
                                 <input type="checkbox" checked={selection[index]} onChange={(e) => onSelect(index, e.target.checked)} className="w-4 h-4 mr-3 bg-slate-800 border-slate-600 rounded text-amber-600 focus:ring-amber-500" />
                                 <span className="truncate" title={item.name || item.title}>{item.name || item.title}</span>
                             </label>
-                             <button onClick={() => onEdit(index)} className="p-1 text-slate-500 hover:text-white opacity-0 group-hover:opacity-100 transition-all" aria-label="Edit">
+                             <button onClick={() => onEdit(index)} className="p-1 text-slate-500 hover:text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all" aria-label="Edit">
                                 <Icons.FileText className="w-3.5 h-3.5" />
                             </button>
                         </div>

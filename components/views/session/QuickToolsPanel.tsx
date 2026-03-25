@@ -189,9 +189,10 @@ export const QuickToolsPanel: React.FC<QuickToolsPanelProps> = ({
                                     )}
                                     <div className="flex items-center justify-between mt-1">
                                         {plotStatusBadge(status)}
-                                        <span className="text-[10px] text-slate-500 opacity-70">
-                            tap to cycle
-                        </span>
+                                        <span className="text-[10px] text-slate-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+                                            <Icons.RefreshCw className="w-2.5 h-2.5" />
+                                            tap to cycle
+                                        </span>
                                     </div>
                                 </button>
                             ) : null;

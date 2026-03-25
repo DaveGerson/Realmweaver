@@ -232,7 +232,7 @@ export const RealmChatWidget: React.FC<RealmChatWidgetProps> = ({ campaign, onAd
         {!isOpen && (
             <button
                 onClick={handleOpen}
-                className="fixed bottom-6 right-6 p-4 bg-indigo-600 text-white rounded-full shadow-2xl hover:bg-indigo-500 transition-transform hover:scale-105 z-50"
+                className="fixed bottom-3 right-3 sm:bottom-6 sm:right-6 p-4 bg-indigo-600 text-white rounded-full shadow-2xl hover:bg-indigo-500 transition-transform hover:scale-105 z-50"
                 aria-label="Open RealmChat"
             >
                 <Icons.Chat className="w-8 h-8" />
@@ -242,8 +242,8 @@ export const RealmChatWidget: React.FC<RealmChatWidgetProps> = ({ campaign, onAd
         {/* Main Window */}
         {isOpen && (
             <div className={twMerge(
-                "fixed bottom-6 right-6 w-[450px] bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col overflow-hidden z-50 transition-all duration-300",
-                isMinimized ? "h-auto" : "h-[700px] animate-fade-in"
+                "fixed bottom-3 right-3 sm:bottom-6 sm:right-6 w-full sm:w-[450px] max-w-[calc(100vw-1.5rem)] bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col overflow-hidden z-50 transition-all duration-300",
+                isMinimized ? "h-auto" : "h-[calc(100vh-6rem)] sm:h-[700px] animate-fade-in"
             )}>
                 {/* Header */}
                 <header 
