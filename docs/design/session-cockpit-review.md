@@ -1,5 +1,7 @@
 # Session Cockpit Archetype Review
 
+> **Status:** HISTORICAL REFERENCE — Pre-implementation design analysis. Most identified gaps resolved in Phases A-F and UX Refactoring Sprint. Valuable for understanding design rationale behind current features.
+
 > Comprehensive review of Realmweaver's Session Runner from 5 DM archetype perspectives
 > Date: 2026-03-18
 

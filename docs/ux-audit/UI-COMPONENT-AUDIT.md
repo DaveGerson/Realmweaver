@@ -1,5 +1,7 @@
 # Realmweaver UI Component Audit -- Follow-Up Report
 
+> **Status:** ACTIVE — 34 of 70 findings addressed in DM Workflow sprint (2026-03-24). Remaining items tracked below. Combat items intentionally deferred (D&D Beyond handles combat better).
+
 **Date:** 2026-03-24
 **Type:** Follow-up audit on post-refactoring state
 **Prior Audit:** docs/ux-audit/UX-AUDIT-REPORT.md (2026-03-24)

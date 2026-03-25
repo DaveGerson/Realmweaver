@@ -1,5 +1,7 @@
 # Realmweaver UX Audit Report -- Unified Synthesis
 
+> **Status:** HISTORICAL BASELINE — Pre-refactoring snapshot. Most Critical and High findings resolved in UX Refactoring Sprint (2026-03-24). See UI-COMPONENT-AUDIT.md for post-refactoring assessment.
+
 **Date:** 2026-03-24
 **Synthesized from:** 9 individual audit reports (6 view-partitioned, 3 cross-cutting)
 **Audited surface:** ~90 .tsx component files, ~3,600 lines of service code, full type system
