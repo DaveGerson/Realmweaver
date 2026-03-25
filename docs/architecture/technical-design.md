@@ -1,16 +1,14 @@
 
 # Technical Design Document: RealmWeaver
 
-> **Last Updated:** 2026-03-18
+> **Last Updated:** 2026-03-24
 > **Audience:** Developers contributing to the RealmWeaver codebase
 
 ---
 
 ## 1. Introduction
 
-RealmWeaver is a single-page application (SPA) for tabletop RPG Game Masters to create, manage, and run campaigns with AI assistance. It runs entirely in the browser with client-side persistence (localStorage) and integrates with Google Gemini for AI-powered content generation.
-
-This document covers the technical architecture, design decisions, data flow, and key subsystems.
+RealmWeaver is a single-page application (SPA) for tabletop RPG Game Masters to create, manage, and run campaigns with AI assistance. It runs entirely in the browser with client-side persistence (localStorage). AI generation is powered by the Claude Code CLI via a local Vite proxy middleware, with an Anthropic REST API path prepared for future production deployment.
 
 ---
 
@@ -21,22 +19,18 @@ This document covers the technical architecture, design decisions, data flow, an
 | **Runtime** | React 19.2.0 | UI framework with `useSyncExternalStore` for external state binding |
 | **Language** | TypeScript 5.8.2 | Type safety (ES2022 target, bundler module resolution) |
 | **Build** | Vite 6.2.0 | Dev server, HMR, production bundling |
-| **AI** | @google/genai 1.25.0 | Google Gemini API client (schema-enforced JSON generation) |
+| **AI** | Claude Code CLI / `@anthropic-ai/sdk` 0.39.0 | Local Claude CLI (default) or Anthropic REST API |
 | **State** | Immer 10.1.3 | Immutable state updates with mutable syntax |
-| **Styling** | Tailwind CSS (CDN) | Utility-first CSS — loaded via `<script>` in index.html, not a build dependency |
+| **Styling** | Tailwind CSS (CDN) | Utility-first CSS via `<script>` in index.html |
 | **Icons** | Lucide React 0.546.0 | SVG icon library, centralized through `Icons.tsx` |
 | **Graphs** | React Flow 11.10.1 + Dagre 0.8.5 + D3 7.8.5 | Entity relationship visualization |
 | **Utilities** | tailwind-merge 3.3.1 | Conditional className composition without conflicts |
-| **Testing** | Vitest 4.1.0 | Test runner (configured, used alongside built-in smoke tests) |
-
-### Dependency Loading
-
-React, Immer, Lucide, React Flow, Dagre, D3, and `@google/genai` are loaded via **ES module import maps** defined in `index.html`. Tailwind CSS is loaded via CDN script tag. This avoids bundling these libraries, keeping the build focused on application code.
+| **Testing** | Vitest 4.1.0 + Playwright 1.58.2 | Unit tests and E2E tests |
 
 ### TypeScript Configuration
 
 - **Target:** ES2022 with `bundler` module resolution
-- **JSX:** `react-jsx` (automatic runtime — no `React` import needed)
+- **JSX:** `react-jsx` (automatic runtime)
 - **Path alias:** `@/*` maps to project root
 - **No emit:** TypeScript does type checking only; Vite handles transpilation
 - **Strict mode:** Not explicitly enabled
@@ -51,66 +45,89 @@ All code lives at the **project root** — there is no `src/` directory.
 
 ```
 Realmweaver/
-├── App.tsx                     # Root component (~671 lines)
-├── index.tsx                   # React 19 createRoot entry
-├── index.html                  # Import maps, CDN deps, custom styles
-├── vite.config.ts              # Dev server (port 3000), path aliases, env injection
-├── smokeTest.ts                # Built-in smoke test suite (~389 lines)
+├── App.tsx                     # Root component (~564L after decomposition)
+├── index.tsx                   # React 19 createRoot entry; mounts ToastProvider, ConfirmDialogProvider
+├── index.html                  # Tailwind CDN, Google Fonts, favicon
+├── vite.config.ts              # Dev server (port 3000), path alias, env injection
+├── vite-plugin-ai-proxy.ts     # Vite middleware: POST /api/ai/generate -> claude CLI binary
+│
+├── hooks/                      # Custom React hooks (UX refactoring sprint extractions)
+│   ├── useEntitySelection.ts   # Selected entity IDs, nav stack, breadcrumbs, recent items
+│   ├── useModalState.ts        # All modal open/close state; closeTopModal() priority logic
+│   ├── useConfirmDialog.ts     # Context-provider confirm dialog (replaces window.confirm)
+│   ├── useToast.ts             # Context-provider toast queue (replaces window.alert)
+│   ├── useEntitySearch.ts      # Multi-field case-insensitive filter for entity lists
+│   └── useRovingTabIndex.ts    # Roving tabindex for keyboard grid/list navigation
 │
 ├── components/                 # UI layer (organized by role)
-│   ├── common/                 # Shared primitives: Button, Icons, Textarea, EntityHistoryManager
-│   ├── layout/                 # App shell: Header, CampaignSidebar, ContentWrapper
-│   ├── views/                  # Top-level screens: Welcome, Creator, Selector, SessionRunner
-│   ├── dashboards/             # Entity list views with embedded generators (9 dashboards)
+│   ├── common/                 # Shared primitives (20+ components)
+│   ├── layout/                 # App shell: Header, CampaignSidebar, ViewRouter
+│   │   └── sidebar/            # 5 sidebar sub-components + sidebarUtils.ts
+│   ├── views/                  # Top-level screens: Welcome, Creator, SessionRunner, etc.
+│   │   └── session/            # 5 SessionRunner sub-components
+│   ├── dashboards/             # Entity list views (10 dashboards)
 │   ├── generators/             # AI creation forms (8 generators + EntityChatGenerator)
-│   ├── editors/                # Detail editing views (13 editors + PrepDocumentView)
-│   ├── dialogs/                # Modal tools: DmCoach, EvocationWizard, ExportModal
-│   ├── tools/                  # Gameplay tools: CombatTracker
-│   ├── visualizers/            # Data viz: RelationshipGraph
-│   └── RealmChat/              # Floating chat widget: RealmChatWidget
+│   ├── editors/                # Detail editing views (12 editors + PrepDocumentView)
+│   ├── dialogs/                # Modal tools (7 dialogs, all use DialogShell)
+│   ├── tools/                  # Gameplay tools: CombatTracker, DiceRoller, SecretsTracker
+│   ├── visualizers/            # Data viz: RelationshipGraph (D3), PlotTimeline
+│   └── RealmChat/              # Floating chat widget (indigo accent only)
 │
 ├── services/                   # Business logic layer
-│   ├── campaignService.ts      # Central state store (~1,736 lines)
-│   ├── geminiService.ts        # AI service facade (~143 lines)
-│   ├── importExportService.ts  # Import/export logic
+│   ├── campaignService.ts      # Central state store
+│   ├── aiService.ts            # AI service facade (the ONLY AI import for components)
+│   ├── contextBuilder.ts       # Tiered token-budget-aware context assembly
+│   ├── continuityChecker.ts    # 8 rule-based consistency checks (pure function, no AI)
+│   ├── importExportService.ts  # JSON/Obsidian import-export
 │   └── ai/                     # AI implementation modules
-│       ├── core.ts             # Gemini API wrapper (~119 lines)
-│       ├── realmWeaver.ts      # Entity generation (~278 lines)
-│       ├── dmCoach.ts          # Session assistance (~99 lines)
-│       ├── realmChat.ts        # Conversational AI (~141 lines)
-│       ├── evocationWizard.ts  # Batch generation & parsing (~189 lines)
-│       └── mockService.ts      # Mock data for offline testing (~423 lines)
+│       ├── core.ts             # Backward-compat adapter (3 function signatures preserved)
+│       ├── modelConfig.ts      # ModelTier type + tier-to-model mappings + provider config
+│       ├── realmWeaver.ts      # Entity generation
+│       ├── dmCoach.ts          # Session assistance
+│       ├── realmChat.ts        # Conversational AI
+│       ├── evocationWizard.ts  # Batch generation & parsing
+│       ├── worldSimulation.ts  # World event simulation
+│       ├── styleMatching.ts    # DM writing style analysis
+│       ├── mockService.ts      # Static mock data for offline dev
+│       └── providers/          # AI provider backends
+│           ├── types.ts        # AIProvider interface + option types
+│           ├── registry.ts     # Provider registry singleton
+│           ├── claude-cli.ts   # Claude CLI via Vite proxy (default)
+│           ├── anthropic-api.ts # Anthropic REST API (stub)
+│           └── retry.ts        # Transient failure retry logic
 │
-├── types/                      # TypeScript type definitions (18+ files)
-│   ├── index.ts                # Barrel export
-│   ├── Campaign.ts             # Root campaign type
-│   └── [Entity].ts             # One file per entity type
-│
-└── utils/
-    └── entityUtils.ts          # Default entity factories
+├── types/                      # TypeScript type definitions (24 files, barrel via index.ts)
+└── utils/                      # Utility functions (9 files)
 ```
 
 ### 3.2 Layer Diagram
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Component Layer                        │
-│  Dashboards │ Generators │ Editors │ Dialogs │ Tools     │
-├─────────────┼────────────────────────┼──────────────────┤
-│             │                        │                   │
-│  React      │  campaignService.ts    │  geminiService.ts │
-│  State      │  (External Store)      │  (AI Facade)      │
-│  Binding    │                        │       │           │
-│             │  ┌──────────────────┐  │       ▼           │
-│  useSyncExternalStore()           │  │  ┌────────────┐   │
-│             │  │ Immer produce()  │  │  │ ai/core.ts │   │
-│             │  │ localStorage     │  │  │ (Gemini)   │   │
-│             │  │ Debounced save   │  │  └────────────┘   │
-│             │  └──────────────────┘  │       │           │
-├─────────────┴────────────────────────┴───────┼───────────┤
-│                                              ▼           │
-│              Google Gemini API / Mock Service             │
-└─────────────────────────────────────────────────────────┘
++---------------------------------------------------------------+
+|                    Component Layer                             |
+|  Dashboards | Generators | Editors | Dialogs | Tools          |
++------+----------------------------+-------------------------+--+
+       |                            |                         |
+       |  React State Binding       |  AI Service Layer       |
+       |                            |                         |
+       |  useSyncExternalStore()    |  aiService.ts           |
+       |          |                 |  (facade/router)        |
+       v          v                 |         |               |
+  campaignService.ts                |         v               |
+  (External Store)                  |    ai/core.ts           |
+  +---------------------+           |    (adapter)            |
+  | Immer produce()     |           |         |               |
+  | localStorage        |           |         v               |
+  | Debounced save (2s) |           |  providers/registry.ts  |
+  | Relationship sync   |           |         |               |
+  | Cascade delete      |           |    claude-cli.ts        |
+  +---------------------+           |    (Vite proxy)         |
+                                    +-------------------------+
+                                              |
+                             +----------------+-----------------+
+                             |                                  |
+                      Claude CLI                         Mock Service
+                    (local dev)                        (offline dev)
 ```
 
 ---
@@ -121,8 +138,6 @@ Realmweaver/
 
 **Location:** `services/campaignService.ts`
 
-The app uses a custom external store (not Redux, Zustand, or Context) built with the factory pattern:
-
 ```typescript
 export function createCampaignStore(config: { persist?: boolean } = {}) {
     let state: CampaignState = {
@@ -132,21 +147,20 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         saveStatus: 'idle' | 'saved' | 'saving' | 'error',
         lastSavedAt: string | null,
     };
-    const listeners = new Set<() => void>();
 
-    const updateState = (updater: (draft: CampaignState) => void) => {
-        state = produce(state, updater);   // Immer immutable update
-        notify();                           // Notify React subscribers
-        scheduleSave();                     // Debounced localStorage write (2s)
+    const updateState = (updater) => {
+        state = produce(state, updater);  // Immer immutable update
+        notify();                          // Notify React subscribers
+        scheduleSave();                    // Debounced localStorage write (2s)
     };
 
-    const _internalUpdate = (updater: (draft: CampaignState) => void) => {
+    const _internalUpdate = (updater) => {
         state = produce(state, updater);
         notify();
-        // No save — used for meta-state like saveStatus, appStatus
+        // No save -- for meta-state like saveStatus, appStatus
     };
 
-    return { getState, subscribe, /* CRUD methods */ };
+    return { getState, subscribe, getActiveCampaign, /* CRUD methods */ };
 }
 
 export const campaignService = createCampaignStore(); // Singleton
@@ -154,7 +168,7 @@ export const campaignService = createCampaignStore(); // Singleton
 
 **Design decisions:**
 - **Factory pattern** — `createCampaignStore({ persist: false })` enables isolated test instances
-- **Two update paths** — `updateState()` triggers persistence; `_internalUpdate()` doesn't (for transient UI state like `saveStatus`)
+- **Two update paths** — `updateState()` triggers persistence; `_internalUpdate()` doesn't
 - **Debounced save** — 2-second delay prevents excessive localStorage writes during rapid edits
 - **`useSyncExternalStore`** — React 18+ API for subscribing to external state without Context
 
@@ -166,23 +180,23 @@ const { campaigns, activeCampaignId, appStatus, saveStatus, lastSavedAt } =
     useSyncExternalStore(campaignService.subscribe, campaignService.getState);
 ```
 
-Components derive state from this binding. UI-only state (selected entity IDs, active view, modal states, `isMockMode`) lives in `useState` within `App.tsx`.
+UI-only state (selected entity IDs, active view, modal states, `isMockMode`) lives in hooks extracted from App.tsx:
+- `useEntitySelection` — selected IDs, nav stack, breadcrumbs, recent items
+- `useModalState` — modal open/close state for all app-level dialogs
 
 ### 4.3 Persistence
 
 - **Storage keys:** `realmweaver-campaigns` and `realmweaver-active-campaign-id`
 - **Format:** JSON serialization of the full campaigns array
-- **Timing:** Debounced 2-second auto-save after any state change via `updateState()`
-- **Loading:** On mount, the store reads from localStorage and sets `appStatus` accordingly
+- **Timing:** Debounced 2-second auto-save after any `updateState()` call
+- **Loading:** On mount, the store reads from localStorage and sets `appStatus`
 
 ### 4.4 Relationship Management
 
-The campaign service handles entity cross-references automatically:
-
-- **Bidirectional sync:** `linkNpcToFaction()` updates both the NPC's `factionId` and the Faction's member list (`_synchronizeNpcFactionLink`)
+- **Bidirectional sync:** `linkNpcToFaction()` updates both the NPC's `factionId` and the Faction's member list
 - **Cascade deletion:** Deleting a faction removes `factionId` from all linked NPCs
 - **Cycle detection:** `setLocationParent()` validates no circular parent-child chains
-- **Scene linking:** Scenes reference NPCs and locations; deletion cleans up these references
+- **Scene linking:** Scenes reference NPCs and locations; deletion cascades to these references
 
 ---
 
@@ -192,86 +206,127 @@ The campaign service handles entity cross-references automatically:
 
 ```
 Components
-    ↓ call
-geminiService.ts          ← Facade: checks isMockMode, routes to real or mock
-    ↓ delegates to
-ai/realmWeaver.ts         ← Domain logic: prompts, schemas, instructions
+    | import from aiService.ts ONLY
+    v
+aiService.ts          <- Facade: checks isMockMode, routes to real or mock
+    |
+    v
+ai/realmWeaver.ts     <- Domain logic: prompts, schemas, instructions
 ai/dmCoach.ts
 ai/realmChat.ts
 ai/evocationWizard.ts
-    ↓ calls
-ai/core.ts                ← Gemini API wrapper: generateWithSchema / generateText / generateChatCompletion
+ai/worldSimulation.ts
+ai/styleMatching.ts
+    |
+    v
+ai/core.ts            <- Backward-compat adapter (preserves 3 function signatures)
+    |
+    v
+providers/registry    <- Active provider (default: claude-cli)
+    |
+    +-- claude-cli.ts    <- HTTP POST /api/ai/generate -> Vite proxy -> claude binary
+    +-- anthropic-api.ts <- Anthropic REST API (stub, not yet implemented)
 ```
 
-### 5.2 Core API Functions (`ai/core.ts`)
+### 5.2 Provider Abstraction Layer
+
+**Location:** `services/ai/providers/`
+
+The provider abstraction allows swapping AI backends without changing domain modules.
+
+**`AIProvider` interface** (all providers implement this):
+```typescript
+interface AIProvider {
+    readonly name: string;
+    generateWithSchema<T>(options: GenerateWithSchemaOptions): Promise<T>;
+    generateText(options: GenerateTextOptions): Promise<string>;
+    generateChatCompletion(options: GenerateChatOptions): Promise<string>;
+}
+```
+
+**`ModelTier`** — logical quality tiers used throughout the app:
+```typescript
+type ModelTier = 'lite' | 'standard' | 'quality';
+
+// Claude CLI aliases:   lite -> haiku,  standard -> sonnet,  quality -> opus
+// Anthropic API IDs:    lite -> claude-haiku-4-5-20251001,
+//                       standard -> claude-sonnet-4-6,
+//                       quality  -> claude-opus-4-6
+```
+
+**`core.ts`** preserves the three function signatures all domain modules already use (`generateWithSchema`, `generateText`, `generateChatCompletion`). It maps legacy Gemini model name strings to `ModelTier` values so domain modules need no changes during migration.
+
+**Claude CLI provider** (`providers/claude-cli.ts`):
+- Makes HTTP POST to the Vite dev server at `/api/ai/generate`
+- The `vite-plugin-ai-proxy.ts` middleware handles the request by spawning the `claude` binary
+- Security: uses `execFile` (no shell injection) for prompts under 100KB; temp file approach for larger prompts
+
+**Environment variables** for provider configuration:
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `REALMWEAVER_AI_PROVIDER` | Active provider (`claude-cli` or `anthropic-api`) | `claude-cli` |
+| `CLAUDE_CLI_PATH` | Path to the `claude` binary | `claude` (on $PATH) |
+| `ANTHROPIC_API_KEY` | API key for `anthropic-api` provider | — |
+| `REALMWEAVER_DEFAULT_TIER` | Default model tier | `standard` |
+| `REALMWEAVER_MAX_RETRIES` | Max retry attempts on transient errors | `3` |
+| `REALMWEAVER_TIMEOUT_MS` | Request timeout | `120000` (2 minutes) |
+
+### 5.3 Core Adapter Functions (`ai/core.ts`)
+
+The adapter forwards calls to the active provider after mapping legacy model names:
 
 **`generateWithSchema(prompt, schema, instructions, configOverrides, modelName, campaignContext?)`**
-- Forces structured JSON output via Gemini's `responseSchema`
-- Injects campaign context into the prompt
-- Manages thinking budgets: Pro 32K tokens, Flash 24K tokens
-- Cleans markdown-wrapped JSON from responses
-- Special handling for tool-augmented calls (Google Search) — must omit schema
+- Forces structured JSON output (schema embedded in prompt for Claude)
+- Injects campaign context
+- `configOverrides.contents` (multimodal PDF parts) forwarded; `configOverrides.tools` (Google Search) silently dropped
 
 **`generateText(fullPrompt, modelName, campaignContext?)`**
 - Free-form text generation (narration, descriptions)
-- Injects campaign context
 
 **`generateChatCompletion(history, systemInstruction, modelName, campaignContext?)`**
-- Multi-turn conversation support (RealmChat, EntityChatGenerator)
-- Prepends campaign context to the first user message
+- Multi-turn conversation (RealmChat, EntityChatGenerator, document chat)
 
-**Client initialization:** Lazy — the `GoogleGenAI` client is created on the first API call using the injected `GEMINI_API_KEY`.
-
-### 5.3 Domain Modules
+### 5.4 Domain Modules
 
 | Module | Functions | Output |
 |--------|-----------|--------|
-| `realmWeaver.ts` | `generateNpc`, `generateLocation`, `generateFaction`, `generateItem`, `generateScene`, `generateAdventure`, `generateArticle` | Structured entity JSON |
-| `dmCoach.ts` | `generateNarration`, `generateImprovisation`, `generateRollableTable`, `analyzeSessionNotes` | Free text, structured tables |
-| `realmChat.ts` | `generateRealmChatResponse` | `{ message, suggestions, draftEntities }` |
-| `evocationWizard.ts` | `generateCampaignFill`, `parseNpcFromText`, `parseLocationFromText`, `chatWithDocument`, `parseCharacterSheetPdf` | Batch entity arrays |
+| `realmWeaver.ts` | `generateNpc`, `generateLocation`, `generateFaction`, `generateItem`, `generateScene`, `generateAdventure`, `generateArticle`, `generatePoiFromLoot` | Structured entity JSON |
+| `dmCoach.ts` | `generateNarration`, `generateImprovisation`, `generateRollableTable`, `generateEnhancedText`, `generateSessionRecap`, `analyzeSessionNotes` | Free text, structured tables |
+| `realmChat.ts` | `chatWithRealmWeaver`, `generateNpcRoleplay` | `RealmChatResponse`, `{ dialogue, moodCue }` |
+| `evocationWizard.ts` | `generateCampaignFill`, `parseDocumentForEntities`, `generateChatResponse`, `parseCharacterSheetPdf`, `generateStarterNpcs`, `generateStarterLocations`, `generateStarterAdventure` | Batch entity arrays |
+| `worldSimulation.ts` | `generateWorldEvent` | `WorldEvent` |
+| `styleMatching.ts` | `analyzeWritingStyle` | 200-word style guide string |
 
-Each module defines:
-- **JSON schemas** using `@google/genai`'s `Type` enum for structured output
-- **System instructions** that set the AI's persona and task requirements
-- **Campaign context** integration for world-consistent generation
+### 5.5 Service Facade (`aiService.ts`)
 
-### 5.4 Service Facade (`geminiService.ts`)
-
-Every AI function is exported through the facade, which handles mock mode switching:
+All AI functions route through `aiService.ts` with mock mode switching:
 
 ```typescript
-export const generateNpc = (prompt, useGroundedSearch, isMockMode, campaignContext) => {
-    if (isMockMode) return mockService.generateNpc(prompt, useGroundedSearch);
-    return aiRealmWeaver.generateNpc(prompt, useGroundedSearch, campaignContext);
+export const generateNpc = (prompt: string, isMockMode = false, campaignContext?: string) => {
+    if (isMockMode) return mockService.generateNpc(prompt, false, campaignContext);
+    return aiRealmWeaver.generateNpc(prompt, campaignContext);
 };
 ```
 
-**21 exported functions** cover all generation, coaching, parsing, and chat operations.
+### 5.6 Mock Service (`ai/mockService.ts`)
 
-### 5.5 Mock Service (`ai/mockService.ts`)
+Mirrors the facade API with hardcoded sample data, simulated async delays, and no external API calls. Used for offline development, smoke tests, and demo mode.
 
-Mirrors the facade API with:
-- Hardcoded sample data for every entity type
-- Simulated async delays
-- No external API calls
+### 5.7 Campaign Context
 
-Used for offline development, smoke tests, and demo mode.
+`services/contextBuilder.ts` provides a tiered, token-budget-aware builder:
 
-### 5.6 Campaign Context
-
-Every AI call receives a `campaignContext` string built from the active campaign:
+- **Variant `'generation'`** — world consistency: all entity names, setting, relationships
+- **Variant `'coach'`** — current session: active scene, combat, recent events first
+- **Variant `'chat'`** — balanced: entity names + current context
 
 ```typescript
-const campaignContext = `
-Setting: ${campaign.setting}
-Existing NPCs: ${campaign.npcs.map(n => n.name).join(', ')}
-Existing Locations: ${campaign.locations.map(l => l.name).join(', ')}
-// ... factions, items, session history, active scene, etc.
-`;
+import { buildCampaignContext } from '@/services/contextBuilder';
+const campaignContext = buildCampaignContext(campaign, 'generation', 4000);
 ```
 
-This ensures generated content is consistent with the existing world.
+A simpler version in `utils/entityUtils.ts` builds a flat string with entity names only.
 
 ---
 
@@ -279,82 +334,98 @@ This ensures generated content is consistent with the existing world.
 
 ### 6.1 View Routing
 
-`App.tsx` manages the active view via `EditorView` type:
+`EditorView` type in `App.tsx` defines all valid views:
 
 ```typescript
-type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' |
+export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' |
     'adventures' | 'lorebook' | 'session-logs' | 'player-characters' |
-    'plots' | 'combat' | 'relationships' | 'session-runner';
+    'plots' | 'combat' | 'relationships' | 'session-runner' | 'secrets';
 ```
 
-View selection is driven by `CampaignSidebar` navigation. The main content area renders the appropriate dashboard, editor, or tool based on `activeView` and any selected entity ID.
+`components/layout/ViewRouter.tsx` renders the correct component for each `EditorView`. This was extracted from `App.tsx` to reduce its line count from ~1165 to ~564.
 
 ### 6.2 Three-Tier Component Pattern
 
 **Dashboards** (`components/dashboards/`)
 - List views showing all entities of a type
-- Embed the corresponding generator inline
-- Handle entity selection and creation callbacks
-- 9 dashboards: NPC, Location, Faction, Item, Adventure, Article, SessionLog, PlayerCharacter, Plot
+- Embed creation panel via `EntityCreationPanel` (chat/form toggle)
+- Use `useEntitySearch` for search/filter
+- Handle entity selection callbacks
+- 10 dashboards: NPC, Location, Faction, Item, Adventure, Article, SessionLog, PlayerCharacter, Plot, Note
 
 **Generators** (`components/generators/`)
 - AI-powered creation forms
-- Accept `isMockMode` and `campaignContext` props
-- Call `geminiService` functions and return created entities via callbacks
-- Support both prompt-based and chat-based creation (EntityChatGenerator)
+- Accept `isMockMode`, `campaignContext`, and `onEntityCreated` callback props
+- Call `aiService` functions
+- Support form-based creation; chat-based creation via `EntityChatGenerator`
 - 8 generators + EntityChatGenerator
 
 **Editors** (`components/editors/`)
-- Detail editing views for individual entities
+- Detail editing views with tabbed layouts
 - Manage local form state for fields
-- Include AI-assist buttons for individual field generation
-- Call `onUpdate` callbacks to persist changes via campaignService
-- 13 editors + PrepDocumentView
+- Include AI-assist buttons (via `RegenerateButton`) for individual field generation
+- Accept `onNavigate` callback for `EntityLink` click handling
+- 12 editors + PrepDocumentView
 
-### 6.3 Specialized Components
+### 6.3 Custom Hooks
 
-**DmCoach** (`components/dialogs/DmCoach.tsx`)
-- Slide-out panel with three tools: Narrator, Improviser, Rollable Table
-- Each tool has its own prompt, placeholder, action function, and icon
-- Low-latency mode toggle (`useLiteModel`) for faster in-session responses
-- Receives active session context for aware generation
+| Hook | Purpose | Returns |
+|------|---------|---------|
+| `useEntitySelection` | All selected entity IDs, nav stack, breadcrumbs, recent items, handlers | `EntitySelectionState` |
+| `useModalState` | Open/close state for all app-level modals; `closeTopModal()` priority logic | `ModalState` |
+| `useConfirmDialog` | Programmatic confirm dialog via context provider | `{ confirm }` |
+| `useToast` | Toast notification queue via context provider | `{ addToast }` |
+| `useEntitySearch` | Multi-field case-insensitive filter for entity arrays | `{ filteredEntities, searchTerm, setSearchTerm }` |
+| `useRovingTabIndex` | Roving tabindex for keyboard grid/list navigation | `{ getRovingProps }` |
 
-**EvocationWizard** (`components/dialogs/EvocationWizard.tsx`)
-- Modal with four modes: simple, detailed, ingest, chat
-- Manages internal `WizardStateData` (arrays of NPCs, locations, factions, items, adventures)
-- In-wizard editing before approval
-- Batch output via `onAddToCampaign` callback
+### 6.4 Dialog System
 
-**RealmChatWidget** (`components/RealmChat/RealmChatWidget.tsx`)
-- Floating chat interface (open/minimize/close states)
-- Multi-turn conversation history
-- Draft entity management — preview, edit, approve workflow
-- Model tier selection (performance/medium/quality)
+**`DialogShell`** provides:
+- `role="dialog" aria-modal="true"`
+- Focus trap (Tab/Shift+Tab stay within dialog)
+- Escape key to close
+- Backdrop click to close
+- Body scroll lock while open
 
-**SessionRunner** (`components/views/SessionRunner.tsx`)
-- Unified session view with scene management
-- Integrated combat tracking, voice notes, DM tools
-- Scene progression (planned → in-progress → completed)
+**`useConfirmDialog`** — context-provider pattern. `ConfirmDialogProvider` must wrap the app in `index.tsx`. Components call `const { confirm } = useConfirmDialog()` then `await confirm(title, message, options)`.
 
-**RelationshipGraph** (`components/visualizers/RelationshipGraph.tsx`)
-- D3-based force-directed graph of entity relationships
-- Interactive: click nodes to navigate to entity editors
-- Auto-layout via Dagre
+**`useToast`** — context-provider pattern. `ToastProvider` must wrap the app in `index.tsx`. Components call `const { addToast } = useToast()` then `addToast(message, variant)`.
 
-### 6.4 Shared Components
+### 6.5 Entity Cross-Linking System
 
-- **Button** — styled button with variant support
-- **Textarea** — styled textarea
-- **Icons** — centralized re-export from `lucide-react` (all icon imports must go through this file)
-- **EntityHistoryManager** — version history tracking for entities that support undo/history
+| Component | Purpose |
+|-----------|---------|
+| `EntityLink` | Renders entity name as a styled inline link; shows `EntityQuickCard` on hover |
+| `EntityQuickCard` | Portal-rendered floating preview card; mobile: bottom sheet |
+| `LinkedText` | Scans text for entity name matches and wraps them in `EntityLink` |
+| `BacklinksPanel` | Displays all entities that reference the current entity (via `backlinkUtils`) |
+| `MentionInput` | Textarea with `@mention` autocomplete for 7 entity types |
+
+### 6.6 Shared Common Components
+
+| Component | Purpose |
+|-----------|---------|
+| `Button` | Styled button with variant support (primary/secondary/ghost/danger) |
+| `Textarea` / `AiTextarea` | Styled textarea; exports `inputBaseClasses`, `textareaBaseClasses` |
+| `Icons` | Centralized re-export from `lucide-react` — ALL icon imports must use this |
+| `EntityHistoryManager` | Version history tracking for entities that support undo/history |
+| `EntityCreationPanel` | Chat-vs-form creation mode toggle for dashboards |
+| `RegenerateButton` | Inline AI field regeneration with expanded preview panel |
+| `SkeletonCard` | Animated loading placeholder |
+| `TabLayout` | Reusable tabbed panel layout with `TabDefinition` interface |
+| `DmStylePanel` | DM Style settings panel (guided/standard/power modes) |
+| `GenerateHerePanel` | Inline generation trigger panel with collapsible prompt textarea |
+| `SceneResourcesPanel` | Collapsible in-editor NPC/location reference for SceneEditor |
+| `CommandPalette` | Ctrl+K global search across all entity types |
+| `Breadcrumbs` | Navigation breadcrumb trail with clickable segments |
+| `KeyboardShortcutsHelp` | Keyboard shortcut reference overlay |
+| `ErrorBoundary` | Class-based error boundary; optional custom fallback prop |
 
 ---
 
 ## 7. Type System
 
 ### 7.1 Entity Type Pattern
-
-Each entity has its own file in `types/` and is re-exported via `types/index.ts`:
 
 ```typescript
 // types/NPC.ts
@@ -363,82 +434,86 @@ export interface NPC {
     name: string;         // Display name
     description: string;  // Primary description
     history: Array<{...}>;  // Version history
-    // ... entity-specific fields
+    // entity-specific fields...
 }
 ```
 
 **Required fields (all entities):** `id`, `name`
-**Common fields:** `description`, `history`
+**Common fields:** `description`, `history` (for entities with version tracking)
 
 ### 7.2 Campaign Type
 
+See `types/Campaign.ts` for the authoritative definition. Key fields beyond the entity arrays:
+
 ```typescript
 interface Campaign {
-    id: string;
-    title: string;
-    settingType: 'custom' | 'official';
-    officialSetting?: string;
-    setting: string;
-    npcs: NPC[];
-    locations: Location[];
-    factions: Faction[];
-    items: Item[];
-    adventures: Adventure[];     // Each contains Scene[]
-    articles: Article[];
-    sessionLogs: SessionLog[];
-    playerCharacters: PlayerCharacter[];
-    plots: Plot[];
-    notes: Note[];
+    // ...entity arrays (npcs, locations, factions, etc.)...
+    secrets?: Secret[];
     activeEncounter?: Encounter;
     activeSceneId?: string;
     activeSessionId?: string;
+    pinnedEntities?: Array<{ type: string; id: string }>;
+    dmStyle?: DmStyle;               // 'guided' | 'standard' | 'power'
+    featureOverrides?: Record<string, boolean>;
+    wizardDismissed?: boolean;
+    styleProfile?: string;           // AI-generated DM voice description
+    gcpApiKey?: string;              // Optional GCP key for audio transcription
 }
 ```
 
-### 7.3 Adding a New Entity Type
+### 7.3 ENTITY_TYPE_CONFIG
+
+Single source of truth for entity type metadata in `utils/entityUtils.ts`:
+
+```typescript
+export const ENTITY_TYPE_CONFIG: Record<string, { icon: string; color: string; label: string }> = {
+  npc:              { icon: 'NPCs',             color: 'amber',   label: 'NPCs' },
+  location:         { icon: 'Locations',        color: 'emerald', label: 'Locations' },
+  faction:          { icon: 'Factions',         color: 'violet',  label: 'Factions' },
+  item:             { icon: 'Items',            color: 'sky',     label: 'Items' },
+  adventure:        { icon: 'Adventures',       color: 'orange',  label: 'Adventures' },
+  article:          { icon: 'BookCopy',         color: 'cyan',    label: 'Articles' },
+  sessionLog:       { icon: 'SessionLog',       color: 'rose',    label: 'Session Logs' },
+  'session-log':    { icon: 'SessionLog',       color: 'rose',    label: 'Session Logs' },
+  playerCharacter:  { icon: 'PlayerCharacters', color: 'teal',    label: 'Player Characters' },
+  'player-character': { icon: 'PlayerCharacters', color: 'teal', label: 'Player Characters' },
+  plot:             { icon: 'Plot',             color: 'yellow',  label: 'Plots' },
+  note:             { icon: 'FileText',         color: 'slate',   label: 'Notes' },
+};
+```
+
+Derive color shades: `` `text-${config.color}-400` ``, `` `bg-${config.color}-900/60` ``.
+
+### 7.4 Adding a New Entity Type
 
 1. Create `types/NewEntity.ts`
 2. Export from `types/index.ts`
-3. Add array to `Campaign` interface
+3. Add array to `Campaign` interface in `types/Campaign.ts`
 4. Add CRUD methods in `campaignService.ts`
 5. Add mock data in `mockService.ts`
-6. Add facade function in `geminiService.ts`
+6. Add facade function in `aiService.ts`
 7. Add default factory in `entityUtils.ts`
-8. Create generator, dashboard, and editor components
-9. Add view routing in `App.tsx`
-10. Add sidebar entry in `CampaignSidebar.tsx`
+8. Add entry in `ENTITY_TYPE_CONFIG` in `entityUtils.ts`
+9. Create generator, dashboard (with `EntityCreationPanel` + `useEntitySearch`), and editor components
+10. Add `EditorView` value in `App.tsx`
+11. Add view rendering in `ViewRouter.tsx`
+12. Add sidebar entry in `CampaignSidebar.tsx`
 
 ---
 
-## 8. Knowledge Graph & Context System
+## 8. Utilities
 
-### 8.1 Entity Relationships
-
-Entities form an interconnected graph:
-
-```
-Adventure ──contains──→ Scene ──occurs at──→ Location
-                          │                      │
-                          ├──involves──→ NPC ←──controls── Faction
-                          │              │
-                          │              └──member of──→ Faction
-                          │
-Article ──references──→ [NPC | Location | Faction]
-
-Location ──parent of──→ Location (hierarchy)
-Location ──connects to──→ Location (adjacency)
-```
-
-### 8.2 Context Injection for DM Coach
-
-The DM Coach builds a priority-ranked context string:
-
-1. **Active session state** — current scene, adventure, location, present NPCs
-2. **Campaign notes** — most recently modified notes
-3. **Current focus** — whatever entity the DM is editing during the session
-4. **Linked lore** — articles connected to any entity currently in context
-
-This ensures the AI "knows" the web of relationships surrounding the party.
+| Utility | Purpose |
+|---------|---------|
+| `entityUtils.ts` | Default entity factories (`createDefaultNpc()`, etc.), `ENTITY_TYPE_CONFIG`, `buildCampaignContext()` |
+| `entityDetailExtractors.ts` | Extract display strings and edit details from entity fields; defines `QuickCardEntityType` |
+| `entityFieldSave.ts` | Dispatch field-level saves to the correct `campaignService.update*()` method by entity type |
+| `backlinkUtils.ts` | `computeBacklinks(campaign, entityId, entityType)` — compute all inbound cross-references |
+| `dmStyleUtils.ts` | `isFeatureVisible(feature, dmStyle, overrides)` — feature visibility logic for DM Style modes |
+| `demoTemplates.ts` | Starter demo campaign data for the onboarding quick-start option |
+| `diceUtils.ts` | `parseFormula(formula)` + `rollDice(formula)` — dice formula parsing and rolling |
+| `keyboardShortcuts.ts` | `SHORTCUTS` constant + `matchShortcut(event)` — keyboard shortcut definitions and matching |
+| `popoverPosition.ts` | `calculatePopoverPosition(triggerRect, isExpanded)` — screen coordinate calculation for popovers |
 
 ---
 
@@ -456,45 +531,69 @@ Tailwind is loaded via a CDN `<script>` tag in `index.html`, not as a build depe
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| Background | `bg-stone-900`, `bg-stone-800`, `bg-slate-950` | Page, cards, panels |
-| Text | `text-stone-100`, `text-stone-300` | Primary, secondary |
-| Accent | `text-amber-400`, `bg-amber-600` | Interactive, highlights |
-| Border | `border-stone-700` | Separators, card edges |
-| Radius | `rounded-lg`, `rounded-md` | Cards, inputs |
+| Page background | `bg-slate-900` | Page, outermost container |
+| Card background | `bg-slate-800` | Cards, panels, modals |
+| Secondary bg | `bg-slate-700` | Secondary buttons, inputs |
+| Primary text | `text-slate-100` | Body text, labels |
+| Secondary text | `text-slate-300` / `text-slate-400` | Secondary text, placeholders |
+| Accent | `text-amber-400`, `bg-amber-600` | Interactive elements, primary buttons |
+| Border | `border-slate-700`, `border-slate-600` | Separators, form inputs |
+| Radius | `rounded-lg` (cards), `rounded-md` (inputs) | Consistent corner rounding |
 
-### 9.3 Fonts
+**Note:** Earlier codebase versions used `stone-*` tokens. The codebase now uses `slate-*` throughout. Do not introduce `stone-*` in new code.
 
-- **Roboto** (sans-serif) — body text
-- **Merriweather** (serif) — headings
-- Both loaded via Google Fonts CDN in `index.html`
+### 9.3 Indigo Exception
+
+`indigo-*` tokens are used exclusively in `RealmChatWidget.tsx` to visually distinguish the AI assistant voice. Never add indigo elsewhere.
+
+### 9.4 Input Base Classes
+
+`components/common/Textarea.tsx` exports:
+
+```typescript
+export const inputBaseClasses = 'bg-slate-800 border border-slate-600 rounded-lg text-slate-100 '
+    + 'placeholder-slate-400 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 focus:outline-none';
+
+export const textareaBaseClasses = `${inputBaseClasses} resize-none`;
+```
+
+Use these for all text input and textarea elements.
 
 ---
 
 ## 10. Testing
 
-### 10.1 Smoke Tests (`smokeTest.ts`)
-
-Built-in test suite triggered from within the app:
-
-- **`testServiceFunctions()`** — validates all generator functions return data in the expected format
-- **`testCampaignHandlers()`** — simulates a full user session: create campaign → CRUD entities → link relationships → reorder → delete
-- Runs with `isMockMode` parameter to avoid API calls
-- Provides console-based pass/fail reporting
-
-### 10.2 Vitest
-
-Configured in `vite.config.ts` (globals: true, environment: node). Available for unit tests:
+### 10.1 Vitest Unit Tests (`tests/`)
 
 ```bash
-npm test         # Run once
+npm test          # Run once
 npm run test:watch  # Watch mode
 ```
 
-### 10.3 Manual Testing
+Test files cover:
+- `campaignService.sprint1.test.ts` — entity CRUD, relationships, cascade delete
+- `contextBuilder.test.ts` — tiered context assembly
+- `diceUtils.test.ts` — formula parsing and rolling
+- `archetype.*.test.ts` — 5 DM archetype scenario tests (forever-dm, lazy-dm, new-dm, tactical-dm, worldbuilder)
+- `migration-verification.test.ts` — AI migration correctness
 
-- Toggle mock mode in the header for API-free testing
-- Browser DevTools for state inspection
-- localStorage can be cleared to reset all data
+### 10.2 Playwright E2E Tests (`e2e/`)
+
+```bash
+npm run test:e2e          # Headless
+npm run test:e2e:headed   # Visible browser
+npm run test:e2e:ui       # Interactive UI
+```
+
+Covers: campaign creation lifecycle, entity CRUD, navigation (EntityLink, back stack), session runner flow, DM coach tools.
+
+### 10.3 Smoke Tests (`smokeTest.ts`)
+
+Runs automatically on app startup in development mode. Tests service function availability and a full entity CRUD session. Console reports pass/fail.
+
+### 10.4 Manual Testing
+
+Toggle mock mode in the app header for full feature testing without any AI API key or network access.
 
 ---
 
@@ -503,23 +602,27 @@ npm run test:watch  # Watch mode
 ### 11.1 Vite Configuration
 
 ```typescript
-// vite.config.ts
+// vite.config.ts highlights
 {
-    plugins: [react()],
+    plugins: [react(), aiProxyPlugin()],  // aiProxyPlugin adds /api/ai/generate endpoint
     server: { port: 3000, host: '0.0.0.0' },
     resolve: { alias: { '@': path.resolve(__dirname, '.') } },
     define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+        'process.env.REALMWEAVER_AI_PROVIDER': JSON.stringify(env.REALMWEAVER_AI_PROVIDER || 'claude-cli'),
+        'process.env.AI_PROVIDER': JSON.stringify(env.AI_PROVIDER || 'claude-cli'),
+        // SECURITY: ANTHROPIC_API_KEY is intentionally NOT injected into the client bundle.
     }
 }
 ```
 
 ### 11.2 Environment Variables
 
-| Variable | Source | Usage |
-|----------|--------|-------|
-| `GEMINI_API_KEY` | `.env.local` | Injected at build time via Vite `define` |
+| Variable | Source | Injected to Browser | Purpose |
+|----------|--------|---------------------|---------|
+| `REALMWEAVER_AI_PROVIDER` | `.env.local` | Yes | Active provider name |
+| `ANTHROPIC_API_KEY` | `.env.local` | **No** | Used server-side in Vite middleware only |
+| `CLAUDE_CLI_PATH` | `.env.local` | No | Path to `claude` binary (Vite middleware) |
+| `GEMINI_API_KEY` | `.env.local` | Yes (legacy compat) | Unused; kept for legacy code paths |
 
 ### 11.3 Production Build
 
@@ -528,26 +631,23 @@ npm run build    # Outputs to dist/
 npm run preview  # Serves dist/ for verification
 ```
 
-The build produces a static SPA bundle. No server-side rendering or API backend.
+The build produces a static SPA bundle. No server-side rendering. The Vite proxy middleware is a development-time tool only — it is not part of the production bundle.
 
 ---
 
 ## 12. Security Considerations
 
-- **API key handling:** The Gemini API key is injected at build time — it is embedded in the client bundle. This is acceptable for the current deployment model (Google AI Studio) but would need server-side proxying for public deployment.
+- **API key handling:** `ANTHROPIC_API_KEY` is NOT injected into the client bundle. It is consumed server-side in the Vite proxy middleware. The `claude-cli` provider has no API key at all — authentication is handled by the Claude Code CLI binary's own session.
 - **Data storage:** All campaign data is stored in browser localStorage. No server-side persistence.
-- **No authentication:** The app is single-user, local-only. Cloud sync and auth are planned for Phase 5.
+- **No authentication:** The app is single-user, local-only.
+- **CLI invocation:** Uses `execFile` (not `exec`) to prevent shell injection. Large prompts use a temp file approach.
 - **Input sanitization:** AI-generated content is rendered as text/markdown, not raw HTML.
 
 ---
 
 ## 13. Known Limitations & Technical Debt
 
-1. **No server-side persistence** — localStorage only; data is browser-specific and can be lost on clear
-2. **API key in client bundle** — acceptable for current deployment, needs proxying for public use
-3. **No formal test coverage** — smoke tests provide sanity checks but not comprehensive unit/integration coverage
-4. **No linting/formatting tools** — no ESLint or Prettier configured
-5. **No CI/CD pipeline** — no automated builds, tests, or deployments
-6. **Large files** — `campaignService.ts` (~1,736 lines) and `App.tsx` (~671 lines) could benefit from decomposition
-7. **Tailwind CDN** — no tree-shaking of CSS; entire Tailwind library is loaded
-8. **Import maps for deps** — limits control over dependency bundling and tree-shaking
+1. **No server-side persistence** — localStorage only; data is browser-specific
+2. **Anthropic API provider is a stub** — production path exists but is not yet implemented
+3. **`@google/genai` still listed as dependency** — present for legacy compatibility; not used in active code paths
+4. **Smoke tests lack TypeScript compilation** — `smokeTest.ts` runs directly in-browser, not via Vitest
