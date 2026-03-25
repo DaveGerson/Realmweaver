@@ -62,23 +62,26 @@ export const ActiveScenePanel: React.FC<ActiveScenePanelProps> = ({
     onNavigate,
 }) => {
     const [showRecap, setShowRecap] = useState(true);
-    const [skillCheckRolls, setSkillCheckRolls] = useState<Record<number, { total: number; passed: boolean }>>({});
+    const [skillCheckRolls, setSkillCheckRolls] = useState<Record<number, { d20: number; modifier: number; total: number; passed: boolean }>>({});
+    const [skillCheckModifiers, setSkillCheckModifiers] = useState<Record<number, number>>({});
 
     const handleSkillCheckRoll = useCallback((checkIndex: number, dc: number, skillName: string) => {
-        const { results, total } = rollDice({ count: 1, sides: 20, modifier: 0 });
+        const modifier = skillCheckModifiers[checkIndex] ?? 0;
+        const { results, total: d20 } = rollDice({ count: 1, sides: 20, modifier: 0 });
+        const total = d20 + modifier;
         const passed = total >= dc;
-        setSkillCheckRolls(prev => ({ ...prev, [checkIndex]: { total, passed } }));
+        setSkillCheckRolls(prev => ({ ...prev, [checkIndex]: { d20, modifier, total, passed } }));
 
         const roll: DiceRoll = {
             id: crypto.randomUUID(),
-            formula: '1d20',
+            formula: modifier !== 0 ? `1d20${modifier >= 0 ? '+' : ''}${modifier}` : '1d20',
             results,
             total,
             timestamp: new Date().toISOString(),
             note: `${skillName} check (DC ${dc}) - ${passed ? 'Pass' : 'Fail'}`,
         };
         campaignService.addDiceRollToSession(roll);
-    }, []);
+    }, [skillCheckModifiers]);
 
     return (
         <div className={twMerge(
@@ -251,19 +254,32 @@ export const ActiveScenePanel: React.FC<ActiveScenePanelProps> = ({
                             <div className="space-y-2">
                                 {activeScene.skillChecks.map((check, i) => {
                                     const rollResult = skillCheckRolls[i];
+                                    const modifier = skillCheckModifiers[i] ?? 0;
                                     return (
                                         <div key={i} className="flex items-center gap-3 text-sm flex-wrap">
                                             <span className="text-amber-400 font-mono font-bold">DC {check.dc}</span>
                                             <span className="text-white">{check.skill}</span>
                                             {check.description && <span className="text-slate-400">— {check.description}</span>}
-                                            <button
-                                                onClick={() => handleSkillCheckRoll(i, check.dc, check.skill)}
-                                                className="px-2 py-0.5 rounded-md bg-amber-700 hover:bg-amber-600 text-white text-xs font-semibold transition-colors flex items-center gap-1"
-                                                title={`Roll 1d20 vs DC ${check.dc}`}
-                                            >
-                                                <Icons.Dice className="w-3 h-3" />
-                                                Roll
-                                            </button>
+                                            <div className="flex items-center gap-1.5">
+                                                <label className="text-xs text-slate-400 sr-only" htmlFor={`modifier-${i}`}>Modifier</label>
+                                                <input
+                                                    id={`modifier-${i}`}
+                                                    type="number"
+                                                    value={modifier}
+                                                    onChange={e => setSkillCheckModifiers(prev => ({ ...prev, [i]: parseInt(e.target.value, 10) || 0 }))}
+                                                    className="w-14 bg-slate-700 border border-slate-600 rounded-md px-2 py-1 text-xs text-slate-100 text-center focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+                                                    title="Modifier (e.g. +5 for proficiency)"
+                                                    aria-label="Roll modifier"
+                                                />
+                                                <button
+                                                    onClick={() => handleSkillCheckRoll(i, check.dc, check.skill)}
+                                                    className="px-3 py-1.5 min-h-[44px] rounded-md bg-amber-700 hover:bg-amber-600 text-white text-xs font-semibold transition-colors flex items-center gap-1"
+                                                    title={`Roll 1d20${modifier >= 0 ? '+' : ''}${modifier} vs DC ${check.dc}`}
+                                                >
+                                                    <Icons.Dice className="w-3 h-3" />
+                                                    Roll
+                                                </button>
+                                            </div>
                                             {rollResult && (
                                                 <span className={twMerge(
                                                     "text-xs font-mono font-bold px-2 py-0.5 rounded-full",
@@ -271,7 +287,7 @@ export const ActiveScenePanel: React.FC<ActiveScenePanelProps> = ({
                                                         ? "bg-green-500/20 text-green-400"
                                                         : "bg-red-500/20 text-red-400"
                                                 )}>
-                                                    Rolled: {rollResult.total} — {rollResult.passed ? 'Pass' : 'Fail'}
+                                                    {rollResult.d20}{rollResult.modifier !== 0 ? (rollResult.modifier > 0 ? `+${rollResult.modifier}` : rollResult.modifier) : ''} = {rollResult.total} — {rollResult.passed ? 'Pass' : 'Fail'}
                                                 </span>
                                             )}
                                         </div>

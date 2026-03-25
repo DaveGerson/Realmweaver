@@ -63,7 +63,7 @@ export const EntityCreationPanel: React.FC<EntityCreationPanelProps> = ({
 
       {/* Creation panel */}
       {creationMode === 'chat' ? (
-        <div className="h-[480px] border border-slate-800 rounded-xl overflow-hidden">
+        <div className="min-h-[480px] max-h-[70vh] border border-slate-800 rounded-xl overflow-hidden">
           {chatPanel}
         </div>
       ) : (

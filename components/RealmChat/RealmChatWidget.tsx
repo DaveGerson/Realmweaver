@@ -1,7 +1,8 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
+import { inputBaseClasses } from '../common/Textarea';
 import type { Campaign, ChatMessage, DraftEntity, ModelTier, NPC, Location, Faction, Item, Adventure, Article } from '../../types/index';
 import { chatWithRealmWeaver } from '../../services/aiService';
 import { twMerge } from 'tailwind-merge';
@@ -32,6 +33,7 @@ export const RealmChatWidget: React.FC<RealmChatWidgetProps> = ({ campaign, onAd
   const [isLoading, setIsLoading] = useState(false);
   const [tier, setTier] = useState<ModelTier>('medium');
   const [isEntityPickerOpen, setIsEntityPickerOpen] = useState(false);
+  const [entityPickerSearch, setEntityPickerSearch] = useState('');
 
   // Session-persistent chat history keyed by campaign ID
   const storageKey = `realmchat-history-${campaign.id}`;
@@ -221,8 +223,41 @@ export const RealmChatWidget: React.FC<RealmChatWidgetProps> = ({ campaign, onAd
               timestamp: Date.now()
           }]);
           setIsEntityPickerOpen(false);
+          setEntityPickerSearch('');
       }
   }
+
+  // Filter all entity lists for the entity picker search (case-insensitive name match)
+  const filteredPickerNpcs = useMemo(() => {
+      if (!entityPickerSearch) return campaign.npcs;
+      const q = entityPickerSearch.toLowerCase();
+      return campaign.npcs.filter(e => e.name.toLowerCase().includes(q));
+  }, [campaign.npcs, entityPickerSearch]);
+  const filteredPickerLocations = useMemo(() => {
+      if (!entityPickerSearch) return campaign.locations;
+      const q = entityPickerSearch.toLowerCase();
+      return campaign.locations.filter(e => e.name.toLowerCase().includes(q));
+  }, [campaign.locations, entityPickerSearch]);
+  const filteredPickerFactions = useMemo(() => {
+      if (!entityPickerSearch) return campaign.factions;
+      const q = entityPickerSearch.toLowerCase();
+      return campaign.factions.filter(e => e.name.toLowerCase().includes(q));
+  }, [campaign.factions, entityPickerSearch]);
+  const filteredPickerItems = useMemo(() => {
+      if (!entityPickerSearch) return campaign.items;
+      const q = entityPickerSearch.toLowerCase();
+      return campaign.items.filter(e => e.name.toLowerCase().includes(q));
+  }, [campaign.items, entityPickerSearch]);
+  const filteredPickerAdventures = useMemo(() => {
+      if (!entityPickerSearch) return campaign.adventures;
+      const q = entityPickerSearch.toLowerCase();
+      return campaign.adventures.filter(e => e.title.toLowerCase().includes(q));
+  }, [campaign.adventures, entityPickerSearch]);
+  const filteredPickerArticles = useMemo(() => {
+      if (!entityPickerSearch) return campaign.articles;
+      const q = entityPickerSearch.toLowerCase();
+      return campaign.articles.filter(e => e.title.toLowerCase().includes(q));
+  }, [campaign.articles, entityPickerSearch]);
 
   const selectedDraft = drafts.find(d => d.id === selectedDraftId);
 
@@ -306,15 +341,28 @@ export const RealmChatWidget: React.FC<RealmChatWidgetProps> = ({ campaign, onAd
                             <div className="absolute inset-0 bg-slate-900 z-20 flex flex-col animate-in fade-in duration-200">
                                 <div className="p-3 border-b border-slate-700 flex justify-between items-center bg-slate-800">
                                     <h4 className="text-sm font-semibold text-slate-200">Load Entity to Edit</h4>
-                                    <button onClick={() => setIsEntityPickerOpen(false)}><Icons.X className="w-4 h-4 text-slate-400" /></button>
+                                    <button onClick={() => { setIsEntityPickerOpen(false); setEntityPickerSearch(''); }}><Icons.X className="w-4 h-4 text-slate-400" /></button>
+                                </div>
+                                <div className="p-2 border-b border-slate-700/50 bg-slate-800/50">
+                                    <input
+                                        type="text"
+                                        value={entityPickerSearch}
+                                        onChange={e => setEntityPickerSearch(e.target.value)}
+                                        placeholder="Search entities..."
+                                        className={`${inputBaseClasses} w-full px-3 py-1.5 text-sm`}
+                                        autoFocus
+                                    />
                                 </div>
                                 <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
-                                    <EntityPickerList title="NPCs" items={campaign.npcs} type="npc" onSelect={handleImportEntity} />
-                                    <EntityPickerList title="Locations" items={campaign.locations} type="location" onSelect={handleImportEntity} />
-                                    <EntityPickerList title="Factions" items={campaign.factions} type="faction" onSelect={handleImportEntity} />
-                                    <EntityPickerList title="Items" items={campaign.items} type="item" onSelect={handleImportEntity} />
-                                    <EntityPickerList title="Adventures" items={campaign.adventures} type="adventure" onSelect={handleImportEntity} />
-                                    <EntityPickerList title="Lore" items={campaign.articles} type="article" onSelect={handleImportEntity} />
+                                    <EntityPickerList title="NPCs" items={filteredPickerNpcs} type="npc" onSelect={handleImportEntity} />
+                                    <EntityPickerList title="Locations" items={filteredPickerLocations} type="location" onSelect={handleImportEntity} />
+                                    <EntityPickerList title="Factions" items={filteredPickerFactions} type="faction" onSelect={handleImportEntity} />
+                                    <EntityPickerList title="Items" items={filteredPickerItems} type="item" onSelect={handleImportEntity} />
+                                    <EntityPickerList title="Adventures" items={filteredPickerAdventures} type="adventure" onSelect={handleImportEntity} />
+                                    <EntityPickerList title="Lore" items={filteredPickerArticles} type="article" onSelect={handleImportEntity} />
+                                    {entityPickerSearch && filteredPickerNpcs.length === 0 && filteredPickerLocations.length === 0 && filteredPickerFactions.length === 0 && filteredPickerItems.length === 0 && filteredPickerAdventures.length === 0 && filteredPickerArticles.length === 0 && (
+                                        <p className="text-center text-slate-500 text-sm py-6">No entities match "{entityPickerSearch}"</p>
+                                    )}
                                 </div>
                             </div>
                         )}
