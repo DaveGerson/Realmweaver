@@ -100,6 +100,8 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
   const [approvedIds, setApprovedIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [appliedCount, setAppliedCount] = useState(0);
+  // Tracks which (eventId, updateIndex) pairs have been expanded beyond 3 lines
+  const [expandedUpdates, setExpandedUpdates] = useState<Set<string>>(new Set());
 
   const selectedLabel =
     DAYS_LABELS.reduce((best, opt) => {
@@ -129,6 +131,18 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
         next.delete(id);
       } else {
         next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleUpdateExpanded = (key: string) => {
+    setExpandedUpdates(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
       }
       return next;
     });
@@ -188,37 +202,15 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
                 <label className="block text-slate-200 font-semibold mb-3 text-sm">
                   Time elapsed since last session
                 </label>
-                <div className="space-y-3">
-                  <input
-                    type="range"
-                    min={1}
-                    max={180}
-                    value={daysPassed}
-                    onChange={e => setDaysPassed(Number(e.target.value))}
-                    className="w-full accent-amber-500 cursor-pointer"
-                    aria-label="Days elapsed"
-                  />
-                  <div className="flex justify-between text-xs text-slate-500 select-none">
-                    <span>1 day</span>
-                    <span>1 week</span>
-                    <span>1 month</span>
-                    <span>6 months</span>
-                  </div>
-                </div>
-                <div className="mt-3 text-center">
-                  <span className="inline-block bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-amber-300 font-semibold text-sm">
-                    {selectedLabel} ({daysPassed} {daysPassed === 1 ? 'day' : 'days'})
-                  </span>
-                </div>
 
-                {/* Quick-pick buttons */}
-                <div className="flex flex-wrap gap-2 mt-4 justify-center">
+                {/* Preset quick-pick buttons — replaces the misleading linear slider */}
+                <div className="flex flex-wrap gap-2 justify-center">
                   {DAYS_LABELS.map(opt => (
                     <button
                       key={opt.days}
                       onClick={() => setDaysPassed(opt.days)}
                       className={twMerge(
-                        'px-3 py-1 rounded-full text-xs font-medium border transition-colors',
+                        'px-3 py-1.5 rounded-full text-sm font-medium border transition-colors',
                         daysPassed === opt.days
                           ? 'bg-amber-600 border-amber-500 text-white'
                           : 'bg-slate-800 border-slate-600 text-slate-300 hover:border-amber-600 hover:text-amber-300'
@@ -227,6 +219,12 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
                       {opt.label}
                     </button>
                   ))}
+                </div>
+
+                <div className="mt-4 text-center">
+                  <span className="inline-block bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-amber-300 font-semibold text-sm">
+                    {selectedLabel} ({daysPassed} {daysPassed === 1 ? 'day' : 'days'})
+                  </span>
                 </div>
               </div>
 
@@ -332,6 +330,8 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
                           <p className="text-slate-500 text-xs uppercase tracking-wide font-medium">Proposed Changes</p>
                           {event.suggestedUpdates.map((upd, idx) => {
                             const entityName = resolveEntityName(campaign, upd.entityId, upd.entityType);
+                            const updateKey = `${event.id}-${idx}`;
+                            const isExpanded = expandedUpdates.has(updateKey);
                             return (
                               <div key={idx} className="bg-slate-900/60 border border-slate-700/50 rounded p-2.5 text-xs space-y-1.5">
                                 <div className="flex items-center gap-1.5 text-slate-400">
@@ -342,16 +342,27 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
                                 <div className="flex gap-2">
                                   <div className="flex-1 bg-red-950/30 border border-red-800/30 rounded p-2">
                                     <p className="text-red-400 text-[10px] font-semibold mb-0.5 uppercase tracking-wide">Before</p>
-                                    <p className="text-slate-400 leading-relaxed line-clamp-3">{upd.currentValue || '(empty)'}</p>
+                                    <p className={twMerge('text-slate-400 leading-relaxed', !isExpanded && 'line-clamp-3')}>
+                                      {upd.currentValue || '(empty)'}
+                                    </p>
                                   </div>
                                   <div className="flex items-center flex-shrink-0 text-slate-500">
                                     <Icons.ChevronRight className="w-3 h-3" />
                                   </div>
                                   <div className="flex-1 bg-green-950/30 border border-green-800/30 rounded p-2">
                                     <p className="text-green-400 text-[10px] font-semibold mb-0.5 uppercase tracking-wide">After</p>
-                                    <p className="text-slate-300 leading-relaxed line-clamp-3">{upd.proposedValue}</p>
+                                    <p className={twMerge('text-slate-300 leading-relaxed', !isExpanded && 'line-clamp-3')}>
+                                      {upd.proposedValue}
+                                    </p>
                                   </div>
                                 </div>
+                                {/* Show more / Show less toggle */}
+                                <button
+                                  onClick={() => toggleUpdateExpanded(updateKey)}
+                                  className="text-[10px] text-slate-500 hover:text-amber-400 transition-colors mt-0.5"
+                                >
+                                  {isExpanded ? 'Show less' : 'Show more'}
+                                </button>
                               </div>
                             );
                           })}

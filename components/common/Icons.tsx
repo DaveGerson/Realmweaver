@@ -84,6 +84,7 @@ import {
   Copy,
   LayoutGrid,
   GitGraph,
+  RefreshCw,
 } from 'lucide-react';
 
 export const Icons = {
@@ -170,6 +171,7 @@ export const Icons = {
   Duplicate: Copy,
   AllCampaigns: LayoutGrid,
   WorldGraph: GitGraph,
+  RefreshCw,
 };
 
 export const SceneIcon = ({ type, className }: { type: string, className?: string }) => {

@@ -2,7 +2,7 @@
 // components/dialogs/ContinuityChecker.tsx
 // Modal dialog that displays continuity issues for the active campaign.
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { Campaign } from '@/types/index';
 import { checkContinuity } from '@/services/continuityChecker';
 import type { ContinuityIssue, IssueSeverity } from '@/services/continuityChecker';
@@ -163,18 +163,27 @@ export const ContinuityChecker: React.FC<ContinuityCheckerProps> = ({
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
   const [isRunning, setIsRunning] = useState(true);
+  const runTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Run the checker. We defer via setTimeout so the spinner renders first.
-  useEffect(() => {
+  const runCheck = useCallback(() => {
+    if (runTimerRef.current) clearTimeout(runTimerRef.current);
     setIsRunning(true);
-    const timer = setTimeout(() => {
+    runTimerRef.current = setTimeout(() => {
       const result = checkContinuity(campaign);
       result.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
       setIssues(result);
       setIsRunning(false);
     }, 50);
-    return () => clearTimeout(timer);
   }, [campaign]);
+
+  useEffect(() => {
+    runCheck();
+    return () => {
+      if (runTimerRef.current) clearTimeout(runTimerRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount; re-check is manual via runCheck()
 
   const handleDismiss = useCallback((id: string) => {
     setDismissedIds(prev => new Set([...prev, id]));
@@ -235,14 +244,29 @@ export const ContinuityChecker: React.FC<ContinuityCheckerProps> = ({
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-200 transition-colors p-1 rounded-md hover:bg-slate-700"
-            aria-label="Close continuity checker"
-          >
-            <Icons.X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Re-check button */}
+            <button
+              type="button"
+              onClick={runCheck}
+              disabled={isRunning}
+              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-amber-300 transition-colors px-2 py-1 rounded-md hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label="Re-run continuity check"
+              title="Re-check for issues"
+            >
+              <Icons.RefreshCw className={twMerge('w-3.5 h-3.5', isRunning && 'animate-spin')} />
+              <span className="hidden sm:inline">Re-check</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-slate-400 hover:text-slate-200 transition-colors p-1 rounded-md hover:bg-slate-700"
+              aria-label="Close continuity checker"
+            >
+              <Icons.X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Filter tabs */}

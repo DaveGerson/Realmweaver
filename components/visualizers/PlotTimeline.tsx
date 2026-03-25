@@ -222,10 +222,10 @@ export const PlotTimeline: React.FC<PlotTimelineProps> = ({
 
       <div className="flex">
         {/* ---- Fixed left column: plot name labels ---- */}
-        <div className="flex-shrink-0 z-10" style={{ width: LABEL_WIDTH }}>
-          {/* Header spacer matching the session header height */}
+        <div className="flex-shrink-0 z-20" style={{ width: LABEL_WIDTH }}>
+          {/* Header spacer — sticky so it stays aligned with the scrolling session header */}
           <div
-            className="border-b border-slate-700 bg-slate-900"
+            className="sticky top-0 z-20 border-b border-slate-700 bg-slate-900"
             style={{ height: ROW_HEIGHT }}
           />
           {/* One label row per plot */}
@@ -264,8 +264,8 @@ export const PlotTimeline: React.FC<PlotTimelineProps> = ({
             </div>
           ) : (
             <div style={{ width: Math.max(sessions.length * COL_WIDTH, 1), minWidth: '100%' }}>
-              {/* Session header row */}
-              <div className="flex border-b border-slate-700" style={{ height: ROW_HEIGHT }}>
+              {/* Session header row — sticky so column labels stay visible while scrolling vertically */}
+              <div className="flex border-b border-slate-700 sticky top-0 z-10 bg-slate-900 shadow-sm" style={{ height: ROW_HEIGHT }}>
                 {sessions.map((session, si) => (
                   <div
                     key={session.id}
