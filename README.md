@@ -56,7 +56,7 @@ GEMINI_API_KEY=your_api_key_here
 | **Build** | Vite 6.2 |
 | **AI** | Google Gemini (`gemini-2.5-flash` / `gemini-2.5-pro`) |
 | **State** | Custom store + Immer + `useSyncExternalStore` |
-| **Styling** | Tailwind CSS (CDN) — dark fantasy theme (stone + amber) |
+| **Styling** | Tailwind CSS (CDN) — dark fantasy theme (slate + amber) |
 | **Icons** | Lucide React (centralized via `Icons.tsx`) |
 | **Graphs** | React Flow + Dagre + D3 |
 | **Testing** | Vitest (97 unit tests) + Playwright (38 E2E tests) |
@@ -81,6 +81,9 @@ geminiService.ts (facade)    useSyncExternalStore()
 - Tiered context builder (token-budget-aware, 3 tiers)
 - Three-tier component hierarchy (dashboards → generators → editors)
 - Entity cross-linking (EntityLink, QuickCard, LinkedText, BacklinksPanel)
+- Decomposed App shell: ViewRouter, useEntitySelection, useModalState, sidebar sub-components, session sub-components
+- Accessible dialog system: DialogShell (focus trap), useConfirmDialog, useToast
+- ENTITY_TYPE_CONFIG as canonical entity color/icon registry
 
 All code at **project root** (no `src/` directory). Import alias `@/` maps to root.
 
@@ -120,6 +123,9 @@ npm run test:e2e:headed  # E2E with visible browser
 - **Named exports only** — no `export default`
 - **AI calls** through `geminiService.ts` facade — never `ai/` modules directly
 - **Mock mode** — every AI function has a mock implementation
+- **Modals** must use `DialogShell`; confirmations use `useConfirmDialog`; alerts use `useToast`
+- **Entity colors/icons** derived from `ENTITY_TYPE_CONFIG` in `utils/entityUtils.ts`
+- **Indigo** is reserved for `RealmChatWidget` only; all other accents use amber
 
 ### Testing
 
@@ -133,7 +139,7 @@ npm run test:e2e:headed  # E2E with visible browser
 
 ## Project Status
 
-**Phases A through F complete.** All local features are implemented, tested, and deployed.
+**Phases A through F complete, plus UX refactoring sprint.** All local features are implemented, tested, and deployed.
 
 | Phase | Status | What |
 |-------|--------|------|
@@ -145,6 +151,7 @@ npm run test:e2e:headed  # E2E with visible browser
 | D | Done | World coherence (context builder, plot timeline, continuity checker, relationship intelligence) |
 | E | Done | Visual polish (rich cards, tabbed editors, shortcuts, mobile, DM style) |
 | F | Done | Growth (campaign wizard, templates, world simulation, style matching, cross-campaign) |
+| UX Refactor | Done | App shell decomposition (ViewRouter, hooks, sidebar sub-components, session sub-components), accessible dialog system (DialogShell, useConfirmDialog, useToast), ENTITY_TYPE_CONFIG, ErrorBoundary, EntityCreationPanel, utility extraction |
 
 ---
 

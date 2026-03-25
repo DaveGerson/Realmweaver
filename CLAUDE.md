@@ -1,6 +1,6 @@
 # CLAUDE.md - AI Assistant Guide for Realmweaver
 
-> **Last Updated:** 2026-03-08
+> **Last Updated:** 2026-03-24
 > **Purpose:** Comprehensive guide for AI assistants working with the Realmweaver codebase
 
 ---
@@ -94,29 +94,56 @@ All application code lives at the **project root**, not in a `src/` directory.
 
 ```
 /home/user/Realmweaver/
-├── App.tsx                      # Main application component (~621 lines)
+├── App.tsx                      # Main application component
 ├── index.tsx                    # React entry point
 ├── index.html                   # HTML template with Tailwind CDN + D3
 ├── vite.config.ts               # Vite configuration
 ├── tsconfig.json                # TypeScript configuration
 ├── package.json                 # Dependencies and scripts
-├── smokeTest.ts                 # Smoke tests (~389 lines)
+├── smokeTest.ts                 # Smoke tests
 ├── types.ts                     # Legacy types file (prefer types/ directory)
+│
+├── hooks/                       # Custom React hooks (UX refactoring sprint)
+│   ├── useEntitySelection.ts    # Selected entity state (replaces App.tsx inline state)
+│   ├── useModalState.ts         # Modal open/close/data lifecycle
+│   ├── useConfirmDialog.ts      # Programmatic confirm dialog (replaces window.confirm)
+│   ├── useToast.ts              # Toast notification queue (replaces window.alert)
+│   ├── useEntitySearch.ts       # Search/filter logic for dashboard entity lists
+│   └── useRovingTabIndex.ts     # Keyboard navigation (roving tabindex pattern)
 │
 ├── components/                  # UI components (organized by purpose)
 │   ├── common/                  # Reusable primitives
 │   │   ├── Button.tsx           # Styled button component
 │   │   ├── Icons.tsx            # Centralized icon exports from lucide-react
-│   │   ├── Textarea.tsx         # Styled textarea component
-│   │   └── EntityHistoryManager.tsx # Entity version history tracking
+│   │   ├── Textarea.tsx         # Styled textarea + exports inputBaseClasses, textareaBaseClasses
+│   │   ├── EntityHistoryManager.tsx # Entity version history tracking
+│   │   ├── DialogShell.tsx      # Base modal wrapper with focus trap and accessibility
+│   │   ├── ConfirmDialog.tsx    # Confirmation modal (used with useConfirmDialog)
+│   │   ├── ToastContainer.tsx   # Toast notification renderer (used with useToast)
+│   │   ├── ErrorBoundary.tsx    # React error boundary for graceful error display
+│   │   └── EntityCreationPanel.tsx  # Shared creation panel for dashboard generators
 │   ├── layout/                  # App shell
 │   │   ├── Header.tsx           # Top bar with tools access
-│   │   ├── CampaignSidebar.tsx  # Left sidebar navigation
-│   │   └── ContentWrapper.tsx   # Main content area wrapper
+│   │   ├── CampaignSidebar.tsx  # Left sidebar navigation (orchestrates sidebar/ sub-components)
+│   │   ├── ContentWrapper.tsx   # Main content area wrapper
+│   │   ├── ViewRouter.tsx       # Renders the active EditorView (extracted from App.tsx)
+│   │   └── sidebar/             # Sidebar sub-components
+│   │       ├── SidebarEntityList.tsx # Scrollable entity list with selection
+│   │       ├── SidebarSearch.tsx     # Inline sidebar search/filter input
+│   │       ├── PinnedEntities.tsx    # Pinned entity favorites section
+│   │       ├── RecentItems.tsx       # Recent entity history section
+│   │       ├── ArticleTreeItem.tsx   # Recursive article tree node
+│   │       └── sidebarUtils.ts      # Sidebar-specific helper functions
 │   ├── views/                   # High-level screens
 │   │   ├── WelcomeScreen.tsx    # Landing page
 │   │   ├── CampaignCreator.tsx  # New campaign setup
-│   │   └── CampaignSelector.tsx # Campaign picker
+│   │   ├── CampaignSelector.tsx # Campaign picker
+│   │   └── session/             # Session Runner sub-components
+│   │       ├── ActiveScenePanel.tsx  # Currently active scene display
+│   │       ├── SceneListPanel.tsx    # Ordered scene navigation list
+│   │       ├── RunningLog.tsx        # Freeform session notes capture
+│   │       ├── QuickToolsPanel.tsx   # Inline DM tools (dice, tables, etc.)
+│   │       └── QuickNpcGenerator.tsx # In-session quick NPC creation
 │   ├── dashboards/              # List views with embedded generators
 │   │   ├── NpcDashboard.tsx
 │   │   ├── LocationDashboard.tsx
@@ -151,7 +178,7 @@ All application code lives at the **project root**, not in a `src/` directory.
 │   │   ├── NoteEditor.tsx
 │   │   ├── CampaignSettingEditor.tsx
 │   │   └── PrepDocumentView.tsx     # Adventure prep document renderer
-│   ├── dialogs/                 # Modal components
+│   ├── dialogs/                 # Modal components (all use DialogShell)
 │   │   ├── DmCoach.tsx          # In-session DM assistance tool
 │   │   ├── EvocationWizard.tsx  # Batch generation wizard
 │   │   └── ExportModal.tsx      # Export format selection
@@ -160,22 +187,23 @@ All application code lives at the **project root**, not in a `src/` directory.
 │   ├── visualizers/             # Data visualization
 │   │   └── RelationshipGraph.tsx # Entity relationship graph (D3-based)
 │   └── RealmChat/               # Conversational AI widget
-│       └── RealmChatWidget.tsx  # Floating chat assistant
+│       └── RealmChatWidget.tsx  # Floating chat assistant (indigo accent only)
 │
 ├── services/                    # Business logic and external integrations
-│   ├── campaignService.ts       # Central state management (~1198 lines)
-│   ├── geminiService.ts         # Service facade (~143 lines, mock mode switching)
+│   ├── campaignService.ts       # Central state management
+│   ├── geminiService.ts         # Service facade (mock mode switching)
 │   ├── importExportService.ts   # Import/export functionality
 │   └── ai/                      # AI service modules
-│       ├── core.ts              # Core Gemini API wrapper (~106 lines)
-│       ├── realmWeaver.ts       # Entity generation (~278 lines)
-│       ├── dmCoach.ts           # In-session DM assistance (~99 lines)
-│       ├── evocationWizard.ts   # Batch generation & parsing (~189 lines)
-│       ├── realmChat.ts         # Conversational AI service (~141 lines)
-│       └── mockService.ts       # Mock data for testing (~423 lines)
+│       ├── core.ts              # Core Gemini API wrapper
+│       ├── realmWeaver.ts       # Entity generation
+│       ├── dmCoach.ts           # In-session DM assistance
+│       ├── evocationWizard.ts   # Batch generation & parsing
+│       ├── realmChat.ts         # Conversational AI service
+│       └── mockService.ts       # Mock data for testing
 │
 ├── types/                       # TypeScript type definitions
 │   ├── index.ts                 # Barrel export file
+│   ├── common.ts                # Shared primitive types (used across entity types)
 │   ├── Campaign.ts              # Root campaign type
 │   ├── NPC.ts                   # NPC entity
 │   ├── Location.ts              # Location entity
@@ -197,7 +225,11 @@ All application code lives at the **project root**, not in a `src/` directory.
 │   └── Graph.ts                 # Relationship graph types
 │
 └── utils/                       # Utility functions
-    └── entityUtils.ts           # Default entity factories and helpers
+    ├── entityUtils.ts           # Default entity factories, helpers, ENTITY_TYPE_CONFIG
+    ├── entityDetailExtractors.ts # Extract display strings from complex entity fields
+    ├── entityFieldSave.ts       # Debounced field-save helpers for editors
+    ├── popoverPosition.ts       # Calculate popover/tooltip screen coordinates
+    └── demoTemplates.ts         # Starter demo content for onboarding
 ```
 
 ### Import Path Alias
@@ -256,7 +288,7 @@ export const campaignService = createCampaignStore();
 
 ### 2. React Integration Pattern
 
-**Location:** `App.tsx:46-49`
+**Location:** `App.tsx`
 
 ```typescript
 const { campaigns, activeCampaignId, appStatus, saveStatus, lastSavedAt } = useSyncExternalStore(
@@ -300,6 +332,76 @@ debounced localStorage save → Notify subscribers → React re-render
 - Bidirectional syncing (NPCs ↔ Factions via `_synchronizeNpcFactionLink`)
 - Cycle detection (Location parent-child relationships)
 - Cascade deletion (removing entities cleans up references)
+
+### 5. App.tsx Decomposition (UX Refactoring Sprint)
+
+`App.tsx` delegates responsibilities to extracted units rather than containing everything inline:
+
+- **`hooks/useEntitySelection.ts`** — manages selected entity IDs per view type, replaces inline `useState` pairs in App.tsx
+- **`hooks/useModalState.ts`** — generic open/close/payload lifecycle for dialogs
+- **`components/layout/ViewRouter.tsx`** — renders the correct dashboard or editor for the active `EditorView`, extracted from the main render function in App.tsx
+
+### 6. SessionRunner Decomposition
+
+`components/views/SessionRunner.tsx` orchestrates five focused sub-components in `components/views/session/`:
+
+| Sub-component | Responsibility |
+|---------------|----------------|
+| `ActiveScenePanel` | Displays the currently active scene with read-aloud text |
+| `SceneListPanel` | Shows the ordered scene list and handles scene selection |
+| `RunningLog` | Freeform note capture during session |
+| `QuickToolsPanel` | Inline DM tools (dice, rollable tables, improv prompts) |
+| `QuickNpcGenerator` | In-session rapid NPC creation without leaving the runner |
+
+### 7. CampaignSidebar Decomposition
+
+`CampaignSidebar.tsx` orchestrates sub-components in `components/layout/sidebar/`:
+
+| Sub-component | Responsibility |
+|---------------|----------------|
+| `SidebarEntityList` | Scrollable, selectable entity list per section |
+| `SidebarSearch` | Inline search/filter input |
+| `PinnedEntities` | Pinned favorites section |
+| `RecentItems` | Recently visited entity history |
+| `ArticleTreeItem` | Recursive tree node for nested articles |
+| `sidebarUtils.ts` | Sidebar-specific helpers (sorting, grouping) |
+
+### 8. Dialog System
+
+All modals use `DialogShell` as a base wrapper for consistent focus trap, keyboard dismiss, and accessibility attributes:
+
+```typescript
+// All new dialogs must use DialogShell
+import { DialogShell } from '@/components/common/DialogShell';
+
+const MyDialog: React.FC<Props> = ({ isOpen, onClose }) => (
+  <DialogShell isOpen={isOpen} onClose={onClose} title="My Dialog">
+    {/* dialog content */}
+  </DialogShell>
+);
+```
+
+For destructive confirmations use `useConfirmDialog` rather than `window.confirm`:
+
+```typescript
+const { confirm, ConfirmDialogPortal } = useConfirmDialog();
+// ...
+const ok = await confirm({ title: 'Delete NPC?', message: '...' });
+if (ok) campaignService.deleteNpc(id);
+// render <ConfirmDialogPortal /> in JSX
+```
+
+For user feedback use `useToast` rather than `window.alert`:
+
+```typescript
+const { toast, ToastPortal } = useToast();
+toast({ message: 'NPC saved', variant: 'success' });
+// render <ToastPortal /> in JSX
+```
+
+### 9. ErrorBoundary Wrapping
+
+`components/common/ErrorBoundary.tsx` wraps major view sections so a crash in one panel does not take down the whole app. Wrap top-level route regions and any component that fetches/processes external data.
 
 ---
 
@@ -518,6 +620,28 @@ import { PlusIcon, TrashIcon } from '@/components/common/Icons';
 import { Plus, Trash } from 'lucide-react';
 ```
 
+### EntityCreationPanel
+
+Dashboards that embed a generator panel use `EntityCreationPanel` from `components/common/EntityCreationPanel.tsx` instead of hand-building the creation UI. Pass the entity-type label and children (the generator component):
+
+```typescript
+import { EntityCreationPanel } from '@/components/common/EntityCreationPanel';
+
+<EntityCreationPanel entityLabel="NPC">
+  <NpcGenerator onNpcCreated={handleCreated} isMockMode={isMockMode} campaignContext={campaignContext} />
+</EntityCreationPanel>
+```
+
+### useEntitySearch for Dashboard Lists
+
+Dashboards use `useEntitySearch` from `hooks/useEntitySearch.ts` to provide consistent search/filter behaviour:
+
+```typescript
+import { useEntitySearch } from '@/hooks/useEntitySearch';
+
+const { query, setQuery, filteredEntities } = useEntitySearch(campaign.npcs, ['name', 'description']);
+```
+
 ---
 
 ## Type System
@@ -567,11 +691,12 @@ export interface Campaign {
 5. Add mock data in `services/ai/mockService.ts`
 6. Add facade function in `services/geminiService.ts`
 7. Add default factory in `utils/entityUtils.ts`
-8. Create `components/generators/NewEntityGenerator.tsx`
-9. Create `components/dashboards/NewEntityDashboard.tsx`
-10. Create `components/editors/NewEntityEditor.tsx`
-11. Add view routing in `App.tsx`
-12. Add sidebar entry in `components/layout/CampaignSidebar.tsx`
+8. Add an entry for the new type to `ENTITY_TYPE_CONFIG` in `utils/entityUtils.ts` (icon name, color token, label)
+9. Create `components/generators/NewEntityGenerator.tsx`
+10. Create `components/dashboards/NewEntityDashboard.tsx` — use `EntityCreationPanel` for the creation panel and `useEntitySearch` for filtering
+11. Create `components/editors/NewEntityEditor.tsx`
+12. Add view routing in `components/layout/ViewRouter.tsx`
+13. Add sidebar entry in `components/layout/CampaignSidebar.tsx`
 
 ---
 
@@ -588,23 +713,57 @@ Tailwind is loaded via CDN in `index.html`, not as a build dependency. This mean
 ### Common Style Patterns
 
 ```typescript
-// Dark theme with amber accents
-className="bg-stone-900 text-stone-100"
+// Dark theme with amber accents (slate grays, not stone)
+className="bg-slate-900 text-slate-100"
 className="text-amber-400 hover:text-amber-300"
-className="border-stone-700"
-className="bg-stone-800 rounded-lg p-4"
+className="border-slate-700"
+className="bg-slate-800 rounded-lg p-4"
 
 // Button variants
 className="bg-amber-600 hover:bg-amber-500 text-white rounded-lg px-4 py-2"
-className="bg-stone-700 hover:bg-stone-600 text-stone-200 rounded-lg px-4 py-2"
+className="bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg px-4 py-2"
 ```
 
 ### Design System
 
-- **Theme:** Dark fantasy/medieval (stone grays + amber accents)
+- **Theme:** Dark fantasy/medieval (slate grays + amber accents)
 - **Border radius:** `rounded-lg` for cards, `rounded-md` for inputs
 - **Spacing:** Tailwind standard spacing scale
 - **Typography:** Default Tailwind + monospace for code/tables
+
+### Indigo Exception
+
+Indigo is used **only** in `RealmChatWidget.tsx` to visually distinguish the AI assistant voice from the rest of the app UI. All other interactive accents, icons, and highlights use amber. Do not add indigo to any other component.
+
+### Input/Textarea Base Classes
+
+`components/common/Textarea.tsx` exports two shared class strings for consistent form field styling:
+
+```typescript
+import { inputBaseClasses, textareaBaseClasses } from '@/components/common/Textarea';
+
+// inputBaseClasses: bg-slate-800 border border-slate-600 rounded-lg text-slate-100
+//   placeholder-slate-400 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 focus:outline-none
+// textareaBaseClasses: same as inputBaseClasses + resize-none
+
+<input className={`${inputBaseClasses} px-3 py-2`} />
+<textarea className={`${textareaBaseClasses} p-3 h-24`} />
+```
+
+Use these instead of hand-rolling input styles in new components.
+
+### ENTITY_TYPE_CONFIG
+
+`utils/entityUtils.ts` exports `ENTITY_TYPE_CONFIG` as the single source of truth for entity type metadata (icon name, Tailwind color token, display label). Import this wherever you need entity colors or icons rather than hardcoding them:
+
+```typescript
+import { ENTITY_TYPE_CONFIG } from '@/utils/entityUtils';
+
+const config = ENTITY_TYPE_CONFIG['npc'];  // { icon: 'NPCs', color: 'amber', label: 'NPCs' }
+// Derive shades: `text-${config.color}-400`, `bg-${config.color}-900/60`
+```
+
+All dashboards, `EntityQuickCard`, `CommandPalette`, and `CampaignSidebar` derive colors from this config.
 
 ---
 
@@ -700,6 +859,10 @@ campaignService.linkSceneToLocation(sceneId, locationId);
 8. **Immer for state updates** - Never mutate state directly; use campaignService methods
 9. **`useSyncExternalStore`** - Components subscribe to campaignService state via this React hook
 10. **Entity defaults in `entityUtils.ts`** - Use factory functions like `createDefaultNpc()` for new entity creation
+11. **All modals must use `DialogShell`** - For focus trap, keyboard dismiss (Escape), and ARIA attributes
+12. **Use `useConfirmDialog` instead of `window.confirm`** - Provides branded UI consistent with the design system
+13. **Use `useToast` instead of `window.alert`** - Provides non-blocking feedback that doesn't interrupt the user
+14. **`ENTITY_TYPE_CONFIG` is the single source of truth for entity colors and icons** - Never hardcode entity type colors or icon names in components; derive them from the config in `utils/entityUtils.ts`
 
 ---
 
@@ -747,6 +910,10 @@ docs/
 7. **Forgetting to export types** - New types must be added to `types/index.ts` barrel export.
 8. **Using default exports** - The codebase uses named exports exclusively.
 9. **Missing `campaignContext`** - AI-generated content will be inconsistent with the campaign if context is not passed.
-10. **Not updating the `EditorView` type** - New views must be added to the union type in `App.tsx`.
+10. **Not updating `ViewRouter.tsx`** - New views must be added to `components/layout/ViewRouter.tsx` (no longer only `App.tsx`).
 11. **Forgetting `EntityHistoryManager`** - Entities that support history (NPCs, Locations, etc.) should integrate the history tracking component.
 12. **Not updating documentation** - After significant work, update `docs/architecture/high-level-design.md`, `README.md`, and `CLAUDE.md` per the Documentation Maintenance section above.
+13. **Using `window.confirm` or `window.alert`** - Use `useConfirmDialog` and `useToast` instead for UI-consistent feedback.
+14. **Skipping `DialogShell` for modals** - Hand-rolled modals lack focus trap and keyboard accessibility; always compose dialogs with `DialogShell`.
+15. **Hardcoding entity type colors** - Derive colors from `ENTITY_TYPE_CONFIG` in `utils/entityUtils.ts` to stay in sync across all entity type consumers.
+16. **Using indigo outside RealmChatWidget** - Indigo is reserved exclusively for the RealmChat AI assistant component. Use amber for all other accents.

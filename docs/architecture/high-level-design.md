@@ -1,7 +1,7 @@
 # High-Level Design Document: RealmWeaver
 
-> **Last Updated:** 2026-03-23
-> **Status:** Phases A through F complete. Local-only SPA, fully functional.
+> **Last Updated:** 2026-03-24
+> **Status:** Phases A through F complete, plus UX refactoring sprint. Local-only SPA, fully functional.
 
 ---
 
@@ -61,6 +61,12 @@ RealmWeaver is an AI-native campaign management tool for tabletop RPG Game Maste
 4. **Three-tier component hierarchy** — Dashboards (list + generate) → Generators (AI creation forms) → Editors (detail editing with tabbed layouts).
 
 5. **Entity cross-linking** — `EntityLink` renders clickable references with `EntityQuickCard` hover popovers. `LinkedText` auto-detects entity names in text. `BacklinksPanel` shows inbound references ("Referenced By").
+
+6. **Decomposed App shell (UX refactoring sprint)** — `App.tsx` delegates view routing to `ViewRouter.tsx`, entity selection state to `useEntitySelection`, and modal lifecycle to `useModalState`. `SessionRunner` and `CampaignSidebar` are each decomposed into focused sub-components under `views/session/` and `layout/sidebar/` respectively.
+
+7. **Accessible dialog system** — All modals compose `DialogShell` for consistent focus trap, Escape-to-close, and ARIA roles. Confirmations go through `useConfirmDialog`; ephemeral feedback through `useToast`. Direct use of `window.confirm` / `window.alert` is prohibited.
+
+8. **ENTITY_TYPE_CONFIG** — Canonical map in `utils/entityUtils.ts` from entity type key to `{ icon, color, label }`. All components that render entity type metadata (dashboards, quick cards, command palette, sidebar) derive from this config rather than hardcoding values.
 
 ---
 
@@ -148,21 +154,35 @@ Plot.relatedIds[]      → Any entity  (involves)
 
 ```
 Realmweaver/
-├── App.tsx                          # Root: routing, state, modal management
+├── App.tsx                          # Root: campaign state, isMockMode, top-level layout
+├── hooks/                           # Custom React hooks (UX refactoring sprint)
+│   ├── useEntitySelection.ts        # Selected entity state per view
+│   ├── useModalState.ts             # Modal open/close/payload lifecycle
+│   ├── useConfirmDialog.ts          # Programmatic confirm dialog
+│   ├── useToast.ts                  # Toast notification queue
+│   ├── useEntitySearch.ts           # Dashboard search/filter logic
+│   └── useRovingTabIndex.ts         # Keyboard roving tabindex
 ├── components/
 │   ├── common/                      # Shared: Button, Icons, TabLayout, EntityLink,
-│   │                                  QuickCard, LinkedText, BacklinksPanel, etc.
-│   ├── layout/                      # Shell: Header, CampaignSidebar, ContentWrapper
+│   │                                  QuickCard, LinkedText, BacklinksPanel,
+│   │                                  DialogShell, ConfirmDialog, ToastContainer,
+│   │                                  ErrorBoundary, EntityCreationPanel, etc.
+│   ├── layout/                      # Shell: Header, CampaignSidebar, ContentWrapper,
+│   │   │                              ViewRouter (extracted from App.tsx)
+│   │   └── sidebar/                 # SidebarEntityList, SidebarSearch, PinnedEntities,
+│   │                                  RecentItems, ArticleTreeItem, sidebarUtils
 │   ├── views/                       # Screens: Welcome, Creator, SessionRunner, etc.
-│   ├── dashboards/                  # Entity lists (9 dashboards)
+│   │   └── session/                 # ActiveScenePanel, SceneListPanel, RunningLog,
+│   │                                  QuickToolsPanel, QuickNpcGenerator
+│   ├── dashboards/                  # Entity lists (9 dashboards, use EntityCreationPanel)
 │   ├── generators/                  # AI creation forms (8 generators)
 │   ├── editors/                     # Detail editors with tabs (12 editors)
-│   ├── dialogs/                     # Modals: DmCoach, Wizards, Checker, etc.
+│   ├── dialogs/                     # Modals (all use DialogShell): DmCoach, Wizards, etc.
 │   ├── tools/                       # CombatTracker, SecretsTracker, DiceRoller
 │   ├── visualizers/                 # RelationshipGraph, PlotTimeline
-│   └── RealmChat/                   # Floating chat assistant
+│   └── RealmChat/                   # Floating chat assistant (indigo accent)
 ├── services/
-│   ├── campaignService.ts           # Central state store (~1900 lines)
+│   ├── campaignService.ts           # Central state store
 │   ├── geminiService.ts             # AI facade with mock switching
 │   ├── contextBuilder.ts            # Tiered AI context assembly
 │   ├── continuityChecker.ts         # 8 rule-based consistency checks
@@ -170,8 +190,12 @@ Realmweaver/
 │   └── ai/                          # AI modules (core, realmWeaver, dmCoach,
 │                                      realmChat, evocation, worldSim, style, mock)
 ├── types/                           # TypeScript interfaces (barrel via index.ts)
-├── utils/                           # Helpers: entityUtils, backlinkUtils, dmStyleUtils,
-│                                      diceUtils, keyboardShortcuts
+│                                      Includes types/common.ts for shared primitives
+├── utils/                           # Helpers: entityUtils (+ ENTITY_TYPE_CONFIG),
+│                                      entityDetailExtractors, entityFieldSave,
+│                                      popoverPosition, demoTemplates,
+│                                      backlinkUtils, dmStyleUtils, diceUtils,
+│                                      keyboardShortcuts
 ├── data/templates/                  # 4 campaign templates (JSON)
 ├── e2e/                             # Playwright E2E tests
 ├── tests/                           # Vitest unit tests
