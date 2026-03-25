@@ -12,452 +12,375 @@
 ## Table of Contents
 
 1. [Getting Started](#getting-started)
-2. [The Interface](#the-interface)
+2. [Campaign Management](#campaign-management)
 3. [Building Your World](#building-your-world)
-4. [Crafting Adventures & Scenes](#crafting-adventures--scenes)
-5. [RealmChat: Your Creative Partner](#realmchat-your-creative-partner)
-6. [DM Coach: In-Session Assistant](#dm-coach-in-session-assistant)
-7. [Evocation Wizard: Batch World-Building](#evocation-wizard-batch-world-building)
-8. [Session Management](#session-management)
-9. [Combat Tracker](#combat-tracker)
-10. [Plot Tracking](#plot-tracking)
-11. [Player Characters](#player-characters)
-12. [Relationship Graph](#relationship-graph)
-13. [Lorebook (Articles)](#lorebook-articles)
-14. [Import & Export](#import--export)
-15. [Tips & Best Practices](#tips--best-practices)
-16. [Mock Mode](#mock-mode)
+4. [Session Prep](#session-prep)
+5. [Running a Session](#running-a-session)
+6. [After the Session](#after-the-session)
+7. [Advanced Features](#advanced-features)
+8. [Keyboard Shortcuts](#keyboard-shortcuts)
+9. [DM Style Settings](#dm-style-settings)
+10. [Mock Mode](#mock-mode)
+11. [Import and Export](#import-and-export)
 
 ---
 
 ## Getting Started
 
-### Creating Your First Campaign
+### First Launch and the First Campaign Wizard
 
-1. Launch RealmWeaver — you'll land on the **Welcome Screen**.
-2. Click **"Create New Campaign"**.
-3. Fill in the **Campaign Creator**:
-   - **Campaign Title** — name your world (e.g., "The Sundered Crown").
-   - **Setting Type** — choose **Custom** to write your own world description, or **Official** to select a published setting like Forgotten Realms.
-   - **World Setting** — describe your world in a few sentences. This is important! The AI uses this description as context for everything it generates. More detail here means more consistent content later.
-4. Click **"Weave Campaign"** to enter the main editor.
+When you open RealmWeaver for the first time, you land on the **Welcome Screen**. Click **"Create New Campaign"** to begin. After you name your world and write a brief setting description, the **First Campaign Wizard** launches automatically. This five-step guided setup walks you through:
 
-### Switching Between Campaigns
+1. **World Description** — refine your campaign's setting (at least a sentence or two works; more detail produces better AI output)
+2. **Starting NPCs** — the AI generates a set of characters based on your setting; edit names, traits, and secrets before saving
+3. **Starting Locations** — the AI proposes key places that fit your world; expand cards to add hidden details
+4. **Starter Adventure** — a first adventure with scenes is generated and ready to customize
+5. **Go** — all approved content is added to your campaign in one click
 
-Click the campaign name in the header to return to the **Campaign Selector**, where you can switch between campaigns or create new ones.
+You can skip the wizard and build manually at any time by clicking **"Skip"**.
+
+### Using a Demo Template
+
+When creating a campaign, you can load a pre-built template (such as the Winter's Daughter starter scenario) to see a fully populated campaign and explore how everything fits together before building your own.
+
+### Interface Overview
+
+RealmWeaver has three persistent areas:
+
+- **Sidebar (left)** — your campaign's table of contents, organized by entity type. Hover any category and click the **+** icon to create a new entity.
+- **Main workspace (center)** — shows dashboards, editors, generators, and tools depending on what is selected.
+- **Header (top)** — quick access to tools: DM Coach, Evocation Wizard, Session Runner, Export, and the Mock Mode toggle.
 
 ---
 
-## The Interface
+## Campaign Management
 
-RealmWeaver has three main areas:
+### Creating and Switching Campaigns
 
-### Campaign Sidebar (Left)
+Click the campaign title in the header to return to the **Campaign Selector**. From there you can switch between campaigns, create a new one, or access the **Cross-Campaign Dashboard** for a bird's-eye view of all your campaigns at once.
 
-Your campaign's table of contents. Everything is organized into categories:
+### Cross-Campaign Dashboard
 
-- **Setting** — your world description and configuration
-- **NPCs** — characters in your world
-- **Locations** — places, organized in hierarchies
-- **Factions** — organizations and groups
-- **Items** — artifacts, equipment, treasures
-- **Adventures** — story arcs (expand to see scenes)
-- **Lorebook** — lore articles and world encyclopedia
-- **Session Logs** — records of past and planned sessions
-- **Player Characters** — your players' characters
-- **Plots** — storyline threads you're tracking
+The Cross-Campaign Dashboard shows all your campaigns as cards, each displaying entity counts, active plot count, last session date, and DM Style badge. From this view you can:
 
-Hover over any category and click the **+** icon to create a new entity.
+- Switch to any campaign with one click
+- Duplicate a campaign (useful for branching what-if scenarios)
+- Delete a campaign you no longer need
 
-### Main Editor (Center)
+### Campaign Setting Editor
 
-Your primary workspace. Depending on what you've selected, this area shows:
-- A **dashboard** listing all entities of a type
-- An **editor** for a specific entity's details
-- A **generator** form for creating new content
-- A **tool** like the combat tracker or relationship graph
+Found under **Setting** in the sidebar, this is where you configure your campaign's core properties:
 
-### Header (Top)
-
-Quick access to powerful tools:
-- **DM Coach** — in-session assistance
-- **Evocation Wizard** — batch content generation
-- **Mock Mode** toggle — test without API calls
-- **Export** — save your campaign data
-- **Session Runner** — run a live game session
+- **Title** — your campaign's name
+- **Setting Type** — choose **Custom** to write your own world description, or **Official** to pick a published setting (Forgotten Realms, Ravenloft, Eberron, DragonLance, etc.). Official settings make generators search for lore-accurate content.
+- **World Setting Synopsis** — a free-form description of your world, its history, and current state. This text is the single most important input for AI consistency. Write two to five paragraphs for best results.
+- **Writing Style Profile** — see [Style Matching](#style-matching) below.
+- **Google Cloud API Key** — optional; enables real-time voice transcription in session logs.
 
 ---
 
 ## Building Your World
 
-### Generating Entities
+### Entity Types
 
-All entity types (NPCs, locations, factions, items) follow the same creation pattern:
+RealmWeaver organizes campaign content into these entity types, all accessible from the sidebar:
 
-1. In the sidebar, hover over the category (e.g., "NPCs") and click the **+** icon.
-2. The **generator** appears in the main area. Write a description of what you want:
-   - *Good:* "A grizzled old ranger who lost his wolf companion and now runs a lonely tavern at the edge of the wilds."
-   - *Vague:* "Make an NPC." (Works, but you'll get generic results.)
-3. Click **"Create"**. The AI generates a fully detailed entity using your campaign's world setting and existing content as context.
-4. The new entity appears in the sidebar and its editor opens automatically.
+| Type | What it covers |
+|------|---------------|
+| **NPCs** | Characters — allies, villains, shopkeepers, anyone the players might meet |
+| **Locations** | Places — cities, dungeons, taverns, regions; can be nested in hierarchies |
+| **Factions** | Organizations, guilds, cults, governments, any group with shared goals |
+| **Items** | Artifacts, weapons, treasures, key props |
+| **Adventures** | Story arcs that contain ordered scenes |
+| **Scenes** | Individual encounters, set pieces, or story beats within an adventure |
+| **Lorebook Articles** | Lore entries, historical records, religion, culture, world encyclopedia |
+| **Session Logs** | Records of past, present, and future game sessions |
+| **Player Characters** | Your players' characters, imported or entered manually |
+| **Plots** | Ongoing storyline threads tracked across sessions |
+| **Notes** | Quick freeform notes that do not fit other categories |
 
-**Pro Tips:**
-- The more detail in your prompt, the better the result.
-- For NPCs, check **"Generate from existing lore"** to create characters based on published D&D material (uses Google Search).
-- You can also create entities via **RealmChat** for a more conversational experience.
+### Two Ways to Create Entities
+
+Every entity type offers two creation modes, selectable via tabs at the top of the creation panel:
+
+**Form Mode (Prompt + Structured Inputs)**
+Write a description of what you want in the prompt field. Use **prompt chips** — quick-select buttons like "A mysterious merchant" or "A guard captain with a secret" — to fill the field instantly. Click **Create** and the AI generates a fully detailed entity using your world setting and existing campaign content as context.
+
+**Chat Mode**
+Switch to the Chat tab to talk with the AI conversationally. Describe what you have in mind, ask for changes, and iterate until the entity feels right. The AI builds a live draft in the right panel as you chat. When satisfied, click **Add to Campaign**.
 
 ### Editing Entities
 
-Click any entity in the sidebar to open its editor. Every field is editable.
+Click any entity in the sidebar to open its editor. Every field is editable. Look for the **sparkle icon** next to text fields — clicking it asks the AI to generate or rewrite that specific field using the entity's other information as context.
 
-**AI-Assist:** Look for the sparkle icon next to text fields. Click it to have the AI generate or rewrite that specific field — it uses all the other information about the entity as context, so results are consistent.
+### Linking Entities
 
-### Linking Entities Together
+Connections make your world feel alive and improve AI generation quality:
 
-Connections make your world feel alive:
+- **NPCs to Factions** — assign an NPC to a faction in the NPC editor; both sides update automatically
+- **Locations to Locations** — set a parent location to build hierarchies (e.g., "The Dragon's Lair" inside "Volcanic Peaks"); cycle detection prevents invalid nesting
+- **Scenes to NPCs and Locations** — link a scene to the characters and places it involves
+- **Articles to Entities** — reference any number of NPCs, locations, or factions from a lore article
 
-- **NPCs → Factions:** Assign an NPC to a faction in the NPC editor. Both sides update automatically.
-- **Locations → Locations:** Set a parent location to build hierarchies (e.g., "The Dragon's Lair" inside "Volcanic Peaks").
-- **Scenes → NPCs & Locations:** Link scenes to the characters and places they involve.
-- **Articles → Entities:** Reference any number of NPCs, locations, or factions in a lore article.
+When you delete an entity, all references to it across your campaign are automatically removed.
 
-When you delete an entity, all references to it across your campaign are automatically cleaned up.
+### Adventures and Scenes
 
----
+An **Adventure** is a folder containing an ordered sequence of **Scenes**. Create an adventure first, then add scenes to it. Each generated scene includes:
 
-## Crafting Adventures & Scenes
+- **Read-Aloud Text** — descriptive prose ready to read directly to your players, with a copy button
+- **GM Notes** — private notes on goals, motivations, and outcomes
+- **Skill Checks** — relevant checks and DCs
+- **Rewards** — loot, gold, or story payoffs
+- **Beat Tracking** — mark which beats have been hit during play
 
-### Adventures
+Drag and drop scenes in the sidebar to reorder them. Open an adventure and click the **Prep Document** tab to compile the entire adventure into a clean, printable markdown document that includes linked NPCs, locations, and scenes.
 
-An **Adventure** is a story arc — a folder that contains an ordered sequence of **Scenes**.
+### Entity History and Versions
 
-1. Click **+** next to "Adventures" in the sidebar.
-2. Give it a title, description, and target level range.
-3. Your adventure appears in the sidebar. Expand it to see (and create) scenes.
+NPCs, Locations, and several other entity types maintain a version history. Use the **History** panel in the editor to see previous versions and restore earlier drafts if an AI-assist edit went in the wrong direction.
 
-### Scenes
+### Lorebook Articles
 
-**Scenes** are the building blocks of adventures — individual encounters, story beats, or set pieces.
-
-1. Hover over your adventure in the sidebar and click **+** to add a scene.
-2. Describe the scene you want:
-   - *Example:* "The players must negotiate with a suspicious and vain red dragon who is hoarding a stolen artifact they need."
-3. The AI generates a complete scene with:
-   - **Read-Aloud Text** — evocative descriptions to read directly to your players
-   - **GM Notes** — your private notes on goals, motivations, and outcomes
-   - **Skill Checks** — relevant checks the players might attempt
-   - **Rewards** — loot, gold, or story rewards
-
-**Reordering Scenes:** Drag and drop scenes in the sidebar to change their order within an adventure.
-
-### The Prep Document
-
-Open an adventure and click the **"Prep Document"** tab. RealmWeaver compiles your entire adventure — scenes, linked NPCs, locations, and all — into a clean, copy-pasteable markdown document. Perfect for your session notes or printing.
+The Lorebook is your campaign encyclopedia. Articles are ideal for historical events, religious pantheons, cultural practices, magical systems, and legends. The AI reads Lorebook content when generating new entities, so well-written articles improve consistency across your whole world. Articles support nested organization in the sidebar as a tree structure.
 
 ---
 
-## RealmChat: Your Creative Partner
+## Session Prep
 
-Click the **chat icon** in the bottom-right corner to open RealmChat.
+### Session Prep Wizard
 
-### What It Does
+Open from the header (or start a session directly from a Session Log). The wizard walks you through five steps:
 
-RealmChat is a conversational AI assistant. Instead of filling out forms, you can *talk* to the AI about what you want to create:
+1. **Adventure** — choose which adventure you are running, or run a session without an adventure
+2. **Scenes** — select which scenes from the adventure to include; planned and in-progress scenes are pre-checked
+3. **NPCs and Locations** — the wizard automatically pulls NPCs and locations linked to your selected scenes; add or remove extras with a search filter
+4. **Plot Threads** — select which active plots are in play this session
+5. **Go Live** — set a session title and write optional prep notes, then launch the Session Runner
 
-- "I need a mysterious shopkeeper who's secretly a spy for the thieves' guild."
-- "Create a haunted library that connects to the shadowfell."
-- "Surprise me with a faction that would oppose the Iron Crown."
+If no adventure is selected, the scenes and entities steps are skipped automatically.
 
-### The Draft Workflow
+### Preparing Without the Wizard
 
-As you chat, the AI builds **drafts** of entities in the background:
+You can also prep manually:
 
-1. **Chat** — describe what you want, iterate on ideas, ask for changes
-2. **Preview** — click any draft to see it in full detail
-3. **Edit** — modify the draft before adding it
-4. **Approve** — click "Approve" to add the finished entity to your campaign
-
-### Performance Modes
-
-Choose your AI model tier:
-- **Performance** — fastest responses, good for quick ideas
-- **Medium** — balanced speed and quality (default)
-- **Quality** — deepest reasoning, best for complex or nuanced content
+- Create a **Session Log** and link it to an adventure
+- Review your **adventures and scenes** in the editor
+- Open the **Prep Document** in your adventure for a printable overview
+- Check your **Plots** dashboard to review active storylines
+- Use **DM Coach** for narration and improv practice
 
 ---
 
-## DM Coach: In-Session Assistant
+## Running a Session
 
-Access the DM Coach from the **header** — it's designed for use *during* your game sessions.
+### Session Runner Layout
 
-### Narrator
+The Session Runner is a three-column live-game interface:
 
-Need to describe something on the fly?
+- **Left column — Scene List** — the planned scenes for the session in order; click any scene to jump to it; the current scene is highlighted
+- **Center column — Active Scene** — the full active scene view: read-aloud text with a copy button, GM notes, linked NPCs with relationship dynamics summary, linked location, and a Next Scene button
+- **Right column — Quick Tools** — DM Coach shortcut, dice roller, Secrets Tracker, plot status cycling, and Quick NPC Generator
 
-- Type: "Describe a bustling fantasy marketplace at dusk"
-- Get: Beautiful, evocative read-aloud text instantly
+On mobile, the three columns collapse into tabs you can swipe between.
 
-### Improviser
+### Running Log
 
-Players doing the unexpected?
+The Running Log sits at the bottom of the Session Runner. Use it to capture notes without leaving the screen:
 
-- Type: "The players just tried to adopt the goblin they were supposed to fight"
-- Get: Creative consequences, future plot hooks, and NPC reactions
+- Type a note and hit Enter (or use the **voice button** to dictate hands-free via browser speech recognition)
+- Tag notes as Combat, NPC, Decision, Loot, or Discovery
+- Use `@` to mention entities by name — they become clickable links
+- Toggle **Important Only** to filter the log to highlighted entries
+- System events such as scene transitions, dice rolls, and NPC creation are automatically logged with color-coded icons
 
-### Rollable Tables
+### Voice Capture
 
-Need a random table fast?
+Tap the microphone icon in the Running Log to start voice capture. RealmWeaver uses browser speech recognition to transcribe your words in real time. Speak naturally — the captured text appears as a note entry. For higher-quality transcription, add a Google Cloud API key in Campaign Settings.
 
-- Type: "A d6 table for random tavern patrons" or "Items in a wizard's pocket"
-- Get: A structured, rollable table you can use immediately
+### Quick NPC Generator
 
-### Low-Latency Mode
+In the right panel of the Session Runner, the **Quick NPC Generator** lets you create a new NPC on the fly without leaving the runner. The new NPC is immediately added to your campaign and can be linked to the active scene.
 
-Toggle this on for faster responses during live play. Uses a lighter AI model optimized for speed — perfect for in-the-moment improvisation where every second counts.
+### Session Timer
 
-### Context Awareness
+A live session timer displays in the Session Runner header, counting up from when the session started. The start time persists if you navigate away and return.
 
-The DM Coach automatically knows:
-- Your active scene, adventure, and location
-- Which NPCs are present
-- Recent session notes
-- Whatever entity you're currently editing
+### Combat Tracker
 
-No need to re-explain your world — the Coach already knows.
-
----
-
-## Evocation Wizard: Batch World-Building
-
-Access the Evocation Wizard from the **header**. It generates multiple connected entities at once.
-
-### Simple Mode
-
-Give it a single theme:
-- *Example:* "A gothic-horror city plagued by a mysterious vampire curse."
-- **Result:** A set of related NPCs, locations, factions, and even a starting adventure — all interconnected.
-
-### Detailed Mode
-
-For more control, add multiple specific prompts:
-- "A corrupt city guard captain who takes bribes"
-- "A hidden underground resistance movement"
-- "A marketplace where illegal potions are sold"
-
-Each prompt generates its own entity, all aware of each other.
-
-### Ingest Mode
-
-Have existing notes, a wiki page, or a document? Paste the text and the Wizard will parse it to extract entities.
-
-### Chat Mode
-
-An iterative approach — chat with the AI to gradually build out content, refining as you go.
-
-### Reviewing Results
-
-After generation, you can:
-- **Preview** everything the Wizard created
-- **Edit** individual entities before adding them
-- **Select** which pieces to add to your campaign
-- **Discard** anything that doesn't fit
+Access the **Combat Tracker** from the quick tools panel or the sidebar. Add combatants (NPCs and player characters), set initiative values, track HP and conditions, and advance through rounds. Encounter results are recorded in the session log automatically.
 
 ---
 
-## Session Management
+## After the Session
+
+### Session End Wizard
+
+When you click **End Session** in the Session Runner, the **Session End Wizard** opens and guides you through five steps:
+
+1. **AI Recap** — paste or dictate your session notes and click **Generate Recap**. The AI writes a summary of the session and detects unresolved loose ends.
+2. **Plot Status** — for each plot linked to the session, mark it as Advanced, Stalled, or Unchanged
+3. **Loose Ends** — review the AI-suggested loose ends and add your own; these carry forward into the next session
+4. **Player Recap** — the AI generates a player-facing version of the recap (spoiler-free) you can copy and share with your group
+5. **Save and End** — saves everything and closes the runner
 
 ### Session Logs
 
-Session logs track your game sessions — past, present, and future.
-
-1. Click **+** next to "Session Logs" to create a new one.
-2. Add a title, date, and link to the adventure you'll be running.
-3. Use the editor to record notes, events, and outcomes.
-
-### Voice Notes
-
-The session log editor supports **microphone-enabled note analysis**:
-- Record voice notes during play
-- The AI structures your voice notes into organized categories: events, decisions, combat, loot
-- Hands-free note-taking while you focus on running the game
-
-### Session Runner
-
-For live sessions, use the **Session Runner** (accessible from the header):
-- Scene-by-scene progression through your adventure
-- Quick access to DM Coach, combat tracker, and dice tools
-- Integrated note-taking
-- One-click scene advancement
+All session data is stored in **Session Logs**, accessible from the sidebar. Each log records the adventure played, planned scenes, running notes, structured note entries, plot progressions, loose ends, the GM recap, and the player-facing recap. You can edit any field after the session ends.
 
 ---
 
-## Combat Tracker
+## Advanced Features
 
-Access from the sidebar under **Combat** or directly from the Session Runner.
+### World Simulation
 
-### Running an Encounter
+Access from the header under the tools menu. The **World Simulation Wizard** lets you fast-forward time between sessions and see what your world has been doing without the players:
 
-1. Add combatants (NPCs and player characters)
-2. Roll or set initiative values
-3. Track HP, conditions, and turn order
-4. Advance through rounds
+1. Set how much time has passed (1 day to 6 months)
+2. Click **Simulate** — the AI generates world events involving your factions, NPCs, locations, and plots, rated as Minor, Major, or Critical
+3. Review the events and the specific entity field changes each one proposes
+4. Approve or reject individual events
+5. Click **Apply** — approved changes are written directly to your campaign
 
-The combat tracker integrates with your session log — encounter results are recorded automatically.
+This is useful before a time-skip, to simulate faction politics while players were off-screen, or to give the world a sense of momentum.
 
----
+### Continuity Checker
 
-## Plot Tracking
+Access from the header. The Continuity Checker scans your entire campaign data against eight rule-based checks and surfaces issues at three severity levels:
 
-Plots help you manage storylines across multiple sessions so you never drop a thread.
+- **Errors** (red) — definite problems, such as scenes referencing deleted NPCs
+- **Warnings** (amber) — likely issues, such as an adventure with no scenes
+- **Info** (blue) — notable gaps worth reviewing, such as NPCs without a faction
 
-### Creating Plots
+Click any issue to navigate directly to the entity with the problem. Dismiss issues you have intentionally set up that way. Run the checker before session prep to catch problems before they surface at the table.
 
-1. Click **+** next to "Plots" in the sidebar.
-2. Give your plot a title, description, and status (Active, Completed, Failed, On Hold).
-3. Link related entities — which NPCs are involved? Which locations matter?
+### Secrets and Clues Tracker
 
-### Tracking Progress
+Available from the **Quick Tools** panel in the Session Runner, and from the sidebar in Power mode. The Secrets Tracker lets you catalog four types of information:
 
-As sessions progress, update your plots:
-- Move from Active to Completed when resolved
-- Add session references showing when the plot advanced
-- Note key decisions that affect the plot's direction
+- **Secrets** — hidden truths players do not know yet
+- **Clues** — discoverable hints pointing toward secrets
+- **Revelations** — information the players have already learned
+- **Rumors** — hearsay that may or may not be true
 
----
+Each entry can be linked to specific entities — the NPC who holds the secret, the location where the clue can be found, the faction the revelation implicates. Use the category filter tabs to focus on one type at a time.
 
-## Player Characters
+### Relationship Graph
 
-### Adding Player Characters
+Access from the **Relationships** view in the sidebar. The graph is a live, interactive visualization of how all your entities connect:
 
-Two ways to add PCs:
-
-1. **Manual Entry** — click **+** next to "Player Characters" and fill in the details
-2. **PDF Import** — upload a character sheet PDF and the AI will parse it automatically, extracting name, class, level, stats, and more
-
-### What PCs Do
-
-Player character data feeds into AI generation:
-- The DM Coach considers PC classes, levels, and backstories
-- Generated challenges can be tailored to your specific party
-- Skill check suggestions reference PC proficiencies
-
----
-
-## Relationship Graph
-
-Access from the sidebar under **Relationships**.
-
-The relationship graph is an interactive visualization of how your entities connect:
-
-- **Nodes** represent NPCs, factions, locations, and other entities
-- **Edges** show relationships — faction membership, location connections, scene involvement
+- **Nodes** represent NPCs (green), factions (indigo), locations (amber), items (purple), adventures (blue), scenes (red), and articles (cyan)
+- **Edges** show relationships — faction membership, scene links, location hierarchy, article references
 - **Click** any node to jump to that entity's editor
-- **Zoom, pan, and drag** to explore your world's web of connections
+- **Zoom and pan** to explore dense connection webs
+- **Toggle entity type filters** to reduce clutter
 
-The graph auto-layouts using force-directed algorithms, so it reorganizes as your world grows.
+The graph uses D3 force-directed layout and updates as your world grows.
 
----
+### Plot Timeline
 
-## Lorebook (Articles)
+Found inside the **Plots** view. The Plot Timeline shows each of your active plots as a horizontal row, with sessions as columns. For each session, a colored dot shows the plot's status that session: Advanced (filled), Stalled (ring), or Unchanged (hollow). Hover a dot for the exact status. Click a plot row or a session column to navigate there. Six rotating accent colors keep plots visually distinct even at scale.
 
-The Lorebook is your campaign's encyclopedia — a place for deep lore, world history, religious systems, cultural notes, and anything that doesn't fit neatly into other entity types.
+### RealmChat
 
-### Creating Articles
+The **RealmChat widget** (blue chat icon in the bottom-right corner) is a floating conversational AI assistant. Unlike the entity generators in dashboards, RealmChat is open-ended and multi-turn:
 
-1. Click **+** next to "Lorebook" in the sidebar.
-2. Write or generate your article using AI.
-3. Link related entities — articles can reference any number of NPCs, locations, and factions.
+- Chat freely — ask it to create entities, iterate on ideas, or brainstorm
+- Drafts appear in the right panel of the widget as you chat
+- Click any draft to open a full entity editor inline
+- Click **Approve** to add the finished entity to your campaign
 
-Articles are especially useful for:
-- Historical events
-- Religious pantheons
-- Cultural practices
-- Magical systems
-- Legends and myths
+RealmChat persists your conversation history for the session (stored in sessionStorage per campaign). Use the model tier selector to choose between **Performance** (fastest), **Medium** (default), or **Quality** (deepest reasoning) depending on your needs.
 
-The AI uses Lorebook content as context when generating new content, keeping your world consistent.
+### Evocation Wizard
 
----
+Access from the header. The Evocation Wizard generates multiple connected entities at once — useful for rapidly populating a new region, establishing a faction web, or seeding a starting adventure.
 
-## Import & Export
+**Simple mode** — give a single theme ("A gothic-horror city under a vampire's curse") and receive a set of interconnected NPCs, locations, factions, and an adventure.
 
-### Exporting
+**Detailed mode** — write separate prompts for each entity you want, each aware of the others.
 
-Click **Export** in the header to save your campaign:
+**Ingest mode** — paste existing notes, a wiki article, or any text document. The wizard parses it to extract and structure entities.
 
-- **JSON** — full-fidelity backup, can be re-imported into RealmWeaver
-- **Obsidian Markdown** — export as a folder of markdown files for use in Obsidian or any markdown editor
+**Chat mode** — an iterative approach where you build content conversationally.
 
-### Importing
+After generation, preview all results, edit individual entities, select which ones to add, and discard anything that does not fit. Nothing is committed until you approve it.
 
-- **JSON** — import a previously exported RealmWeaver campaign
-- **PDF Character Sheets** — import player character data from PDF character sheets
+### Style Matching
 
-### Data Storage
+Found in the **Campaign Setting Editor** under the Writing Style Profile section. Once you have at least five entities with descriptive text (NPCs, locations, adventures), click **Generate Style Profile**. The AI reads a sample of your descriptions and produces a 200-word style guide that captures your writing voice — tone, vocabulary, sentence structure, use of metaphor, thematic preferences.
 
-RealmWeaver saves all data to your browser's **localStorage**. This means:
-- Your data stays on your device — nothing is sent to a server (except AI generation requests to Google Gemini)
-- Data persists between browser sessions
-- Clearing browser data will delete your campaigns — use Export to create backups!
-- Data is specific to your browser — a different browser or device won't have your campaigns
+Once saved, this profile is automatically injected into every AI generation prompt. The result is AI content that reads like *you* wrote it. You can regenerate the profile as your campaign grows, or clear it to return to the AI's default voice.
 
 ---
 
-## Tips & Best Practices
+## Keyboard Shortcuts
 
-### Writing Better Prompts
+### Command Palette (Ctrl+K or Cmd+K)
 
-The AI generates better content when you give it more to work with:
+Press **Ctrl+K** (Windows/Linux) or **Cmd+K** (Mac) from anywhere in the app to open the Command Palette. Type to search across all entity types — NPCs, locations, factions, items, adventures, articles, session logs, plots, player characters, and scenes — by name. Results appear instantly with type badges. Press **Enter** or click a result to navigate directly to that entity. Press **Escape** to close.
 
-| Instead of... | Try... |
-|---------------|--------|
-| "Make an NPC" | "A half-elf bard who performs at the Silver Harp tavern and secretly works as an informant for the city guard" |
-| "Create a location" | "A crumbling wizard's tower in the Mistwood forest, now inhabited by a colony of intelligent spiders who trade in rare mushrooms" |
-| "Generate a scene" | "The players arrive at a peace negotiation between two rival merchant guilds, but discover that the mediator has been charmed by a hidden fey" |
+The Command Palette also shows **Recent Items** — the last several entities you opened — at the top when the search field is empty.
 
-### Building a Consistent World
+### Other Keyboard Navigation
 
-1. **Fill in your campaign setting first** — this is the foundation for all AI generation.
-2. **Link entities to each other** — the more connections, the more consistent AI-generated content will be.
-3. **Use the Evocation Wizard for initial world-building** — generate a batch of connected entities to establish your world's baseline.
-4. **Write Lorebook articles for important lore** — the AI references these when generating new content.
+- **Escape** — closes any open dialog or modal
+- **Arrow keys** — navigate lists in dashboards (roving tabindex pattern)
+- **Enter or Space** — activate the focused item in a list
+- **Tab** — move between interactive elements in the standard order
 
-### Preparing for Sessions
+---
 
-1. Create a **Session Log** for your upcoming session.
-2. Review and organize scenes in your adventure.
-3. Open the **Prep Document** for a printable overview.
-4. Check your **Plots** to remember active storylines.
-5. Use the **Session Runner** when it's game time.
+## DM Style Settings
 
-### During Sessions
+RealmWeaver has three experience modes, set in the **Campaign Setting Editor** under DM Style:
 
-1. Open the **DM Coach** for quick narration, improv help, and tables.
-2. Turn on **Low-Latency Mode** in the Coach for faster responses.
-3. Use **Voice Notes** to capture what happens without breaking flow.
-4. Track combat with the **Combat Tracker**.
+| Mode | Who it is for | What changes |
+|------|--------------|--------------|
+| **Guided** | New DMs or players new to the app | Hides advanced tools to reduce overwhelm: Continuity Checker, Relationship Graph, Plot Timeline, Backlinks Panel, Secrets Tracker, Combat Tracker, keyboard shortcut hints |
+| **Standard** | Most DMs | All core features visible; advanced tools accessible |
+| **Power** | Experienced DMs who want everything | All features and panels always shown |
 
-### After Sessions
-
-1. Update your **Session Log** with a recap (or let the AI help write one).
-2. Update **Plot** statuses — what advanced? What's new?
-3. Create any new NPCs, locations, or items that emerged during play.
-4. **Export a backup** of your campaign.
+Switching modes does not delete anything — it only shows or hides controls. Individual features can also be manually toggled on or off regardless of mode using the feature override toggles in the settings panel. This lets you, for example, run in Guided mode but enable the Combat Tracker.
 
 ---
 
 ## Mock Mode
 
-Toggle **Mock Mode** in the header to use RealmWeaver without an AI API key.
+Toggle **Mock Mode** in the header to use RealmWeaver without any AI API calls.
 
-In mock mode:
-- All AI features return pre-written sample data
-- The full UI and workflow is functional
-- Great for learning the app before connecting your API key
-- Useful for offline preparation or demos
+In Mock Mode:
+- All generation buttons return pre-written, realistic sample data
+- The full UI and every workflow is functional
+- Wizards, the Session Runner, and all dialogs work normally
+- Useful for learning the app, offline preparation, or demonstrating it to others
 
-All the same buttons, workflows, and features work — you just get consistent sample output instead of AI-generated content.
+Switch back off to use your actual AI backend.
 
 ---
 
-Happy weaving, Dungeon Master!
+## Import and Export
+
+### Exporting
+
+Click **Export** in the header to save your campaign data:
+
+- **JSON** — a complete backup of all campaign data. Can be re-imported into RealmWeaver. Use this for backups and for moving campaigns between devices.
+- **Obsidian Markdown** — exports your campaign as a folder of interlinked markdown files, compatible with Obsidian, Logseq, or any markdown editor.
+
+### Importing
+
+- **Campaign JSON** — re-import a previously exported RealmWeaver campaign
+- **PDF Character Sheets** — upload a PDF character sheet for a player character; the AI parses it to extract name, class, level, stats, and backstory automatically
+
+### Data Storage
+
+RealmWeaver stores all data in your browser's **localStorage**. This means:
+- Your data stays on your device — nothing is sent to a server except AI generation requests
+- Data persists between browser sessions
+- Clearing browser data or cookies will delete your campaigns — export regular backups
+- Data is tied to your browser; a different browser or device will not see the same campaigns
+
+---
+
+Happy weaving, Dungeon Master.

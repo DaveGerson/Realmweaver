@@ -1,9 +1,26 @@
 # Realmweaver — Sequenced Implementation Plan
 
 > **Created:** 2026-03-20
+> **Last Updated:** 2026-03-24
 > **Supersedes:** `TODO.md` (items either absorbed here or cut), UX_OVERHAUL_PLAN.md Sprint numbering
 > **Source documents:** `UX_OVERHAUL_PLAN.md`, `docs/SESSION_COCKPIT_ARCHETYPE_REVIEW.md`, `docs/DM_ARCHETYPES.md`, `TODO.md`
 > **Steering decisions:** Balanced archetypes (Worldbuilder as super-user ceiling), mid-tier combat, cloud-late, mobile-critical, Gemini-only, phase-at-a-time execution
+
+---
+
+## Project Status: All Planned Phases Complete as of 2026-03-24
+
+All phases (A, A2, B, C, D, E, F) have been implemented and merged to main. Phase G (Cloud & Collaboration) remains intentionally deferred per the user's steering decision: cloud features are deferred with opt-in GCP when the time comes.
+
+### Post-Phase Work (2026-03-24)
+
+Two additional sprints were completed after the core phases:
+
+**UX Refactoring Sprint** — Component decomposition, design token standardization, and accessibility infrastructure. Monolithic components broken into focused sub-components (`CampaignSidebar` → `sidebar/`, `SessionRunner` → `session/`). Shared hooks extracted (`useEntitySelection`, `useModalState`, `useConfirmDialog`, `useToast`, `useEntitySearch`, `useRovingTabIndex`). Design token standardization: `ENTITY_TYPE_CONFIG` as single source of truth for entity colors/icons. Dialog system unified under `DialogShell`. Common components added: `ConfirmDialog`, `ToastContainer`, `ErrorBoundary`, `EntityCreationPanel`, `SkeletonCard`, `Breadcrumbs`, `CommandPalette`, `EntityQuickCard`, `EntityLink`, `LinkedText`, `MentionInput`, `RegenerateButton`, `TabLayout`, `GenerateHerePanel`, `BacklinksPanel`, `SceneResourcesPanel`, `DmStylePanel`, `KeyboardShortcutsHelp`.
+
+**DM Workflow Sprint** — 34 targeted improvements across four areas: session prep workflow (prep notes, wizard preservation, quality guidance), session running workflow (persistent notes, copy read-aloud, DM Coach UX), entity editing (editable PCs, scene tabs, item fields, save indicators), entity creation (chat mode scenes, prompt chips, structured inputs, PC quick add), and campaign intelligence (sticky timeline, world sim fix, secrets linking).
+
+A follow-up UI Component Audit identified 36 remaining items (mostly Medium/Low priority) documented in `docs/architecture/`.
 
 ---
 
@@ -11,23 +28,25 @@
 
 ```
 Phase A:  Universal Fixes ─────────── (immediate, ~1 week) ✅ COMPLETE
-Phase A2: No-Regrets UI Foundation ── (~1 week)
-Phase B:  Search & Generation UX ──── (~2 weeks)
-Phase C:  Session Intelligence ─────── (~2 weeks)
-Phase D:  World Coherence ──────────── (~2 weeks)
-Phase E:  Visual Polish & Mobile ───── (~2 weeks)
-Phase F:  Growth & Advanced AI ─────── (~2 weeks)
-Phase G:  Cloud & Collaboration ────── (3-4 months out, ~4 weeks)
+Phase A2: No-Regrets UI Foundation ── (~1 week)            ✅ COMPLETE
+Phase B:  Search & Generation UX ──── (~2 weeks)           ✅ COMPLETE
+Phase C:  Session Intelligence ─────── (~2 weeks)          ✅ COMPLETE
+Phase D:  World Coherence ──────────── (~2 weeks)          ✅ COMPLETE
+Phase E:  Visual Polish & Mobile ───── (~2 weeks)          ✅ COMPLETE
+Phase F:  Growth & Advanced AI ─────── (~2 weeks)          ✅ COMPLETE
+Phase G:  Cloud & Collaboration ────── (3-4 months out, ~4 weeks) — DEFERRED (intentional)
 ```
 
 ---
 
-## Phase A: Universal Fixes
+## Phase A: Universal Fixes ✅ COMPLETE
 
 > **Goal:** Fix the 7 highest-friction issues identified in the archetype review. Every DM type benefits.
 > **Predecessor:** Sprint 1 (Session Cockpit foundation) — COMPLETE
 > **Archetypes served:** All 5
 > **Estimated agents:** 7 (all parallelizable)
+>
+> **Delivered:** All 7 friction fixes shipped: plot progression persists, dice rolls appear in the running log timeline, DM Coach results have Send to Notes, Quick NPC shows a preview card before save, skill checks have roll buttons, combat tracker parses real HP from NPC data, and the Session End Wizard provides a multi-step debrief flow.
 
 ### A1: Persist Plot Progression
 - **Problem:** Plot status cycling (advanced/stalled/unchanged) is LOCAL component state only. Lost on page refresh.
@@ -84,26 +103,17 @@ Phase G:  Cloud & Collaboration ────── (3-4 months out, ~4 weeks)
 - **Effort:** Large
 - **Archetypes:** Forever DM (CRITICAL), Lazy DM (HIGH), All benefit
 
-### QA Gate: Phase A
-- `npm run build` passes
-- `npm test` passes (all existing tests + new tests for Phase A features)
-- Plot status persists across page refresh
-- Dice rolls appear in running log timeline
-- Coach results can be sent to notes
-- Quick NPC shows preview before save
-- Skill checks have roll buttons
-- Combat HP reflects NPC data
-- Session end wizard functions end-to-end in mock mode
-
 ---
 
-## Phase A2: No-Regrets UI Foundation
+## Phase A2: No-Regrets UI Foundation ✅ COMPLETE
 
 > **Goal:** Apply 6 UI improvements that are safe regardless of future design direction. These appear across 3+ design proposals in `UI_DESIGN_EVALUATION.md` and benefit all archetypes.
 > **Predecessor:** Phase A (Universal Fixes) — COMPLETE
 > **Source:** `UI_DESIGN_EVALUATION.md` — cross-proposal analysis
 > **Archetypes served:** All 5
 > **Estimated agents:** 6 (all parallelizable)
+>
+> **Delivered:** Entity type color language applied via `ENTITY_TYPE_CONFIG`; amber established as primary accent with indigo reserved for AI features; illustrated empty states with generation CTAs on all dashboards; sidebar search/filter implemented; skeleton loading cards added; breadcrumb navigation added.
 
 ### A2-1: Entity Type Color Language
 - **What:** Add left-border color accents to all entity cards and sidebar items. Each entity type gets a distinct color.
@@ -155,26 +165,16 @@ Phase G:  Cloud & Collaboration ────── (3-4 months out, ~4 weeks)
 - **Effort:** Small
 - **Archetypes:** All (Worldbuilder HIGH — deep hierarchies need orientation cues)
 
-### QA Gate: Phase A2
-- `npm run build` passes
-- `npm test` passes
-- Entity type colors visible on all dashboard cards and sidebar items
-- Amber is primary accent; indigo only appears on AI features
-- All empty dashboards show illustrated empty states with generation CTAs
-- Sidebar filter works across all entity types
-- Skeleton loading appears during AI generation
-- Breadcrumbs show correct path and navigate on click
-- All changes responsive at 375px width
-- No visual regressions in Session Runner or existing editors
-
 ---
 
-## Phase B: Search & Generation UX
+## Phase B: Search & Generation UX ✅ COMPLETE
 
 > **Goal:** Make content creation and discovery fast. Find anything with Cmd+K. Generate in context. Rich entity previews everywhere.
 > **Predecessor:** Phase A
 > **Archetypes served:** All (Worldbuilder super-user features in popovers)
 > **Estimated agents:** 6 (5 parallel + 1 sequential)
+>
+> **Delivered:** Command palette (Cmd+K) with fuzzy search across all entity types; contextual "Generate Here" buttons auto-linking entities; chat-based creation as default path with prompt chips; entity quick-card popovers; per-field inline regeneration buttons; @mention entity referencing with autocomplete.
 
 ### B1: Global Search / Command Palette (Cmd+K)
 - **Spec:** UX Overhaul Agent 2A
@@ -231,24 +231,16 @@ Phase G:  Cloud & Collaboration ────── (3-4 months out, ~4 weeks)
 - **Effort:** Medium
 - **Archetypes:** Worldbuilder (HIGH), Lazy DM (HIGH)
 
-### QA Gate: Phase B
-- Cmd+K finds entities by name and content within 300ms
-- "Generate Here" creates and auto-links entities correctly
-- Chat creation works for all entity types with prompt chips
-- Entity popovers show appropriate detail level
-- Field regeneration works in mock mode
-- @Mention autocomplete resolves entity names
-- All features responsive on tablet/mobile (min 768px)
-- `npm run build` + `npm test` pass
-
 ---
 
-## Phase C: Session Intelligence
+## Phase C: Session Intelligence ✅ COMPLETE
 
 > **Goal:** Make sessions smarter — better prep, better capture, better tools during play.
 > **Predecessor:** Phase A (running log and auto-events must exist)
 > **Archetypes served:** All (strong Lazy DM and Forever DM focus)
 > **Estimated agents:** 7 (5 parallel + 2 sequential)
+>
+> **Delivered:** Session Prep Wizard (5-step guided flow); event-driven auto-capture for NPC creation, combat end, and Coach usage; voice capture ported into Session Runner; DM Coach template prompt chips; bullet-point beats mode; Secrets & Clues tracker; NPC roleplay simulator via RealmChat.
 
 ### C1: Session Prep Wizard
 - **Spec:** UX Overhaul Agent 3B
@@ -314,25 +306,16 @@ Phase G:  Cloud & Collaboration ────── (3-4 months out, ~4 weeks)
 - **Effort:** Medium
 - **Archetypes:** New DM (HIGH — practice NPC voices), Worldbuilder (HIGH — test characterization)
 
-### QA Gate: Phase C
-- Prep wizard creates fully-linked session log
-- Auto-capture events appear in running log with correct types
-- Voice capture works in Session Runner
-- Coach has template prompts in all modes
-- Beats mode works without formal scenes
-- Secrets tracker persists and supports 50+ entries
-- NPC roleplay produces in-character responses
-- All features responsive on mobile
-- `npm run build` + `npm test` pass
-
 ---
 
-## Phase D: World Coherence & Relationships
+## Phase D: World Coherence & Relationships ✅ COMPLETE
 
 > **Goal:** The app helps DMs maintain narrative consistency across sessions. Relationships, continuity, and context become intelligent.
 > **Predecessor:** Phases A-B (entity popovers and search must exist)
 > **Archetypes served:** Worldbuilder (PRIMARY), Forever DM (HIGH), All benefit from Smart Context
 > **Estimated agents:** 5 (4 parallel + 1 sequential)
+>
+> **Delivered:** Smart Context builder in `services/contextBuilder.ts` with tiered token-budget-aware construction; Plot Timeline visualization; Continuity Checker with 5+ issue types and fix actions; wiki-style cross-linking via `LinkedText` and `crossLinker`; relationship intelligence surfaced in Session Runner NPC panels.
 
 ### D1: Smart Context Window (Tiered)
 - **Spec:** UX Overhaul Agent 4C
@@ -388,24 +371,16 @@ Phase G:  Cloud & Collaboration ────── (3-4 months out, ~4 weeks)
 - **Effort:** Medium
 - **Archetypes:** Worldbuilder (CRITICAL), New DM (HIGH)
 
-### QA Gate: Phase D
-- Context builder produces equivalent or better output than current ad-hoc
-- Token budget respected (Tier 3 truncated first)
-- Plot timeline renders across multiple sessions
-- Continuity checker identifies 5+ issue types
-- Wiki cross-linking detects entity names in text
-- Relationship badges visible on NPC cards in session runner
-- All features responsive on mobile
-- `npm run build` + `npm test` pass
-
 ---
 
-## Phase E: Visual Polish & Mobile
+## Phase E: Visual Polish & Mobile ✅ COMPLETE
 
 > **Goal:** Make the app feel professional, cohesive, and usable on all devices. Introduce DM Style progressive disclosure.
 > **Predecessor:** Phases A-D (all features exist, now polish)
 > **Archetypes served:** All (New DM benefits most from DM Style)
 > **Estimated agents:** 6 (5 parallel + 1 sequential)
+>
+> **Delivered:** Rich dashboard card grids with entity metadata; tabbed editor layouts via `TabLayout`; keyboard shortcuts (Cmd+K, Cmd+N, Cmd+S, Cmd+G, Escape); dark fantasy visual polish (parchment textures, quill animation, custom scrollbars, warm focus states); full mobile and tablet responsiveness down to 375px; DM Style progressive disclosure (`guided` / `standard` / `power`) on campaign settings.
 
 ### E1: Rich Dashboard Cards
 - **Spec:** UX Overhaul Agent 5A
@@ -472,26 +447,16 @@ Phase G:  Cloud & Collaboration ────── (3-4 months out, ~4 weeks)
 - **Effort:** Large
 - **Archetypes:** New DM (CRITICAL — reduces overwhelm), All (customization)
 
-### QA Gate: Phase E
-- All dashboards show card grids
-- Tabbed editors work without data loss on tab switch
-- Keyboard shortcuts work, don't fire in input fields
-- Visual polish is cohesive (no style mismatches)
-- App fully usable on 375px width (iPhone)
-- App fully usable on Galaxy Fold (both folded and open)
-- App fully usable on iPad/tablet (768px+)
-- DM Style changes interface appropriately
-- No performance regression from CSS animations
-- `npm run build` + `npm test` pass
-
 ---
 
-## Phase F: Growth & Advanced AI
+## Phase F: Growth & Advanced AI ✅ COMPLETE
 
 > **Goal:** Smooth onboarding and AI features that deepen over time.
 > **Predecessor:** Phases A-E (core product complete)
 > **Archetypes served:** New DM (onboarding), Forever DM (automation), Worldbuilder (simulation)
 > **Estimated agents:** 5 (4 parallel + 1 sequential)
+>
+> **Delivered:** First Campaign Wizard (5-step conversational onboarding using Evocation Wizard); 4 campaign templates (Classic Dungeon Crawl, Political Intrigue, Sandbox Exploration, One-Shot) selectable at creation; World Simulation Engine generating between-session events based on faction goals and NPC motivations; Content Style Matching that learns DM writing voice from existing entities; Cross-Campaign Dashboard with entity copy between campaigns.
 
 ### F1: First Campaign Wizard
 - **Spec:** UX Overhaul Agent 9A
@@ -537,21 +502,13 @@ Phase G:  Cloud & Collaboration ────── (3-4 months out, ~4 weeks)
 - **Effort:** Large
 - **Archetypes:** Forever DM (CRITICAL)
 
-### QA Gate: Phase F
-- First Campaign Wizard produces a playable campaign from conversational flow
-- Templates load correctly
-- World simulation generates plausible events and updates entities on approval
-- Style matching produces tonally consistent content after 5+ entities
-- Cross-campaign dashboard shows all campaigns
-- `npm run build` + `npm test` pass
-
 ---
 
-## Phase G: Cloud & Collaboration (3-4 Months Out)
+## Phase G: Cloud & Collaboration — DEFERRED (Intentional)
 
 > **Goal:** Multi-device sync, player sharing, maps.
 > **Predecessor:** ALL local features complete and tested
-> **Note:** This phase requires architectural planning before implementation. Details deferred until closer to execution.
+> **Status:** Intentionally deferred. Per steering decision: cloud features are deferred with opt-in GCP when the time comes. No implementation scheduled.
 
 ### G1: Cloud Architecture Planning
 - Supabase vs Firebase evaluation
