@@ -152,8 +152,18 @@ export const RegenerateButton: React.FC<RegenerateButtonProps> = ({
       {/* Expanded panel — absolute positioned below the trigger, overlays content */}
       {isActive && (
         <div
+          role="dialog"
+          aria-label={`Regenerate ${fieldName} options`}
+          aria-modal="false"
           className="absolute left-0 top-full mt-1 z-50 min-w-72 w-max max-w-sm bg-slate-900 border border-amber-800/60 rounded-lg shadow-xl shadow-black/50 p-3 space-y-2"
           style={{ minWidth: '18rem' }}
+          onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              e.stopPropagation();
+              handleClose();
+            }
+          }}
         >
           {/* Panel header */}
           <div className="flex items-center gap-2">

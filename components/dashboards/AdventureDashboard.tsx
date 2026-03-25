@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
+import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
 import type { Adventure, AdventureForBatchAdd, Campaign } from '../../types/index';
 import { AdventureGenerator } from '../generators/AdventureGenerator';
 import { EntityChatGenerator } from '../generators/EntityChatGenerator';
@@ -26,6 +27,7 @@ interface AdventureDashboardProps {
 
 export const AdventureDashboard: React.FC<AdventureDashboardProps> = ({ adventures, onAdventureCreated, onSelectAdventure, isMockMode, isOfficialSetting, campaignContext }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: 3 });
   const filteredAdventures = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     if (!q) return adventures;
@@ -107,7 +109,7 @@ export const AdventureDashboard: React.FC<AdventureDashboardProps> = ({ adventur
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredAdventures.map(adv => {
+          {filteredAdventures.map((adv, index) => {
             const totalScenes = adv.scenes?.length ?? 0;
             const completedScenes = adv.scenes?.filter(s => s.status === 'completed').length ?? 0;
             const completionPct = totalScenes > 0 ? Math.round((completedScenes / totalScenes) * 100) : 0;
@@ -117,6 +119,7 @@ export const AdventureDashboard: React.FC<AdventureDashboardProps> = ({ adventur
                 key={adv.id}
                 onClick={() => onSelectAdventure(adv.id)}
                 className="card-parchment p-4 rounded-lg border border-slate-800 border-l-4 border-l-orange-500 text-left hover:border-slate-700 hover:border-l-orange-400 transition-all space-y-2"
+                {...getRovingProps(index)}
               >
                 <h3 className="font-semibold text-orange-400 leading-tight">{adv.title}</h3>
                 {hookSnippet && (

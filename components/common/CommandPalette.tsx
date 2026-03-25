@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Icons } from '@/components/common/Icons';
+import { DialogShell } from '@/components/common/DialogShell';
 import type { NPC, Location, Faction, Item, Adventure, Article, SessionLog, Plot, PlayerCharacter } from '@/types/index';
 import { ENTITY_TYPE_CONFIG } from '@/utils/entityUtils';
 
@@ -523,26 +524,20 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     return offsets;
   }, [recentResults, groupedEntityResults, actionResults]);
 
-  if (!isOpen) return null;
-
   const isEmpty = flatResults.length === 0;
   const hasQuery = query.trim().length > 0;
 
   return (
-    // Backdrop
-    <div
-      className="fixed inset-0 z-[100] flex items-start justify-center pt-[10vh] px-4"
-      style={{ backdropFilter: 'blur(4px)', backgroundColor: 'rgba(0,0,0,0.6)' }}
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Command palette"
+    <DialogShell
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabel="Command palette"
+      className="w-full max-w-xl mx-4"
     >
       {/* Panel */}
       <div
-        className="w-full max-w-xl bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden flex flex-col"
+        className="w-full bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden flex flex-col"
         style={{ maxHeight: '75vh' }}
-        onClick={e => e.stopPropagation()}
       >
         {/* Search input row */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-700 flex-shrink-0">
@@ -614,6 +609,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </DialogShell>
   );
 };

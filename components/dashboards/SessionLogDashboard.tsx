@@ -5,6 +5,7 @@ import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { createDefaultSession } from '../../utils/entityUtils';
 import { SessionPrepWizard } from '../dialogs/SessionPrepWizard';
+import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
 
 interface SessionLogDashboardProps {
   campaign: Campaign;
@@ -25,6 +26,8 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
 }) => {
   const [isPrepWizardOpen, setIsPrepWizardOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const { getRovingProps: getPlannedRovingProps } = useRovingTabIndex({ direction: 'vertical', columns: 1 });
+  const { getRovingProps: getPastRovingProps } = useRovingTabIndex({ direction: 'vertical', columns: 1 });
 
   const filteredSessionLogs = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -115,7 +118,7 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
                     <Icons.Calendar className="w-5 h-5 text-amber-400" /> Upcoming & Planned
                 </h3>
                 <div className="space-y-3">
-                    {plannedSessions.map(session => {
+                    {plannedSessions.map((session, index) => {
                         const linkedAdventure = session.adventureId
                             ? campaign.adventures?.find(a => a.id === session.adventureId)
                             : undefined;
@@ -125,6 +128,7 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
                                 key={session.id}
                                 onClick={() => onSelectSessionLog(session.id)}
                                 className="card-parchment w-full text-left border border-slate-800 border-l-4 border-l-rose-500 hover:border-slate-700 hover:border-l-rose-400 p-4 rounded-lg transition-all group space-y-2"
+                                {...getPlannedRovingProps(index)}
                             >
                                 <div className="flex justify-between items-start gap-2">
                                     <span className="font-semibold text-slate-200 group-hover:text-amber-300 transition-colors leading-tight">{session.title}</span>
@@ -171,7 +175,7 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
                     <Icons.BookCopy className="w-5 h-5 text-slate-500" /> Session Chronicle
                 </h3>
                 <div className="space-y-3">
-                    {pastSessions.map(session => {
+                    {pastSessions.map((session, index) => {
                         const linkedAdventure = session.adventureId
                             ? campaign.adventures?.find(a => a.id === session.adventureId)
                             : undefined;
@@ -180,6 +184,7 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
                                 key={session.id}
                                 onClick={() => onSelectSessionLog(session.id)}
                                 className="w-full text-left bg-slate-900/30 border border-slate-800 border-l-4 border-l-rose-500/50 hover:border-slate-600 hover:border-l-rose-400 hover:bg-slate-800 p-4 rounded-lg transition-all opacity-80 hover:opacity-100 space-y-2"
+                                {...getPastRovingProps(index)}
                             >
                                 <div className="flex justify-between items-start gap-2">
                                     <span className="font-semibold text-slate-300 leading-tight">{session.title}</span>

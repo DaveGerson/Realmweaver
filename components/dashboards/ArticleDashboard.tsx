@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
+import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
 import type { Article, NPC, Location, Faction } from '../../types/index';
 import { ArticleGenerator } from '../generators/ArticleGenerator';
 import { EntityChatGenerator } from '../generators/EntityChatGenerator';
@@ -29,6 +30,7 @@ interface ArticleDashboardProps {
 
 export const ArticleDashboard: React.FC<ArticleDashboardProps> = ({ articles, npcs = [], locations = [], factions = [], onArticleCreated, onSelectArticle, isMockMode, isOfficialSetting, campaignContext }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: 3 });
   const filteredArticles = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     if (!q) return articles;
@@ -105,7 +107,7 @@ export const ArticleDashboard: React.FC<ArticleDashboardProps> = ({ articles, np
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredArticles.map(article => {
+          {filteredArticles.map((article, index) => {
             const contentSnippet = article.content ? article.content.slice(0, 100) + (article.content.length > 100 ? '…' : '') : '';
             const categoryColors: Record<string, string> = {
               lore: 'bg-cyan-900/40 text-cyan-300 border-cyan-500/30',
@@ -118,6 +120,7 @@ export const ArticleDashboard: React.FC<ArticleDashboardProps> = ({ articles, np
                 key={article.id}
                 onClick={() => onSelectArticle(article.id)}
                 className="card-parchment p-4 rounded-lg border border-slate-800 border-l-4 border-l-cyan-500 text-left hover:border-slate-700 hover:border-l-cyan-400 transition-all space-y-2"
+                {...getRovingProps(index)}
               >
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="font-semibold text-cyan-400 leading-tight">{article.title}</h3>

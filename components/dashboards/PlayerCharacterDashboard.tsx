@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import type { PlayerCharacter } from '../../types/index';
 import { PlayerCharacterImporter } from '../generators/PlayerCharacterImporter';
 import { Icons } from '../common/Icons';
+import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
 
 interface PlayerCharacterDashboardProps {
   playerCharacters: PlayerCharacter[];
@@ -14,6 +15,7 @@ interface PlayerCharacterDashboardProps {
 
 export const PlayerCharacterDashboard: React.FC<PlayerCharacterDashboardProps> = ({ playerCharacters, onImport, onPlayerCharacterCreated, onSelectPlayerCharacter, isMockMode }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: 3 });
   const filteredPCs = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     if (!q) return playerCharacters || [];
@@ -47,7 +49,7 @@ export const PlayerCharacterDashboard: React.FC<PlayerCharacterDashboardProps> =
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filteredPCs.map(pc => {
+            {filteredPCs.map((pc, index) => {
               const charClass = pc.characterStatistics.classes.charClass;
               const subclass = pc.characterStatistics.classes.subclass;
               const level = pc.characterStatistics.classes.level;
@@ -58,6 +60,7 @@ export const PlayerCharacterDashboard: React.FC<PlayerCharacterDashboardProps> =
                   key={pc.id}
                   onClick={() => onSelectPlayerCharacter(pc.id)}
                   className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 border-l-4 border-l-amber-500 text-left hover:bg-slate-800 hover:border-slate-700 hover:border-l-amber-400 transition-all space-y-2"
+                  {...getRovingProps(index)}
                 >
                   <h3 className="font-semibold text-amber-400 leading-tight">{pc.characterSocial.characterName}</h3>
                   <div className="flex flex-wrap items-center gap-1.5">

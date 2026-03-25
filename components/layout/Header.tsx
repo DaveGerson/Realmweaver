@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Icons } from '../common/Icons';
 import type { Campaign } from '../../types/index';
 import type { SaveStatus } from '../../services/campaignService';
@@ -51,6 +51,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -62,6 +63,55 @@ export const Header: React.FC<HeaderProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Focus the first menu item when the menu opens
+  useEffect(() => {
+    if (isMenuOpen) {
+      requestAnimationFrame(() => {
+        const first = menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]');
+        first?.focus();
+      });
+    }
+  }, [isMenuOpen]);
+
+  const handleMenuKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!isMenuOpen) return;
+    const items = Array.from(
+      menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []
+    );
+    const focused = document.activeElement as HTMLElement;
+    const currentIdx = items.indexOf(focused);
+
+    switch (e.key) {
+      case 'Escape':
+        e.preventDefault();
+        setIsMenuOpen(false);
+        menuButtonRef.current?.focus();
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        if (items.length > 0) {
+          const next = currentIdx < items.length - 1 ? currentIdx + 1 : 0;
+          items[next]?.focus();
+        }
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        if (items.length > 0) {
+          const prev = currentIdx > 0 ? currentIdx - 1 : items.length - 1;
+          items[prev]?.focus();
+        }
+        break;
+      case 'Home':
+        e.preventDefault();
+        items[0]?.focus();
+        break;
+      case 'End':
+        e.preventDefault();
+        items[items.length - 1]?.focus();
+        break;
+    }
+  }, [isMenuOpen]);
 
   const handleImportClick = () => {
     importInputRef.current?.click();
@@ -109,30 +159,40 @@ export const Header: React.FC<HeaderProps> = ({
               <h1 className="text-lg font-bold font-serif text-slate-100 hidden sm:block">RealmWeaver</h1>
           </div>
           <div className="h-6 w-px bg-slate-700 hidden sm:block"></div>
-          <div className="relative" ref={menuRef}>
-              <button onClick={() => setIsMenuOpen(p => !p)} className="flex items-center gap-2 group">
+          <div className="relative" ref={menuRef} onKeyDown={handleMenuKeyDown}>
+              <button
+                ref={menuButtonRef}
+                onClick={() => setIsMenuOpen(p => !p)}
+                aria-haspopup="menu"
+                aria-expanded={isMenuOpen}
+                className="flex items-center gap-2 group"
+              >
                   <span className="text-base font-semibold text-slate-300 group-hover:text-white transition-colors truncate max-w-[150px] sm:max-w-xs">{activeCampaign.title}</span>
                   <Icons.ChevronDown className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isMenuOpen ? 'rotate-180' : ''}`} />
               </button>
               {isMenuOpen && (
-                  <div className="absolute top-full mt-2 w-60 bg-slate-800 border border-slate-700 rounded-md shadow-lg z-[60] animate-in fade-in duration-150">
+                  <div
+                    className="absolute top-full mt-2 w-60 bg-slate-800 border border-slate-700 rounded-md shadow-lg z-[60] animate-in fade-in duration-150"
+                    role="menu"
+                    aria-label="Campaign menu"
+                  >
                       <div className="p-1">
                           {onAllCampaigns && (
-                              <button onClick={() => { onAllCampaigns(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-amber-300 hover:bg-slate-700 rounded-md transition-colors font-medium">
+                              <button onClick={() => { onAllCampaigns(); setIsMenuOpen(false); }} role="menuitem" className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-amber-300 hover:bg-slate-700 rounded-md transition-colors font-medium focus:outline-none focus:bg-slate-700">
                                   <Icons.AllCampaigns className="w-4 h-4" /> All Campaigns
                               </button>
                           )}
-                          <button onClick={() => { onSwitchCampaign(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded-md transition-colors">
+                          <button onClick={() => { onSwitchCampaign(); setIsMenuOpen(false); }} role="menuitem" className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded-md transition-colors focus:outline-none focus:bg-slate-700">
                               <Icons.Campaign className="w-4 h-4" /> Switch Campaign
                           </button>
-                          <button onClick={() => { onCreateNew(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded-md transition-colors">
+                          <button onClick={() => { onCreateNew(); setIsMenuOpen(false); }} role="menuitem" className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded-md transition-colors focus:outline-none focus:bg-slate-700">
                               <Icons.Plus className="w-4 h-4" /> Create New Campaign
                           </button>
-                          <div className="h-px bg-slate-700 my-1"></div>
-                          <button onClick={() => { handleImportClick(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded-md transition-colors">
+                          <div className="h-px bg-slate-700 my-1" role="separator"></div>
+                          <button onClick={() => { handleImportClick(); setIsMenuOpen(false); }} role="menuitem" className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded-md transition-colors focus:outline-none focus:bg-slate-700">
                             <Icons.FileUp className="w-4 h-4" /> Import Campaign
                           </button>
-                          <button onClick={() => { onShowExportModal(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded-md transition-colors">
+                          <button onClick={() => { onShowExportModal(); setIsMenuOpen(false); }} role="menuitem" className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded-md transition-colors focus:outline-none focus:bg-slate-700">
                               <Icons.FileDown className="w-4 h-4" /> Export Campaign
                           </button>
                       </div>

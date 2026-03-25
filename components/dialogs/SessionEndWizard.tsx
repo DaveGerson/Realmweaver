@@ -199,7 +199,7 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
                 </div>
 
                 {/* Step Indicators */}
-                <div className="flex items-center gap-1 px-6 py-3 border-b border-slate-800">
+                <div className="flex items-center gap-1 px-6 py-3 border-b border-slate-800" role="navigation" aria-label="Wizard steps">
                     {STEP_ORDER.map((step, i) => (
                         <React.Fragment key={step}>
                             <button
@@ -216,6 +216,9 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
                             >
                                 {i < currentIndex && <Icons.CheckCircle className="w-3 h-3 inline mr-1" />}
                                 {STEP_LABELS[step]}
+                                {currentStep === step && (
+                                    <span className="sr-only">, Step {i + 1} of {STEP_ORDER.length}</span>
+                                )}
                             </button>
                             {i < STEP_ORDER.length - 1 && <Icons.ChevronDown className="w-3 h-3 text-slate-600 rotate-[-90deg]" />}
                         </React.Fragment>

@@ -363,25 +363,52 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                     )}
                     <div className="fixed bottom-4 right-4 md:hidden z-30">
                         {fabOpen && (
-                            <div className="absolute bottom-16 right-0 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-2 space-y-1 min-w-[180px]">
+                            <div
+                                className="absolute bottom-16 right-0 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-2 space-y-1 min-w-[180px]"
+                                role="menu"
+                                aria-label="Quick tools"
+                                onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
+                                    if (e.key === 'Escape') {
+                                        e.preventDefault();
+                                        setFabOpen(false);
+                                    }
+                                    const items = Array.from(
+                                        (e.currentTarget as HTMLDivElement).querySelectorAll<HTMLElement>('[role="menuitem"]')
+                                    );
+                                    const focused = document.activeElement as HTMLElement;
+                                    const currentIdx = items.indexOf(focused);
+                                    if (e.key === 'ArrowDown') {
+                                        e.preventDefault();
+                                        const next = currentIdx < items.length - 1 ? currentIdx + 1 : 0;
+                                        items[next]?.focus();
+                                    } else if (e.key === 'ArrowUp') {
+                                        e.preventDefault();
+                                        const prev = currentIdx > 0 ? currentIdx - 1 : items.length - 1;
+                                        items[prev]?.focus();
+                                    }
+                                }}
+                            >
                                 <button
+                                    role="menuitem"
                                     onClick={() => { onOpenCoach(); setFabOpen(false); }}
-                                    className="w-full flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-lg text-sm text-slate-200 hover:bg-slate-700 transition-colors"
+                                    className="w-full flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-lg text-sm text-slate-200 hover:bg-slate-700 transition-colors focus:outline-none focus:bg-slate-700"
                                 >
                                     <Icons.Coach className="w-4 h-4 text-amber-400 flex-shrink-0" />
                                     DM Coach
                                 </button>
                                 <button
+                                    role="menuitem"
                                     onClick={() => { setMobileTab('tools'); setFabOpen(false); }}
-                                    className="w-full flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-lg text-sm text-slate-200 hover:bg-slate-700 transition-colors"
+                                    className="w-full flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-lg text-sm text-slate-200 hover:bg-slate-700 transition-colors focus:outline-none focus:bg-slate-700"
                                 >
                                     <Icons.Dice className="w-4 h-4 text-amber-400 flex-shrink-0" />
                                     Dice Roller
                                 </button>
                                 {canShowCombatTracker && (
                                     <button
+                                        role="menuitem"
                                         onClick={() => { handleOpenCombat(); setMobileTab('tools'); setFabOpen(false); }}
-                                        className="w-full flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-lg text-sm text-slate-200 hover:bg-slate-700 transition-colors"
+                                        className="w-full flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-lg text-sm text-slate-200 hover:bg-slate-700 transition-colors focus:outline-none focus:bg-slate-700"
                                     >
                                         <Icons.Combat className="w-4 h-4 text-red-400 flex-shrink-0" />
                                         Combat Tracker
@@ -389,8 +416,9 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                                 )}
                                 {canShowSecretsTracker && (
                                     <button
+                                        role="menuitem"
                                         onClick={() => { setMobileTab('tools'); setFabOpen(false); }}
-                                        className="w-full flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-lg text-sm text-slate-200 hover:bg-slate-700 transition-colors"
+                                        className="w-full flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-lg text-sm text-slate-200 hover:bg-slate-700 transition-colors focus:outline-none focus:bg-slate-700"
                                     >
                                         <Icons.Lock className="w-4 h-4 text-amber-400 flex-shrink-0" />
                                         Secrets & Clues
@@ -400,6 +428,8 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                         )}
                         <button
                             onClick={() => setFabOpen(p => !p)}
+                            aria-haspopup="menu"
+                            aria-expanded={fabOpen}
                             className={twMerge(
                                 "w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-colors",
                                 fabOpen

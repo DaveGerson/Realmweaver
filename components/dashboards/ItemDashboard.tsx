@@ -8,6 +8,7 @@ import { Icons } from '../common/Icons';
 import { EntityCreationPanel } from '../common/EntityCreationPanel';
 import { createDefaultItem } from '../../utils/entityUtils';
 import { useEntitySearch } from '../../hooks/useEntitySearch';
+import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
 
 const ITEM_PROMPT_CHIPS = [
   'A cursed weapon',
@@ -27,6 +28,7 @@ interface ItemDashboardProps {
 
 export const ItemDashboard: React.FC<ItemDashboardProps> = ({ items, onItemCreated, onSelectItem, isMockMode, isOfficialSetting, campaignContext }) => {
   const { filteredEntities: filteredItems, searchTerm, setSearchTerm } = useEntitySearch(items, ['name', 'description', 'properties']);
+  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: 3 });
 
   const handleItemCreated = (data: any) => {
     const { id, ...itemData } = data;
@@ -82,7 +84,7 @@ export const ItemDashboard: React.FC<ItemDashboardProps> = ({ items, onItemCreat
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredItems.map(item => {
+          {filteredItems.map((item, index) => {
             const descSnippet = item.description ? item.description.slice(0, 80) + (item.description.length > 80 ? '…' : '') : '';
             const rarityColors: Record<string, string> = {
               common: 'bg-slate-700/60 text-slate-300 border-slate-600/30',
@@ -98,6 +100,7 @@ export const ItemDashboard: React.FC<ItemDashboardProps> = ({ items, onItemCreat
                 key={item.id}
                 onClick={() => onSelectItem(item.id)}
                 className="card-parchment p-4 rounded-lg border border-slate-800 border-l-4 border-l-sky-500 text-left hover:border-slate-700 hover:border-l-sky-400 transition-all space-y-2"
+                {...getRovingProps(index)}
               >
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="font-semibold text-sky-400 leading-tight">{item.name}</h3>

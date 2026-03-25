@@ -8,6 +8,7 @@ import { Icons } from '../common/Icons';
 import { EntityCreationPanel } from '../common/EntityCreationPanel';
 import { createDefaultFaction } from '../../utils/entityUtils';
 import { useEntitySearch } from '../../hooks/useEntitySearch';
+import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
 
 const FACTION_PROMPT_CHIPS = [
   'A thieves\' guild',
@@ -29,6 +30,7 @@ interface FactionDashboardProps {
 
 export const FactionDashboard: React.FC<FactionDashboardProps> = ({ factions, npcs = [], locations = [], onFactionCreated, onSelectFaction, isMockMode, isOfficialSetting, campaignContext }) => {
   const { filteredEntities: filteredFactions, searchTerm, setSearchTerm } = useEntitySearch(factions, ['name', 'description', 'goals']);
+  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: 3 });
 
   const handleFactionCreated = (data: any) => {
     const { id, ...factionData } = data;
@@ -92,7 +94,7 @@ export const FactionDashboard: React.FC<FactionDashboardProps> = ({ factions, np
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredFactions.map(faction => {
+          {filteredFactions.map((faction, index) => {
             const leader = npcs.find(n => n.id === faction.leaderId);
             const goalsSnippet = faction.goals ? faction.goals.slice(0, 80) + (faction.goals.length > 80 ? '…' : '') : '';
             const memberCount = faction.memberIds?.length ?? 0;
@@ -101,6 +103,7 @@ export const FactionDashboard: React.FC<FactionDashboardProps> = ({ factions, np
                 key={faction.id}
                 onClick={() => onSelectFaction(faction.id)}
                 className="card-parchment p-4 rounded-lg border border-slate-800 border-l-4 border-l-violet-500 text-left hover:border-slate-700 hover:border-l-violet-400 transition-all space-y-2"
+                {...getRovingProps(index)}
               >
                 <h3 className="font-semibold text-violet-400 leading-tight">{faction.name}</h3>
                 {goalsSnippet && (
