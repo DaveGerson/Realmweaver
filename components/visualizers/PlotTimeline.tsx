@@ -316,7 +316,7 @@ export const PlotTimeline: React.FC<PlotTimelineProps> = ({
             className="flex items-center gap-1.5 px-2 py-1 rounded text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 transition-colors"
             title={compactMode ? 'Show full session titles' : 'Show compact session numbers'}
           >
-            <Icons.SlidersHorizontal className="w-3 h-3" />
+            <Icons.Sliders className="w-3 h-3" />
             {compactMode ? 'Expand' : 'Compact'}
           </button>
         </div>
