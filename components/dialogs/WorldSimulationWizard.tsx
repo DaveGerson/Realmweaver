@@ -102,6 +102,8 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
   const [appliedCount, setAppliedCount] = useState(0);
   // Tracks which (eventId, updateIndex) pairs have been expanded beyond 3 lines
   const [expandedUpdates, setExpandedUpdates] = useState<Set<string>>(new Set());
+  // Cancellation ref — set to true when the user cancels mid-generation
+  const cancelledRef = React.useRef(false);
 
   const selectedLabel =
     DAYS_LABELS.reduce((best, opt) => {
@@ -110,19 +112,28 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
     }, DAYS_LABELS[0]).label;
 
   const handleSimulate = useCallback(async () => {
+    cancelledRef.current = false;
     setStep('loading');
     setError(null);
     try {
       const result = await generateWorldEvents(campaign, daysPassed, isMockMode);
+      // If the user cancelled while the promise was in-flight, discard the result
+      if (cancelledRef.current) return;
       setEvents(result);
       // Default: all events approved
       setApprovedIds(new Set(result.map(e => e.id)));
       setStep('review');
     } catch (err) {
+      if (cancelledRef.current) return;
       setError(err instanceof Error ? err.message : 'An unknown error occurred.');
       setStep('setup');
     }
   }, [campaign, daysPassed, isMockMode]);
+
+  const handleCancelGeneration = useCallback(() => {
+    cancelledRef.current = true;
+    setStep('setup');
+  }, []);
 
   const toggleApproval = (id: string) => {
     setApprovedIds(prev => {
@@ -409,7 +420,12 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
           )}
 
           {step === 'loading' && (
-            <div className="flex-1 text-center text-slate-500 text-sm">Please wait...</div>
+            <>
+              <div className="flex-1 text-center text-slate-500 text-sm">Please wait...</div>
+              <Button variant="ghost" onClick={handleCancelGeneration}>
+                Cancel
+              </Button>
+            </>
           )}
 
           {step === 'review' && (

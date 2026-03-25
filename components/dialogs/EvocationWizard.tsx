@@ -102,6 +102,7 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
     // Generation State
     const [isLoading, setIsLoading] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState('Evoking...');
+    const [detailedProgress, setDetailedProgress] = useState<{ completed: number; total: number } | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [generatedData, setGeneratedData] = useState<WizardStateData | null>(null);
     const [selection, setSelection] = useState<SelectionState | null>(null);
@@ -117,6 +118,7 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
         setError(null);
         setGeneratedData(null);
         setSelection(null);
+        setDetailedProgress(null);
     };
 
     const processGeneratedData = (data: BatchAddData) => {
@@ -160,17 +162,28 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                     data = await generateCampaignFill(fullPrompt, initialGenerationOptions, isMockMode, campaignContext);
                     break;
 
-                case 'detailed':
+                case 'detailed': {
                     setLoadingMessage('Generating from prompts...');
                     const detailedData: BatchAddData = { npcs: [], locations: [], factions: [], adventures: [], items: [] };
-                    const npcPromises = detailedPrompts.npcs.map(p => generateNpc(p.prompt, isMockMode, campaignContext).then(res => ({ ...res, factionId: p.linkId })));
-                    const locationPromises = detailedPrompts.locations.map(p => generateLocation(p.prompt, isMockMode, campaignContext).then(res => ({ ...res, parentLocationId: p.linkId })));
-                    const factionPromises = detailedPrompts.factions.map(p => generateFaction(p.prompt, isMockMode, campaignContext));
-                    const itemPromises = detailedPrompts.items.map(p => generateItem(p.prompt, isMockMode, campaignContext));
-                    const adventurePromises = detailedPrompts.adventures.filter(adv => adv.prompt.trim() !== '' && adv.scenes.length > 0 && adv.scenes.some(s => s.prompt.trim() !== '')).map(adv => {
+                    const validAdventures = detailedPrompts.adventures.filter(adv => adv.prompt.trim() !== '' && adv.scenes.length > 0 && adv.scenes.some(s => s.prompt.trim() !== ''));
+                    const totalDetailed =
+                        detailedPrompts.npcs.length +
+                        detailedPrompts.locations.length +
+                        detailedPrompts.factions.length +
+                        detailedPrompts.items.length +
+                        validAdventures.length;
+                    setDetailedProgress({ completed: 0, total: totalDetailed });
+                    const trackProgress = <T,>(p: Promise<T>): Promise<T> =>
+                        p.then(res => { setDetailedProgress(prev => prev ? { ...prev, completed: prev.completed + 1 } : prev); return res; });
+
+                    const npcPromises = detailedPrompts.npcs.map(p => trackProgress(generateNpc(p.prompt, isMockMode, campaignContext).then(res => ({ ...res, factionId: p.linkId }))));
+                    const locationPromises = detailedPrompts.locations.map(p => trackProgress(generateLocation(p.prompt, isMockMode, campaignContext).then(res => ({ ...res, parentLocationId: p.linkId }))));
+                    const factionPromises = detailedPrompts.factions.map(p => trackProgress(generateFaction(p.prompt, isMockMode, campaignContext)));
+                    const itemPromises = detailedPrompts.items.map(p => trackProgress(generateItem(p.prompt, isMockMode, campaignContext)));
+                    const adventurePromises = validAdventures.map(adv => {
                         const scenesDescription = adv.scenes.filter(s => s.prompt.trim() !== '').map(s => `- Scene Prompt: "${s.prompt}"${s.type ? ` (Suggested Type: ${s.type})` : ''}`).join('\n');
                         const fullAdvPrompt = `Based on the following adventure concept, generate a complete adventure outline.\nAdventure Concept: "${adv.prompt}"\n\nThe adventure's structure must be built around the following user-provided scenes. Generate full, detailed scenes based on these prompts:\n${scenesDescription}`;
-                        return generateAdventure(fullAdvPrompt, isMockMode, campaignContext);
+                        return trackProgress(generateAdventure(fullAdvPrompt, isMockMode, campaignContext));
                     });
 
                     const [npcsResult, locationsResult, factionsResult, itemsResult, adventuresResult] = await Promise.all([Promise.all(npcPromises), Promise.all(locationPromises), Promise.all(factionPromises), Promise.all(itemPromises), Promise.all(adventurePromises)]);
@@ -182,6 +195,7 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                     detailedData.adventures = adventuresResult;
                     data = detailedData;
                     break;
+                }
                 
                 case 'ingest':
                     setLoadingMessage('Parsing document...');
@@ -225,6 +239,15 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
         setSelection(produce(draft => {
             if (draft) {
                 draft[type][index] = isChecked;
+            }
+        }));
+    };
+
+    const handleSelectAll = (type: keyof SelectionState, checked: boolean) => {
+        if (!selection) return;
+        setSelection(produce(draft => {
+            if (draft) {
+                draft[type] = draft[type].map(() => checked);
             }
         }));
     };
@@ -326,6 +349,19 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                                     <Icons.Wizard className="w-16 h-16 mb-4 animate-pulse" />
                                     <p className="text-lg">The mists of creation swirl...</p>
                                     <p className="text-sm">{loadingMessage}</p>
+                                    {detailedProgress && detailedProgress.total > 0 && (
+                                        <div className="mt-4 w-48 space-y-2">
+                                            <p className="text-xs text-center text-amber-400">
+                                                Generating... {detailedProgress.completed} of {detailedProgress.total} complete
+                                            </p>
+                                            <div className="w-full bg-slate-800 rounded-full h-1.5">
+                                                <div
+                                                    className="bg-amber-500 h-1.5 rounded-full transition-all duration-300"
+                                                    style={{ width: `${Math.round((detailedProgress.completed / detailedProgress.total) * 100)}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                             {!isLoading && !hasGeneratedData && (
@@ -336,11 +372,11 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                             )}
                             {hasGeneratedData && (
                                 <div className="space-y-4 animate-fade-in">
-                                    <ResultsSection title="NPCs" items={generatedData.npcs} selection={selection.npcs} onSelect={(i, c) => handleSelectionChange('npcs', i, c)} onEdit={(i) => setEditingEntity({ type: 'npcs', index: i })} />
-                                    <ResultsSection title="Locations" items={generatedData.locations} selection={selection.locations} onSelect={(i, c) => handleSelectionChange('locations', i, c)} onEdit={(i) => setEditingEntity({ type: 'locations', index: i })} />
-                                    <ResultsSection title="Factions" items={generatedData.factions} selection={selection.factions} onSelect={(i, c) => handleSelectionChange('factions', i, c)} onEdit={(i) => setEditingEntity({ type: 'factions', index: i })} />
-                                    <ResultsSection title="Items" items={generatedData.items} selection={selection.items} onSelect={(i, c) => handleSelectionChange('items', i, c)} onEdit={(i) => setEditingEntity({ type: 'items', index: i })} />
-                                    <ResultsSection title="Adventures" items={generatedData.adventures} selection={selection.adventures} onSelect={(i, c) => handleSelectionChange('adventures', i, c)} onEdit={(i) => setEditingEntity({ type: 'adventures', index: i })} />
+                                    <ResultsSection title="NPCs" items={generatedData.npcs} selection={selection.npcs} onSelect={(i, c) => handleSelectionChange('npcs', i, c)} onSelectAll={(c) => handleSelectAll('npcs', c)} onEdit={(i) => setEditingEntity({ type: 'npcs', index: i })} />
+                                    <ResultsSection title="Locations" items={generatedData.locations} selection={selection.locations} onSelect={(i, c) => handleSelectionChange('locations', i, c)} onSelectAll={(c) => handleSelectAll('locations', c)} onEdit={(i) => setEditingEntity({ type: 'locations', index: i })} />
+                                    <ResultsSection title="Factions" items={generatedData.factions} selection={selection.factions} onSelect={(i, c) => handleSelectionChange('factions', i, c)} onSelectAll={(c) => handleSelectAll('factions', c)} onEdit={(i) => setEditingEntity({ type: 'factions', index: i })} />
+                                    <ResultsSection title="Items" items={generatedData.items} selection={selection.items} onSelect={(i, c) => handleSelectionChange('items', i, c)} onSelectAll={(c) => handleSelectAll('items', c)} onEdit={(i) => setEditingEntity({ type: 'items', index: i })} />
+                                    <ResultsSection title="Adventures" items={generatedData.adventures} selection={selection.adventures} onSelect={(i, c) => handleSelectionChange('adventures', i, c)} onSelectAll={(c) => handleSelectAll('adventures', c)} onEdit={(i) => setEditingEntity({ type: 'adventures', index: i })} />
                                 </div>
                             )}
                         </div>
@@ -685,22 +721,35 @@ interface ResultsSectionProps {
     items: { name?: string, title?: string }[];
     selection: boolean[];
     onSelect: (index: number, isChecked: boolean) => void;
+    onSelectAll: (checked: boolean) => void;
     onEdit: (index: number) => void;
 }
-const ResultsSection: React.FC<ResultsSectionProps> = ({ title, items, selection, onSelect, onEdit }) => {
+const ResultsSection: React.FC<ResultsSectionProps> = ({ title, items, selection, onSelect, onSelectAll, onEdit }) => {
     const [isExpanded, setIsExpanded] = useState(true);
     if (items.length === 0) return null;
+    const selectedCount = selection.filter(Boolean).length;
+    const allSelected = selectedCount === items.length;
     return (
         <div>
             <button onClick={() => setIsExpanded(p => !p)} className="w-full flex items-center justify-between p-2 text-left bg-slate-800/50 rounded-t-md">
                 <h4 className="font-semibold text-slate-200">{title}</h4>
                 <div className="flex items-center gap-2">
-                    <span className="text-xs bg-slate-700 text-slate-300 rounded-full px-2 py-0.5">{selection.filter(Boolean).length}/{items.length}</span>
+                    <span className="text-xs bg-slate-700 text-slate-300 rounded-full px-2 py-0.5">{selectedCount}/{items.length}</span>
                     <Icons.ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
                 </div>
             </button>
             {isExpanded && (
                 <div className="bg-slate-950/30 border border-t-0 border-slate-800/50 rounded-b-md p-2 space-y-1">
+                    {/* Select all / Deselect all toggle */}
+                    <div className="flex justify-end pb-1 border-b border-slate-800/60 mb-1">
+                        <button
+                            type="button"
+                            onClick={() => onSelectAll(!allSelected)}
+                            className="text-sm text-amber-400 hover:text-amber-300 transition-colors"
+                        >
+                            {allSelected ? 'Deselect all' : 'Select all'}
+                        </button>
+                    </div>
                     {items.map((item, index) => (
                         <div key={index} className="flex items-center justify-between p-1.5 rounded-md hover:bg-slate-800/50 transition-colors group">
                             <label className="flex items-center text-sm text-slate-300 select-none flex-grow cursor-pointer">

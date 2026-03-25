@@ -381,6 +381,7 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
                     onKeyDown={handleRoleplayKeyDown}
                     isLoading={roleplayLoading}
                     error={roleplayError}
+                    onClearError={() => setRoleplayError(null)}
                     onClear={handleClearConversation}
                     onSendToNotes={onSendToNotes ? handleSendConversationToNotes : undefined}
                     messagesEndRef={messagesEndRef}
@@ -423,7 +424,22 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
                                 </button>
                             ))}
                         </div>
-                        {error && <p className="text-xs text-red-400">{error}</p>}
+                        {error && (
+                            <div className="flex items-start gap-3 text-red-400 bg-red-900/20 border border-red-800/30 rounded-lg p-3">
+                                <Icons.AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm leading-snug">{error}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleGenerate}
+                                    disabled={isLoading}
+                                    className="flex-shrink-0 text-xs text-red-300 hover:text-white bg-red-800/40 hover:bg-red-700/60 rounded px-2 py-1 transition-colors disabled:opacity-40"
+                                >
+                                    Try Again
+                                </button>
+                            </div>
+                        )}
                         <Button onClick={handleGenerate} disabled={isLoading} className="w-full">
                             {isLoading ? (
                                 <><Icons.Coach className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
@@ -463,6 +479,7 @@ interface RoleplayPanelProps {
     onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
     isLoading: boolean;
     error: string | null;
+    onClearError: () => void;
     onClear: () => void;
     onSendToNotes?: () => void;
     messagesEndRef: React.RefObject<HTMLDivElement>;
@@ -481,6 +498,7 @@ const RoleplayPanel: React.FC<RoleplayPanelProps> = ({
     onKeyDown,
     isLoading,
     error,
+    onClearError,
     onClear,
     onSendToNotes,
     messagesEndRef,
@@ -627,7 +645,19 @@ const RoleplayPanel: React.FC<RoleplayPanelProps> = ({
                 )}
 
                 {error && (
-                    <p className="text-xs text-red-400 text-center py-1">{error}</p>
+                    <div className="flex items-start gap-3 text-red-400 bg-red-900/20 border border-red-800/30 rounded-lg p-3 mx-1">
+                        <Icons.AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm leading-snug">{error}</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={onClearError}
+                            className="flex-shrink-0 text-xs text-red-300 hover:text-white bg-red-800/40 hover:bg-red-700/60 rounded px-2 py-1 transition-colors"
+                        >
+                            Dismiss
+                        </button>
+                    </div>
                 )}
 
                 <div ref={messagesEndRef} />

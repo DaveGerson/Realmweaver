@@ -50,7 +50,7 @@ const SEVERITY_BADGE_CLASS: Record<IssueSeverity, string> = {
 
 function SeverityIcon({ severity, className }: { severity: IssueSeverity; className?: string }) {
   const base = twMerge('w-4 h-4 flex-shrink-0', SEVERITY_ICON_CLASS[severity], className);
-  if (severity === 'error') return <Icons.X className={base} />;
+  if (severity === 'error') return <Icons.AlertCircle className={base} />;
   if (severity === 'warning') return <Icons.AlertTriangle className={base} />;
   return <Icons.Help className={base} />;
 }
