@@ -11,6 +11,8 @@ import {
 import { campaignService } from '@/services/campaignService';
 import { DialogShell } from '@/components/common/DialogShell';
 import { getWintersDaughterTemplate } from '@/utils/demoTemplates';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { useToast } from '@/hooks/useToast';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -217,9 +219,14 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
     onDismiss,
     onComplete,
 }) => {
+    // ── Hooks ──────────────────────────────────────────────────────────────
+    const { confirm } = useConfirmDialog();
+    const { addToast } = useToast();
+
     // ── State ──────────────────────────────────────────────────────────────
     const [step, setStep] = useState<WizardStep>(1);
     const [isLoading, setIsLoading] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // Step 1
@@ -257,6 +264,20 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
 
     const handleStep2Next = async () => {
         if (npcDrafts.length === 0) return;
+
+        // If step 3 already has data, ask before regenerating
+        if (locationDrafts.length > 0) {
+            const shouldRegenerate = await confirm(
+                'Regenerate locations?',
+                'You already have generated locations. Do you want to regenerate them and lose your current edits?',
+                { confirmLabel: 'Regenerate', cancelLabel: 'Keep current', variant: 'danger' }
+            );
+            if (!shouldRegenerate) {
+                setStep(3);
+                return;
+            }
+        }
+
         setError(null);
         setIsLoading(true);
         try {
@@ -273,6 +294,20 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
 
     const handleStep3Next = async () => {
         if (locationDrafts.length === 0) return;
+
+        // If step 4 already has adventure data, ask before regenerating
+        if (adventureDraft !== null) {
+            const shouldRegenerate = await confirm(
+                'Regenerate adventure?',
+                'You already have a generated adventure. Do you want to regenerate it and lose your current edits?',
+                { confirmLabel: 'Regenerate', cancelLabel: 'Keep current', variant: 'danger' }
+            );
+            if (!shouldRegenerate) {
+                setStep(4);
+                return;
+            }
+        }
+
         setError(null);
         setIsLoading(true);
         try {
@@ -293,48 +328,60 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
         }
     };
 
-    const handleStep4Next = () => {
-        // Save everything to the campaign
-        let npcCount = 0;
-        let locCount = 0;
+    const handleStep4Next = async () => {
+        setIsSaving(true);
+        setError(null);
 
-        // Save NPCs
-        for (const draft of npcDrafts) {
-            const { _key: _k, ...npcData } = draft;
-            campaignService.createNpc({ ...npcData, factionId: undefined });
-            npcCount++;
+        try {
+            let npcCount = 0;
+            let locCount = 0;
+
+            // Save NPCs
+            for (const draft of npcDrafts) {
+                const { _key: _k, ...npcData } = draft;
+                campaignService.createNpc({ ...npcData, factionId: undefined });
+                npcCount++;
+            }
+
+            // Save Locations
+            for (const draft of locationDrafts) {
+                const { _key: _k, ...locData } = draft;
+                campaignService.createLocation({
+                    ...locData,
+                    subLocationIds: [],
+                    loot: locData.loot || [],
+                    connections: locData.connections || [],
+                    pointsOfInterest: locData.pointsOfInterest || [],
+                    history: locData.history || [],
+                });
+                locCount++;
+            }
+
+            // Save Adventure
+            let sceneCount = 0;
+            if (adventureDraft) {
+                campaignService.createFullAdventure({
+                    title: adventureDraft.title,
+                    hook: adventureDraft.hook,
+                    theme: adventureDraft.theme,
+                    level: adventureDraft.level,
+                    scenes: adventureDraft.scenes,
+                });
+                sceneCount = adventureDraft.scenes?.length ?? 0;
+            }
+
+            setSavedCounts({ npcs: npcCount, locations: locCount, scenes: sceneCount });
+            campaignService.dismissWizard();
+            addToast('Campaign content saved successfully!', 'success');
+            setStep(5);
+        } catch (e) {
+            console.error('Failed to save campaign content:', e);
+            const message = e instanceof Error ? e.message : 'An unexpected error occurred.';
+            addToast(`Save failed: ${message}`, 'error');
+            setError('Could not save your campaign content. Please try again.');
+        } finally {
+            setIsSaving(false);
         }
-
-        // Save Locations
-        for (const draft of locationDrafts) {
-            const { _key: _k, ...locData } = draft;
-            campaignService.createLocation({
-                ...locData,
-                subLocationIds: [],
-                loot: locData.loot || [],
-                connections: locData.connections || [],
-                pointsOfInterest: locData.pointsOfInterest || [],
-                history: locData.history || [],
-            });
-            locCount++;
-        }
-
-        // Save Adventure
-        let sceneCount = 0;
-        if (adventureDraft) {
-            campaignService.createFullAdventure({
-                title: adventureDraft.title,
-                hook: adventureDraft.hook,
-                theme: adventureDraft.theme,
-                level: adventureDraft.level,
-                scenes: adventureDraft.scenes,
-            });
-            sceneCount = adventureDraft.scenes?.length ?? 0;
-        }
-
-        setSavedCounts({ npcs: npcCount, locations: locCount, scenes: sceneCount });
-        campaignService.dismissWizard();
-        setStep(5);
     };
 
     // ── NPC draft mutations ────────────────────────────────────────────────
@@ -386,6 +433,10 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
     };
 
     // ── Adventure draft mutations ─────────────────────────────────────────
+
+    const handleSceneRemove = useCallback((index: number) => {
+        setAdventureDraft(d => d ? { ...d, scenes: d.scenes.filter((_, i) => i !== index) } : d);
+    }, []);
 
     const handleRegenerateAdventure = async () => {
         setError(null);
@@ -518,6 +569,24 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
                                     {worldDescription.trim().length} / 20 min
                                 </p>
                             </div>
+
+                            {/* Persistent writing prompts */}
+                            <div className="bg-slate-800/50 border border-slate-700/60 rounded-lg px-4 py-3 space-y-1.5">
+                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Ideas to include:</p>
+                                <ul className="space-y-1">
+                                    {[
+                                        'Tone & atmosphere (gritty, heroic, horror, whimsical...)',
+                                        'Central conflict or tension',
+                                        'What makes magic or technology unique here?',
+                                        'Key factions or power groups',
+                                    ].map(hint => (
+                                        <li key={hint} className="flex items-start gap-2 text-xs text-slate-400">
+                                            <span className="text-slate-600 mt-0.5 flex-shrink-0">•</span>
+                                            {hint}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
                         </div>
                     )}
 
@@ -608,12 +677,19 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
                                                     <span className="text-xs text-slate-500 font-mono">
                                                         {i + 1}
                                                     </span>
-                                                    <span className="text-sm font-medium text-slate-200">
+                                                    <span className="text-sm font-medium text-slate-200 flex-1 min-w-0 truncate">
                                                         {scene.title}
                                                     </span>
-                                                    <span className="ml-auto text-xs text-slate-500 capitalize bg-slate-700 px-2 py-0.5 rounded-full">
+                                                    <span className="text-xs text-slate-500 capitalize bg-slate-700 px-2 py-0.5 rounded-full flex-shrink-0">
                                                         {scene.type}
                                                     </span>
+                                                    <button
+                                                        onClick={() => handleSceneRemove(i)}
+                                                        className="text-slate-600 hover:text-red-400 transition-colors p-0.5 flex-shrink-0"
+                                                        title="Remove scene"
+                                                    >
+                                                        <Icons.Trash className="w-3.5 h-3.5" />
+                                                    </button>
                                                 </div>
                                                 <p className="text-xs text-slate-400 leading-relaxed line-clamp-2">
                                                     {scene.readAloudText}
@@ -803,11 +879,20 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
                             </button>
                             <button
                                 onClick={handleStep4Next}
-                                disabled={isLoading || !adventureDraft}
-                                className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition-colors disabled:opacity-50"
+                                disabled={isLoading || isSaving || !adventureDraft}
+                                className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                <Icons.CheckCircle className="w-4 h-4" />
-                                Save All & Finish
+                                {isSaving ? (
+                                    <>
+                                        <Icons.Loader className="w-4 h-4 animate-spin" />
+                                        Saving...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Icons.CheckCircle className="w-4 h-4" />
+                                        Save All & Finish
+                                    </>
+                                )}
                             </button>
                         </div>
                     )}
