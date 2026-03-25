@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Campaign, SessionLog } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
@@ -24,10 +24,21 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
   isMockMode,
 }) => {
   const [isPrepWizardOpen, setIsPrepWizardOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const activeSession = sessionLogs.find(s => s.status === 'active');
-  const plannedSessions = sessionLogs.filter(s => s.status === 'planned').sort((a, b) => new Date(a.sessionDate).getTime() - new Date(b.sessionDate).getTime());
-  const pastSessions = sessionLogs.filter(s => s.status === 'completed').sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime());
+  const filteredSessionLogs = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return sessionLogs;
+    return sessionLogs.filter(s =>
+      s.title.toLowerCase().includes(q) ||
+      s.prepNotes?.toLowerCase().includes(q) ||
+      s.recap?.toLowerCase().includes(q)
+    );
+  }, [sessionLogs, searchTerm]);
+
+  const activeSession = filteredSessionLogs.find(s => s.status === 'active');
+  const plannedSessions = filteredSessionLogs.filter(s => s.status === 'planned').sort((a, b) => new Date(a.sessionDate).getTime() - new Date(b.sessionDate).getTime());
+  const pastSessions = filteredSessionLogs.filter(s => s.status === 'completed').sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime());
 
   const handleCreate = () => {
       const def = createDefaultSession();
@@ -49,12 +60,22 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
               <h1 className="text-3xl font-bold font-serif text-slate-100">Session Manager</h1>
               <p className="text-slate-400">Plan future games, run your current session, and archive the past.</p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
+                <div className="relative">
+                  <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    placeholder="Search sessions..."
+                    className="bg-slate-800 border border-slate-700 rounded-md pl-9 pr-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 w-48"
+                  />
+                </div>
                 <Button
                     onClick={() => setIsPrepWizardOpen(true)}
                     className="bg-amber-600 hover:bg-amber-500 shadow-lg shadow-amber-500/20"
-                    disabled={!!activeSession}
-                    title={activeSession ? 'A session is already live' : 'Open the Session Prep Wizard'}
+                    disabled={!!filteredSessionLogs.find(s => s.status === 'active')}
+                    title={filteredSessionLogs.find(s => s.status === 'active') ? 'A session is already live' : 'Open the Session Prep Wizard'}
                 >
                     <Icons.Play className="w-4 h-4 mr-2" /> Prepare Session
                 </Button>
@@ -126,13 +147,19 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
                     })}
                     {plannedSessions.length === 0 && (
                         <div className="text-center py-8 bg-slate-900/30 rounded-lg border border-dashed border-slate-800">
-                            <p className="text-slate-500 text-sm">No future sessions planned.</p>
-                            <button
-                                onClick={() => setIsPrepWizardOpen(true)}
-                                className="mt-2 text-xs text-amber-500 hover:text-amber-400 underline underline-offset-2 transition-colors"
-                            >
-                                Use the Prep Wizard to plan one
-                            </button>
+                            {searchTerm ? (
+                                <p className="text-slate-500 text-sm">No planned sessions match "{searchTerm}".</p>
+                            ) : (
+                                <>
+                                    <p className="text-slate-500 text-sm">No future sessions planned.</p>
+                                    <button
+                                        onClick={() => setIsPrepWizardOpen(true)}
+                                        className="mt-2 text-xs text-amber-500 hover:text-amber-400 underline underline-offset-2 transition-colors"
+                                    >
+                                        Use the Prep Wizard to plan one
+                                    </button>
+                                </>
+                            )}
                         </div>
                     )}
                 </div>
@@ -170,9 +197,11 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
                             </button>
                         );
                     })}
-                     {pastSessions.length === 0 && (
+                    {pastSessions.length === 0 && (
                         <div className="text-center py-8 bg-slate-900/30 rounded-lg border border-dashed border-slate-800">
-                            <p className="text-slate-500 text-sm">No history recorded yet.</p>
+                            <p className="text-slate-500 text-sm">
+                                {searchTerm ? `No completed sessions match "${searchTerm}".` : 'No history recorded yet.'}
+                            </p>
                         </div>
                     )}
                 </div>
@@ -186,7 +215,6 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
               campaign={campaign}
               onComplete={handleWizardComplete}
               onClose={() => setIsPrepWizardOpen(false)}
-              isMockMode={isMockMode}
           />
       )}
     </>

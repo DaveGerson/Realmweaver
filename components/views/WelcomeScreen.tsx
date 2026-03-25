@@ -17,7 +17,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
           Your AI-powered companion for crafting unforgettable tabletop RPG campaigns.
         </p>
         <Button onClick={onStart} size="lg" className="mt-8">
-          Create Your First Campaign
+          Create a Campaign
         </Button>
       </div>
     </div>

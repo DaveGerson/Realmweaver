@@ -1,11 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Adventure, AdventureForBatchAdd, Campaign } from '../../types/index';
 import { AdventureGenerator } from '../generators/AdventureGenerator';
 import { EntityChatGenerator } from '../generators/EntityChatGenerator';
 import { AdventureEditor } from '../editors/AdventureEditor';
 import { Icons } from '../common/Icons';
-import { Button } from '../common/Button';
+import { EntityCreationPanel } from '../common/EntityCreationPanel';
 import { createDefaultAdventure } from '../../utils/entityUtils';
 
 const ADVENTURE_PROMPT_CHIPS = [
@@ -25,7 +25,16 @@ interface AdventureDashboardProps {
 }
 
 export const AdventureDashboard: React.FC<AdventureDashboardProps> = ({ adventures, onAdventureCreated, onSelectAdventure, isMockMode, isOfficialSetting, campaignContext }) => {
-  const [creationMode, setCreationMode] = useState<'chat' | 'form'>('chat');
+  const [searchTerm, setSearchTerm] = useState('');
+  const filteredAdventures = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return adventures;
+    return adventures.filter(a =>
+      a.title.toLowerCase().includes(q) ||
+      a.hook?.toLowerCase().includes(q) ||
+      a.theme?.toLowerCase().includes(q)
+    );
+  }, [adventures, searchTerm]);
 
   const handleAdventureCreated = (data: any) => {
     const { id, ...advData } = data;
@@ -53,70 +62,52 @@ export const AdventureDashboard: React.FC<AdventureDashboardProps> = ({ adventur
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
       {/* Creation Area */}
-      <div className="space-y-3">
-        {/* Mode toggle header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Icons.Sparkles className="w-5 h-5 text-indigo-400" />
-            <h2 className="text-lg font-bold font-serif text-slate-100">
-              {creationMode === 'chat' ? 'Create via Chat' : 'Adventure Generator'}
-            </h2>
-          </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setCreationMode(creationMode === 'chat' ? 'form' : 'chat')}
-          >
-            {creationMode === 'chat' ? (
-              <>
-                <Icons.FileText className="w-4 h-4 mr-2" />
-                Switch to form
-              </>
-            ) : (
-              <>
-                <Icons.Chat className="w-4 h-4 mr-2" />
-                Switch to chat
-              </>
+      <EntityCreationPanel
+        entityLabel="Adventure"
+        chatPanel={
+          <EntityChatGenerator
+            entityType="adventure"
+            isMockMode={isMockMode}
+            campaignContext={campaignContext}
+            onEntityCreated={handleAdventureCreated}
+            initialData={createDefaultAdventure()}
+            promptChips={ADVENTURE_PROMPT_CHIPS}
+            renderPreview={(data, onUpdate) => (
+              <AdventureEditor
+                adventure={{ ...data, id: 'preview' }}
+                campaign={previewCampaign}
+                onUpdate={(_, updates) => onUpdate(updates)}
+              />
             )}
-          </Button>
-        </div>
-
-        {/* Creation panel */}
-        {creationMode === 'chat' ? (
-          <div className="h-[480px] border border-slate-800 rounded-xl overflow-hidden">
-            <EntityChatGenerator
-              entityType="adventure"
-              isMockMode={isMockMode}
-              campaignContext={campaignContext}
-              onEntityCreated={handleAdventureCreated}
-              initialData={createDefaultAdventure()}
-              promptChips={ADVENTURE_PROMPT_CHIPS}
-              renderPreview={(data, onUpdate) => (
-                <AdventureEditor
-                  adventure={{ ...data, id: 'preview' }}
-                  campaign={previewCampaign}
-                  onUpdate={(_, updates) => onUpdate(updates)}
-                />
-              )}
-            />
-          </div>
-        ) : (
-          <div className="relative min-h-[400px]">
-            <AdventureGenerator
-              onAdventureCreated={onAdventureCreated}
-              isMockMode={isMockMode}
-              isOfficialSetting={isOfficialSetting}
-              campaignContext={campaignContext}
-            />
-          </div>
-        )}
-      </div>
+          />
+        }
+        formPanel={
+          <AdventureGenerator
+            onAdventureCreated={onAdventureCreated}
+            isMockMode={isMockMode}
+            isOfficialSetting={isOfficialSetting}
+            campaignContext={campaignContext}
+          />
+        }
+      />
 
       {/* Entity List */}
       <div>
-        <h2 className="text-2xl font-bold font-serif text-slate-200 mb-4">Existing Adventures ({adventures.length})</h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <h2 className="text-2xl font-bold font-serif text-slate-200">Existing Adventures ({adventures.length})</h2>
+          <div className="relative max-w-xs w-full sm:w-auto">
+            <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Search adventures..."
+              className="w-full bg-slate-800 border border-slate-700 rounded-md pl-9 pr-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
+            />
+          </div>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {adventures.map(adv => {
+          {filteredAdventures.map(adv => {
             const totalScenes = adv.scenes?.length ?? 0;
             const completedScenes = adv.scenes?.filter(s => s.status === 'completed').length ?? 0;
             const completionPct = totalScenes > 0 ? Math.round((completedScenes / totalScenes) * 100) : 0;
@@ -144,6 +135,12 @@ export const AdventureDashboard: React.FC<AdventureDashboardProps> = ({ adventur
               </button>
             );
           })}
+          {filteredAdventures.length === 0 && adventures.length > 0 && (
+            <div className="md:col-span-2 xl:col-span-3 text-center py-10">
+              <Icons.Search className="w-10 h-10 mx-auto mb-3 text-slate-700" />
+              <p className="text-slate-400">No adventures match "{searchTerm}"</p>
+            </div>
+          )}
           {adventures.length === 0 && (
             <div className="md:col-span-2 xl:col-span-3 text-center py-16">
               <Icons.Adventures className="w-16 h-16 mx-auto mb-4 text-slate-700" />

@@ -77,7 +77,7 @@ const StatusDot: React.FC<StatusDotProps> = ({ status, color, onMouseEnter, onMo
       <span
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
-        className="w-3 h-3 rounded-full border border-stone-600 bg-transparent flex-shrink-0 cursor-default"
+        className="w-3 h-3 rounded-full border border-slate-600 bg-transparent flex-shrink-0 cursor-default"
         style={{ display: 'inline-block' }}
       />
     );
@@ -195,8 +195,8 @@ export const PlotTimeline: React.FC<PlotTimelineProps> = ({
 
   if (plots.length === 0) {
     return (
-      <div className="bg-stone-800/50 border border-stone-700 rounded-lg p-6 text-center">
-        <p className="text-stone-500 text-sm italic">No plots to display. Create a plot arc to see the timeline.</p>
+      <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6 text-center">
+        <p className="text-slate-500 text-sm italic">No plots to display. Create a plot arc to see the timeline.</p>
       </div>
     );
   }
@@ -213,7 +213,7 @@ export const PlotTimeline: React.FC<PlotTimelineProps> = ({
       {/* Floating tooltip (fixed positioning) */}
       {tooltip.visible && (
         <div
-          className="fixed z-50 pointer-events-none bg-stone-900 border border-stone-600 text-stone-200 text-xs px-2 py-1 rounded shadow-lg max-w-[200px] text-center"
+          className="fixed z-50 pointer-events-none bg-slate-900 border border-slate-600 text-slate-200 text-xs px-2 py-1 rounded shadow-lg max-w-[200px] text-center"
           style={{ left: tooltip.x, top: tooltip.y, transform: 'translate(-50%, -100%)' }}
         >
           {tooltip.content}
@@ -222,10 +222,10 @@ export const PlotTimeline: React.FC<PlotTimelineProps> = ({
 
       <div className="flex">
         {/* ---- Fixed left column: plot name labels ---- */}
-        <div className="flex-shrink-0 z-10" style={{ width: LABEL_WIDTH }}>
-          {/* Header spacer matching the session header height */}
+        <div className="flex-shrink-0 z-20" style={{ width: LABEL_WIDTH }}>
+          {/* Header spacer — sticky so it stays aligned with the scrolling session header */}
           <div
-            className="border-b border-stone-700 bg-stone-900"
+            className="sticky top-0 z-20 border-b border-slate-700 bg-slate-900"
             style={{ height: ROW_HEIGHT }}
           />
           {/* One label row per plot */}
@@ -235,7 +235,7 @@ export const PlotTimeline: React.FC<PlotTimelineProps> = ({
               <div
                 key={plot.id}
                 className="flex items-center pr-3 cursor-pointer group"
-                style={{ height: ROW_HEIGHT, borderBottom: '1px solid #292524' /* stone-800 */ }}
+                style={{ height: ROW_HEIGHT, borderBottom: '1px solid #292524' /* slate-800 */ }}
                 onClick={() => onSelectPlot?.(plot.id)}
                 title={plot.title}
               >
@@ -244,7 +244,7 @@ export const PlotTimeline: React.FC<PlotTimelineProps> = ({
                   className="flex-shrink-0 w-1.5 h-5 rounded-full mr-2"
                   style={{ backgroundColor: color.line }}
                 />
-                <span className="text-xs text-stone-300 group-hover:text-amber-300 transition-colors truncate leading-tight">
+                <span className="text-xs text-slate-300 group-hover:text-amber-300 transition-colors truncate leading-tight">
                   {plot.title}
                 </span>
               </div>
@@ -260,24 +260,24 @@ export const PlotTimeline: React.FC<PlotTimelineProps> = ({
         >
           {sessions.length === 0 ? (
             <div className="flex items-center justify-center h-full px-8 py-6">
-              <p className="text-stone-600 text-xs italic">No session logs yet.</p>
+              <p className="text-slate-600 text-xs italic">No session logs yet.</p>
             </div>
           ) : (
             <div style={{ width: Math.max(sessions.length * COL_WIDTH, 1), minWidth: '100%' }}>
-              {/* Session header row */}
-              <div className="flex border-b border-stone-700" style={{ height: ROW_HEIGHT }}>
+              {/* Session header row — sticky so column labels stay visible while scrolling vertically */}
+              <div className="flex border-b border-slate-700 sticky top-0 z-10 bg-slate-900 shadow-sm" style={{ height: ROW_HEIGHT }}>
                 {sessions.map((session, si) => (
                   <div
                     key={session.id}
-                    className="flex-shrink-0 flex flex-col items-center justify-center cursor-pointer hover:bg-stone-700/40 transition-colors group px-1"
+                    className="flex-shrink-0 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-700/40 transition-colors group px-1"
                     style={{ width: COL_WIDTH, borderRight: si < sessions.length - 1 ? '1px solid #292524' : undefined }}
                     onClick={() => onSelectSession?.(session.id)}
                     title={session.title || `Session ${si + 1}`}
                   >
-                    <span className="text-[10px] text-stone-500 group-hover:text-stone-300 transition-colors">
+                    <span className="text-[10px] text-slate-500 group-hover:text-slate-300 transition-colors">
                       S{si + 1}
                     </span>
-                    <span className="text-xs text-stone-400 group-hover:text-stone-200 transition-colors truncate w-full text-center px-1 leading-tight">
+                    <span className="text-xs text-slate-400 group-hover:text-slate-200 transition-colors truncate w-full text-center px-1 leading-tight">
                       {session.title || `Session ${si + 1}`}
                     </span>
                   </div>
@@ -291,7 +291,7 @@ export const PlotTimeline: React.FC<PlotTimelineProps> = ({
                 return (
                   <div
                     key={plot.id}
-                    className="flex relative cursor-pointer hover:bg-stone-800/40 transition-colors"
+                    className="flex relative cursor-pointer hover:bg-slate-800/40 transition-colors"
                     style={{ height: ROW_HEIGHT, borderBottom: '1px solid #292524' }}
                     onClick={() => onSelectPlot?.(plot.id)}
                   >
@@ -360,10 +360,10 @@ export const PlotTimeline: React.FC<PlotTimelineProps> = ({
           { label: 'Advanced', el: <span className="w-3.5 h-3.5 rounded-full inline-block" style={{ backgroundColor: '#22c55e' }} /> },
           { label: 'Stalled',  el: <span className="w-3.5 h-3.5 rounded-full inline-block" style={{ backgroundColor: '#f59e0b' }} /> },
           { label: 'Unchanged', el: <span className="w-3.5 h-3.5 rounded-full border-2 inline-block" style={{ borderColor: '#6b7280' }} /> },
-          { label: 'Not mentioned', el: <span className="w-3 h-3 rounded-full border inline-block border-stone-600 bg-transparent" /> },
+          { label: 'Not mentioned', el: <span className="w-3 h-3 rounded-full border inline-block border-slate-600 bg-transparent" /> },
           { label: 'Resolved', el: <Icons.Check className="w-3.5 h-3.5 inline-block" style={{ color: '#22c55e' }} /> },
         ].map(({ label, el }) => (
-          <span key={label} className="flex items-center gap-1.5 text-xs text-stone-500">
+          <span key={label} className="flex items-center gap-1.5 text-xs text-slate-500">
             {el}
             {label}
           </span>

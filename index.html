@@ -99,6 +99,40 @@
         pointer-events: none;
       }
 
+      /* -------------------------------------------------------
+         tailwindcss-animate polyfill — animate-in + modifiers
+         (Tailwind is loaded via CDN without the animate plugin)
+      ------------------------------------------------------- */
+      @keyframes tw-fade-in   { from { opacity: 0; }             to { opacity: 1; }            }
+      @keyframes tw-zoom-in   { from { transform: scale(0.95); } to { transform: scale(1); }   }
+      @keyframes tw-slide-in-from-bottom-2  { from { transform: translateY(0.5rem); }  to { transform: translateY(0); } }
+      @keyframes tw-slide-in-from-bottom-4  { from { transform: translateY(1rem); }    to { transform: translateY(0); } }
+      @keyframes tw-slide-in-from-bottom-8  { from { transform: translateY(2rem); }    to { transform: translateY(0); } }
+      @keyframes tw-slide-in-from-bottom-10 { from { transform: translateY(2.5rem); }  to { transform: translateY(0); } }
+      @keyframes tw-slide-in-from-right     { from { transform: translateX(100%); }    to { transform: translateX(0); } }
+      @keyframes tw-slide-in-from-top-2     { from { transform: translateY(-0.5rem); } to { transform: translateY(0); } }
+      @keyframes tw-slide-in-from-top-5     { from { transform: translateY(-1.25rem); } to { transform: translateY(0); } }
+
+      /* Base .animate-in: no-op; modifier classes below apply the animation. */
+      .animate-in { animation-fill-mode: both; }
+
+      /* Modifier classes that combine with .animate-in */
+      .animate-in.fade-in            { animation-name: tw-fade-in; }
+      .animate-in.zoom-in-95         { animation-name: tw-fade-in, tw-zoom-in; }
+      .animate-in.slide-in-from-bottom-2  { animation-name: tw-fade-in, tw-slide-in-from-bottom-2; }
+      .animate-in.slide-in-from-bottom-4  { animation-name: tw-fade-in, tw-slide-in-from-bottom-4; }
+      .animate-in.slide-in-from-bottom-8  { animation-name: tw-fade-in, tw-slide-in-from-bottom-8; }
+      .animate-in.slide-in-from-bottom-10 { animation-name: tw-fade-in, tw-slide-in-from-bottom-10; }
+      .animate-in.slide-in-from-right     { animation-name: tw-fade-in, tw-slide-in-from-right; }
+      .animate-in.slide-in-from-top-2     { animation-name: tw-fade-in, tw-slide-in-from-top-2; }
+      .animate-in.slide-in-from-top-5     { animation-name: tw-fade-in, tw-slide-in-from-top-5; }
+
+      /* Duration helpers */
+      .duration-150 { animation-duration: 150ms; }
+      .duration-200 { animation-duration: 200ms; }
+      .duration-300 { animation-duration: 300ms; }
+      .duration-500 { animation-duration: 500ms; }
+
       /* React Flow Customizations */
       .react-flow__node {
         font-size: 12px;

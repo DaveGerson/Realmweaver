@@ -15,6 +15,18 @@ interface AiTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaEleme
   regenerateButton?: React.ReactNode;
 }
 
+/**
+ * Shared input base classes for text inputs and textareas across the app.
+ * Provides consistent dark-theme styling with amber focus rings.
+ */
+export const inputBaseClasses = 'bg-slate-800 border border-slate-600 rounded-lg text-slate-100 placeholder-slate-400 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 focus:outline-none';
+
+/**
+ * Textarea variant of inputBaseClasses — adds `resize-none` so height is
+ * controlled via the `rows` attribute rather than manual dragging.
+ */
+export const textareaBaseClasses = `${inputBaseClasses} resize-none`;
+
 export const AiTextarea: React.FC<AiTextareaProps> = ({
   label,
   className,
@@ -37,7 +49,7 @@ export const AiTextarea: React.FC<AiTextareaProps> = ({
           <button
             onClick={onAiGenerate}
             disabled={isGenerating}
-            className="flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 disabled:opacity-50 transition-colors"
           >
             <Sparkles className={`w-3.5 h-3.5 ${isGenerating ? 'animate-pulse' : ''}`} />
             {isGenerating ? 'Generating...' : 'Generate'}

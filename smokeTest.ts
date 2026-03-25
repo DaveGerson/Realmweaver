@@ -18,7 +18,7 @@ import {
     generateChatResponse,
     parseCharacterSheetPdf,
     chatWithRealmWeaver,
-} from './services/geminiService';
+} from './services/aiService';
 import { createCampaignStore } from './services/campaignService';
 
 // --- Helper for logging test results ---
@@ -39,42 +39,28 @@ const testServiceFunctions = async (isMockMode: boolean) => {
   let success = true;
   try {
     // 1. Standard Generation
-    const npc = await generateNpc('test npc prompt', false, isMockMode);
+    const npc = await generateNpc('test npc prompt', isMockMode);
     success &&= testLog(!!(npc && npc.name), 'generateNpc: Success', 'generateNpc: Failed', npc);
-    
-    const location = await generateLocation('test location prompt', false, isMockMode);
+
+    const location = await generateLocation('test location prompt', isMockMode);
     success &&= testLog(!!(location && location.name && typeof location.secrets === 'string'), 'generateLocation: Success', 'generateLocation: Failed', location);
-    
-    const item = await generateItem('test item prompt', false, isMockMode);
+
+    const item = await generateItem('test item prompt', isMockMode);
     success &&= testLog(!!(item && item.name), 'generateItem: Success', 'generateItem: Failed', item);
 
-    const scene = await generateScene('test scene prompt', false, isMockMode);
+    const scene = await generateScene('test scene prompt', isMockMode);
     success &&= testLog(!!(scene && scene.title && scene.readAloudText), 'generateScene: Success', 'generateScene: Failed', scene);
-    
-    const faction = await generateFaction('test faction prompt', false, isMockMode);
+
+    const faction = await generateFaction('test faction prompt', isMockMode);
     success &&= testLog(!!(faction && faction.name), 'generateFaction: Success', 'generateFaction: Failed', faction);
-    
-    const adventure = await generateAdventure('test adventure prompt', false, isMockMode);
+
+    const adventure = await generateAdventure('test adventure prompt', isMockMode);
     success &&= testLog(!!(adventure && adventure.title && Array.isArray(adventure.scenes)), 'generateAdventure: Success', 'generateAdventure: Failed', adventure);
-    
-    const article = await generateArticle('test article prompt', false, isMockMode);
+
+    const article = await generateArticle('test article prompt', isMockMode);
     success &&= testLog(!!(article && article.title && article.content), 'generateArticle: Success', 'generateArticle: Failed', article);
 
-    // 2. Grounded Generation (New Features)
-    console.log('   Testing Grounded Search variants...');
-    const npcGrounded = await generateNpc('Drizzt Do\'Urden', true, isMockMode);
-    success &&= testLog(!!(npcGrounded && npcGrounded.name), 'generateNpc (Grounded): Success', 'generateNpc (Grounded): Failed', npcGrounded);
-
-    const locationGrounded = await generateLocation('Castle Ravenloft', true, isMockMode);
-    success &&= testLog(!!(locationGrounded && locationGrounded.name), 'generateLocation (Grounded): Success', 'generateLocation (Grounded): Failed', locationGrounded);
-
-    const factionGrounded = await generateFaction('Harpers', true, isMockMode);
-    success &&= testLog(!!(factionGrounded && factionGrounded.name), 'generateFaction (Grounded): Success', 'generateFaction (Grounded): Failed', factionGrounded);
-
-    const itemGrounded = await generateItem('Vorpal Sword', true, isMockMode);
-    success &&= testLog(!!(itemGrounded && itemGrounded.name), 'generateItem (Grounded): Success', 'generateItem (Grounded): Failed', itemGrounded);
-
-    // 3. DM Tools & Utilities
+    // 2. DM Tools & Utilities
     const narration = await generateNarration('test narration prompt', undefined, false, isMockMode);
     success &&= testLog(typeof narration === 'string' && narration.length > 0, 'generateNarration: Success', 'generateNarration: Failed', narration);
 

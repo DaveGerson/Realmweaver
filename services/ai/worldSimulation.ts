@@ -1,9 +1,8 @@
 
-import { Type } from "@google/genai";
 import type { Campaign } from '../../types/index';
 import { generateWithSchema } from './core';
 
-const MODEL_NAME = 'gemini-2.5-flash';
+const MODEL_NAME = 'standard';
 
 export interface WorldEvent {
   id: string;
@@ -23,44 +22,44 @@ export interface WorldEvent {
 }
 
 const worldEventSchema = {
-  type: Type.OBJECT,
+  type: 'object',
   properties: {
-    title: { type: Type.STRING, description: "A short, evocative title for the world event." },
+    title: { type: 'string', description: "A short, evocative title for the world event." },
     description: {
-      type: Type.STRING,
+      type: 'string',
       description: "A 2-4 sentence narrative description of what happened in the world during this time.",
     },
     affectedEntityIds: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING },
+      type: 'array',
+      items: { type: 'string' },
       description: "Array of entity IDs (from the campaign data) that are directly involved or affected.",
     },
     affectedEntityTypes: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING },
+      type: 'array',
+      items: { type: 'string' },
       description: "Parallel array of entity types ('npc', 'faction', 'location', 'plot') matching affectedEntityIds.",
     },
     suggestedUpdates: {
-      type: Type.ARRAY,
+      type: 'array',
       description: "Proposed changes to campaign entities as a result of this event.",
       items: {
-        type: Type.OBJECT,
+        type: 'object',
         properties: {
-          entityId: { type: Type.STRING, description: "The ID of the entity to update." },
+          entityId: { type: 'string', description: "The ID of the entity to update." },
           entityType: {
-            type: Type.STRING,
+            type: 'string',
             description: "The type of entity: 'npc', 'faction', 'location', or 'plot'.",
           },
           field: {
-            type: Type.STRING,
+            type: 'string',
             description: "The field on the entity to update, e.g. 'description', 'motivations', 'goals', 'secrets'.",
           },
           currentValue: {
-            type: Type.STRING,
+            type: 'string',
             description: "The current value of the field (from the campaign data).",
           },
           proposedValue: {
-            type: Type.STRING,
+            type: 'string',
             description: "The proposed new value for the field, reflecting the world event.",
           },
         },
@@ -68,12 +67,12 @@ const worldEventSchema = {
       },
     },
     severity: {
-      type: Type.STRING,
+      type: 'string',
       enum: ['minor', 'major', 'critical'],
       description: "How significant this event is: 'minor' = background detail, 'major' = plot-relevant change, 'critical' = world-altering consequence.",
     },
     category: {
-      type: Type.STRING,
+      type: 'string',
       enum: ['faction', 'npc', 'location', 'plot', 'world'],
       description: "The primary domain this event belongs to.",
     },
@@ -82,10 +81,10 @@ const worldEventSchema = {
 };
 
 const worldEventsSchema = {
-  type: Type.OBJECT,
+  type: 'object',
   properties: {
     events: {
-      type: Type.ARRAY,
+      type: 'array',
       description: "An array of 2-4 world events that occurred during the elapsed time.",
       items: worldEventSchema,
     },

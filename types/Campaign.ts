@@ -41,4 +41,5 @@ export interface Campaign {
   featureOverrides?: Record<string, boolean>; // Per-feature manual overrides (bypasses dmStyle)
   wizardDismissed?: boolean; // Set to true when the First Campaign Wizard has been dismissed or completed
   styleProfile?: string; // AI-generated description of the DM's writing voice and style
+  gcpApiKey?: string; // Optional GCP API key for real-time audio transcription in Session Logs
 }

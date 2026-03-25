@@ -1,11 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Article, NPC, Location, Faction } from '../../types/index';
 import { ArticleGenerator } from '../generators/ArticleGenerator';
 import { EntityChatGenerator } from '../generators/EntityChatGenerator';
 import { ArticleEditor } from '../editors/ArticleEditor';
 import { Icons } from '../common/Icons';
-import { Button } from '../common/Button';
+import { EntityCreationPanel } from '../common/EntityCreationPanel';
 import { createDefaultArticle } from '../../utils/entityUtils';
 
 const ARTICLE_PROMPT_CHIPS = [
@@ -28,7 +28,16 @@ interface ArticleDashboardProps {
 }
 
 export const ArticleDashboard: React.FC<ArticleDashboardProps> = ({ articles, npcs = [], locations = [], factions = [], onArticleCreated, onSelectArticle, isMockMode, isOfficialSetting, campaignContext }) => {
-  const [creationMode, setCreationMode] = useState<'chat' | 'form'>('chat');
+  const [searchTerm, setSearchTerm] = useState('');
+  const filteredArticles = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return articles;
+    return articles.filter(a =>
+      a.title.toLowerCase().includes(q) ||
+      a.content?.toLowerCase().includes(q) ||
+      a.category?.toLowerCase().includes(q)
+    );
+  }, [articles, searchTerm]);
 
   const handleArticleCreated = (data: any) => {
     const { id, ...articleData } = data;
@@ -42,84 +51,66 @@ export const ArticleDashboard: React.FC<ArticleDashboardProps> = ({ articles, np
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
       {/* Creation Area */}
-      <div className="space-y-3">
-        {/* Mode toggle header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Icons.Sparkles className="w-5 h-5 text-indigo-400" />
-            <h2 className="text-lg font-bold font-serif text-slate-100">
-              {creationMode === 'chat' ? 'Create via Chat' : 'Lore Article Generator'}
-            </h2>
-          </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setCreationMode(creationMode === 'chat' ? 'form' : 'chat')}
-          >
-            {creationMode === 'chat' ? (
-              <>
-                <Icons.FileText className="w-4 h-4 mr-2" />
-                Switch to form
-              </>
-            ) : (
-              <>
-                <Icons.Chat className="w-4 h-4 mr-2" />
-                Switch to chat
-              </>
+      <EntityCreationPanel
+        entityLabel="Lore Article"
+        chatPanel={
+          <EntityChatGenerator
+            entityType="article"
+            isMockMode={isMockMode}
+            campaignContext={campaignContext}
+            onEntityCreated={handleArticleCreated}
+            initialData={createDefaultArticle()}
+            promptChips={ARTICLE_PROMPT_CHIPS}
+            renderPreview={(data, onUpdate) => (
+              <ArticleEditor
+                article={{ ...data, id: 'preview' }}
+                allArticles={articles}
+                allNpcs={npcs}
+                allLocations={locations}
+                allFactions={factions}
+                onUpdate={(_, updates) => onUpdate(updates)}
+                onDelete={() => {}}
+                isMockMode={isMockMode}
+              />
             )}
-          </Button>
-        </div>
-
-        {/* Creation panel */}
-        {creationMode === 'chat' ? (
-          <div className="h-[480px] border border-slate-800 rounded-xl overflow-hidden">
-            <EntityChatGenerator
-              entityType="article"
-              isMockMode={isMockMode}
-              campaignContext={campaignContext}
-              onEntityCreated={handleArticleCreated}
-              initialData={createDefaultArticle()}
-              promptChips={ARTICLE_PROMPT_CHIPS}
-              renderPreview={(data, onUpdate) => (
-                <ArticleEditor
-                  article={{ ...data, id: 'preview' }}
-                  allArticles={articles}
-                  allNpcs={npcs}
-                  allLocations={locations}
-                  allFactions={factions}
-                  onUpdate={(_, updates) => onUpdate(updates)}
-                  onDelete={() => {}}
-                  isMockMode={isMockMode}
-                />
-              )}
-            />
-          </div>
-        ) : (
-          <div className="relative min-h-[400px]">
-            <ArticleGenerator
-              onArticleCreated={onArticleCreated}
-              isMockMode={isMockMode}
-              isOfficialSetting={isOfficialSetting}
-              allArticles={articles}
-              npcs={npcs}
-              locations={locations}
-              factions={factions}
-              campaignContext={campaignContext}
-            />
-          </div>
-        )}
-      </div>
+          />
+        }
+        formPanel={
+          <ArticleGenerator
+            onArticleCreated={onArticleCreated}
+            isMockMode={isMockMode}
+            isOfficialSetting={isOfficialSetting}
+            allArticles={articles}
+            npcs={npcs}
+            locations={locations}
+            factions={factions}
+            campaignContext={campaignContext}
+          />
+        }
+      />
 
       {/* Entity List */}
       <div>
-        <h2 className="text-2xl font-bold font-serif text-slate-200 mb-4">Lorebook Articles ({articles.length})</h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <h2 className="text-2xl font-bold font-serif text-slate-200">Lorebook Articles ({articles.length})</h2>
+          <div className="relative max-w-xs w-full sm:w-auto">
+            <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Search articles..."
+              className="w-full bg-slate-800 border border-slate-700 rounded-md pl-9 pr-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
+            />
+          </div>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {articles.map(article => {
+          {filteredArticles.map(article => {
             const contentSnippet = article.content ? article.content.slice(0, 100) + (article.content.length > 100 ? '…' : '') : '';
             const categoryColors: Record<string, string> = {
               lore: 'bg-cyan-900/40 text-cyan-300 border-cyan-500/30',
               history: 'bg-amber-900/40 text-amber-300 border-amber-500/30',
-              cosmology: 'bg-indigo-900/40 text-indigo-300 border-indigo-500/30',
+              cosmology: 'bg-amber-900/40 text-amber-300 border-amber-500/30',
             };
             const categoryStyle = categoryColors[article.category] ?? 'bg-slate-700/60 text-slate-300 border-slate-600/30';
             return (
@@ -140,6 +131,12 @@ export const ArticleDashboard: React.FC<ArticleDashboardProps> = ({ articles, np
               </button>
             );
           })}
+          {filteredArticles.length === 0 && articles.length > 0 && (
+            <div className="md:col-span-2 xl:col-span-3 text-center py-10">
+              <Icons.Search className="w-10 h-10 mx-auto mb-3 text-slate-700" />
+              <p className="text-slate-400">No articles match "{searchTerm}"</p>
+            </div>
+          )}
           {articles.length === 0 && (
             <div className="md:col-span-2 xl:col-span-3 text-center py-16">
               <Icons.FileCode className="w-16 h-16 mx-auto mb-4 text-slate-700" />

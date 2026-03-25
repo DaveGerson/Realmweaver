@@ -17,7 +17,7 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ segments, canGoBack = 
     if (segments.length <= 1 && !canGoBack) return null;
 
     return (
-        <nav className="flex items-center gap-1.5 text-sm text-slate-500 px-6 md:px-8 pt-4 pb-0" aria-label="Breadcrumb">
+        <nav className="flex items-center gap-1.5 text-sm text-slate-500 px-6 md:px-8 pt-4 pb-2" aria-label="Breadcrumb">
             {canGoBack && (
                 <button
                     onClick={onGoBack}

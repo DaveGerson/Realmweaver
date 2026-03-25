@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Campaign, SettingType } from '../../types/index';
 import { Icons } from '../common/Icons';
-import { analyzeWritingStyle } from '../../services/geminiService';
+import { analyzeWritingStyle } from '../../services/aiService';
 
 interface CampaignSettingEditorProps {
   campaign: Campaign;
@@ -36,7 +36,8 @@ export const CampaignSettingEditor: React.FC<CampaignSettingEditorProps> = ({
     title: campaign.title,
     setting: campaign.setting,
     settingType: campaign.settingType,
-    officialSetting: campaign.officialSetting || OFFICIAL_SETTINGS[0]
+    officialSetting: campaign.officialSetting || OFFICIAL_SETTINGS[0],
+    gcpApiKey: campaign.gcpApiKey || '',
   });
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -47,7 +48,8 @@ export const CampaignSettingEditor: React.FC<CampaignSettingEditorProps> = ({
       title: campaign.title,
       setting: campaign.setting,
       settingType: campaign.settingType,
-      officialSetting: campaign.officialSetting || OFFICIAL_SETTINGS[0]
+      officialSetting: campaign.officialSetting || OFFICIAL_SETTINGS[0],
+      gcpApiKey: campaign.gcpApiKey || '',
     });
   }, [campaign]);
 
@@ -61,7 +63,8 @@ export const CampaignSettingEditor: React.FC<CampaignSettingEditorProps> = ({
       formData.title !== campaign.title ||
       formData.setting !== campaign.setting ||
       formData.settingType !== campaign.settingType ||
-      formData.officialSetting !== campaign.officialSetting
+      formData.officialSetting !== campaign.officialSetting ||
+      formData.gcpApiKey !== (campaign.gcpApiKey || '')
     ) {
       onUpdate(formData);
     }
@@ -187,6 +190,26 @@ export const CampaignSettingEditor: React.FC<CampaignSettingEditorProps> = ({
         />
       </div>
 
+      {/* Google Cloud API Key */}
+      <div className="border-t border-slate-800 pt-6">
+        <div className="flex items-center gap-2 mb-3">
+          <Icons.Mic className="w-4 h-4 text-amber-400" />
+          <h3 className="text-sm font-semibold text-slate-300">Google Cloud API Key (optional)</h3>
+        </div>
+        <input
+          type="password"
+          name="gcpApiKey"
+          value={formData.gcpApiKey}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          placeholder="Paste your GCP API key here..."
+          className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600 font-mono text-sm"
+        />
+        <p className="text-xs text-slate-500 mt-1.5">
+          Enables real-time audio transcription in Session Logs. Your key is stored locally and never sent to our servers.
+        </p>
+      </div>
+
       {/* Writing Style Section */}
       <div className="border-t border-slate-800 pt-6">
         <div className="flex items-center gap-2 mb-3">
@@ -212,7 +235,7 @@ export const CampaignSettingEditor: React.FC<CampaignSettingEditorProps> = ({
               <button
                 onClick={handleRegenerateStyle}
                 disabled={isAnalyzing || !canGenerateStyle}
-                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-stone-700 hover:bg-stone-600 text-stone-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isAnalyzing ? (
                   <Icons.Loader className="w-3 h-3 animate-spin" />
@@ -224,7 +247,7 @@ export const CampaignSettingEditor: React.FC<CampaignSettingEditorProps> = ({
               <button
                 onClick={handleClearStyle}
                 disabled={isAnalyzing}
-                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-stone-700 hover:bg-stone-600 text-stone-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <Icons.X className="w-3 h-3" />
                 Clear

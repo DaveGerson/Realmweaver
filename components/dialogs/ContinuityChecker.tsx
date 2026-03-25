@@ -2,7 +2,7 @@
 // components/dialogs/ContinuityChecker.tsx
 // Modal dialog that displays continuity issues for the active campaign.
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { Campaign } from '@/types/index';
 import { checkContinuity } from '@/services/continuityChecker';
 import type { ContinuityIssue, IssueSeverity } from '@/services/continuityChecker';
@@ -10,6 +10,7 @@ import { Icons } from '@/components/common/Icons';
 import { EntityLink } from '@/components/common/EntityLink';
 import type { QuickCardEntityType } from '@/components/common/EntityQuickCard';
 import { twMerge } from 'tailwind-merge';
+import { DialogShell } from '@/components/common/DialogShell';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -105,14 +106,14 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue, onDismiss, onNavigate }) =
           <SeverityIcon severity={issue.severity} className="mt-0.5" />
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-stone-100 text-sm leading-snug">
+              <span className="font-semibold text-slate-100 text-sm leading-snug">
                 {issue.title}
               </span>
               <span className={twMerge('text-xs rounded px-1.5 py-0.5', SEVERITY_BADGE_CLASS[issue.severity])}>
                 {SEVERITY_LABEL[issue.severity]}
               </span>
             </div>
-            <p className="text-stone-300 text-sm mt-1 leading-relaxed">{issue.description}</p>
+            <p className="text-slate-300 text-sm mt-1 leading-relaxed">{issue.description}</p>
 
             {/* Entity links */}
             {uniqueEntities.length > 0 && onNavigate && (
@@ -131,7 +132,7 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue, onDismiss, onNavigate }) =
 
             {/* Suggested fix */}
             {issue.suggestedFix && (
-              <p className="text-stone-400 text-xs italic mt-2">{issue.suggestedFix}</p>
+              <p className="text-slate-400 text-xs italic mt-2">{issue.suggestedFix}</p>
             )}
           </div>
         </div>
@@ -140,7 +141,7 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue, onDismiss, onNavigate }) =
         <button
           type="button"
           onClick={() => onDismiss(issue.id)}
-          className="flex-shrink-0 text-stone-500 hover:text-stone-300 transition-colors p-1 rounded-md hover:bg-stone-700/50"
+          className="flex-shrink-0 text-slate-500 hover:text-slate-300 transition-colors p-1 rounded-md hover:bg-slate-700/50"
           aria-label="Dismiss issue"
           title="Dismiss for this session"
         >
@@ -162,18 +163,27 @@ export const ContinuityChecker: React.FC<ContinuityCheckerProps> = ({
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
   const [isRunning, setIsRunning] = useState(true);
+  const runTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Run the checker. We defer via setTimeout so the spinner renders first.
-  useEffect(() => {
+  const runCheck = useCallback(() => {
+    if (runTimerRef.current) clearTimeout(runTimerRef.current);
     setIsRunning(true);
-    const timer = setTimeout(() => {
+    runTimerRef.current = setTimeout(() => {
       const result = checkContinuity(campaign);
       result.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
       setIssues(result);
       setIsRunning(false);
     }, 50);
-    return () => clearTimeout(timer);
   }, [campaign]);
+
+  useEffect(() => {
+    runCheck();
+    return () => {
+      if (runTimerRef.current) clearTimeout(runTimerRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount; re-check is manual via runCheck()
 
   const handleDismiss = useCallback((id: string) => {
     setDismissedIds(prev => new Set([...prev, id]));
@@ -197,29 +207,16 @@ export const ContinuityChecker: React.FC<ContinuityCheckerProps> = ({
     info: infoCount,
   };
 
-  // Close on Escape
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [onClose]);
-
   return (
-    /* Overlay */
-    <div
-      className="fixed inset-0 z-[80] bg-black/60 flex items-center justify-center p-2 sm:p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
+    <DialogShell isOpen={true} onClose={onClose} ariaLabel="Continuity Check" className="w-full max-w-2xl mx-2 sm:mx-4">
       {/* Panel */}
-      <div className="bg-stone-900 border border-stone-700 rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+      <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full flex flex-col max-h-[90vh]">
 
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-stone-700 flex-shrink-0">
+        <div className="flex items-center justify-between p-4 border-b border-slate-700 flex-shrink-0">
           <div className="flex items-center gap-3">
             <Icons.Factions className="w-5 h-5 text-amber-400" />
-            <h2 className="text-lg font-semibold text-stone-100">Continuity Check</h2>
+            <h2 className="text-lg font-semibold text-slate-100">Continuity Check</h2>
 
             {!isRunning && (
               <div className="flex items-center gap-1.5 text-xs">
@@ -247,14 +244,29 @@ export const ContinuityChecker: React.FC<ContinuityCheckerProps> = ({
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-stone-400 hover:text-stone-200 transition-colors p-1 rounded-md hover:bg-stone-700"
-            aria-label="Close continuity checker"
-          >
-            <Icons.X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Re-check button */}
+            <button
+              type="button"
+              onClick={runCheck}
+              disabled={isRunning}
+              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-amber-300 transition-colors px-2 py-1 rounded-md hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label="Re-run continuity check"
+              title="Re-check for issues"
+            >
+              <Icons.RefreshCw className={twMerge('w-3.5 h-3.5', isRunning && 'animate-spin')} />
+              <span className="hidden sm:inline">Re-check</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-slate-400 hover:text-slate-200 transition-colors p-1 rounded-md hover:bg-slate-700"
+              aria-label="Close continuity checker"
+            >
+              <Icons.X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Filter tabs */}
@@ -267,8 +279,8 @@ export const ContinuityChecker: React.FC<ContinuityCheckerProps> = ({
               className={twMerge(
                 'px-3 py-1.5 text-sm rounded-md transition-colors',
                 activeTab === tab.id
-                  ? 'bg-stone-700 text-stone-100'
-                  : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
+                  ? 'bg-slate-700 text-slate-100'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
               )}
             >
               {tab.label}
@@ -278,7 +290,7 @@ export const ContinuityChecker: React.FC<ContinuityCheckerProps> = ({
                   tab.id === 'error' ? 'bg-red-900/60 text-red-300'
                   : tab.id === 'warning' ? 'bg-amber-900/60 text-amber-300'
                   : tab.id === 'info' ? 'bg-sky-900/60 text-sky-300'
-                  : 'bg-stone-700 text-stone-300'
+                  : 'bg-slate-700 text-slate-300'
                 )}>
                   {tabCount[tab.id]}
                 </span>
@@ -290,7 +302,7 @@ export const ContinuityChecker: React.FC<ContinuityCheckerProps> = ({
         {/* Issue list */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {isRunning && (
-            <div className="flex items-center justify-center gap-3 py-12 text-stone-400">
+            <div className="flex items-center justify-center gap-3 py-12 text-slate-400">
               <Icons.Loader className="w-5 h-5 animate-spin" />
               <span className="text-sm">Analysing campaign…</span>
             </div>
@@ -299,13 +311,13 @@ export const ContinuityChecker: React.FC<ContinuityCheckerProps> = ({
           {!isRunning && visibleIssues.length === 0 && (
             <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
               <Icons.CheckCircle className="w-10 h-10 text-green-400" />
-              <p className="text-stone-200 font-semibold">
+              <p className="text-slate-200 font-semibold">
                 {liveIssues.length === 0
                   ? 'No issues found! Your campaign is consistent.'
                   : 'No issues in this category.'}
               </p>
               {liveIssues.length === 0 && (
-                <p className="text-stone-400 text-sm">
+                <p className="text-slate-400 text-sm">
                   All entity references, hierarchies, and relationships look good.
                 </p>
               )}
@@ -323,19 +335,19 @@ export const ContinuityChecker: React.FC<ContinuityCheckerProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 border-t border-stone-700 flex items-center justify-between flex-shrink-0">
-          <p className="text-xs text-stone-500">
+        <div className="px-4 py-3 border-t border-slate-700 flex items-center justify-between flex-shrink-0">
+          <p className="text-xs text-slate-500">
             {dismissedIds.size > 0 && `${dismissedIds.size} dismissed this session`}
           </p>
           <button
             type="button"
             onClick={onClose}
-            className="bg-stone-700 hover:bg-stone-600 text-stone-200 text-sm px-4 py-1.5 rounded-md transition-colors"
+            className="bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm px-4 py-1.5 rounded-md transition-colors"
           >
             Close
           </button>
         </div>
       </div>
-    </div>
+    </DialogShell>
   );
 };

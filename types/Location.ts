@@ -1,6 +1,6 @@
 
 // types/Location.ts
-import type { HistoryEntry } from './NPC';
+import type { HistoryEntry } from './common';
 
 export interface LocationConnection {
   id: string;

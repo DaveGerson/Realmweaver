@@ -38,3 +38,8 @@ blob-report/
 
 # E2E test screenshots
 e2e/screenshots/
+
+# Process artifacts (local workflow state, not product docs)
+.planning/
+docs/superpowers/
+docs/ux-audit/screenshots/

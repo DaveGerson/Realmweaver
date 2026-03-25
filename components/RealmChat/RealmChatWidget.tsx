@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import type { Campaign, ChatMessage, DraftEntity, ModelTier, NPC, Location, Faction, Item, Adventure, Article } from '../../types/index';
-import { chatWithRealmWeaver } from '../../services/geminiService';
+import { chatWithRealmWeaver } from '../../services/aiService';
 import { twMerge } from 'tailwind-merge';
 import { buildCampaignContext } from '../../services/contextBuilder';
 import { LinkedText } from '../common/LinkedText';
@@ -28,16 +28,36 @@ interface RealmChatWidgetProps {
 export const RealmChatWidget: React.FC<RealmChatWidgetProps> = ({ campaign, onAddToCampaign, onUpdateCampaign, isMockMode, onNavigate }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false); // New state for minimized view
-  const [history, setHistory] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [tier, setTier] = useState<ModelTier>('medium');
   const [isEntityPickerOpen, setIsEntityPickerOpen] = useState(false);
-  
+
+  // Session-persistent chat history keyed by campaign ID
+  const storageKey = `realmchat-history-${campaign.id}`;
+  const [history, setHistory] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = sessionStorage.getItem(storageKey);
+      if (saved) return JSON.parse(saved) as ChatMessage[];
+    } catch {
+      // ignore parse errors
+    }
+    return [];
+  });
+
+  // Persist history to sessionStorage whenever it changes
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify(history));
+    } catch {
+      // sessionStorage quota exceeded — ignore
+    }
+  }, [history, storageKey]);
+
   // State for generated content
   const [drafts, setDrafts] = useState<DraftEntity[]>([]);
   const [approvedLog, setApprovedLog] = useState<string[]>([]);
-  
+
   // Modal State for editing/approving
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
 
@@ -53,6 +73,18 @@ export const RealmChatWidget: React.FC<RealmChatWidgetProps> = ({ campaign, onAd
       setIsOpen(true);
       setIsMinimized(false);
   }
+
+  const handleNewConversation = () => {
+      setHistory([]);
+      setDrafts([]);
+      setApprovedLog([]);
+      setSelectedDraftId(null);
+      try {
+          sessionStorage.removeItem(storageKey);
+      } catch {
+          // ignore
+      }
+  };
 
   const handleSend = async (textOverride?: string) => {
     const textToSend = textOverride || input;
@@ -211,7 +243,7 @@ export const RealmChatWidget: React.FC<RealmChatWidgetProps> = ({ campaign, onAd
         {isOpen && (
             <div className={twMerge(
                 "fixed bottom-6 right-6 w-[450px] bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col overflow-hidden z-50 transition-all duration-300",
-                isMinimized ? "h-auto" : "h-[700px] animate-in slide-in-from-bottom-10"
+                isMinimized ? "h-auto" : "h-[700px] animate-fade-in"
             )}>
                 {/* Header */}
                 <header 
@@ -226,15 +258,22 @@ export const RealmChatWidget: React.FC<RealmChatWidgetProps> = ({ campaign, onAd
                     <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                          {!isMinimized && (
                              <>
-                                <button 
-                                    onClick={() => setIsEntityPickerOpen(p => !p)} 
+                                <button
+                                    onClick={handleNewConversation}
+                                    className="p-1.5 rounded-md transition-colors text-slate-400 hover:text-amber-300 hover:bg-slate-700"
+                                    title="New Conversation"
+                                >
+                                    <Icons.Plus className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => setIsEntityPickerOpen(p => !p)}
                                     className={`p-1.5 rounded-md transition-colors ${isEntityPickerOpen ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}
                                     title="Load Existing Entity"
                                 >
                                     <Icons.FolderOpen className="w-4 h-4" />
                                 </button>
-                                <select 
-                                    value={tier} 
+                                <select
+                                    value={tier}
                                     onChange={(e) => setTier(e.target.value as ModelTier)}
                                     className="bg-slate-950 border border-slate-700 text-xs text-slate-300 rounded px-2 py-1 outline-none focus:border-indigo-500 max-w-[100px]"
                                 >
@@ -355,14 +394,14 @@ export const RealmChatWidget: React.FC<RealmChatWidgetProps> = ({ campaign, onAd
                                     disabled={isLoading}
                                 />
                                 <Button onClick={() => handleSend()} disabled={isLoading || !input.trim()} size="sm" className="bg-indigo-600 hover:bg-indigo-500">
-                                    <Icons.Combat className="w-4 h-4 rotate-90" />
+                                    <Icons.Send className="w-4 h-4" />
                                 </Button>
                             </div>
                         </div>
 
                         {/* Draft Editor Overlay */}
                         {selectedDraft && (
-                            <div className="absolute inset-0 z-30 bg-slate-950 flex flex-col animate-in fade-in slide-in-from-bottom-10 duration-200">
+                            <div className="absolute inset-0 z-30 bg-slate-950 flex flex-col animate-fade-in">
                                 <div className="flex items-center justify-between p-3 bg-slate-800 border-b border-slate-700">
                                     <h4 className="text-sm font-bold text-slate-200">
                                         {/* @ts-ignore */}

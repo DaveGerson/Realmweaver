@@ -1,11 +1,12 @@
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import type { Campaign, SessionLog, Plot, PlotSessionStatus, PlotStatus } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { twMerge } from 'tailwind-merge';
 import { campaignService } from '../../services/campaignService';
-import { generateSessionRecap } from '../../services/geminiService';
+import { generateSessionRecap } from '../../services/aiService';
+import { DialogShell } from '../common/DialogShell';
 
 type WizardStep = 'recap' | 'plots' | 'loose-ends' | 'player-recap' | 'confirm';
 
@@ -104,6 +105,20 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
         }
     }, [sessionNotesText, plotSummariesText, campaign.title, campaign.setting, isMockMode, sessionLog.runningNotes, sessionLog.looseEnds]);
 
+    // M24: Only auto-trigger recap if there are enough notes to produce a quality result.
+    // With sparse notes the AI tends to hallucinate; let the DM decide instead.
+    const AUTO_TRIGGER_NOTE_THRESHOLD = 5;
+    const noteCount = sessionLog.structuredNotes?.length ?? 0;
+    const hasEnoughNotesForAutoRecap = noteCount >= AUTO_TRIGGER_NOTE_THRESHOLD;
+
+    useEffect(() => {
+        if (!recap && hasEnoughNotesForAutoRecap && (sessionNotesText || sessionLog.runningNotes)) {
+            handleGenerateRecap();
+        }
+        // Run only on mount; handleGenerateRecap is stable via useCallback
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     // Plot status cycling
     const cyclePlotStatus = useCallback((plotId: string) => {
         setPlotStatuses(prev => {
@@ -169,12 +184,9 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-            {/* Backdrop */}
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
-
+        <DialogShell isOpen={true} onClose={onCancel} ariaLabel="End Session" className="relative w-full max-w-2xl mx-4">
             {/* Modal */}
-            <div className="relative w-full max-w-2xl max-h-[90vh] bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col mx-4">
+            <div className="relative w-full max-h-[90vh] bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
                     <div className="flex items-center gap-3">
@@ -192,6 +204,7 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
                         <React.Fragment key={step}>
                             <button
                                 onClick={() => setCurrentStep(step)}
+                                aria-current={currentStep === step ? 'step' : undefined}
                                 className={twMerge(
                                     "text-xs font-bold uppercase tracking-wider px-2 py-1 rounded transition-colors",
                                     currentStep === step
@@ -222,9 +235,18 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
                             {!recap && !isGenerating && (
                                 <div className="text-center py-8">
                                     <Icons.Sparkles className="w-8 h-8 text-amber-400 mx-auto mb-3 opacity-60" />
-                                    <p className="text-sm text-slate-400 mb-4">
-                                        {sessionNotesText ? `${(sessionLog.structuredNotes || []).length} session notes ready for recap.` : 'No structured notes found. You can still generate a recap from running notes.'}
-                                    </p>
+                                    {hasEnoughNotesForAutoRecap ? (
+                                        <p className="text-sm text-slate-400 mb-4">
+                                            {noteCount} session notes ready for recap.
+                                        </p>
+                                    ) : (
+                                        <p className="text-sm text-slate-400 mb-4">
+                                            {noteCount === 0
+                                                ? 'No session notes recorded. You can generate a recap from running notes, or write your own below.'
+                                                : `Only ${noteCount} note${noteCount !== 1 ? 's' : ''} recorded — for best results, use ${AUTO_TRIGGER_NOTE_THRESHOLD}+ notes. You can still generate a recap manually.`
+                                            }
+                                        </p>
+                                    )}
                                     <Button onClick={handleGenerateRecap} disabled={isGenerating}>
                                         <Icons.Sparkles className="w-4 h-4 mr-2" />
                                         Generate AI Recap
@@ -477,6 +499,6 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
                     </div>
                 </div>
             </div>
-        </div>
+        </DialogShell>
     );
 };

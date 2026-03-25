@@ -1,19 +1,13 @@
 
 // types/NPC.ts
+import type { HistoryEntry } from './common';
+export type { HistoryReferenceType, HistoryEntry } from './common';
+
 export interface EntityRelationship {
   id: string;
   targetId: string;
   relationType: string; // e.g., "Ally", "Rival", "Family"
   description: string;
-}
-
-export type HistoryReferenceType = 'session' | 'article' | 'manual';
-
-export interface HistoryEntry {
-  id: string;
-  summary: string;
-  referenceType: HistoryReferenceType;
-  referenceId?: string;
 }
 
 export interface NPC {

@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import type { Encounter, Combatant, NPC, PlayerCharacter, CombatantType } from '../../types/index';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { twMerge } from 'tailwind-merge';
@@ -16,6 +17,7 @@ interface CombatTrackerProps {
 
 export const CombatTracker: React.FC<CombatTrackerProps> = ({ encounter, onUpdate, campaignNpcs, campaignPcs }) => {
   const [isAdding, setIsAdding] = useState(false);
+  const { confirm } = useConfirmDialog();
   
   // Handlers for Combatant State
   const updateCombatant = (id: string, updates: Partial<Combatant>) => {
@@ -89,8 +91,9 @@ export const CombatTracker: React.FC<CombatTrackerProps> = ({ encounter, onUpdat
       onUpdate(nextEncounter);
   };
 
-  const clearEncounter = () => {
-      if(window.confirm("Clear all combatants and reset rounds?")) {
+  const clearEncounter = async () => {
+      const confirmed = await confirm('Clear Encounter', 'Clear all combatants and reset rounds?', { variant: 'danger', confirmLabel: 'Clear' });
+      if (confirmed) {
           onUpdate({ id: encounter.id, round: 1, turnIndex: 0, combatants: [] });
       }
   };
@@ -172,11 +175,13 @@ export const CombatTracker: React.FC<CombatTrackerProps> = ({ encounter, onUpdat
 
                         {/* HP Controls */}
                         <div className="col-span-4 flex items-center justify-center gap-2">
-                            <button onClick={() => updateCombatant(combatant.id, { hp: combatant.hp - 1 })} className="p-1 hover:bg-red-500/20 rounded text-red-400"><Icons.ChevronDown className="w-4 h-4" /></button>
+                            <Button variant="icon" onClick={() => updateCombatant(combatant.id, { hp: combatant.hp - 1 })} className="text-red-400 hover:bg-red-500/20" aria-label="Decrease HP">
+                                <Icons.ChevronDown className="w-4 h-4" />
+                            </Button>
                             <div className="relative">
-                                <input 
-                                    type="number" 
-                                    value={combatant.hp} 
+                                <input
+                                    type="number"
+                                    value={combatant.hp}
                                     onChange={(e) => updateCombatant(combatant.id, { hp: parseInt(e.target.value) || 0 })}
                                     className={twMerge(
                                         "w-16 text-center bg-slate-800 border border-slate-700 rounded p-1 text-lg font-bold outline-none focus:ring-1 focus:ring-amber-500",
@@ -187,22 +192,24 @@ export const CombatTracker: React.FC<CombatTrackerProps> = ({ encounter, onUpdat
                             </div>
                             <span className="text-slate-500">/</span>
                              <div className="relative">
-                                <input 
-                                    type="number" 
-                                    value={combatant.maxHp} 
+                                <input
+                                    type="number"
+                                    value={combatant.maxHp}
                                     onChange={(e) => updateCombatant(combatant.id, { maxHp: parseInt(e.target.value) || 0 })}
                                     className="w-16 text-center bg-slate-800 border border-slate-700 rounded p-1 text-sm text-slate-400 outline-none focus:ring-1 focus:ring-amber-500"
                                 />
                                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] text-slate-500 bg-slate-900 px-1">Max</span>
                             </div>
-                            <button onClick={() => updateCombatant(combatant.id, { hp: Math.min(combatant.maxHp, combatant.hp + 1) })} className="p-1 hover:bg-green-500/20 rounded text-green-400"><Icons.ChevronUp className="w-4 h-4" /></button>
+                            <Button variant="icon" onClick={() => updateCombatant(combatant.id, { hp: Math.min(combatant.maxHp, combatant.hp + 1) })} className="text-green-400 hover:bg-green-500/20" aria-label="Increase HP">
+                                <Icons.ChevronUp className="w-4 h-4" />
+                            </Button>
                         </div>
 
                         {/* Actions */}
                         <div className="col-span-2 flex justify-end">
-                            <button onClick={() => removeCombatant(combatant.id)} className="p-2 text-slate-600 hover:text-red-400 hover:bg-slate-800 rounded transition-colors">
+                            <Button variant="icon" onClick={() => removeCombatant(combatant.id)} className="text-slate-600 hover:text-red-400 hover:bg-slate-800" aria-label={`Remove ${combatant.name}`}>
                                 <Icons.Trash className="w-4 h-4" />
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 ))}

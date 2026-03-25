@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Plot } from '../../types/index';
 import type { SessionLog } from '../../types/index';
 import { Icons } from '../common/Icons';
@@ -51,34 +51,44 @@ const PlotCreator: React.FC<{ onPlotCreated: (data: Omit<Plot, 'id'>) => void; }
 }
 
 export const PlotDashboard: React.FC<PlotDashboardProps> = ({ plots, sessionLogs, onPlotCreated, onSelectPlot, onSelectSession }) => {
-  const activePlots = plots.filter(p => p.status === 'active');
-  const resolvedPlots = plots.filter(p => p.status === 'resolved');
-  const dormantPlots = plots.filter(p => p.status === 'dormant');
+  const [searchTerm, setSearchTerm] = useState('');
+  const filteredPlots = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return plots;
+    return plots.filter(p =>
+      p.title.toLowerCase().includes(q) ||
+      p.description?.toLowerCase().includes(q)
+    );
+  }, [plots, searchTerm]);
+
+  const activePlots = filteredPlots.filter(p => p.status === 'active');
+  const resolvedPlots = filteredPlots.filter(p => p.status === 'resolved');
+  const dormantPlots = filteredPlots.filter(p => p.status === 'dormant');
   const [timelineOpen, setTimelineOpen] = useState(true);
 
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
 
       {/* Plot Timeline — collapsible bird's-eye view */}
-      <div className="bg-stone-900 border border-stone-700 rounded-lg overflow-hidden">
+      <div className="bg-slate-900 border border-slate-700 rounded-lg overflow-hidden">
         <button
-          className="w-full flex items-center justify-between px-5 py-3 hover:bg-stone-800/60 transition-colors"
+          className="w-full flex items-center justify-between px-5 py-3 hover:bg-slate-800/60 transition-colors"
           onClick={() => setTimelineOpen(o => !o)}
         >
           <div className="flex items-center gap-2">
             <Icons.Plot className="w-4 h-4 text-amber-400" />
-            <span className="text-sm font-semibold text-stone-200">Plot Timeline</span>
-            <span className="text-xs text-stone-500 ml-1">
+            <span className="text-sm font-semibold text-slate-200">Plot Timeline</span>
+            <span className="text-xs text-slate-500 ml-1">
               {plots.length} {plots.length === 1 ? 'arc' : 'arcs'} &middot; {sessionLogs.length} {sessionLogs.length === 1 ? 'session' : 'sessions'}
             </span>
           </div>
           {timelineOpen
-            ? <Icons.ChevronUp className="w-4 h-4 text-stone-400" />
-            : <Icons.ChevronDown className="w-4 h-4 text-stone-400" />
+            ? <Icons.ChevronUp className="w-4 h-4 text-slate-400" />
+            : <Icons.ChevronDown className="w-4 h-4 text-slate-400" />
           }
         </button>
         {timelineOpen && (
-          <div className="px-5 pb-5 pt-2 border-t border-stone-800">
+          <div className="px-5 pb-5 pt-2 border-t border-slate-800">
             <PlotTimeline
               plots={plots}
               sessionLogs={sessionLogs}
@@ -94,7 +104,26 @@ export const PlotDashboard: React.FC<PlotDashboardProps> = ({ plots, sessionLogs
           <PlotCreator onPlotCreated={onPlotCreated} />
         </div>
         <div className="lg:col-span-2 space-y-8">
-          
+
+          {/* Search */}
+          <div className="relative">
+            <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Search plots..."
+              className="w-full bg-slate-800 border border-slate-700 rounded-md pl-9 pr-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
+            />
+          </div>
+
+          {searchTerm && filteredPlots.length === 0 && (
+            <div className="text-center py-6">
+              <Icons.Search className="w-8 h-8 mx-auto mb-2 text-slate-700" />
+              <p className="text-slate-400">No plots match "{searchTerm}"</p>
+            </div>
+          )}
+
           {/* Active Plots */}
           <div>
             <h2 className="text-xl font-bold font-serif text-slate-200 mb-4 flex items-center gap-2">
@@ -119,7 +148,7 @@ export const PlotDashboard: React.FC<PlotDashboardProps> = ({ plots, sessionLogs
               </div>
               <div>
                 <h2 className="text-lg font-bold font-serif text-slate-400 mb-3 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-indigo-900"></span> Resolved History
+                    <span className="w-2 h-2 rounded-full bg-amber-900"></span> Resolved History
                 </h2>
                 <div className="space-y-2">
                     {resolvedPlots.map(plot => <PlotCard key={plot.id} plot={plot} onClick={() => onSelectPlot(plot.id)} compact />)}
@@ -143,7 +172,7 @@ interface PlotCardProps {
 const PLOT_STATUS_STYLES: Record<string, string> = {
     active: 'bg-green-900/40 text-green-300 border-green-500/30',
     dormant: 'bg-slate-700/60 text-slate-400 border-slate-600/30',
-    resolved: 'bg-indigo-900/40 text-indigo-300 border-indigo-500/30',
+    resolved: 'bg-amber-900/40 text-amber-300 border-amber-500/30',
 };
 
 const PlotCard: React.FC<PlotCardProps> = ({ plot, onClick, compact }) => {

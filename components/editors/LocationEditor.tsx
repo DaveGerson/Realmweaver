@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import type { Location, LocationConnection, PointOfInterest, PoiInteraction, LootItem, Faction, SessionLog, Article } from '../../types/index';
+import type { Location, LocationConnection, PointOfInterest, PoiInteraction, LootItem, Faction, SessionLog, Article, Campaign } from '../../types/index';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
-import { AiTextarea } from '../common/Textarea';
-import { generateEnhancedText, generatePoiFromLoot, generateNpc } from '../../services/geminiService';
+import { AiTextarea, textareaBaseClasses } from '../common/Textarea';
+import { generatePoiFromLoot, generateNpc } from '../../services/aiService';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { RegenerateButton } from '../common/RegenerateButton';
 import { EntityLink } from '../common/EntityLink';
@@ -22,14 +23,13 @@ interface LocationEditorProps {
   allFactions?: Faction[];
   sessionLogs?: SessionLog[];
   articles?: Article[];
+  campaign?: Campaign;
   onUpdate: (id: string, updatedData: Partial<Location>) => void;
   onDelete: (id: string) => void;
   isMockMode: boolean;
   campaignContext?: string;
   onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
 }
-
-type GenerationField = 'description' | 'secrets';
 
 const LOCATION_TABS: TabDefinition[] = [
   { id: 'overview',     label: 'Overview',     icon: Icons.Locations },
@@ -38,14 +38,12 @@ const LOCATION_TABS: TabDefinition[] = [
   { id: 'history',      label: 'History',      icon: Icons.Clock },
 ];
 
-export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLocations, allFactions = [], onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
+export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLocations, allFactions = [], campaign, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(location);
-  const [isGenerating, setIsGenerating] = useState<GenerationField | null>(null);
   const [generatingPoiFor, setGeneratingPoiFor] = useState<string | null>(null);
   const [isGeneratingNpc, setIsGeneratingNpc] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
-
-  const campaign = campaignService.getState().campaigns.find(c => c.id === campaignService.getState().activeCampaignId)!;
+  const { confirm } = useConfirmDialog();
 
   // Reset to first tab when the entity changes
   useEffect(() => {
@@ -81,33 +79,17 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     onUpdate(location.id, { controllingFactionId: newFactionId });
   };
 
-  const handleAiGenerate = async (field: GenerationField) => {
-    setIsGenerating(field);
-    const context = `Location Name: ${formData.name}\nDescription: ${field === 'description' ? '[GENERATE THIS]' : formData.description}\nSecrets: ${field === 'secrets' ? '[GENERATE THIS]' : formData.secrets}`;
-    const prompt = `Based on the following location info, generate a compelling "${field}":\n\n${context}`;
-
-    try {
-      const result = await generateEnhancedText(prompt, undefined, isMockMode);
-      const updatedData = { [field]: result };
-      setFormData(prev => ({ ...prev, ...updatedData }));
-      onUpdate(location.id, updatedData);
-    } catch (error) {
-      console.error("AI generation failed:", error);
-    } finally {
-      setIsGenerating(null);
-    }
-  };
-
-  const handleFieldRegenerate = (field: GenerationField) => (newValue: string) => {
+  const handleFieldRegenerate = (field: 'description' | 'secrets') => (newValue: string) => {
     setFormData(prev => ({ ...prev, [field]: newValue }));
     onUpdate(location.id, { [field]: newValue });
   };
 
   const locationEntityContext = `Location Name: ${formData.name}\nDescription: ${formData.description || 'Not specified'}\nSecrets: ${formData.secrets || 'Not specified'}`;
 
-  const handleDelete = () => {
-    if (window.confirm(`Are you sure you want to delete ${location.name}? This action cannot be undone.`)) {
-        onDelete(location.id);
+  const handleDelete = async () => {
+    const confirmed = await confirm('Delete Location', `Are you sure you want to delete ${location.name}? This action cannot be undone.`, { variant: 'danger' });
+    if (confirmed) {
+      onDelete(location.id);
     }
   };
 
@@ -248,7 +230,7 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     setIsGeneratingNpc(true);
     const contextWithLocation = `${campaignContext || ''}\nCurrent Location: ${location.name}${location.description ? ` — ${location.description}` : ''}`.trim();
     try {
-      const npcData = await generateNpc(prompt, false, isMockMode, contextWithLocation);
+      const npcData = await generateNpc(prompt, isMockMode, contextWithLocation);
       campaignService.createNpc({ ...npcData, factionId: undefined, relationships: [], history: [] });
     } catch (error) {
       console.error('Failed to generate NPC at location:', error);
@@ -324,8 +306,6 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                 onChange={handleChange}
                 onBlur={handleBlur}
                 rows={5}
-                onAiGenerate={() => handleAiGenerate('description')}
-                isGenerating={isGenerating === 'description'}
                 regenerateButton={<RegenerateButton fieldName="description" currentValue={formData.description} entityType="Location" entityContext={locationEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />}
               />
               {formData.description && onNavigate && (
@@ -341,8 +321,6 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                 onChange={handleChange}
                 onBlur={handleBlur}
                 rows={3}
-                onAiGenerate={() => handleAiGenerate('secrets')}
-                isGenerating={isGenerating === 'secrets'}
                 regenerateButton={<RegenerateButton fieldName="secrets" currentValue={formData.secrets} entityType="Location" entityContext={locationEntityContext} onRegenerate={handleFieldRegenerate('secrets')} isMockMode={isMockMode} campaignContext={campaignContext} />}
               />
               {formData.secrets && onNavigate && (
@@ -398,9 +376,9 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                           Generate an interactive Point of Interest for this loot item.
                         </span>
                       </button>
-                      <button onClick={() => handleDeleteLootItem(item.id)} className="text-slate-500 hover:text-red-400 p-1 rounded transition-colors">
+                      <Button variant="icon" onClick={() => handleDeleteLootItem(item.id)} className="text-slate-500 hover:text-red-400" aria-label="Delete loot item">
                         <Icons.Trash className="w-4 h-4" />
-                      </button>
+                      </Button>
                     </div>
                   ))}
                   {(!formData.loot || formData.loot.length === 0) && (
@@ -590,15 +568,17 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
           {/* History Tab */}
           {activeTab === 'history' && (
             <div className="space-y-6">
-              <EntityHistoryManager
-                  subjectId={location.id}
-                  subjectType="location"
-                  campaign={campaign}
-                  onUpdateEntity={(type, id, changes) => {
-                      if (type === 'npc') campaignService.updateNpc(id, changes);
-                      if (type === 'location') campaignService.updateLocation(id, changes);
-                  }}
-              />
+              {campaign && (
+                <EntityHistoryManager
+                    subjectId={location.id}
+                    subjectType="location"
+                    campaign={campaign}
+                    onUpdateEntity={(type, id, changes) => {
+                        if (type === 'npc') campaignService.updateNpc(id, changes);
+                        if (type === 'location') campaignService.updateLocation(id, changes);
+                    }}
+                />
+              )}
             </div>
           )}
 
@@ -633,7 +613,7 @@ const PointOfInterestEditor: React.FC<PointOfInterestEditorProps> = ({ poi, onDe
                 </button>
                 <div className="flex items-center gap-2">
                     <span className="text-xs text-slate-400">DC {poi.passivePerceptionDC}</span>
-                    <button onClick={() => onDelete(poi.id)} className="p-1 text-slate-500 hover:text-red-400"><Icons.Trash className="w-4 h-4" /></button>
+                    <Button variant="icon" onClick={() => onDelete(poi.id)} className="text-slate-500 hover:text-red-400" aria-label={`Delete ${poi.name}`}><Icons.Trash className="w-4 h-4" /></Button>
                 </div>
             </header>
             {isExpanded && (
@@ -650,7 +630,7 @@ const PointOfInterestEditor: React.FC<PointOfInterestEditorProps> = ({ poi, onDe
                     </div>
                     <div>
                         <label className="block text-xs font-medium text-slate-400 mb-1">Description (Read-Aloud)</label>
-                        <textarea value={poi.description} onChange={e => onChange(poi.id, 'description', e.target.value)} onBlur={onBlur} rows={3} placeholder="What players notice if they meet the passive perception DC." className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500 resize-y" />
+                        <textarea value={poi.description} onChange={e => onChange(poi.id, 'description', e.target.value)} onBlur={onBlur} rows={3} placeholder="What players notice if they meet the passive perception DC." className={`w-full px-2 py-1 text-sm resize-y ${textareaBaseClasses}`} />
                     </div>
 
                     <PoiSubSection
@@ -704,10 +684,10 @@ const PoiSubSection: React.FC<PoiSubSectionProps> = ({ title, items, onAdd, onDe
             {items.map(item => (
                 <div key={item.id} className="bg-slate-900/50 p-2 rounded-md border border-slate-700/50 space-y-1.5">
                     <div className="flex items-start gap-2">
-                        <textarea value={item.description} onChange={e => onChange(item.id, 'description', e.target.value)} onBlur={onBlur} rows={2} placeholder={descriptionPlaceholder} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm resize-y outline-none focus:ring-1 focus:ring-amber-500" />
-                        <button onClick={() => onDelete(item.id)} className="p-1 text-slate-500 hover:text-red-400 mt-1"><Icons.Trash className="w-3.5 h-3.5" /></button>
+                        <textarea value={item.description} onChange={e => onChange(item.id, 'description', e.target.value)} onBlur={onBlur} rows={2} placeholder={descriptionPlaceholder} className={`w-full px-2 py-1 text-sm resize-y ${textareaBaseClasses}`} />
+                        <Button variant="icon" onClick={() => onDelete(item.id)} className="text-slate-500 hover:text-red-400 mt-1" aria-label="Delete item"><Icons.Trash className="w-3.5 h-3.5" /></Button>
                     </div>
-                    <textarea value={item.outcome} onChange={e => onChange(item.id, 'outcome', e.target.value)} onBlur={onBlur} rows={2} placeholder={outcomePlaceholder} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm resize-y outline-none focus:ring-1 focus:ring-amber-500" />
+                    <textarea value={item.outcome} onChange={e => onChange(item.id, 'outcome', e.target.value)} onBlur={onBlur} rows={2} placeholder={outcomePlaceholder} className={`w-full px-2 py-1 text-sm resize-y ${textareaBaseClasses}`} />
                 </div>
             ))}
             {items.length === 0 && <p className="text-xs text-slate-600 italic px-2 py-1">{emptyText}</p>}

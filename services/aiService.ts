@@ -1,0 +1,232 @@
+
+import type { NPC, Location, Faction, RollableTable, Item, Scene, Adventure, Article, PointOfInterest, PlayerCharacter, RealmChatResponse, ChatMessage, DraftEntity, ModelTier, Campaign } from '../types/index';
+import type { BatchAddData, AdventureForBatchAdd } from '../types/index';
+import type { WorldEvent } from './ai/worldSimulation';
+
+import * as aiRealmWeaver from './ai/realmWeaver';
+import * as aiDmCoach from './ai/dmCoach';
+import * as aiEvocationWizard from './ai/evocationWizard';
+import * as aiRealmChat from './ai/realmChat';
+import * as aiWorldSimulation from './ai/worldSimulation';
+import * as aiStyleMatching from './ai/styleMatching';
+import * as mockService from './ai/mockService';
+
+export const generateNpc = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<NPC, 'id' | 'factionId'>> => {
+  if (isMockMode) {
+    return mockService.generateNpc(prompt, false, campaignContext);
+  }
+  return aiRealmWeaver.generateNpc(prompt, campaignContext);
+};
+
+export const generateLocation = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>> => {
+    if (isMockMode) {
+        return mockService.generateLocation(prompt, campaignContext);
+    }
+    return aiRealmWeaver.generateLocation(prompt, campaignContext);
+};
+
+export const generateFaction = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<Faction, 'id' | 'leaderId' | 'memberIds'>> => {
+    if (isMockMode) {
+        return mockService.generateFaction(prompt, campaignContext);
+    }
+    return aiRealmWeaver.generateFaction(prompt, campaignContext);
+};
+
+export const generateItem = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<Item, 'id'>> => {
+    if (isMockMode) {
+        return mockService.generateItem(prompt, campaignContext);
+    }
+    return aiRealmWeaver.generateItem(prompt, campaignContext);
+};
+
+export const generateScene = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<Scene, 'id' | 'locationId' | 'npcIds'>> => {
+    if (isMockMode) {
+        return mockService.generateScene(prompt, campaignContext);
+    }
+    return aiRealmWeaver.generateScene(prompt, campaignContext);
+};
+
+export const generateAdventure = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<AdventureForBatchAdd> => {
+    if (isMockMode) {
+        return mockService.generateAdventure(prompt, campaignContext);
+    }
+    return aiRealmWeaver.generateAdventure(prompt, campaignContext);
+};
+
+export const generateArticle = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds'>> => {
+    if (isMockMode) {
+        return mockService.generateArticle(prompt, campaignContext);
+    }
+    return aiRealmWeaver.generateArticle(prompt, campaignContext);
+};
+
+export const generateNarration = (prompt: string, campaignContext?: string, useLiteModel: boolean = false, isMockMode: boolean = false): Promise<string> => {
+    if (isMockMode) {
+        return mockService.generateNarration(prompt, campaignContext, useLiteModel, isMockMode);
+    }
+    return aiDmCoach.generateNarration(prompt, campaignContext, useLiteModel);
+};
+
+export const generateImprovisation = (prompt: string, campaignContext?: string, useLiteModel: boolean = false, isMockMode: boolean = false): Promise<string> => {
+    if (isMockMode) {
+        return mockService.generateImprovisation(prompt, campaignContext, useLiteModel, isMockMode);
+    }
+    return aiDmCoach.generateImprovisation(prompt, campaignContext, useLiteModel);
+};
+
+export const generateRollableTable = (prompt: string, campaignContext?: string, useLiteModel: boolean = false, isMockMode: boolean = false): Promise<RollableTable> => {
+    if (isMockMode) {
+        return mockService.generateRollableTable(prompt, campaignContext, useLiteModel, isMockMode);
+    }
+    return aiDmCoach.generateRollableTable(prompt, campaignContext, useLiteModel);
+};
+
+export const generateCampaignFill = (prompt: string, options: { npcs: boolean, locations: boolean, factions: boolean, adventures: boolean, items: boolean }, isMockMode: boolean = false, campaignContext?: string): Promise<BatchAddData> => {
+    if (isMockMode) {
+        return mockService.generateCampaignFill(prompt, options, isMockMode, campaignContext);
+    }
+    return aiEvocationWizard.generateCampaignFill(prompt, options, campaignContext);
+};
+
+export const generateEnhancedText = (prompt: string, campaignContext?: string, isMockMode: boolean = false): Promise<string> => {
+    if (isMockMode) {
+        return mockService.generateEnhancedText(prompt, campaignContext);
+    }
+    return aiDmCoach.generateEnhancedText(prompt, campaignContext);
+};
+
+export const generatePoiFromLoot = (prompt: string, campaignContext?: string, isMockMode: boolean = false): Promise<Omit<PointOfInterest, 'id'>> => {
+    if (isMockMode) {
+        return mockService.generatePoiFromLoot(prompt, campaignContext, isMockMode);
+    }
+    return aiRealmWeaver.generatePoiFromLoot(prompt, campaignContext);
+};
+
+export const parseDocumentForEntities = (documentContent: string, isMockMode: boolean = false, campaignContext?: string): Promise<BatchAddData> => {
+    if (isMockMode) {
+        return mockService.generateCampaignFill(documentContent, { npcs: true, locations: true, factions: true, adventures: true, items: true }, isMockMode, campaignContext);
+    }
+    return aiEvocationWizard.parseDocumentForEntities(documentContent, campaignContext);
+}
+
+export const generateChatResponse = (history: { role: 'user' | 'model', text: string }[], campaignContext?: string, isMockMode: boolean = false): Promise<string> => {
+    if (isMockMode) {
+        return mockService.generateChatResponse(history, campaignContext, isMockMode);
+    }
+    return aiEvocationWizard.generateChatResponse(history, campaignContext);
+}
+
+export const parseCharacterSheetPdf = (pdfBase64: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<PlayerCharacter, 'id'>> => {
+    if (isMockMode) {
+        return mockService.parseCharacterSheetPdf(pdfBase64, campaignContext, isMockMode);
+    }
+    return aiEvocationWizard.parseCharacterSheetPdf(pdfBase64, campaignContext);
+}
+
+export const chatWithRealmWeaver = (
+    history: ChatMessage[],
+    currentDrafts: DraftEntity[],
+    approvedEntitiesLog: string[],
+    campaignContext: string,
+    tier: ModelTier,
+    isMockMode: boolean = false,
+    focusedEntityType?: 'npc' | 'location' | 'faction' | 'item' | 'adventure' | 'article'
+): Promise<RealmChatResponse> => {
+    if (isMockMode) {
+        return mockService.chatWithRealmWeaver(history, currentDrafts, approvedEntitiesLog, campaignContext, tier, focusedEntityType);
+    }
+    return aiRealmChat.chatWithRealmWeaver(history, currentDrafts, approvedEntitiesLog, campaignContext, tier, focusedEntityType);
+};
+
+export const analyzeSessionNotes = (notes: string, knownEntityNames: string[], campaignContext?: string, isMockMode: boolean = false): Promise<{entries: {content: string, relatedEntityNames: string[]}[]}> => {
+    if (isMockMode) {
+        return mockService.analyzeSessionNotes(notes, knownEntityNames, campaignContext);
+    }
+    return aiDmCoach.analyzeSessionNotes(notes, knownEntityNames, campaignContext);
+}
+
+export const generateNpcRoleplay = (
+    npcContext: string,
+    conversationHistory: Array<{ role: string; text: string }>,
+    userMessage: string,
+    isMockMode: boolean = false,
+    campaignContext?: string
+): Promise<{ dialogue: string; moodCue: string }> => {
+    if (isMockMode) {
+        return mockService.generateNpcRoleplay(npcContext, conversationHistory, userMessage, campaignContext);
+    }
+    return aiRealmChat.generateNpcRoleplay(npcContext, conversationHistory, userMessage, campaignContext);
+};
+
+export const generateSessionRecap = (
+    sessionNotes: string,
+    plotSummaries: string,
+    campaignContext?: string,
+    isMockMode: boolean = false
+): Promise<{ recap: string; looseEnds: string[]; playerFacingRecap: string }> => {
+    if (isMockMode) {
+        return mockService.generateSessionRecap(sessionNotes, plotSummaries, campaignContext);
+    }
+    return aiDmCoach.generateSessionRecap(sessionNotes, plotSummaries, campaignContext);
+};
+
+export const generateStarterNpcs = (
+    worldDescription: string,
+    isMockMode: boolean = false,
+    campaignContext?: string
+): Promise<Array<Omit<NPC, 'id' | 'factionId'>>> => {
+    if (isMockMode) {
+        return mockService.generateStarterNpcs(worldDescription, campaignContext);
+    }
+    return aiEvocationWizard.generateStarterNpcs(worldDescription, campaignContext);
+};
+
+export const generateStarterLocations = (
+    worldDescription: string,
+    npcs: Array<Omit<NPC, 'id' | 'factionId'>>,
+    isMockMode: boolean = false,
+    campaignContext?: string
+): Promise<Array<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>>> => {
+    if (isMockMode) {
+        return mockService.generateStarterLocations(worldDescription, npcs, campaignContext);
+    }
+    return aiEvocationWizard.generateStarterLocations(worldDescription, npcs, campaignContext);
+};
+
+export const generateStarterAdventure = (
+    worldDescription: string,
+    npcs: Array<Omit<NPC, 'id' | 'factionId'>>,
+    locations: Array<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>>,
+    isMockMode: boolean = false,
+    campaignContext?: string
+): Promise<AdventureForBatchAdd> => {
+    if (isMockMode) {
+        return mockService.generateStarterAdventure(worldDescription, npcs, locations, campaignContext);
+    }
+    return aiEvocationWizard.generateStarterAdventure(worldDescription, npcs, locations, campaignContext);
+};
+
+export const analyzeWritingStyle = (
+    samples: string[],
+    isMockMode: boolean = false,
+    campaignContext?: string
+): Promise<string> => {
+    if (isMockMode) {
+        return mockService.analyzeWritingStyle(samples, campaignContext);
+    }
+    return aiStyleMatching.analyzeWritingStyle(samples, campaignContext);
+};
+
+export { WorldEvent };
+
+export const generateWorldEvents = (
+    campaign: Campaign,
+    daysPassed: number,
+    isMockMode: boolean = false,
+    campaignContext?: string
+): Promise<WorldEvent[]> => {
+    if (isMockMode) {
+        return mockService.generateWorldEvents(campaign, daysPassed, campaignContext);
+    }
+    return aiWorldSimulation.generateWorldEvents(campaign, daysPassed, campaignContext);
+};

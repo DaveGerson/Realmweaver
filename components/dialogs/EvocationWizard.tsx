@@ -1,8 +1,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { DialogShell } from '../common/DialogShell';
+
 import type { Campaign, SceneType, NPC, Location, Faction, Item, Adventure, AdventureForBatchAdd, Scene } from '../../types/index';
 import type { BatchAddData } from '../../types/index';
-import { generateCampaignFill, generateNpc, generateLocation, generateFaction, generateItem, generateAdventure, parseDocumentForEntities, generateChatResponse } from '../../services/geminiService';
+import { generateCampaignFill, generateNpc, generateLocation, generateFaction, generateItem, generateAdventure, parseDocumentForEntities, generateChatResponse } from '../../services/aiService';
+import { buildCampaignContext } from '../../services/contextBuilder';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { twMerge } from 'tailwind-merge';
@@ -75,15 +78,6 @@ type ChatMessage = {
     text: string;
 };
 
-const serializeCampaign = (campaign: Campaign): string => {
-    let context = `Title: ${campaign.title}\nSetting: ${campaign.setting}\n`;
-    if (campaign.npcs.length > 0) context += `NPCs: ${campaign.npcs.map(e => e.name).join(', ')}\n`;
-    if (campaign.locations.length > 0) context += `Locations: ${campaign.locations.map(e => e.name).join(', ')}\n`;
-    if (campaign.factions.length > 0) context += `Factions: ${campaign.factions.map(e => e.name).join(', ')}\n`;
-    if (campaign.items.length > 0) context += `Items: ${campaign.items.map(e => e.name).join(', ')}\n`;
-    if (campaign.adventures.length > 0) context += `Adventures: ${campaign.adventures.map(e => e.title).join(', ')}\n`;
-    return context;
-};
 
 const initialDetailedPrompts: DetailedPrompts = {
     npcs: [], locations: [], factions: [], adventures: [], items: []
@@ -151,7 +145,7 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
 
     const handleGenerate = async () => {
         resetGenerationState();
-        const campaignContext = useCampaignContext ? serializeCampaign(campaign) : undefined;
+        const campaignContext = useCampaignContext ? buildCampaignContext({ variant: 'generation', campaign }) : undefined;
 
         try {
             let data: BatchAddData | null = null;
@@ -169,14 +163,14 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                 case 'detailed':
                     setLoadingMessage('Generating from prompts...');
                     const detailedData: BatchAddData = { npcs: [], locations: [], factions: [], adventures: [], items: [] };
-                    const npcPromises = detailedPrompts.npcs.map(p => generateNpc(p.prompt, false, isMockMode, campaignContext).then(res => ({ ...res, factionId: p.linkId })));
-                    const locationPromises = detailedPrompts.locations.map(p => generateLocation(p.prompt, false, isMockMode, campaignContext).then(res => ({ ...res, parentLocationId: p.linkId })));
-                    const factionPromises = detailedPrompts.factions.map(p => generateFaction(p.prompt, false, isMockMode, campaignContext));
-                    const itemPromises = detailedPrompts.items.map(p => generateItem(p.prompt, false, isMockMode, campaignContext));
+                    const npcPromises = detailedPrompts.npcs.map(p => generateNpc(p.prompt, isMockMode, campaignContext).then(res => ({ ...res, factionId: p.linkId })));
+                    const locationPromises = detailedPrompts.locations.map(p => generateLocation(p.prompt, isMockMode, campaignContext).then(res => ({ ...res, parentLocationId: p.linkId })));
+                    const factionPromises = detailedPrompts.factions.map(p => generateFaction(p.prompt, isMockMode, campaignContext));
+                    const itemPromises = detailedPrompts.items.map(p => generateItem(p.prompt, isMockMode, campaignContext));
                     const adventurePromises = detailedPrompts.adventures.filter(adv => adv.prompt.trim() !== '' && adv.scenes.length > 0 && adv.scenes.some(s => s.prompt.trim() !== '')).map(adv => {
                         const scenesDescription = adv.scenes.filter(s => s.prompt.trim() !== '').map(s => `- Scene Prompt: "${s.prompt}"${s.type ? ` (Suggested Type: ${s.type})` : ''}`).join('\n');
                         const fullAdvPrompt = `Based on the following adventure concept, generate a complete adventure outline.\nAdventure Concept: "${adv.prompt}"\n\nThe adventure's structure must be built around the following user-provided scenes. Generate full, detailed scenes based on these prompts:\n${scenesDescription}`;
-                        return generateAdventure(fullAdvPrompt, false, isMockMode, campaignContext);
+                        return generateAdventure(fullAdvPrompt, isMockMode, campaignContext);
                     });
 
                     const [npcsResult, locationsResult, factionsResult, itemsResult, adventuresResult] = await Promise.all([Promise.all(npcPromises), Promise.all(locationPromises), Promise.all(factionPromises), Promise.all(itemPromises), Promise.all(adventurePromises)]);
@@ -278,17 +272,17 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
     const combinedArticles = [...campaign.articles]; // Articles not generated here yet
 
     return (
-        <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm z-20 flex items-center justify-center p-4" aria-modal="true" role="dialog">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-5xl h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-300 relative">
+        <DialogShell isOpen={true} onClose={onClose} ariaLabel="Evocation Wizard" className="w-full max-w-5xl mx-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-300 relative">
                 <header className="flex items-center justify-between p-4 border-b border-slate-800 flex-shrink-0">
                     <div className="flex items-center gap-3">
-                        <Icons.Wizard className="w-7 h-7 text-indigo-400" />
+                        <Icons.Wizard className="w-7 h-7 text-amber-400" />
                         <h2 className="text-xl font-bold font-serif">Evocation Wizard</h2>
                     </div>
                     <div className="flex items-center gap-6">
                         <div className="flex items-center gap-3">
-                            <span className={`text-xs font-medium ${useCampaignContext ? 'text-indigo-400' : 'text-slate-500'}`}>Use Campaign Context</span>
-                            <button onClick={() => setUseCampaignContext(p => !p)} className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900 ${useCampaignContext ? 'bg-indigo-600' : 'bg-slate-700'}`} role="switch" aria-checked={useCampaignContext}>
+                            <span className={`text-xs font-medium ${useCampaignContext ? 'text-amber-400' : 'text-slate-500'}`}>Use Campaign Context</span>
+                            <button onClick={() => setUseCampaignContext(p => !p)} className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-slate-900 ${useCampaignContext ? 'bg-amber-600' : 'bg-slate-700'}`} role="switch" aria-checked={useCampaignContext}>
                                 <span aria-hidden="true" className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${useCampaignContext ? 'translate-x-5' : 'translate-x-0'}`} />
                             </button>
                         </div>
@@ -311,7 +305,7 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                             {mode === 'simple' && <SimpleModeView prompt={simplePrompt} onPromptChange={setSimplePrompt} qualifiers={qualifiers} onQualifiersChange={setQualifiers} />}
                             {mode === 'detailed' && <DetailedModeView campaign={campaign} prompts={detailedPrompts} onPromptsChange={setDetailedPrompts} />}
                             {mode === 'ingest' && <IngestModeView text={ingestedText} onTextChange={setIngestedText} fileInputRef={fileInputRef} />}
-                            {mode === 'chat' && <ChatModeView history={chatHistory} onHistoryChange={setChatHistory} input={chatInput} onInputChange={setChatInput} campaignContext={useCampaignContext ? serializeCampaign(campaign) : undefined} isMockMode={isMockMode} />}
+                            {mode === 'chat' && <ChatModeView history={chatHistory} onHistoryChange={setChatHistory} input={chatInput} onInputChange={setChatInput} campaignContext={useCampaignContext ? buildCampaignContext({ variant: 'generation', campaign }) : undefined} isMockMode={isMockMode} />}
                         </div>
                         <div className="p-4 border-t border-slate-800">
                              {error && <p className="text-xs text-red-400 mb-2 text-center">{error}</p>}
@@ -420,7 +414,7 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                     </div>
                 )}
             </div>
-        </div>
+        </DialogShell>
     );
 };
 
@@ -429,13 +423,13 @@ const SimpleModeView = ({ prompt, onPromptChange, qualifiers, onQualifiersChange
     <div className="space-y-4">
         <h3 className="text-lg font-semibold font-serif">Simple Generation</h3>
         <p className="text-sm text-slate-400">Provide a central theme or idea. The AI will generate a cohesive set of entities to flesh out your world based on this concept.</p>
-        <textarea value={prompt} onChange={(e) => onPromptChange(e.target.value)} placeholder="e.g., A floating city powered by a trapped storm elemental." rows={4} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 outline-none resize-y" />
+        <textarea value={prompt} onChange={(e) => onPromptChange(e.target.value)} placeholder="e.g., A floating city powered by a trapped storm elemental." rows={4} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-amber-500 outline-none resize-y" />
         <div>
             <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">Optional Qualifiers</label>
             <div className="space-y-2">
-                <input type="text" value={qualifiers.theme} onChange={e => onQualifiersChange(p => ({...p, theme: e.target.value}))} placeholder="Theme/Genre (e.g., Political Intrigue, Cosmic Horror)" className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-1.5 text-sm placeholder:text-slate-600 focus:ring-1 focus:ring-indigo-500 outline-none" />
-                <input type="text" value={qualifiers.conflict} onChange={e => onQualifiersChange(p => ({...p, conflict: e.target.value}))} placeholder="Central Conflict (e.g., A brewing civil war)" className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-1.5 text-sm placeholder:text-slate-600 focus:ring-1 focus:ring-indigo-500 outline-none" />
-                <input type="text" value={qualifiers.locations} onChange={e => onQualifiersChange(p => ({...p, locations: e.target.value}))} placeholder="Key Locations (e.g., The Obsidian Spire, Sunken Market)" className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-1.5 text-sm placeholder:text-slate-600 focus:ring-1 focus:ring-indigo-500 outline-none" />
+                <input type="text" value={qualifiers.theme} onChange={e => onQualifiersChange(p => ({...p, theme: e.target.value}))} placeholder="Theme/Genre (e.g., Political Intrigue, Cosmic Horror)" className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-1.5 text-sm placeholder:text-slate-600 focus:ring-1 focus:ring-amber-500 outline-none" />
+                <input type="text" value={qualifiers.conflict} onChange={e => onQualifiersChange(p => ({...p, conflict: e.target.value}))} placeholder="Central Conflict (e.g., A brewing civil war)" className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-1.5 text-sm placeholder:text-slate-600 focus:ring-1 focus:ring-amber-500 outline-none" />
+                <input type="text" value={qualifiers.locations} onChange={e => onQualifiersChange(p => ({...p, locations: e.target.value}))} placeholder="Key Locations (e.g., The Obsidian Spire, Sunken Market)" className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-1.5 text-sm placeholder:text-slate-600 focus:ring-1 focus:ring-amber-500 outline-none" />
             </div>
         </div>
     </div>
@@ -501,7 +495,7 @@ const IngestModeView = ({ text, onTextChange, fileInputRef }) => {
         <div className="space-y-4">
             <h3 className="text-lg font-semibold font-serif">Ingest Document</h3>
             <p className="text-sm text-slate-400">Paste your existing campaign notes or upload a text file (.txt, .md, .json). The AI will read the document and extract any recognizable entities like NPCs, locations, and adventures.</p>
-            <textarea value={text} onChange={(e) => onTextChange(e.target.value)} placeholder="Paste your campaign notes here..." rows={12} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 outline-none resize-y" />
+            <textarea value={text} onChange={(e) => onTextChange(e.target.value)} placeholder="Paste your campaign notes here..." rows={12} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-amber-500 outline-none resize-y" />
             <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".txt,.md,.json" className="hidden" />
             <Button onClick={() => fileInputRef.current?.click()} variant="secondary" className="w-full"><Icons.FileUp className="w-4 h-4 mr-2" />Upload File</Button>
         </div>
@@ -539,7 +533,7 @@ const ChatModeView = ({ history, onHistoryChange, input, onInputChange, campaign
             <p className="text-sm text-slate-400">Describe your ideas conversationally. The assistant will help you brainstorm and develop them. When you're ready, click "Generate Entities from Chat" below.</p>
             <div className="flex-1 bg-slate-950 border border-slate-700 rounded-md p-2 overflow-y-auto custom-scrollbar flex flex-col gap-4">
                 {history.map((msg, index) => (
-                    <div key={index} className={twMerge("p-3 rounded-lg max-w-[85%] w-fit", msg.role === 'user' ? 'bg-indigo-600 self-end' : 'bg-slate-700 self-start')}>
+                    <div key={index} className={twMerge("p-3 rounded-lg max-w-[85%] w-fit", msg.role === 'user' ? 'bg-amber-600 self-end' : 'bg-slate-700 self-start')}>
                         <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
                     </div>
                 ))}
@@ -547,7 +541,7 @@ const ChatModeView = ({ history, onHistoryChange, input, onInputChange, campaign
                 <div ref={chatEndRef} />
             </div>
             <div className="flex items-center gap-2">
-                <input type="text" value={input} onChange={e => onInputChange(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendChat()} disabled={isChatting} placeholder="Let's create a mysterious forest..." className="flex-grow bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 outline-none" />
+                <input type="text" value={input} onChange={e => onInputChange(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendChat()} disabled={isChatting} placeholder="Let's create a mysterious forest..." className="flex-grow bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-amber-500 outline-none" />
                 <Button onClick={handleSendChat} disabled={isChatting || !input.trim()}><Icons.Plus className="w-4 h-4" /> Send</Button>
             </div>
         </div>
@@ -556,7 +550,7 @@ const ChatModeView = ({ history, onHistoryChange, input, onInputChange, campaign
 
 
 const ModeButton = ({ label, icon: Icon, isActive, onClick }: { label: string; icon: React.ElementType, isActive: boolean; onClick: () => void; }) => (
-    <button onClick={onClick} className={twMerge('flex items-center justify-center gap-2 w-full px-3 py-2 text-sm font-semibold rounded-md transition-colors', isActive ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800')}>
+    <button onClick={onClick} className={twMerge('flex items-center justify-center gap-2 w-full px-3 py-2 text-sm font-semibold rounded-md transition-colors', isActive ? 'bg-amber-600 text-white' : 'text-slate-300 hover:bg-slate-800')}>
         <Icon className="w-4 h-4" />
         {label}
     </button>
@@ -588,13 +582,13 @@ const SimpleDetailedSection: React.FC<SimpleDetailedSectionProps> = ({ title, it
                     {items.map(p => (
                         <div key={p.id} className="bg-slate-800/50 p-2 rounded-md space-y-1.5">
                             <div className="flex items-start gap-2">
-                                <textarea value={p.prompt} onChange={(e) => onChange(p.id, e.target.value)} placeholder={`Prompt for new ${title.slice(0, -1)}...`} rows={2} className="flex-grow bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-sm resize-y outline-none focus:ring-1 focus:ring-indigo-500" />
+                                <textarea value={p.prompt} onChange={(e) => onChange(p.id, e.target.value)} placeholder={`Prompt for new ${title.slice(0, -1)}...`} rows={2} className="flex-grow bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-sm resize-y outline-none focus:ring-1 focus:ring-amber-500" />
                                 <button onClick={() => onRemove(p.id)} className="p-1 text-slate-500 hover:text-red-400 transition-colors mt-1"><Icons.Trash className="w-4 h-4" /></button>
                             </div>
                             {linkOptions && linkNoun && (
                                 <div className="flex items-center gap-2">
                                     <Icons.Link className="w-3 h-3 text-slate-400" />
-                                    <select value={p.linkId || 'none'} onChange={(e) => onChange(p.id, p.prompt, e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-indigo-500">
+                                    <select value={p.linkId || 'none'} onChange={(e) => onChange(p.id, p.prompt, e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-amber-500">
                                         <option value="none">-- Link to {linkNoun} (Optional) --</option>
                                         {linkOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                     </select>
@@ -620,11 +614,11 @@ const ScenePromptItem: React.FC<{
     return (
         <div className="bg-slate-800/50 p-2 rounded-md space-y-1.5">
             <div className="flex items-start gap-2">
-                <textarea value={scene.prompt} onChange={(e) => onChange(e.target.value, scene.type || 'none')} placeholder="Scene prompt..." rows={2} className="flex-grow bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-sm resize-y outline-none focus:ring-1 focus:ring-indigo-500" />
+                <textarea value={scene.prompt} onChange={(e) => onChange(e.target.value, scene.type || 'none')} placeholder="Scene prompt..." rows={2} className="flex-grow bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-sm resize-y outline-none focus:ring-1 focus:ring-amber-500" />
                 <button onClick={onRemove} className="p-1 text-slate-500 hover:text-red-400 transition-colors mt-1"><Icons.Trash className="w-4 h-4" /></button>
             </div>
             <div className="flex items-center gap-2">
-                <select value={scene.type || 'none'} onChange={(e) => onChange(scene.prompt, e.target.value as SceneType | 'none')} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-indigo-500">
+                <select value={scene.type || 'none'} onChange={(e) => onChange(scene.prompt, e.target.value as SceneType | 'none')} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-amber-500">
                     <option value="none">-- Scene Type (Optional) --</option>
                     {sceneTypeOptions.map(opt => <option key={opt} value={opt} className="capitalize">{opt}</option>)}
                 </select>
@@ -660,7 +654,7 @@ const AdventureDetailedSection: React.FC<AdventureDetailedSectionProps> = ({ ite
                     {items.map(adventure => (
                         <div key={adventure.id} className="bg-slate-800/50 p-2 rounded-md space-y-2 border border-slate-700/50">
                             <div className="flex items-start gap-2">
-                                <textarea value={adventure.prompt} onChange={(e) => onChange(adventure.id, e.target.value)} placeholder="Adventure concept prompt..." rows={2} className="flex-grow bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-sm resize-y outline-none focus:ring-1 focus:ring-indigo-500" />
+                                <textarea value={adventure.prompt} onChange={(e) => onChange(adventure.id, e.target.value)} placeholder="Adventure concept prompt..." rows={2} className="flex-grow bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-sm resize-y outline-none focus:ring-1 focus:ring-amber-500" />
                                 <button onClick={() => onRemove(adventure.id)} className="p-1 text-slate-500 hover:text-red-400 transition-colors mt-1"><Icons.Trash className="w-4 h-4" /></button>
                             </div>
                             <div className="pl-4 border-l-2 border-slate-700 ml-2 space-y-2 pt-2">
@@ -710,7 +704,7 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({ title, items, selection
                     {items.map((item, index) => (
                         <div key={index} className="flex items-center justify-between p-1.5 rounded-md hover:bg-slate-800/50 transition-colors group">
                             <label className="flex items-center text-sm text-slate-300 select-none flex-grow cursor-pointer">
-                                <input type="checkbox" checked={selection[index]} onChange={(e) => onSelect(index, e.target.checked)} className="w-4 h-4 mr-3 bg-slate-800 border-slate-600 rounded text-indigo-600 focus:ring-indigo-500" />
+                                <input type="checkbox" checked={selection[index]} onChange={(e) => onSelect(index, e.target.checked)} className="w-4 h-4 mr-3 bg-slate-800 border-slate-600 rounded text-amber-600 focus:ring-amber-500" />
                                 <span className="truncate" title={item.name || item.title}>{item.name || item.title}</span>
                             </label>
                              <button onClick={() => onEdit(index)} className="p-1 text-slate-500 hover:text-white opacity-0 group-hover:opacity-100 transition-all" aria-label="Edit">

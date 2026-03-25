@@ -5,6 +5,9 @@ import { Icons, SceneIcon } from '../common/Icons';
 import { Button } from '../common/Button';
 import { twMerge } from 'tailwind-merge';
 import { campaignService } from '../../services/campaignService';
+import { DialogShell } from '../common/DialogShell';
+import { textareaBaseClasses } from '../common/Textarea';
+import { useEntitySearch } from '@/hooks/useEntitySearch';
 
 type WizardStep = 'adventure' | 'scenes' | 'entities' | 'plots' | 'review';
 
@@ -21,7 +24,6 @@ export interface SessionPrepWizardProps {
     campaign: Campaign;
     onComplete: (sessionLogId: string) => void;
     onClose: () => void;
-    isMockMode: boolean;
 }
 
 export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
@@ -189,6 +191,29 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
         }
     };
 
+    // ── Step 3: Extra entity search ───────────────────────────────────────────
+    // Entities not already auto-linked via scenes — used in the "add extra" lists
+    const extraNpcPool = useMemo(
+        () => campaign.npcs.filter(n => !sceneLinkedNpcIds.has(n.id)),
+        [campaign.npcs, sceneLinkedNpcIds]
+    );
+    const extraLocationPool = useMemo(
+        () => campaign.locations.filter(l => !sceneLinkedLocationIds.has(l.id)),
+        [campaign.locations, sceneLinkedLocationIds]
+    );
+
+    const {
+        filteredEntities: filteredExtraNpcs,
+        searchTerm: npcSearchTerm,
+        setSearchTerm: setNpcSearchTerm,
+    } = useEntitySearch(extraNpcPool, ['name', 'description']);
+
+    const {
+        filteredEntities: filteredExtraLocations,
+        searchTerm: locationSearchTerm,
+        setSearchTerm: setLocationSearchTerm,
+    } = useEntitySearch(extraLocationPool, ['name', 'description']);
+
     // ── Step 4: Plot threads ──────────────────────────────────────────────────
     const activePlots = useMemo<Plot[]>(
         () => campaign.plots.filter(p => p.status === 'active'),
@@ -213,6 +238,7 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
         : `Session ${sessionNumber}`;
 
     const [sessionTitle, setSessionTitle] = useState('');
+    const [prepNotes, setPrepNotes] = useState('');
     const effectiveTitle = sessionTitle.trim() || defaultTitle;
 
     // ── Navigation ────────────────────────────────────────────────────────────
@@ -257,7 +283,7 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
             sessionDate: new Date().toISOString(),
             adventureId: selectedAdventureId ?? undefined,
             plannedSceneIds: Array.from(selectedSceneIds),
-            prepNotes: '',
+            prepNotes: prepNotes.trim(),
             runningNotes: '',
             structuredNotes: [],
             relatedPlotIds: Array.from(selectedPlotIds),
@@ -270,7 +296,7 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
         const newId = campaignService.createSessionLog(sessionData);
         campaignService.goLive(newId);
         onComplete(newId);
-    }, [effectiveTitle, selectedAdventureId, selectedSceneIds, selectedPlotIds, onComplete]);
+    }, [effectiveTitle, selectedAdventureId, selectedSceneIds, selectedPlotIds, prepNotes, onComplete]);
 
     // ── Status badge colour ───────────────────────────────────────────────────
     const sceneStatusBadge = (status: Scene['status']) => {
@@ -296,12 +322,9 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-            {/* Backdrop */}
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-
+        <DialogShell isOpen={true} onClose={onClose} ariaLabel="Session Prep Wizard" className="relative w-full max-w-2xl mx-4">
             {/* Modal */}
-            <div className="relative w-full max-w-2xl max-h-[90vh] bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col mx-4">
+            <div className="relative w-full max-h-[90vh] bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col">
 
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
@@ -323,6 +346,7 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
                         <React.Fragment key={step}>
                             <button
                                 onClick={() => setCurrentStep(step)}
+                                aria-current={currentStep === step ? 'step' : undefined}
                                 className={twMerge(
                                     'text-xs font-bold uppercase tracking-wider px-2 py-1 rounded transition-colors whitespace-nowrap',
                                     currentStep === step
@@ -559,32 +583,45 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
                                 </div>
 
                                 {/* Add extra NPCs */}
-                                <div className="space-y-1">
-                                    {campaign.npcs
-                                        .filter(n => !sceneLinkedNpcIds.has(n.id))
-                                        .map(npc => {
-                                            const isAdded = extraNpcIds.has(npc.id);
-                                            return (
-                                                <button
-                                                    key={npc.id}
-                                                    onClick={() => toggleNpc(npc.id, false)}
-                                                    className={twMerge(
-                                                        'w-full flex items-center gap-2 px-3 py-1.5 rounded text-xs transition-colors',
-                                                        isAdded
-                                                            ? 'bg-slate-700 text-amber-300'
-                                                            : 'bg-slate-800/50 text-slate-500 hover:text-slate-300 hover:bg-slate-800'
-                                                    )}
-                                                >
-                                                    {isAdded
-                                                        ? <Icons.Check className="w-3 h-3 text-amber-400 flex-shrink-0" />
-                                                        : <Icons.Plus className="w-3 h-3 flex-shrink-0" />
-                                                    }
-                                                    {npc.name}
-                                                </button>
-                                            );
-                                        })
-                                    }
-                                </div>
+                                {extraNpcPool.length > 0 && (
+                                    <div className="space-y-1.5">
+                                        <div className="relative">
+                                            <Icons.Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 pointer-events-none" />
+                                            <input
+                                                type="text"
+                                                value={npcSearchTerm}
+                                                onChange={e => setNpcSearchTerm(e.target.value)}
+                                                placeholder="Search NPCs to add..."
+                                                className="w-full bg-slate-800 border border-slate-700 rounded-md pl-8 pr-3 py-1.5 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30"
+                                            />
+                                        </div>
+                                        {filteredExtraNpcs.length === 0 ? (
+                                            <p className="text-xs text-slate-600 italic px-1">No NPCs match your search.</p>
+                                        ) : (
+                                            filteredExtraNpcs.map(npc => {
+                                                const isAdded = extraNpcIds.has(npc.id);
+                                                return (
+                                                    <button
+                                                        key={npc.id}
+                                                        onClick={() => toggleNpc(npc.id, false)}
+                                                        className={twMerge(
+                                                            'w-full flex items-center gap-2 px-3 py-1.5 rounded text-xs transition-colors',
+                                                            isAdded
+                                                                ? 'bg-slate-700 text-amber-300'
+                                                                : 'bg-slate-800/50 text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+                                                        )}
+                                                    >
+                                                        {isAdded
+                                                            ? <Icons.Check className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                                                            : <Icons.Plus className="w-3 h-3 flex-shrink-0" />
+                                                        }
+                                                        {npc.name}
+                                                    </button>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Locations */}
@@ -635,32 +672,45 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
                                 </div>
 
                                 {/* Add extra locations */}
-                                <div className="space-y-1">
-                                    {campaign.locations
-                                        .filter(l => !sceneLinkedLocationIds.has(l.id))
-                                        .map(loc => {
-                                            const isAdded = extraLocationIds.has(loc.id);
-                                            return (
-                                                <button
-                                                    key={loc.id}
-                                                    onClick={() => toggleLocation(loc.id, false)}
-                                                    className={twMerge(
-                                                        'w-full flex items-center gap-2 px-3 py-1.5 rounded text-xs transition-colors',
-                                                        isAdded
-                                                            ? 'bg-slate-700 text-amber-300'
-                                                            : 'bg-slate-800/50 text-slate-500 hover:text-slate-300 hover:bg-slate-800'
-                                                    )}
-                                                >
-                                                    {isAdded
-                                                        ? <Icons.Check className="w-3 h-3 text-amber-400 flex-shrink-0" />
-                                                        : <Icons.Plus className="w-3 h-3 flex-shrink-0" />
-                                                    }
-                                                    {loc.name}
-                                                </button>
-                                            );
-                                        })
-                                    }
-                                </div>
+                                {extraLocationPool.length > 0 && (
+                                    <div className="space-y-1.5">
+                                        <div className="relative">
+                                            <Icons.Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 pointer-events-none" />
+                                            <input
+                                                type="text"
+                                                value={locationSearchTerm}
+                                                onChange={e => setLocationSearchTerm(e.target.value)}
+                                                placeholder="Search locations to add..."
+                                                className="w-full bg-slate-800 border border-slate-700 rounded-md pl-8 pr-3 py-1.5 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30"
+                                            />
+                                        </div>
+                                        {filteredExtraLocations.length === 0 ? (
+                                            <p className="text-xs text-slate-600 italic px-1">No locations match your search.</p>
+                                        ) : (
+                                            filteredExtraLocations.map(loc => {
+                                                const isAdded = extraLocationIds.has(loc.id);
+                                                return (
+                                                    <button
+                                                        key={loc.id}
+                                                        onClick={() => toggleLocation(loc.id, false)}
+                                                        className={twMerge(
+                                                            'w-full flex items-center gap-2 px-3 py-1.5 rounded text-xs transition-colors',
+                                                            isAdded
+                                                                ? 'bg-slate-700 text-amber-300'
+                                                                : 'bg-slate-800/50 text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+                                                        )}
+                                                    >
+                                                        {isAdded
+                                                            ? <Icons.Check className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                                                            : <Icons.Plus className="w-3 h-3 flex-shrink-0" />
+                                                        }
+                                                        {loc.name}
+                                                    </button>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -845,6 +895,23 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
                                 )}
                             </div>
 
+                            {/* Prep Notes */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                                    Prep Notes <span className="font-normal text-slate-600 normal-case tracking-normal">(optional)</span>
+                                </label>
+                                <textarea
+                                    value={prepNotes}
+                                    onChange={e => setPrepNotes(e.target.value)}
+                                    rows={4}
+                                    placeholder={'e.g. "Use a Scottish accent for Angus"\n"The thieves\' guild contact arrives at the docks"\n"Players may skip the dungeon — prep the shortcut path"'}
+                                    className={`${textareaBaseClasses} w-full px-3 py-2 text-sm`}
+                                />
+                                <p className="text-xs text-slate-600 mt-1">
+                                    Personal reminders, accents, contingencies — only you see this.
+                                </p>
+                            </div>
+
                             <div className="bg-amber-900/10 border border-amber-800/30 rounded-lg p-4">
                                 <p className="text-sm text-amber-200">
                                     <Icons.Live className="w-4 h-4 inline mr-1.5 text-amber-400" />
@@ -885,6 +952,6 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
                     </div>
                 </div>
             </div>
-        </div>
+        </DialogShell>
     );
 };

@@ -31,7 +31,7 @@ const ENTITY_TEXT_CLASS: Record<QuickCardEntityType, string> = {
   article: 'text-cyan-400 hover:text-cyan-300',
   plot: 'text-yellow-400 hover:text-yellow-300',
   'session-log': 'text-rose-400 hover:text-rose-300',
-  'player-character': 'text-indigo-400 hover:text-indigo-300',
+  'player-character': 'text-amber-400 hover:text-amber-300',
   scene: 'text-blue-400 hover:text-blue-300',
 };
 
@@ -69,7 +69,7 @@ export const EntityLink: React.FC<EntityLinkProps> = ({
   // Track whether the card is being hovered so we don't close on trigger leave
   const cardHoveredRef = useRef(false);
 
-  const colorClass = ENTITY_TEXT_CLASS[entityType] ?? 'text-stone-300 hover:text-stone-100';
+  const colorClass = ENTITY_TEXT_CLASS[entityType] ?? 'text-slate-300 hover:text-slate-100';
 
   // ── Open/close helpers ───────────────────────────────────────────────────
 

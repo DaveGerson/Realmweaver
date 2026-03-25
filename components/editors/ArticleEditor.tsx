@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import type { Article, ArticleCategory } from '../../types/index';
+import type { Article, ArticleCategory, Campaign } from '../../types/index';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
-import { generateEnhancedText } from '../../services/geminiService';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { RegenerateButton } from '../common/RegenerateButton';
 import { EntityLink } from '../common/EntityLink';
@@ -20,6 +20,7 @@ interface ArticleEditorProps {
   allNpcs?: any[];
   allLocations?: any[];
   allFactions?: any[];
+  campaign?: Campaign;
   onUpdate: (id: string, updatedData: Partial<Article>) => void;
   onDelete: (id: string) => void;
   isMockMode: boolean;
@@ -29,14 +30,13 @@ interface ArticleEditorProps {
 
 const categoryOptions: ArticleCategory[] = ['lore', 'history', 'cosmology'];
 
-export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticles, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
+export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticles, campaign, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(article);
-  const [isGenerating, setIsGenerating] = useState<keyof Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds' | 'category'> | null>(null);
-  const campaign = campaignService.getState().campaigns.find(c => c.id === campaignService.getState().activeCampaignId)!;
+  const { confirm } = useConfirmDialog();
 
-  const allNpcs = campaign.npcs;
-  const allLocations = campaign.locations;
-  const allFactions = campaign.factions;
+  const allNpcs = campaign?.npcs ?? [];
+  const allLocations = campaign?.locations ?? [];
+  const allFactions = campaign?.factions ?? [];
 
   useEffect(() => {
     setFormData(article);
@@ -70,28 +70,12 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
       onUpdate(article.id, { relatedEntityIds: newRelated });
   }
 
-  const handleDelete = () => {
-    if (window.confirm(`Are you sure you want to delete the article "${article.title}"? This cannot be undone.`)) {
-        onDelete(article.id);
+  const handleDelete = async () => {
+    const confirmed = await confirm('Delete Article', `Are you sure you want to delete the article "${article.title}"? This cannot be undone.`, { variant: 'danger' });
+    if (confirmed) {
+      onDelete(article.id);
     }
   }
-
-  const handleAiGenerate = async (field: 'content') => {
-    setIsGenerating(field);
-    const context = `Article Title: ${formData.title}\nCategory: ${formData.category}`;
-    const prompt = `Based on the following article info, generate compelling content:\n\n${context}`;
-
-    try {
-      const result = await generateEnhancedText(prompt, undefined, isMockMode);
-      const updatedData = { [field]: result };
-      setFormData(prev => ({ ...prev, ...updatedData }));
-      onUpdate(article.id, updatedData);
-    } catch (error) {
-      console.error("AI generation failed:", error);
-    } finally {
-      setIsGenerating(null);
-    }
-  };
 
   const handleFieldRegenerate = (field: 'content') => (newValue: string) => {
     setFormData(prev => ({ ...prev, [field]: newValue }));
@@ -164,8 +148,6 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
           onChange={handleChange}
           onBlur={handleBlur}
           rows={15}
-          onAiGenerate={() => handleAiGenerate('content')}
-          isGenerating={isGenerating === 'content'}
           regenerateButton={<RegenerateButton fieldName="content" currentValue={formData.content} entityType="Article" entityContext={articleEntityContext} onRegenerate={handleFieldRegenerate('content')} isMockMode={isMockMode} campaignContext={campaignContext} />}
         />
         {formData.content && onNavigate && (
@@ -204,15 +186,17 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
             )}
         </div>
 
-        <EntityHistoryManager 
-            subjectId={article.id}
-            subjectType="article"
-            campaign={campaign}
-            onUpdateEntity={(type, id, changes) => {
-                if (type === 'npc') campaignService.updateNpc(id, changes);
-                if (type === 'location') campaignService.updateLocation(id, changes);
-            }}
-        />
+        {campaign && (
+          <EntityHistoryManager
+              subjectId={article.id}
+              subjectType="article"
+              campaign={campaign}
+              onUpdateEntity={(type, id, changes) => {
+                  if (type === 'npc') campaignService.updateNpc(id, changes);
+                  if (type === 'location') campaignService.updateLocation(id, changes);
+              }}
+          />
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>

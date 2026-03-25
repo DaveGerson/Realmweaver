@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Icons } from '@/components/common/Icons';
-import { generateEnhancedText } from '@/services/geminiService';
+import { generateEnhancedText } from '@/services/aiService';
 
 interface RegenerateButtonProps {
   fieldName: string;
@@ -138,8 +138,8 @@ export const RegenerateButton: React.FC<RegenerateButtonProps> = ({
         className={[
           'inline-flex items-center gap-1 text-xs transition-colors ml-2 flex-shrink-0 rounded px-1 py-0.5',
           isActive
-            ? 'text-indigo-300 bg-indigo-900/40'
-            : 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-900/20',
+            ? 'text-amber-300 bg-amber-900/40'
+            : 'text-amber-400 hover:text-amber-300 hover:bg-amber-900/20',
         ].join(' ')}
       >
         {panelState === 'loading' ? (
@@ -152,17 +152,17 @@ export const RegenerateButton: React.FC<RegenerateButtonProps> = ({
       {/* Expanded panel — absolute positioned below the trigger, overlays content */}
       {isActive && (
         <div
-          className="absolute left-0 top-full mt-1 z-50 min-w-72 w-max max-w-sm bg-slate-900 border border-indigo-800/60 rounded-lg shadow-xl shadow-black/50 p-3 space-y-2"
+          className="absolute left-0 top-full mt-1 z-50 min-w-72 w-max max-w-sm bg-slate-900 border border-amber-800/60 rounded-lg shadow-xl shadow-black/50 p-3 space-y-2"
           style={{ minWidth: '18rem' }}
         >
           {/* Panel header */}
           <div className="flex items-center gap-2">
             {panelState === 'loading' ? (
-              <Icons.Loader className="w-3.5 h-3.5 text-indigo-400 animate-spin flex-shrink-0" />
+              <Icons.Loader className="w-3.5 h-3.5 text-amber-400 animate-spin flex-shrink-0" />
             ) : (
-              <Icons.Sparkles className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
+              <Icons.Sparkles className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
             )}
-            <span className="text-xs text-indigo-300 font-medium">
+            <span className="text-xs text-amber-300 font-medium">
               {panelState === 'loading'
                 ? `Regenerating ${fieldName}...`
                 : panelState === 'preview'
@@ -198,12 +198,12 @@ export const RegenerateButton: React.FC<RegenerateButtonProps> = ({
                 onChange={e => setTweakInstruction(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Optional tweak (e.g. Make more sinister)"
-                className="flex-grow bg-slate-800 border border-indigo-800/40 rounded px-2 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                className="flex-grow bg-slate-800 border border-amber-800/40 rounded px-2 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-colors"
               />
               <button
                 type="button"
                 onClick={handleRegenerate}
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-700 hover:bg-indigo-600 text-white text-xs rounded transition-colors whitespace-nowrap"
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-amber-700 hover:bg-amber-600 text-white text-xs rounded transition-colors whitespace-nowrap"
               >
                 <Icons.Sparkles className="w-3 h-3" />
                 Regenerate
@@ -221,7 +221,7 @@ export const RegenerateButton: React.FC<RegenerateButtonProps> = ({
                 <button
                   type="button"
                   onClick={handleAccept}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-700 hover:bg-indigo-600 text-white text-xs rounded transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-700 hover:bg-amber-600 text-white text-xs rounded transition-colors"
                 >
                   <Icons.CheckCircle className="w-3 h-3" />
                   Accept

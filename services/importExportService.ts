@@ -142,7 +142,9 @@ const downloadFile = (filename: string, content: string, mimeType: string) => {
 
 export const exportCampaignAsJson = (campaign: Campaign) => {
     const filename = `${campaign.title.replace(/ /g, '_')}.json`;
-    const content = JSON.stringify(campaign, null, 2);
+    // SECURITY: Strip sensitive fields before export to prevent credential leakage
+    const { gcpApiKey: _omit, ...exportable } = campaign;
+    const content = JSON.stringify(exportable, null, 2);
     downloadFile(filename, content, 'application/json');
 };
 
