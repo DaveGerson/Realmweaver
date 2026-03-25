@@ -4,26 +4,64 @@ import * as d3 from 'd3';
 import type { Campaign } from '../../types/index';
 import { EntityType, GraphNode, GraphLink } from '../../types/index';
 import { twMerge } from 'tailwind-merge';
+import { ENTITY_TYPE_CONFIG } from '@/utils/entityUtils';
+import { Icons } from '@/components/common/Icons';
 
 interface RelationshipGraphProps {
   campaign: Campaign;
   onNodeSelect: (type: string, id: string) => void;
 }
 
-const TYPE_COLORS: Record<string, string> = {
-  [EntityType.NPC]: '#22c55e',      // Green-500
-  [EntityType.LOCATION]: '#f59e0b', // Amber-500
-  [EntityType.FACTION]: '#6366f1',  // Indigo-500
-  [EntityType.ITEM]: '#a855f7',     // Purple-500
-  [EntityType.ADVENTURE]: '#3b82f6',// Blue-500
-  [EntityType.SCENE]: '#ef4444',    // Red-500
-  [EntityType.ARTICLE]: '#06b6d4',  // Cyan-500
+// Map Tailwind color tokens used in ENTITY_TYPE_CONFIG to D3-usable hex values.
+const TAILWIND_COLOR_TO_HEX: Record<string, string> = {
+  amber:   '#f59e0b',
+  emerald: '#10b981',
+  violet:  '#8b5cf6',
+  sky:     '#38bdf8',
+  orange:  '#f97316',
+  cyan:    '#06b6d4',
+  rose:    '#f43f5e',
+  teal:    '#14b8a6',
+  yellow:  '#eab308',
+  slate:   '#94a3b8',
+  blue:    '#3b82f6',
+  red:     '#ef4444',
+  purple:  '#a855f7',
+  green:   '#22c55e',
+  indigo:  '#6366f1',
+  pink:    '#ec4899',
 };
+
+// EntityType enum values (uppercase) mapped to ENTITY_TYPE_CONFIG keys (lowercase).
+const ENTITY_TYPE_TO_CONFIG_KEY: Record<string, string> = {
+  [EntityType.NPC]:       'npc',
+  [EntityType.LOCATION]:  'location',
+  [EntityType.FACTION]:   'faction',
+  [EntityType.ITEM]:      'item',
+  [EntityType.ADVENTURE]: 'adventure',
+  [EntityType.SCENE]:     'adventure', // Scene uses adventure color family
+  [EntityType.ARTICLE]:   'article',
+};
+
+// Derive TYPE_COLORS from ENTITY_TYPE_CONFIG so they stay in sync automatically.
+const TYPE_COLORS: Record<string, string> = Object.fromEntries(
+  Object.entries(ENTITY_TYPE_TO_CONFIG_KEY).map(([entityTypeKey, configKey]) => {
+    const config = ENTITY_TYPE_CONFIG[configKey];
+    const hex = config ? (TAILWIND_COLOR_TO_HEX[config.color] ?? '#94a3b8') : '#94a3b8';
+    return [entityTypeKey, hex];
+  })
+);
+
+// Override SCENE to be slightly distinct from ADVENTURE
+TYPE_COLORS[EntityType.SCENE] = '#ef4444'; // red-500
 
 export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, onNodeSelect }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
+  // Store node positions so they survive filter toggles
+  const nodePositionCacheRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+
   const [filters, setFilters] = useState<Partial<Record<EntityType, boolean>>>({
       [EntityType.NPC]: true,
       [EntityType.FACTION]: true,
@@ -73,7 +111,6 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
               }
               if (filters[EntityType.LOCATION] && l.connections) {
                   l.connections.forEach(c => {
-                      // Only link if target exists
                       if (campaign.locations.some(loc => loc.id === c.targetLocationId)) {
                           links.push({ source: l.id, target: c.targetLocationId, label: 'connected-to' });
                       }
@@ -114,13 +151,6 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
               }
               if (a.relatedEntityIds) {
                   a.relatedEntityIds.forEach(rid => {
-                      // Check if target exists in current node set to avoid d3 errors
-                      // Note: This check is slightly expensive O(N^2) in naive impl, but map-based check would be better.
-                      // D3 link force will fail if target doesn't exist.
-                      // However, since we filter nodes based on filters, we just need to know if the target entity type is enabled.
-                      // Simplification: We'll trust D3 to filter or we check existence.
-                      // Better to check if the ID matches any node we just added.
-                      // We will do a cleanup pass at the end.
                       links.push({ source: a.id, target: rid, label: 'references' });
                   });
               }
@@ -144,7 +174,7 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
 
   const initializeGraph = useCallback(() => {
     if (!svgRef.current || !containerRef.current) return;
-    
+
     const width = containerRef.current.clientWidth;
     const height = containerRef.current.clientHeight;
 
@@ -158,7 +188,7 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
       .style("background-color", "#020617"); // slate-950
 
     const g = svg.append("g");
-    
+
     const zoom = d3.zoom<SVGSVGElement, unknown>()
         .scaleExtent([0.1, 4])
         .on("zoom", (event) => {
@@ -166,18 +196,30 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
         });
 
     svg.call(zoom);
-    // Store zoom behavior for external reset
     zoomRef.current = zoom;
 
-    // Create mutable copies for D3 to mutate
-    const simulationNodes = nodes.map(n => ({...n}));
+    // Create mutable copies for D3 to mutate.
+    // Restore cached positions so filter toggles don't scatter the graph.
+    const posCache = nodePositionCacheRef.current;
+    const simulationNodes = nodes.map(n => {
+      const cached = posCache.get(n.id);
+      return cached
+        ? { ...n, x: cached.x, y: cached.y, fx: undefined, fy: undefined }
+        : { ...n };
+    });
     const simulationLinks = links.map(l => ({...l}));
+
+    // Use a lower alpha when any cached positions exist so the layout
+    // settles gently rather than exploding from random positions.
+    const hasCachedPositions = simulationNodes.some(n => n.x !== undefined);
+    const startAlpha = hasCachedPositions ? 0.3 : 1;
 
     const simulation = d3.forceSimulation<GraphNode>(simulationNodes)
       .force("link", d3.forceLink<GraphNode, GraphLink>(simulationLinks).id(d => d.id).distance(100))
       .force("charge", d3.forceManyBody().strength(-300))
       .force("center", d3.forceCenter(width / 2, height / 2))
-      .force("collide", d3.forceCollide(30));
+      .force("collide", d3.forceCollide(30))
+      .alpha(startAlpha);
 
     // Each link is a <g> containing a <line> and an optional <text> label
     const linkGroup = g.append("g")
@@ -185,7 +227,6 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
       .data(simulationLinks)
       .join("g");
 
-    // Title element on the group acts as a native SVG tooltip on hover
     linkGroup.append("title")
       .text((d: GraphLink) => d.label ?? '');
 
@@ -194,7 +235,7 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
       .attr("stroke-opacity", 0.6)
       .attr("stroke-width", 1.5);
 
-    // Edge label text — subtle, slate-500 equivalent, small font
+    // Edge label text — subtle, small font
     const linkLabel = linkGroup.append("text")
       .text((d: GraphLink) => d.label ?? '')
       .attr("text-anchor", "middle")
@@ -204,13 +245,12 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
       .attr("font-family", "sans-serif")
       .style("pointer-events", "none")
       .style("user-select", "none")
-      // Subtle background effect via paint-order so the stroke doesn't interfere with fill
       .attr("paint-order", "stroke")
-      .attr("stroke", "#020617") // same as svg background (slate-950)
+      .attr("stroke", "#020617") // slate-950 background
       .attr("stroke-width", "3px")
       .attr("stroke-linejoin", "round");
 
-    const node = g.append("g")
+    const nodeGroup = g.append("g")
       .selectAll<SVGGElement, GraphNode>("g")
       .data(simulationNodes)
       .join("g")
@@ -219,32 +259,25 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
         .on("drag", dragged)
         .on("end", dragended));
 
-    // Node circles
-    node.append("circle")
+    // Invisible large hit area for touch-friendly interaction (44px diameter = r:22).
+    // This circle captures click/touch events; the visible circle below provides the visual.
+    nodeGroup.append("circle")
+      .attr("r", 22)
+      .attr("fill", "transparent")
+      .style("cursor", "pointer")
+      .on("click", handleNodeClick);
+
+    // Visible node circle (r:8 = 16px visual diameter)
+    nodeGroup.append("circle")
       .attr("r", 8)
       .attr("fill", (d: GraphNode) => TYPE_COLORS[d.group] || '#94a3b8')
       .attr("stroke", "#fff")
       .attr("stroke-width", 1.5)
       .style("cursor", "pointer")
-      .on("click", (event: MouseEvent, d: GraphNode) => {
-        event.stopPropagation();
-        const typeMap: Record<string, string> = {
-            [EntityType.NPC]: 'npc',
-            [EntityType.LOCATION]: 'location',
-            [EntityType.FACTION]: 'faction',
-            [EntityType.ADVENTURE]: 'adventure',
-            [EntityType.SCENE]: 'scene', // Special handling usually needed for sidebar
-            [EntityType.ARTICLE]: 'article',
-            [EntityType.ITEM]: 'item'
-        };
-        const mappedType = typeMap[d.group];
-        if (mappedType) {
-            onNodeSelect(mappedType, d.id);
-        }
-      });
+      .style("pointer-events", "none"); // Hit area handled by the transparent circle above
 
     // Node labels
-    node.append("text")
+    nodeGroup.append("text")
       .text((d: GraphNode) => d.name)
       .attr("x", 12)
       .attr("y", 4)
@@ -252,7 +285,24 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
       .style("font-size", "10px")
       .style("font-family", "sans-serif")
       .style("pointer-events", "none")
-      .style("text-shadow", "2px 2px 4px #000"); // Shadow for readability
+      .style("text-shadow", "2px 2px 4px #000");
+
+    function handleNodeClick(event: MouseEvent, d: GraphNode) {
+      event.stopPropagation();
+      const typeMap: Record<string, string> = {
+          [EntityType.NPC]: 'npc',
+          [EntityType.LOCATION]: 'location',
+          [EntityType.FACTION]: 'faction',
+          [EntityType.ADVENTURE]: 'adventure',
+          [EntityType.SCENE]: 'scene',
+          [EntityType.ARTICLE]: 'article',
+          [EntityType.ITEM]: 'item'
+      };
+      const mappedType = typeMap[d.group];
+      if (mappedType) {
+          onNodeSelect(mappedType, d.id);
+      }
+    }
 
     simulation.on("tick", () => {
       link
@@ -261,13 +311,19 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
         .attr("x2", (d: GraphLink) => ((d.target as GraphNode).x ?? 0))
         .attr("y2", (d: GraphLink) => ((d.target as GraphNode).y ?? 0));
 
-      // Position label at the geometric midpoint of each edge
       linkLabel
         .attr("x", (d: GraphLink) => (((d.source as GraphNode).x ?? 0) + ((d.target as GraphNode).x ?? 0)) / 2)
         .attr("y", (d: GraphLink) => (((d.source as GraphNode).y ?? 0) + ((d.target as GraphNode).y ?? 0)) / 2);
 
-      node
+      nodeGroup
         .attr("transform", (d: GraphNode) => `translate(${d.x},${d.y})`);
+
+      // Continuously update position cache so the next render can restore positions
+      simulationNodes.forEach(n => {
+        if (n.x !== undefined && n.y !== undefined) {
+          posCache.set(n.id, { x: n.x, y: n.y });
+        }
+      });
     });
 
     function dragstarted(event: any, d: GraphNode) {
@@ -286,7 +342,7 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
       d.fx = null;
       d.fy = null;
     }
-    
+
     return () => simulation.stop();
 
   }, [nodes, links, onNodeSelect]);
@@ -300,16 +356,32 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
 
   const toggleFilter = (type: EntityType) => {
       setFilters(prev => ({...prev, [type]: !prev[type]}));
-  }
+  };
 
   const handleResetView = () => {
       if (svgRef.current && zoomRef.current) {
-          d3.select(svgRef.current).call(zoomRef.current.transform, d3.zoomIdentity);
+          d3.select(svgRef.current)
+            .transition()
+            .duration(300)
+            .call(zoomRef.current.transform, d3.zoomIdentity);
       }
   };
 
+  // Empty state: no nodes to show
+  if (nodes.length === 0) {
+    return (
+      <div className="w-full h-full rounded-lg overflow-hidden bg-slate-950 border border-slate-700 shadow-inner flex flex-col items-center justify-center gap-3 px-8">
+        <Icons.WorldGraph className="w-12 h-12 text-slate-600" />
+        <p className="text-slate-400 text-sm text-center max-w-xs">
+          No entity relationships to display. Create NPCs, locations, and factions to see connections.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-full rounded-lg overflow-hidden bg-slate-950 border border-slate-700 shadow-inner relative" ref={containerRef}>
+      {/* Filter panel — top-left */}
       <div className="absolute top-4 left-4 z-10 bg-slate-900/80 backdrop-blur p-2 rounded-lg border border-slate-800 flex flex-col gap-2 shadow-xl">
             <h3 className="text-xs font-bold text-slate-400 uppercase px-1">Graph Filters</h3>
             <FilterToggle label="Factions" color={TYPE_COLORS[EntityType.FACTION]} active={filters[EntityType.FACTION]} onClick={() => toggleFilter(EntityType.FACTION)} />
@@ -325,9 +397,7 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
                     className="flex items-center gap-2 px-2 py-1 rounded text-xs font-medium transition-all w-full bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 hover:text-amber-300"
                     title="Reset pan and zoom to initial view"
                 >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
+                    <Icons.RefreshCw className="w-3 h-3" />
                     Reset View
                 </button>
             </div>
@@ -337,8 +407,8 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
   );
 };
 
-const FilterToggle = ({ label, color, active, onClick }: { label: string, color: string, active: boolean, onClick: () => void }) => (
-    <button 
+const FilterToggle = ({ label, color, active, onClick }: { label: string, color: string, active: boolean | undefined, onClick: () => void }) => (
+    <button
         onClick={onClick}
         className={twMerge(
             "flex items-center gap-2 px-2 py-1 rounded text-xs font-medium transition-all w-full",
