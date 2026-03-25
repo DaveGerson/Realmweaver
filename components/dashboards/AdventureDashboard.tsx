@@ -1,6 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
+import { useEntitySearch } from '@/hooks/useEntitySearch';
 import type { Adventure, AdventureForBatchAdd, Campaign } from '../../types/index';
 import { AdventureGenerator } from '../generators/AdventureGenerator';
 import { EntityChatGenerator } from '../generators/EntityChatGenerator';
@@ -8,6 +9,24 @@ import { AdventureEditor } from '../editors/AdventureEditor';
 import { Icons } from '../common/Icons';
 import { EntityCreationPanel } from '../common/EntityCreationPanel';
 import { createDefaultAdventure } from '../../utils/entityUtils';
+
+/** Returns a Tailwind color class for a completeness dot given a percentage 0-100. */
+function completenessColor(pct: number): string {
+  if (pct >= 67) return 'bg-green-500';
+  if (pct >= 33) return 'bg-amber-500';
+  return 'bg-red-500';
+}
+
+/** Key fields for Adventure completeness: title, hook, theme, level (>0). */
+function adventureCompleteness(adv: { title?: string; hook?: string; theme?: string; level?: number; scenes?: any[] }): number {
+  const checks = [
+    !!(adv.title?.trim()),
+    !!(adv.hook?.trim()),
+    !!(adv.theme?.trim()),
+    (adv.scenes?.length ?? 0) > 0,
+  ];
+  return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+}
 
 const ADVENTURE_PROMPT_CHIPS = [
   'A dungeon crawl',
@@ -26,17 +45,24 @@ interface AdventureDashboardProps {
 }
 
 export const AdventureDashboard: React.FC<AdventureDashboardProps> = ({ adventures, onAdventureCreated, onSelectAdventure, isMockMode, isOfficialSetting, campaignContext }) => {
-  const [searchTerm, setSearchTerm] = useState('');
   const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: 3 });
+
+  // Normalize: adventure uses `title`, hook needs `name`
+  const normalizedAdventures = useMemo(
+    () => adventures.map(a => ({ ...a, name: a.title })),
+    [adventures],
+  );
+
+  const { filteredEntities: filteredNormalized, searchTerm, setSearchTerm } = useEntitySearch(
+    normalizedAdventures,
+    ['name', 'hook', 'theme'],
+  );
+
+  // Re-associate back to originals by id for type safety
   const filteredAdventures = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
-    if (!q) return adventures;
-    return adventures.filter(a =>
-      a.title.toLowerCase().includes(q) ||
-      a.hook?.toLowerCase().includes(q) ||
-      a.theme?.toLowerCase().includes(q)
-    );
-  }, [adventures, searchTerm]);
+    const ids = new Set(filteredNormalized.map(a => a.id));
+    return adventures.filter(a => ids.has(a.id));
+  }, [filteredNormalized, adventures]);
 
   const handleAdventureCreated = (data: any) => {
     const { id, ...advData } = data;
@@ -114,14 +140,16 @@ export const AdventureDashboard: React.FC<AdventureDashboardProps> = ({ adventur
             const completedScenes = adv.scenes?.filter(s => s.status === 'completed').length ?? 0;
             const completionPct = totalScenes > 0 ? Math.round((completedScenes / totalScenes) * 100) : 0;
             const hookSnippet = adv.hook ? adv.hook.slice(0, 80) + (adv.hook.length > 80 ? '…' : '') : '';
+            const pct = adventureCompleteness(adv);
             return (
               <button
                 key={adv.id}
                 onClick={() => onSelectAdventure(adv.id)}
-                className="card-parchment p-4 rounded-lg border border-slate-800 border-l-4 border-l-orange-500 text-left hover:border-slate-700 hover:border-l-orange-400 transition-all space-y-2"
+                className="card-parchment relative p-4 rounded-lg border border-slate-800 border-l-4 border-l-orange-500 text-left hover:border-slate-700 hover:border-l-orange-400 transition-all space-y-2"
                 {...getRovingProps(index)}
               >
-                <h3 className="font-semibold text-orange-400 leading-tight">{adv.title}</h3>
+                <span className={`absolute top-2 right-2 w-1.5 h-1.5 rounded-full ${completenessColor(pct)}`} title={`${pct}% complete`} />
+                <h3 className="font-semibold text-orange-400 leading-tight pr-4">{adv.title}</h3>
                 {hookSnippet && (
                   <p className="text-xs text-slate-400 leading-relaxed">{hookSnippet}</p>
                 )}

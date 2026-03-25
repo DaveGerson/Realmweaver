@@ -1,6 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
+import { useEntitySearch } from '@/hooks/useEntitySearch';
 import type { Article, NPC, Location, Faction } from '../../types/index';
 import { ArticleGenerator } from '../generators/ArticleGenerator';
 import { EntityChatGenerator } from '../generators/EntityChatGenerator';
@@ -8,6 +9,19 @@ import { ArticleEditor } from '../editors/ArticleEditor';
 import { Icons } from '../common/Icons';
 import { EntityCreationPanel } from '../common/EntityCreationPanel';
 import { createDefaultArticle } from '../../utils/entityUtils';
+
+/** Returns a Tailwind color class for a completeness dot given a percentage 0-100. */
+function completenessColor(pct: number): string {
+  if (pct >= 67) return 'bg-green-500';
+  if (pct >= 33) return 'bg-amber-500';
+  return 'bg-red-500';
+}
+
+/** Key fields for Article completeness: title, content, category. */
+function articleCompleteness(article: { title?: string; content?: string; category?: string }): number {
+  const checks = [!!(article.title?.trim()), !!(article.content?.trim()), !!(article.category?.trim())];
+  return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+}
 
 const ARTICLE_PROMPT_CHIPS = [
   'A historical event',
@@ -29,17 +43,24 @@ interface ArticleDashboardProps {
 }
 
 export const ArticleDashboard: React.FC<ArticleDashboardProps> = ({ articles, npcs = [], locations = [], factions = [], onArticleCreated, onSelectArticle, isMockMode, isOfficialSetting, campaignContext }) => {
-  const [searchTerm, setSearchTerm] = useState('');
   const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: 3 });
+
+  // Normalize: article uses `title`, hook needs `name`
+  const normalizedArticles = useMemo(
+    () => articles.map(a => ({ ...a, name: a.title })),
+    [articles],
+  );
+
+  const { filteredEntities: filteredNormalized, searchTerm, setSearchTerm } = useEntitySearch(
+    normalizedArticles,
+    ['name', 'content', 'category'],
+  );
+
+  // Re-associate back to originals by id for type safety
   const filteredArticles = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
-    if (!q) return articles;
-    return articles.filter(a =>
-      a.title.toLowerCase().includes(q) ||
-      a.content?.toLowerCase().includes(q) ||
-      a.category?.toLowerCase().includes(q)
-    );
-  }, [articles, searchTerm]);
+    const ids = new Set(filteredNormalized.map(a => a.id));
+    return articles.filter(a => ids.has(a.id));
+  }, [filteredNormalized, articles]);
 
   const handleArticleCreated = (data: any) => {
     const { id, ...articleData } = data;
@@ -115,14 +136,16 @@ export const ArticleDashboard: React.FC<ArticleDashboardProps> = ({ articles, np
               cosmology: 'bg-amber-900/40 text-amber-300 border-amber-500/30',
             };
             const categoryStyle = categoryColors[article.category] ?? 'bg-slate-700/60 text-slate-300 border-slate-600/30';
+            const pct = articleCompleteness(article);
             return (
               <button
                 key={article.id}
                 onClick={() => onSelectArticle(article.id)}
-                className="card-parchment p-4 rounded-lg border border-slate-800 border-l-4 border-l-cyan-500 text-left hover:border-slate-700 hover:border-l-cyan-400 transition-all space-y-2"
+                className="card-parchment relative p-4 rounded-lg border border-slate-800 border-l-4 border-l-cyan-500 text-left hover:border-slate-700 hover:border-l-cyan-400 transition-all space-y-2"
                 {...getRovingProps(index)}
               >
-                <div className="flex items-start justify-between gap-2">
+                <span className={`absolute top-2 right-2 w-1.5 h-1.5 rounded-full ${completenessColor(pct)}`} title={`${pct}% complete`} />
+                <div className="flex items-start justify-between gap-2 pr-4">
                   <h3 className="font-semibold text-cyan-400 leading-tight">{article.title}</h3>
                   <span className={`flex-shrink-0 text-[10px] border rounded-full px-2 py-0.5 capitalize ${categoryStyle}`}>
                     {article.category}

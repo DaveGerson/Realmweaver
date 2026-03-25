@@ -1,11 +1,25 @@
 
 import React, { useState, useMemo } from 'react';
 import type { Campaign, SessionLog } from '../../types/index';
+import { useEntitySearch } from '@/hooks/useEntitySearch';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { createDefaultSession } from '../../utils/entityUtils';
 import { SessionPrepWizard } from '../dialogs/SessionPrepWizard';
 import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
+
+/** Returns a Tailwind color class for a completeness dot given a percentage 0-100. */
+function completenessColor(pct: number): string {
+  if (pct >= 67) return 'bg-green-500';
+  if (pct >= 33) return 'bg-amber-500';
+  return 'bg-red-500';
+}
+
+/** Key fields for SessionLog completeness: title, prepNotes, recap, beats (>0). */
+function sessionCompleteness(s: { title?: string; prepNotes?: string; recap?: string; beats?: any[] }): number {
+  const checks = [!!(s.title?.trim()), !!(s.prepNotes?.trim()), !!(s.recap?.trim()), (s.beats?.length ?? 0) > 0];
+  return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+}
 
 interface SessionLogDashboardProps {
   campaign: Campaign;
@@ -25,19 +39,24 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
   isMockMode,
 }) => {
   const [isPrepWizardOpen, setIsPrepWizardOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
   const { getRovingProps: getPlannedRovingProps } = useRovingTabIndex({ direction: 'vertical', columns: 1 });
   const { getRovingProps: getPastRovingProps } = useRovingTabIndex({ direction: 'vertical', columns: 1 });
 
+  // SessionLog uses `title` not `name`. Normalize for useEntitySearch.
+  const normalizedLogs = useMemo(
+    () => sessionLogs.map(s => ({ ...s, name: s.title })),
+    [sessionLogs],
+  );
+
+  const { filteredEntities: filteredNormalized, searchTerm, setSearchTerm } = useEntitySearch(
+    normalizedLogs,
+    ['name', 'prepNotes', 'recap'],
+  );
+
   const filteredSessionLogs = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
-    if (!q) return sessionLogs;
-    return sessionLogs.filter(s =>
-      s.title.toLowerCase().includes(q) ||
-      s.prepNotes?.toLowerCase().includes(q) ||
-      s.recap?.toLowerCase().includes(q)
-    );
-  }, [sessionLogs, searchTerm]);
+    const ids = new Set(filteredNormalized.map(s => s.id));
+    return sessionLogs.filter(s => ids.has(s.id));
+  }, [filteredNormalized, sessionLogs]);
 
   const activeSession = filteredSessionLogs.find(s => s.status === 'active');
   const plannedSessions = filteredSessionLogs.filter(s => s.status === 'planned').sort((a, b) => new Date(a.sessionDate).getTime() - new Date(b.sessionDate).getTime());
@@ -123,14 +142,16 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
                             ? campaign.adventures?.find(a => a.id === session.adventureId)
                             : undefined;
                         const beatCount = session.beats?.length ?? 0;
+                        const pct = sessionCompleteness(session);
                         return (
                             <button
                                 key={session.id}
                                 onClick={() => onSelectSessionLog(session.id)}
-                                className="card-parchment w-full text-left border border-slate-800 border-l-4 border-l-rose-500 hover:border-slate-700 hover:border-l-rose-400 p-4 rounded-lg transition-all group space-y-2"
+                                className="card-parchment relative w-full text-left border border-slate-800 border-l-4 border-l-rose-500 hover:border-slate-700 hover:border-l-rose-400 p-4 rounded-lg transition-all group space-y-2"
                                 {...getPlannedRovingProps(index)}
                             >
-                                <div className="flex justify-between items-start gap-2">
+                                <span className={`absolute top-2 right-2 w-1.5 h-1.5 rounded-full ${completenessColor(pct)}`} title={`${pct}% complete`} />
+                                <div className="flex justify-between items-start gap-2 pr-4">
                                     <span className="font-semibold text-slate-200 group-hover:text-amber-300 transition-colors leading-tight">{session.title}</span>
                                     <span className="flex-shrink-0 text-xs text-slate-500 bg-slate-900 px-2 py-1 rounded border border-slate-800">{new Date(session.sessionDate).toLocaleDateString()}</span>
                                 </div>
@@ -179,14 +200,16 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
                         const linkedAdventure = session.adventureId
                             ? campaign.adventures?.find(a => a.id === session.adventureId)
                             : undefined;
+                        const pct = sessionCompleteness(session);
                         return (
                             <button
                                 key={session.id}
                                 onClick={() => onSelectSessionLog(session.id)}
-                                className="w-full text-left bg-slate-900/30 border border-slate-800 border-l-4 border-l-rose-500/50 hover:border-slate-600 hover:border-l-rose-400 hover:bg-slate-800 p-4 rounded-lg transition-all opacity-80 hover:opacity-100 space-y-2"
+                                className="relative w-full text-left bg-slate-900/30 border border-slate-800 border-l-4 border-l-rose-500/50 hover:border-slate-600 hover:border-l-rose-400 hover:bg-slate-800 p-4 rounded-lg transition-all opacity-80 hover:opacity-100 space-y-2"
                                 {...getPastRovingProps(index)}
                             >
-                                <div className="flex justify-between items-start gap-2">
+                                <span className={`absolute top-2 right-2 w-1.5 h-1.5 rounded-full ${completenessColor(pct)}`} title={`${pct}% complete`} />
+                                <div className="flex justify-between items-start gap-2 pr-4">
                                     <span className="font-semibold text-slate-300 leading-tight">{session.title}</span>
                                     <span className="flex-shrink-0 text-xs text-slate-600">{new Date(session.sessionDate).toLocaleDateString()}</span>
                                 </div>

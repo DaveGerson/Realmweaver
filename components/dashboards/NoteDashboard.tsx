@@ -1,6 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import type { Note } from '../../types/index';
+import { useEntitySearch } from '@/hooks/useEntitySearch';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 
@@ -8,10 +9,12 @@ interface NoteDashboardProps {
   notes: Note[];
   onNoteCreated: (data: Omit<Note, 'id' | 'createdAt' | 'lastModified'>) => void;
   onSelectNote: (id: string) => void;
+  isMockMode?: boolean;
+  campaignContext?: string;
 }
 
 const NoteCreator: React.FC<{ onNoteCreated: (data: Omit<Note, 'id' | 'createdAt' | 'lastModified'>) => void; }> = ({ onNoteCreated }) => {
-    const [title, setTitle] = useState('');
+    const [title, setTitle] = React.useState('');
 
     const handleCreate = () => {
         if (!title.trim()) return;
@@ -22,7 +25,7 @@ const NoteCreator: React.FC<{ onNoteCreated: (data: Omit<Note, 'id' | 'createdAt
         });
         setTitle('');
     };
-    
+
     return (
         <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 space-y-4 h-full flex flex-col">
             <div className="flex items-center gap-3">
@@ -42,21 +45,42 @@ const NoteCreator: React.FC<{ onNoteCreated: (data: Omit<Note, 'id' | 'createdAt
                 Create Note
             </Button>
         </div>
-    )
+    );
+};
+
+/** Returns a color class for the completeness dot based on percentage 0-100. */
+function completenessColor(pct: number): string {
+  if (pct >= 67) return 'bg-green-500';
+  if (pct >= 33) return 'bg-amber-500';
+  return 'bg-red-500';
+}
+
+/** Completeness for a Note: title + content are the two key fields. */
+function noteCompleteness(note: Note): number {
+  const fields = [note.title, note.content];
+  const filled = fields.filter(f => f && f.trim().length > 0).length;
+  return Math.round((filled / fields.length) * 100);
 }
 
 export const NoteDashboard: React.FC<NoteDashboardProps> = ({ notes, onNoteCreated, onSelectNote }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+  // Sort by most-recently modified, then normalize title->name for the hook
+  const normalizedNotes = useMemo(
+    () => [...notes]
+      .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime())
+      .map(n => ({ ...n, name: n.title })),
+    [notes],
+  );
+
+  const { filteredEntities: filteredNormalized, searchTerm, setSearchTerm } = useEntitySearch(
+    normalizedNotes,
+    ['name', 'content'],
+  );
+
+  // Re-associate back to originals to preserve type safety
   const filteredNotes = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
-    const sorted = [...notes].sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
-    if (!q) return sorted;
-    return sorted.filter(n =>
-      n.title.toLowerCase().includes(q) ||
-      n.content?.toLowerCase().includes(q) ||
-      n.tags.some(t => t.toLowerCase().includes(q))
-    );
-  }, [notes, searchTerm]);
+    const ids = new Set(filteredNormalized.map(n => n.id));
+    return normalizedNotes.filter(n => ids.has(n.id));
+  }, [filteredNormalized, normalizedNotes]);
 
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
@@ -79,27 +103,35 @@ export const NoteDashboard: React.FC<NoteDashboardProps> = ({ notes, onNoteCreat
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {filteredNotes.map(note => (
-              <button 
-                key={note.id} 
-                onClick={() => onSelectNote(note.id)}
-                className="bg-yellow-100/5 border-l-4 border-yellow-500/50 p-4 rounded-r-lg hover:bg-yellow-100/10 transition-all text-left flex flex-col h-40 relative group"
-              >
-                <div className="flex justify-between items-start w-full mb-2">
-                     <h3 className="font-semibold text-slate-200 truncate pr-2">{note.title}</h3>
-                     <Icons.Notes className="w-4 h-4 text-yellow-500/50 flex-shrink-0" />
-                </div>
-                <p className="text-sm text-slate-400 line-clamp-3 flex-grow">{note.content || <span className="italic opacity-50">Empty note...</span>}</p>
-                <div className="mt-2 flex gap-2 overflow-hidden">
-                    {note.tags.map(tag => (
-                        <span key={tag} className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded-full uppercase tracking-wider">{tag}</span>
-                    ))}
-                </div>
-                 <div className="absolute bottom-2 right-2 text-[10px] text-slate-600">
+            {filteredNotes.map(note => {
+              const pct = noteCompleteness(note);
+              return (
+                <button
+                  key={note.id}
+                  onClick={() => onSelectNote(note.id)}
+                  className="bg-slate-800/60 border-l-4 border-slate-600 p-4 rounded-r-lg hover:bg-slate-800 transition-all text-left flex flex-col h-40 relative group"
+                >
+                  {/* Completeness dot */}
+                  <span
+                    className={`absolute top-2 right-2 w-1.5 h-1.5 rounded-full ${completenessColor(pct)}`}
+                    title={`${pct}% complete`}
+                  />
+                  <div className="flex justify-between items-start w-full mb-2 pr-4">
+                    <h3 className="font-semibold text-slate-200 truncate pr-2">{note.title}</h3>
+                    <Icons.Notes className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                  </div>
+                  <p className="text-sm text-slate-400 line-clamp-3 flex-grow">{note.content || <span className="italic opacity-50">Empty note...</span>}</p>
+                  <div className="mt-2 flex gap-2 overflow-hidden">
+                      {note.tags.map(tag => (
+                          <span key={tag} className="text-[10px] bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded-full uppercase tracking-wider">{tag}</span>
+                      ))}
+                  </div>
+                  <div className="absolute bottom-2 right-2 text-[10px] text-slate-600">
                     {new Date(note.lastModified).toLocaleDateString()}
-                </div>
-              </button>
-            ))}
+                  </div>
+                </button>
+              );
+            })}
             {filteredNotes.length === 0 && notes.length > 0 && (
                 <div className="sm:col-span-2 text-center py-8">
                     <Icons.Search className="w-8 h-8 mx-auto mb-2 text-slate-700" />

@@ -1,9 +1,29 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import type { PlayerCharacter } from '../../types/index';
+import { useEntitySearch } from '@/hooks/useEntitySearch';
 import { PlayerCharacterImporter } from '../generators/PlayerCharacterImporter';
 import { Icons } from '../common/Icons';
 import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
+
+/** Returns a Tailwind color class for a completeness dot given a percentage 0-100. */
+function completenessColor(pct: number): string {
+  if (pct >= 67) return 'bg-green-500';
+  if (pct >= 33) return 'bg-amber-500';
+  return 'bg-red-500';
+}
+
+/** Key fields for PC completeness: name, species, charClass, background, playerName. */
+function pcCompleteness(pc: PlayerCharacter): number {
+  const checks = [
+    !!(pc.characterSocial?.characterName?.trim()),
+    !!(pc.characterSocial?.species?.trim()),
+    !!(pc.characterStatistics?.classes?.charClass?.trim()),
+    !!(pc.characterSocial?.background?.trim()),
+    !!(pc.playerName?.trim()),
+  ];
+  return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+}
 
 interface PlayerCharacterDashboardProps {
   playerCharacters: PlayerCharacter[];
@@ -14,18 +34,31 @@ interface PlayerCharacterDashboardProps {
 }
 
 export const PlayerCharacterDashboard: React.FC<PlayerCharacterDashboardProps> = ({ playerCharacters, onImport, onPlayerCharacterCreated, onSelectPlayerCharacter, isMockMode }) => {
-  const [searchTerm, setSearchTerm] = useState('');
   const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: 3 });
+
+  // Normalize PlayerCharacter nested fields into flat search strings
+  const normalizedPCs = useMemo(
+    () => (playerCharacters || []).map(pc => ({
+      ...pc,
+      // name is required by the hook
+      name: pc.characterSocial?.characterName ?? '',
+      // expose nested fields as flat strings for search
+      _species: pc.characterSocial?.species ?? '',
+      _charClass: pc.characterStatistics?.classes?.charClass ?? '',
+      _playerName: pc.playerName ?? '',
+    })),
+    [playerCharacters],
+  );
+
+  const { filteredEntities: filteredNormalized, searchTerm, setSearchTerm } = useEntitySearch(
+    normalizedPCs,
+    ['name', '_species', '_charClass', '_playerName'],
+  );
+
   const filteredPCs = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
-    if (!q) return playerCharacters || [];
-    return (playerCharacters || []).filter(pc =>
-      pc.characterSocial.characterName?.toLowerCase().includes(q) ||
-      pc.characterSocial.species?.toLowerCase().includes(q) ||
-      pc.characterStatistics.classes.charClass?.toLowerCase().includes(q) ||
-      pc.playerName?.toLowerCase().includes(q)
-    );
-  }, [playerCharacters, searchTerm]);
+    const ids = new Set(filteredNormalized.map(pc => pc.id));
+    return (playerCharacters || []).filter(pc => ids.has(pc.id));
+  }, [filteredNormalized, playerCharacters]);
 
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
@@ -55,14 +88,16 @@ export const PlayerCharacterDashboard: React.FC<PlayerCharacterDashboardProps> =
               const level = pc.characterStatistics.classes.level;
               const species = pc.characterSocial.species;
               const background = pc.characterSocial.background;
+              const pct = pcCompleteness(pc);
               return (
                 <button
                   key={pc.id}
                   onClick={() => onSelectPlayerCharacter(pc.id)}
-                  className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 border-l-4 border-l-amber-500 text-left hover:bg-slate-800 hover:border-slate-700 hover:border-l-amber-400 transition-all space-y-2"
+                  className="relative bg-slate-900/50 p-4 rounded-lg border border-slate-800 border-l-4 border-l-amber-500 text-left hover:bg-slate-800 hover:border-slate-700 hover:border-l-amber-400 transition-all space-y-2"
                   {...getRovingProps(index)}
                 >
-                  <h3 className="font-semibold text-amber-400 leading-tight">{pc.characterSocial.characterName}</h3>
+                  <span className={`absolute top-2 right-2 w-1.5 h-1.5 rounded-full ${completenessColor(pct)}`} title={`${pct}% complete`} />
+                  <h3 className="font-semibold text-amber-400 leading-tight pr-4">{pc.characterSocial.characterName}</h3>
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="text-[10px] bg-amber-900/40 text-amber-300 border border-amber-500/30 rounded-full px-2 py-0.5">
                       {species}

@@ -229,9 +229,13 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
             <nav className="flex-1 p-2 space-y-1 overflow-y-auto custom-scrollbar">
 
                 {/* --- Active Session Runner Banner --- */}
-                {campaign.activeSessionId && (() => {
-                    const activeSession = campaign.sessionLogs?.find(s => s.id === campaign.activeSessionId);
-                    return activeSession ? (
+                {(() => {
+                    // Check activeSessionId first, fall back to status === 'active'
+                    const activeSession = campaign.activeSessionId
+                        ? campaign.sessionLogs?.find(s => s.id === campaign.activeSessionId)
+                        : campaign.sessionLogs?.find(s => s.status === 'active');
+                    if (!activeSession) return null;
+                    return (
                         <div className="mb-4">
                             <button
                                 onClick={() => onSelectView('session-runner' as EditorView)}
@@ -245,11 +249,11 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                                 <Icons.Play className="w-4 h-4 text-red-400 animate-pulse" />
                                 <div className="text-left min-w-0">
                                     <div className="font-semibold truncate">{activeSession.title}</div>
-                                    <div className="text-xs text-amber-400/70">Session Live</div>
+                                    <div className="text-xs text-amber-400/70">Session Live — Return to Runner</div>
                                 </div>
                             </button>
                         </div>
-                    ) : null;
+                    );
                 })()}
 
                 {/* --- Search/Filter --- */}
@@ -327,7 +331,11 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                             <Icons.PlayerCharacters className="w-4 h-4" />
                             <span>Party & Characters</span>
                             </button>
-                            <button onClick={() => onSelectView('player-characters')} className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100">
+                            <button
+                                onClick={() => { onSelectView('player-characters'); }}
+                                title="Import a character sheet"
+                                className="text-slate-400 hover:text-amber-400 transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100"
+                            >
                                 <Icons.Plus className="w-4 h-4" />
                             </button>
                         </div>
@@ -373,7 +381,11 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                             <Icons.Plot className="w-4 h-4" />
                             <span>Plots & Arcs</span>
                             </button>
-                            <button onClick={() => onSelectView('plots')} className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100">
+                            <button
+                                onClick={() => { onSelectView('plots'); }}
+                                title="Create a new plot arc"
+                                className="text-slate-400 hover:text-amber-400 transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100"
+                            >
                                 <Icons.Plus className="w-4 h-4" />
                             </button>
                         </div>

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Adventure, Campaign } from '../../types/index';
 import { Icons } from '../common/Icons';
+import { Button } from '../common/Button';
 import { PrepDocumentView } from './PrepDocumentView';
 import { RegenerateButton } from '../common/RegenerateButton';
 import { generateScene } from '../../services/aiService';
@@ -13,11 +14,13 @@ import type { QuickCardEntityType } from '../common/EntityQuickCard';
 import { BacklinksPanel } from '../common/BacklinksPanel';
 import { TabLayout } from '../common/TabLayout';
 import type { TabDefinition } from '../common/TabLayout';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 
 interface AdventureEditorProps {
   adventure: Adventure;
   campaign: Campaign;
   onUpdate: (id: string, updatedData: Partial<Adventure>) => void;
+  onDelete?: (id: string) => void;
   isMockMode?: boolean;
   campaignContext?: string;
   onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
@@ -29,10 +32,11 @@ const ADVENTURE_TABS: TabDefinition[] = [
   { id: 'prepDoc',   label: 'Prep Document', icon: Icons.FileCode },
 ];
 
-export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, campaign, onUpdate, isMockMode = false, campaignContext, onNavigate }) => {
+export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, campaign, onUpdate, onDelete, isMockMode = false, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(adventure);
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [isGeneratingScene, setIsGeneratingScene] = useState(false);
+  const { confirm } = useConfirmDialog();
 
   // Reset to first tab when the adventure changes
   useEffect(() => {
@@ -55,6 +59,16 @@ export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, cam
         const isNumber = e.target.type === 'number';
         onUpdate(adventure.id, { [name]: isNumber ? parseInt(value) || 0 : value });
     }
+  };
+
+  const handleDelete = async () => {
+    if (!onDelete) return;
+    const confirmed = await confirm(
+      'Delete Adventure',
+      `Are you sure you want to delete "${adventure.title}"? All its scenes will also be removed. This cannot be undone.`,
+      { variant: 'danger' },
+    );
+    if (confirmed) onDelete(adventure.id);
   };
 
   const handleFieldRegenerate = (field: 'hook') => (newValue: string) => {
@@ -89,11 +103,17 @@ export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, cam
 
   return (
     <div className="p-6 md:p-8 h-full flex flex-col overflow-y-auto custom-scrollbar animate-fade-in">
-      <header className="space-y-4 mb-6">
-        <div className="flex items-center gap-3 text-amber-400">
-          <Icons.Adventures className="w-8 h-8" />
-          <h1 className="text-3xl font-bold font-serif text-slate-100">Adventure: {adventure.title}</h1>
+      <header className="flex justify-between items-start mb-6 gap-4">
+        <div className="flex items-center gap-3 text-amber-400 min-w-0">
+          <Icons.Adventures className="w-8 h-8 flex-shrink-0" />
+          <h1 className="text-3xl font-bold font-serif text-slate-100 truncate">Adventure: {adventure.title}</h1>
         </div>
+        {onDelete && (
+          <Button variant="danger" size="sm" onClick={handleDelete} className="flex-shrink-0">
+            <Icons.Trash className="w-3.5 h-3.5 mr-2" />
+            Delete Adventure
+          </Button>
+        )}
       </header>
 
       <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-800/50 flex-1">

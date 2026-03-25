@@ -2,9 +2,23 @@
 import React, { useState, useMemo } from 'react';
 import type { Plot } from '../../types/index';
 import type { SessionLog } from '../../types/index';
+import { useEntitySearch } from '@/hooks/useEntitySearch';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { PlotTimeline } from '../visualizers/PlotTimeline';
+
+/** Returns a Tailwind color class for a completeness dot given a percentage 0-100. */
+function completenessColor(pct: number): string {
+  if (pct >= 67) return 'bg-green-500';
+  if (pct >= 33) return 'bg-amber-500';
+  return 'bg-red-500';
+}
+
+/** Key fields for Plot completeness: title, description, status != 'active' (has been worked on). */
+function plotCompleteness(plot: { title?: string; description?: string; relatedEntityIds?: any[] }): number {
+  const checks = [!!(plot.title?.trim()), !!(plot.description?.trim()), (plot.relatedEntityIds?.length ?? 0) > 0];
+  return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+}
 
 interface PlotDashboardProps {
   plots: Plot[];
@@ -27,7 +41,7 @@ const PlotCreator: React.FC<{ onPlotCreated: (data: Omit<Plot, 'id'>) => void; }
         });
         setTitle('');
     };
-    
+
     return (
         <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 space-y-4 h-full flex flex-col">
             <div className="flex items-center gap-3">
@@ -47,19 +61,25 @@ const PlotCreator: React.FC<{ onPlotCreated: (data: Omit<Plot, 'id'>) => void; }
                 Create Plot
             </Button>
         </div>
-    )
-}
+    );
+};
 
 export const PlotDashboard: React.FC<PlotDashboardProps> = ({ plots, sessionLogs, onPlotCreated, onSelectPlot, onSelectSession }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+  // Normalize: plot uses `title`, hook needs `name`
+  const normalizedPlots = useMemo(
+    () => plots.map(p => ({ ...p, name: p.title })),
+    [plots],
+  );
+
+  const { filteredEntities: filteredNormalized, searchTerm, setSearchTerm } = useEntitySearch(
+    normalizedPlots,
+    ['name', 'description'],
+  );
+
   const filteredPlots = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
-    if (!q) return plots;
-    return plots.filter(p =>
-      p.title.toLowerCase().includes(q) ||
-      p.description?.toLowerCase().includes(q)
-    );
-  }, [plots, searchTerm]);
+    const ids = new Set(filteredNormalized.map(p => p.id));
+    return plots.filter(p => ids.has(p.id));
+  }, [filteredNormalized, plots]);
 
   const activePlots = filteredPlots.filter(p => p.status === 'active');
   const resolvedPlots = filteredPlots.filter(p => p.status === 'resolved');
@@ -178,12 +198,14 @@ const PLOT_STATUS_STYLES: Record<string, string> = {
 const PlotCard: React.FC<PlotCardProps> = ({ plot, onClick, compact }) => {
     const statusStyle = PLOT_STATUS_STYLES[plot.status] ?? PLOT_STATUS_STYLES['active'];
     const descSnippet = plot.description ? plot.description.slice(0, 100) + (plot.description.length > 100 ? '…' : '') : '';
+    const pct = plotCompleteness(plot);
     return (
         <button
             onClick={onClick}
             className={`card-parchment w-full border border-slate-800 border-l-4 border-l-yellow-500 p-4 rounded-lg hover:border-slate-700 hover:border-l-yellow-400 transition-all text-left flex flex-col group relative space-y-2 ${compact ? 'py-3' : ''}`}
         >
-            <div className="flex justify-between items-start w-full gap-2">
+            <span className={`absolute top-2 right-2 w-1.5 h-1.5 rounded-full ${completenessColor(pct)}`} title={`${pct}% complete`} />
+            <div className="flex justify-between items-start w-full gap-2 pr-4">
                 <h3 className={`font-semibold text-slate-200 truncate pr-1 ${compact ? 'text-sm' : 'text-base'}`}>{plot.title}</h3>
                 <span className={`flex-shrink-0 text-[10px] border rounded-full px-2 py-0.5 capitalize ${statusStyle}`}>
                     {plot.status}
@@ -204,4 +226,4 @@ const PlotCard: React.FC<PlotCardProps> = ({ plot, onClick, compact }) => {
             </div>
         </button>
     );
-}
+};

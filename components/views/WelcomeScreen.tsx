@@ -1,13 +1,31 @@
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 
 interface WelcomeScreenProps {
   onStart: () => void;
+  onImportCampaign?: (file: File) => void;
 }
 
-export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
+export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart, onImportCampaign }) => {
+  const importInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportClick = () => {
+    importInputRef.current?.click();
+  };
+
+  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && onImportCampaign) {
+      onImportCampaign(file);
+    }
+    // Reset so the same file can be re-imported if needed
+    if (importInputRef.current) {
+      importInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md mx-auto text-center animate-in fade-in slide-in-from-bottom-8 duration-500">
@@ -19,6 +37,25 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
         <Button onClick={onStart} size="lg" className="mt-8">
           Create a Campaign
         </Button>
+        {onImportCampaign && (
+          <>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleFileSelected}
+              className="hidden"
+              aria-hidden="true"
+            />
+            <button
+              type="button"
+              onClick={handleImportClick}
+              className="mt-4 block mx-auto text-sm text-slate-400 hover:text-amber-400 transition-colors underline underline-offset-4"
+            >
+              Import an existing campaign
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
