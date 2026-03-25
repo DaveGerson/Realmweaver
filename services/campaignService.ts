@@ -1265,6 +1265,11 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     session.sessionDate = new Date().toISOString();
                 }
 
+                // Persist session start timestamp for the in-session timer
+                if (!session.startedAt) {
+                    session.startedAt = new Date().toISOString();
+                }
+
                 // Activate the first planned scene if adventure is linked
                 if (session.adventureId && session.plannedSceneIds.length > 0) {
                     campaign.activeSceneId = session.plannedSceneIds[0];
@@ -1495,6 +1500,47 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 if (!session || !session.structuredNotes) return;
                 const note = session.structuredNotes.find(n => n.id === noteId);
                 if (note) note.isImportant = !note.isImportant;
+            });
+        },
+
+        /**
+         * Deletes a structured note from the active session log.
+         */
+        deleteSessionNote(noteId: string) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign || !campaign.activeSessionId) return;
+                const session = campaign.sessionLogs?.find(s => s.id === campaign.activeSessionId);
+                if (!session?.structuredNotes) return;
+                session.structuredNotes = session.structuredNotes.filter(n => n.id !== noteId);
+            });
+        },
+
+        /**
+         * Updates the text content of a structured note in the active session log.
+         */
+        updateSessionNoteContent(noteId: string, content: string) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign || !campaign.activeSessionId) return;
+                const session = campaign.sessionLogs?.find(s => s.id === campaign.activeSessionId);
+                if (!session?.structuredNotes) return;
+                const note = session.structuredNotes.find(n => n.id === noteId);
+                if (note) note.content = content;
+            });
+        },
+
+        /**
+         * Persists the session start timestamp so the timer survives re-mounts.
+         * Only writes if startedAt is not already set.
+         */
+        setSessionStartedAt(sessionLogId: string, isoTimestamp: string) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign) return;
+                const session = campaign.sessionLogs?.find(s => s.id === sessionLogId);
+                if (!session || session.startedAt) return; // already persisted
+                session.startedAt = isoTimestamp;
             });
         },
 

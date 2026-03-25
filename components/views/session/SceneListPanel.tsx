@@ -158,7 +158,7 @@ export const SceneListPanel: React.FC<SceneListPanelProps> = ({
                             </span>
                             <button
                                 onClick={() => campaignService.deleteBeat(beat.id)}
-                                className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-slate-600 hover:text-red-400"
+                                className="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-slate-600 hover:text-red-400"
                                 title="Delete beat"
                             >
                                 <Icons.X className="w-3 h-3" />

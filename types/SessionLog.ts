@@ -58,8 +58,12 @@ export interface SessionLog {
   // Beats (lightweight freeform planning checklist)
   beats?: Beat[];
 
+  // Session Timer
+  startedAt?: string; // ISO string, persisted on first go-live so timer survives re-mounts
+
   // Post-Session
   recap: string;
   notableEvents: string;
   looseEnds: string;
+  playerRecap?: string;
 }

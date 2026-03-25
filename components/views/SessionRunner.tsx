@@ -45,9 +45,23 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
     const canShowCombatTracker = isFeatureVisible('combat-tracker', _dmStyle, _featureOverrides);
     const canShowSecretsTracker = isFeatureVisible('secrets-tracker', _dmStyle, _featureOverrides);
 
-    // Session timer
-    const startedAtRef = useRef<number>(Date.now());
+    // Session timer — M21: use persisted startedAt from sessionLog so the timer
+    // survives navigation away and back. Fall back to Date.now() only if not set yet.
+    const startedAtRef = useRef<number>(
+        sessionLog.startedAt
+            ? new Date(sessionLog.startedAt).getTime()
+            : Date.now()
+    );
     const [elapsedMinutes, setElapsedMinutes] = useState(0);
+
+    // Persist the start timestamp on first mount when it is not already saved
+    useEffect(() => {
+        if (!sessionLog.startedAt) {
+            campaignService.setSessionStartedAt(sessionLog.id, new Date(startedAtRef.current).toISOString());
+        }
+    // Run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     useEffect(() => {
         const tick = () => {

@@ -9,6 +9,33 @@ import { LinkedText } from '@/components/common/LinkedText';
 import { rollDice } from '@/utils/diceUtils';
 import type { QuickCardEntityType } from '@/components/common/EntityQuickCard';
 
+/** Copy-to-clipboard button with 2-second visual feedback. */
+const CopyButton: React.FC<{ text: string; className?: string }> = ({ text, className }) => {
+    const [copied, setCopied] = useState(false);
+    const handleCopy = () => {
+        navigator.clipboard.writeText(text).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        });
+    };
+    return (
+        <button
+            onClick={handleCopy}
+            className={twMerge(
+                "p-1.5 rounded-md transition-colors",
+                copied
+                    ? "text-green-400"
+                    : "text-amber-600 hover:text-amber-400 hover:bg-amber-900/30",
+                className
+            )}
+            title={copied ? 'Copied!' : 'Copy read-aloud text'}
+            aria-label={copied ? 'Copied!' : 'Copy read-aloud text'}
+        >
+            {copied ? <Icons.Check className="w-4 h-4" /> : <Icons.Duplicate className="w-4 h-4" />}
+        </button>
+    );
+};
+
 interface ActiveScenePanelProps {
     activeScene: Scene | null;
     activeSceneLocation: Location | null;
@@ -98,8 +125,11 @@ export const ActiveScenePanel: React.FC<ActiveScenePanelProps> = ({
 
                     {/* Read-Aloud Text */}
                     {activeScene.readAloudText && (
-                        <div className="bg-amber-900/20 border border-amber-800/40 rounded-lg p-4">
-                            <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2">Read Aloud</h3>
+                        <div className="bg-amber-900/20 border border-amber-800/40 rounded-lg p-4 relative">
+                            <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider">Read Aloud</h3>
+                                <CopyButton text={activeScene.readAloudText} />
+                            </div>
                             <p className="text-lg italic text-amber-100/90 leading-relaxed font-serif border-l-4 border-amber-700/40 pl-4 whitespace-pre-wrap">
                                 {onNavigate
                                     ? <LinkedText text={activeScene.readAloudText} onNavigate={onNavigate} />

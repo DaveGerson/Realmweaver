@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { Campaign, NPC, RollableTable, RollableTableEntry } from '../../types/index';
 import { generateNarration, generateImprovisation, generateRollableTable, generateNpcRoleplay } from '../../services/aiService';
 import { Icons } from '../common/Icons';
@@ -71,6 +71,8 @@ function resolveChipLabel(label: string, tokens: { locationName?: string; npcNam
 interface DmCoachProps {
   campaign: Campaign;
   activeContext?: string;
+  /** IDs of NPCs in the currently active scene, used to group the NPC selector. */
+  activeSceneNpcIds?: string[];
   onClose: () => void;
   onSendToNotes?: (content: string) => void;
   onResultGenerated?: (content: string) => void;
@@ -78,7 +80,7 @@ interface DmCoachProps {
   onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
 }
 
-export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClose, onSendToNotes, onResultGenerated, isMockMode, onNavigate }) => {
+export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activeSceneNpcIds, onClose, onSendToNotes, onResultGenerated, isMockMode, onNavigate }) => {
     const [activeTool, setActiveTool] = useState<CoachTool>('narrate');
     const [prompt, setPrompt] = useState('');
     const [mentionedEntityIds, setMentionedEntityIds] = useState<string[]>([]);
@@ -94,6 +96,15 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClo
     const [roleplayLoading, setRoleplayLoading] = useState(false);
     const [roleplayError, setRoleplayError] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    // H15: Escape key dismisses the coach panel
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
 
     useEffect(() => {
         if (activeTool === 'roleplay' && messagesEndRef.current) {
@@ -276,7 +287,19 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClo
     };
 
     return (
-        <aside className="absolute inset-y-0 right-0 w-full max-w-md bg-slate-900/80 backdrop-blur-md border-l border-slate-800 z-10 flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
+        <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label="DM Coach"
+            className={[
+                // Mobile: half-height bottom sheet anchored to bottom of parent
+                "absolute bottom-0 left-0 right-0 h-[60vh]",
+                // Desktop: full-height side panel on the right
+                "md:inset-y-0 md:left-auto md:right-0 md:w-full md:max-w-md md:h-auto",
+                "bg-slate-900/95 backdrop-blur-md border-t md:border-t-0 md:border-l border-slate-800 z-10 flex flex-col shadow-2xl",
+                "animate-in slide-in-from-bottom md:slide-in-from-right duration-300",
+            ].join(' ')}
+        >
             <header className="flex items-center justify-between p-4 border-b border-slate-800 flex-shrink-0">
                 <div className="flex items-center gap-3">
                     <Icons.Coach className="w-6 h-6 text-amber-400" />
@@ -343,6 +366,7 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClo
             {activeTool === 'roleplay' ? (
                 <RoleplayPanel
                     campaign={campaign}
+                    activeSceneNpcIds={activeSceneNpcIds}
                     selectedNpcId={selectedNpcId}
                     onSelectNpc={(id) => {
                         setSelectedNpcId(id);
@@ -428,6 +452,7 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, onClo
 
 interface RoleplayPanelProps {
     campaign: Campaign;
+    activeSceneNpcIds?: string[];
     selectedNpcId: string;
     onSelectNpc: (id: string) => void;
     selectedNpc: NPC | undefined;
@@ -445,6 +470,7 @@ interface RoleplayPanelProps {
 
 const RoleplayPanel: React.FC<RoleplayPanelProps> = ({
     campaign,
+    activeSceneNpcIds,
     selectedNpcId,
     onSelectNpc,
     selectedNpc,
@@ -463,6 +489,24 @@ const RoleplayPanel: React.FC<RoleplayPanelProps> = ({
         ? campaign.factions.find(f => f.id === selectedNpc.factionId)
         : undefined;
 
+    // H16: Group NPCs — scene NPCs first, others alphabetically
+    const { sceneNpcs, otherNpcs } = useMemo(() => {
+        const sceneIds = new Set(activeSceneNpcIds ?? []);
+        const inScene: NPC[] = [];
+        const outside: NPC[] = [];
+        const sorted = [...campaign.npcs].sort((a, b) => a.name.localeCompare(b.name));
+        for (const npc of sorted) {
+            if (sceneIds.has(npc.id)) {
+                inScene.push(npc);
+            } else {
+                outside.push(npc);
+            }
+        }
+        return { sceneNpcs: inScene, otherNpcs: outside };
+    }, [campaign.npcs, activeSceneNpcIds]);
+
+    const hasSceneGroup = sceneNpcs.length > 0;
+
     return (
         <div className="flex-1 flex flex-col overflow-hidden">
             {/* NPC Selector */}
@@ -478,9 +522,26 @@ const RoleplayPanel: React.FC<RoleplayPanelProps> = ({
                         className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
                     >
                         <option value="">— Choose an NPC —</option>
-                        {campaign.npcs.map(npc => (
-                            <option key={npc.id} value={npc.id}>{npc.name}</option>
-                        ))}
+                        {hasSceneGroup ? (
+                            <>
+                                <optgroup label="In This Scene">
+                                    {sceneNpcs.map(npc => (
+                                        <option key={npc.id} value={npc.id}>{npc.name}</option>
+                                    ))}
+                                </optgroup>
+                                {otherNpcs.length > 0 && (
+                                    <optgroup label="Other NPCs">
+                                        {otherNpcs.map(npc => (
+                                            <option key={npc.id} value={npc.id}>{npc.name}</option>
+                                        ))}
+                                    </optgroup>
+                                )}
+                            </>
+                        ) : (
+                            otherNpcs.map(npc => (
+                                <option key={npc.id} value={npc.id}>{npc.name}</option>
+                            ))
+                        )}
                     </select>
                 </div>
 

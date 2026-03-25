@@ -105,9 +105,14 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
         }
     }, [sessionNotesText, plotSummariesText, campaign.title, campaign.setting, isMockMode, sessionLog.runningNotes, sessionLog.looseEnds]);
 
-    // Auto-trigger recap generation on mount when session notes are available
+    // M24: Only auto-trigger recap if there are enough notes to produce a quality result.
+    // With sparse notes the AI tends to hallucinate; let the DM decide instead.
+    const AUTO_TRIGGER_NOTE_THRESHOLD = 5;
+    const noteCount = sessionLog.structuredNotes?.length ?? 0;
+    const hasEnoughNotesForAutoRecap = noteCount >= AUTO_TRIGGER_NOTE_THRESHOLD;
+
     useEffect(() => {
-        if (!recap && (sessionNotesText || sessionLog.runningNotes)) {
+        if (!recap && hasEnoughNotesForAutoRecap && (sessionNotesText || sessionLog.runningNotes)) {
             handleGenerateRecap();
         }
         // Run only on mount; handleGenerateRecap is stable via useCallback
@@ -230,9 +235,18 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
                             {!recap && !isGenerating && (
                                 <div className="text-center py-8">
                                     <Icons.Sparkles className="w-8 h-8 text-amber-400 mx-auto mb-3 opacity-60" />
-                                    <p className="text-sm text-slate-400 mb-4">
-                                        {sessionNotesText ? `${(sessionLog.structuredNotes || []).length} session notes ready for recap.` : 'No structured notes found. You can still generate a recap from running notes.'}
-                                    </p>
+                                    {hasEnoughNotesForAutoRecap ? (
+                                        <p className="text-sm text-slate-400 mb-4">
+                                            {noteCount} session notes ready for recap.
+                                        </p>
+                                    ) : (
+                                        <p className="text-sm text-slate-400 mb-4">
+                                            {noteCount === 0
+                                                ? 'No session notes recorded. You can generate a recap from running notes, or write your own below.'
+                                                : `Only ${noteCount} note${noteCount !== 1 ? 's' : ''} recorded — for best results, use ${AUTO_TRIGGER_NOTE_THRESHOLD}+ notes. You can still generate a recap manually.`
+                                            }
+                                        </p>
+                                    )}
                                     <Button onClick={handleGenerateRecap} disabled={isGenerating}>
                                         <Icons.Sparkles className="w-4 h-4 mr-2" />
                                         Generate AI Recap
