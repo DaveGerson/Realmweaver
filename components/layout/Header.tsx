@@ -134,7 +134,35 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   if (!activeCampaign) {
-    return null; // Don't render header if no campaign is active
+    return (
+      <header className="flex items-center justify-between p-3 border-b border-slate-800 bg-slate-900 flex-shrink-0 relative z-[60]">
+        <div className="flex items-center gap-2">
+          <Icons.Campaign className="w-6 h-6 text-amber-400" />
+          <h1 className="text-lg font-bold font-serif text-slate-100">Realmweaver</h1>
+        </div>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className={`hidden md:inline text-xs font-medium ${isMockMode ? 'text-amber-400' : 'text-slate-500'}`}>
+            Mock Mode
+          </span>
+          <button
+            onClick={onToggleMockMode}
+            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-slate-900 ${
+              isMockMode ? 'bg-amber-600' : 'bg-slate-700'
+            }`}
+            role="switch"
+            aria-checked={isMockMode}
+            aria-label="Mock Mode"
+          >
+            <span
+              aria-hidden="true"
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                isMockMode ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+      </header>
+    );
   }
 
   const dmStyle = activeCampaign.dmStyle ?? 'standard';
@@ -253,6 +281,7 @@ export const Header: React.FC<HeaderProps> = ({
             title="Check Continuity"
           >
             <Icons.Factions className="w-5 h-5 text-amber-400" />
+            <span className="hidden md:inline lg:hidden">Check</span>
             <span className="hidden lg:inline">Continuity</span>
             {continuityIssueCount > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[1.1rem] h-[1.1rem] flex items-center justify-center rounded-full bg-red-600 text-white text-[10px] font-bold leading-none px-0.5">
@@ -265,25 +294,29 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={onToggleWizard}
             className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-amber-500 rounded-md p-1 sm:-m-1"
             aria-label="Toggle Evocation Wizard"
+            title="Evocation Wizard"
           >
             <Icons.Wizard className="w-5 h-5 text-amber-400" />
+            <span className="hidden md:inline lg:hidden">Evocation</span>
             <span className="hidden lg:inline">Evocation Wizard</span>
           </button>
           <button
             onClick={onToggleWorldSim}
             className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-amber-500 rounded-md p-1 sm:-m-1"
             aria-label="World Simulation — what happened off-screen?"
-            title="What happened off-screen?"
+            title="World Simulation — what happened off-screen?"
           >
             <Icons.WorldSim className="w-5 h-5 text-amber-400" />
-            <span className="hidden lg:inline">World Sim</span>
+            <span className="hidden md:inline">World Sim</span>
           </button>
-           <button
+          <button
               onClick={onToggleCoach}
               className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-amber-500 rounded-md p-1 sm:-m-1"
               aria-label="Toggle Session Weaver"
+              title="Session Weaver"
             >
             <Icons.Coach className="w-5 h-5 text-amber-400" />
+            <span className="hidden md:inline lg:hidden">Session</span>
             <span className="hidden lg:inline">Session Weaver</span>
           </button>
           {/* Keyboard Shortcuts Help */}
