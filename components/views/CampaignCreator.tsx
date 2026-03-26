@@ -181,12 +181,13 @@ const TemplateSelectorStep: React.FC<TemplateSelectorStepProps> = ({
       </div>
 
       <div className="flex justify-center">
-        <button
+        <Button
+          variant="ghost"
           onClick={onSkip}
-          className="text-sm text-slate-400 hover:text-slate-200 transition-colors underline underline-offset-2"
+          className="underline underline-offset-2 text-slate-400 hover:text-slate-200"
         >
           Start From Scratch — I'll build my own world
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -288,14 +289,16 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampai
 
         <form onSubmit={handleSubmit} className="bg-slate-900/50 p-8 rounded-xl border border-slate-800 space-y-6">
           {/* Back to templates */}
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => setStep('template-select')}
-            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+            className="text-slate-400 hover:text-slate-200"
           >
-            <Icons.ChevronLeft className="w-3.5 h-3.5" />
+            <Icons.ChevronLeft className="w-3.5 h-3.5 mr-1" />
             Back to templates
-          </button>
+          </Button>
 
           {/* Campaign Title */}
           <div>

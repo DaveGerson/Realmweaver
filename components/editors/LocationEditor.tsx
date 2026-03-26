@@ -365,17 +365,18 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                           <option key={poi.id} value={poi.id}>{poi.name}</option>
                         ))}
                       </select>
-                      <button
+                      <Button
+                        variant="icon"
                         onClick={() => handleGeneratePoi(item)}
                         disabled={generatingPoiFor === item.id || !item.description}
-                        className="text-amber-400 hover:text-amber-300 p-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed group relative"
+                        className="text-amber-400 hover:text-amber-300 group relative"
                         aria-label="Generate Point of Interest from loot"
                       >
                         {generatingPoiFor === item.id ? <Icons.Sparkles className="w-4 h-4 animate-spin" /> : <Icons.Sparkles className="w-4 h-4" />}
                         <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-slate-900 text-slate-300 text-xs rounded-md p-2 border border-slate-700 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg">
                           Generate an interactive Point of Interest for this loot item.
                         </span>
-                      </button>
+                      </Button>
                       <Button variant="icon" onClick={() => handleDeleteLootItem(item.id)} className="text-slate-500 hover:text-red-400" aria-label="Delete loot item">
                         <Icons.Trash className="w-4 h-4" />
                       </Button>
@@ -546,12 +547,9 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                                   <option value="">-- Select Target --</option>
                                   {possibleConnectionTargets.map(loc => (<option key={loc.id} value={loc.id}>{loc.name}</option>))}
                               </select>
-                              <button
-                                onClick={() => handleDeleteConnection(conn.id)}
-                                className="text-slate-500 hover:text-red-400 p-1 rounded transition-colors"
-                              >
+                              <Button variant="icon" onClick={() => handleDeleteConnection(conn.id)} className="text-slate-500 hover:text-red-400" aria-label="Delete connection">
                                 <Icons.Trash className="w-4 h-4" />
-                              </button>
+                              </Button>
                           </div>
                       ))}
                       {(!formData.connections || formData.connections.length === 0) && (

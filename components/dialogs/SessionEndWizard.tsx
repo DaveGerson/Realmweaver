@@ -193,9 +193,9 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
                         <Icons.Stop className="w-5 h-5 text-red-400" />
                         <h2 className="text-lg font-bold text-white font-serif">End Session</h2>
                     </div>
-                    <button onClick={onCancel} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
+                    <Button variant="icon" onClick={onCancel} className="text-slate-400 hover:text-white">
                         <Icons.X className="w-5 h-5" />
-                    </button>
+                    </Button>
                 </div>
 
                 {/* Step Indicators */}

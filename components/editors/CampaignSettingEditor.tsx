@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Campaign, SettingType } from '../../types/index';
 import { Icons } from '../common/Icons';
+import { Button } from '../common/Button';
 import { analyzeWritingStyle } from '../../services/aiService';
 
 interface CampaignSettingEditorProps {
@@ -232,26 +233,28 @@ export const CampaignSettingEditor: React.FC<CampaignSettingEditorProps> = ({
               </p>
             )}
             <div className="flex flex-wrap gap-2">
-              <button
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={handleRegenerateStyle}
                 disabled={isAnalyzing || !canGenerateStyle}
-                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isAnalyzing ? (
-                  <Icons.Loader className="w-3 h-3 animate-spin" />
+                  <Icons.Loader className="w-3 h-3 animate-spin mr-1.5" />
                 ) : (
-                  <Icons.Sparkles className="w-3 h-3" />
+                  <Icons.Sparkles className="w-3 h-3 mr-1.5" />
                 )}
                 {isAnalyzing ? 'Analyzing...' : 'Regenerate'}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={handleClearStyle}
                 disabled={isAnalyzing}
-                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                <Icons.X className="w-3 h-3" />
+                <Icons.X className="w-3 h-3 mr-1.5" />
                 Clear
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
@@ -273,18 +276,19 @@ export const CampaignSettingEditor: React.FC<CampaignSettingEditorProps> = ({
               </p>
             )}
             {canGenerateStyle && (
-              <button
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={handleRegenerateStyle}
                 disabled={isAnalyzing}
-                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-amber-600 hover:bg-amber-500 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isAnalyzing ? (
-                  <Icons.Loader className="w-3 h-3 animate-spin" />
+                  <Icons.Loader className="w-3 h-3 animate-spin mr-1.5" />
                 ) : (
-                  <Icons.Sparkles className="w-3 h-3" />
+                  <Icons.Sparkles className="w-3 h-3 mr-1.5" />
                 )}
                 {isAnalyzing ? 'Analyzing your writing...' : 'Generate Style Profile'}
-              </button>
+              </Button>
             )}
           </div>
         )}

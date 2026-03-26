@@ -152,28 +152,32 @@ export const PlayerCharacterImporter: React.FC<PlayerCharacterImporterProps> = (
       {/* Tab bar — only rendered when the quick-add callback is available */}
       {hasManualPath && (
         <div className="flex border-b border-slate-700">
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             type="button"
             onClick={() => setActiveTab('pdf')}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
+            className={`rounded-none px-4 py-2 ${
               activeTab === 'pdf'
                 ? 'text-amber-400 border-b-2 border-amber-400'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             Import PDF
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             type="button"
             onClick={() => setActiveTab('manual')}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
+            className={`rounded-none px-4 py-2 ${
               activeTab === 'manual'
                 ? 'text-amber-400 border-b-2 border-amber-400'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             Quick Add
-          </button>
+          </Button>
         </div>
       )}
 

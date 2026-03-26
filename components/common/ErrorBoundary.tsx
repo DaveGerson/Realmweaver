@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from './Button';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -117,18 +118,20 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
                     {/* Actions */}
                     <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                        <button
+                        <Button
+                            variant="primary"
+                            size="lg"
                             onClick={this.reset}
-                            className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition-colors"
                         >
                             Try Again
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            size="lg"
                             onClick={() => window.location.reload()}
-                            className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-medium text-slate-200 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg transition-colors"
                         >
                             Return Home
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>

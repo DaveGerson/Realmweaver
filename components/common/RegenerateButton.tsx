@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Icons } from '@/components/common/Icons';
+import { Button } from '@/components/common/Button';
 import { generateEnhancedText } from '@/services/aiService';
 
 interface RegenerateButtonProps {
@@ -180,14 +181,15 @@ export const RegenerateButton: React.FC<RegenerateButtonProps> = ({
                 : `Regenerate ${fieldName}`}
             </span>
             {panelState !== 'loading' && (
-              <button
+              <Button
                 type="button"
+                variant="icon"
                 onClick={handleClose}
-                className="ml-auto text-slate-500 hover:text-slate-300 transition-colors"
+                className="ml-auto"
                 aria-label="Close"
               >
                 <Icons.X className="w-3.5 h-3.5" />
-              </button>
+              </Button>
             )}
           </div>
 
@@ -210,14 +212,16 @@ export const RegenerateButton: React.FC<RegenerateButtonProps> = ({
                 placeholder="Optional tweak (e.g. Make more sinister)"
                 className="flex-grow bg-slate-800 border border-amber-800/40 rounded px-2 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-colors"
               />
-              <button
+              <Button
                 type="button"
+                variant="primary"
+                size="sm"
                 onClick={handleRegenerate}
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-amber-700 hover:bg-amber-600 text-white text-xs rounded transition-colors whitespace-nowrap"
+                className="whitespace-nowrap"
               >
-                <Icons.Sparkles className="w-3 h-3" />
+                <Icons.Sparkles className="w-3 h-3 mr-1.5" />
                 Regenerate
-              </button>
+              </Button>
             </div>
           )}
 
@@ -228,22 +232,24 @@ export const RegenerateButton: React.FC<RegenerateButtonProps> = ({
                 {previewValue}
               </p>
               <div className="flex items-center gap-2">
-                <button
+                <Button
                   type="button"
+                  variant="primary"
+                  size="sm"
                   onClick={handleAccept}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-700 hover:bg-amber-600 text-white text-xs rounded transition-colors"
                 >
-                  <Icons.CheckCircle className="w-3 h-3" />
+                  <Icons.CheckCircle className="w-3 h-3 mr-1.5" />
                   Accept
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="secondary"
+                  size="sm"
                   onClick={handleReject}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs rounded transition-colors"
                 >
-                  <Icons.X className="w-3 h-3" />
+                  <Icons.X className="w-3 h-3 mr-1.5" />
                   Reject
-                </button>
+                </Button>
               </div>
             </>
           )}

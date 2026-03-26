@@ -13,10 +13,11 @@ export interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
-const BASE_BTN = 'inline-flex items-center justify-center rounded-md font-semibold text-sm px-4 py-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 transition-colors disabled:opacity-50';
-const CANCEL_BTN = twMerge(BASE_BTN, 'bg-slate-700 text-slate-100 hover:bg-slate-600 focus:ring-slate-500');
-const CONFIRM_BTN = twMerge(BASE_BTN, 'bg-amber-600 text-white hover:bg-amber-500 focus:ring-amber-500');
-const DANGER_BTN  = twMerge(BASE_BTN, 'bg-red-800 text-white hover:bg-red-700 focus:ring-red-600');
+// Shared base classes matching Button's output for ref-bearing buttons in focus trap
+const BTN_BASE = 'inline-flex items-center justify-center rounded-md font-semibold text-sm px-4 py-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 transition-colors';
+const CANCEL_BTN = twMerge(BTN_BASE, 'bg-slate-700 text-slate-100 hover:bg-slate-600 focus:ring-slate-500');
+const CONFIRM_BTN = twMerge(BTN_BASE, 'bg-amber-600 text-white hover:bg-amber-500 focus:ring-amber-500');
+const DANGER_BTN = twMerge(BTN_BASE, 'bg-red-800 text-white hover:bg-red-700 focus:ring-red-600');
 
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   isOpen,
@@ -97,6 +98,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         </div>
 
         <div className="flex justify-end gap-3 px-6 pb-5">
+          {/* Raw buttons with refs for focus-trap keyboard navigation */}
           <button ref={cancelRef} className={CANCEL_BTN} onClick={onCancel}>
             {cancelLabel}
           </button>

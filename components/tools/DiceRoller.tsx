@@ -2,6 +2,7 @@
 import React, { useState, useCallback } from 'react';
 import type { DiceRoll } from '../../types';
 import { Icons } from '../common/Icons';
+import { Button } from '../common/Button';
 import { parseFormula, rollDice, formatFormula, type ParsedFormula } from '../../utils/diceUtils';
 
 interface DiceRollerProps {
@@ -135,13 +136,15 @@ export const DiceRoller: React.FC<DiceRollerProps> = ({ onLogRoll }) => {
                 <div>
                     <div className="flex flex-wrap gap-1.5 mb-2">
                         {DICE_TYPES.map(sides => (
-                            <button
+                            <Button
                                 key={sides}
+                                variant="primary"
+                                size="sm"
                                 onClick={() => handleDieClick(sides)}
-                                className="px-2.5 py-1.5 rounded-md bg-amber-700 hover:bg-amber-600 text-white text-xs font-bold transition-colors"
+                                className="bg-amber-700 hover:bg-amber-600 font-bold"
                             >
                                 d{sides}
-                            </button>
+                            </Button>
                         ))}
                     </div>
                     <div className="flex items-center gap-2">
@@ -160,18 +163,22 @@ export const DiceRoller: React.FC<DiceRollerProps> = ({ onLogRoll }) => {
 
                 {/* Advantage / Disadvantage */}
                 <div className="flex gap-1.5 border-t border-slate-700 pt-3">
-                    <button
+                    <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={handleAdvantage}
-                        className="flex-1 px-2 py-1.5 rounded-md bg-green-700 hover:bg-green-600 text-white text-xs font-semibold transition-colors"
+                        className="flex-1 bg-green-700 hover:bg-green-600 text-white"
                     >
                         Advantage
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        variant="danger"
+                        size="sm"
                         onClick={handleDisadvantage}
-                        className="flex-1 px-2 py-1.5 rounded-md bg-red-700 hover:bg-red-600 text-white text-xs font-semibold transition-colors"
+                        className="flex-1 bg-red-700 hover:bg-red-600"
                     >
                         Disadvantage
-                    </button>
+                    </Button>
                 </div>
 
                 {/* Formula Input */}
@@ -188,13 +195,14 @@ export const DiceRoller: React.FC<DiceRollerProps> = ({ onLogRoll }) => {
                                 className="w-full bg-slate-700 border border-slate-600 rounded-md pl-7 pr-2 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
                             />
                         </div>
-                        <button
+                        <Button
+                            variant="primary"
+                            size="sm"
                             onClick={handleFormulaRoll}
                             disabled={!formulaInput.trim()}
-                            className="px-3 py-1.5 rounded-md bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors"
                         >
                             Roll
-                        </button>
+                        </Button>
                     </div>
                     {formulaError && (
                         <p className="text-xs text-red-400 mt-1">{formulaError}</p>
@@ -261,12 +269,14 @@ export const DiceRoller: React.FC<DiceRollerProps> = ({ onLogRoll }) => {
                             placeholder="Note (optional)..."
                             className="w-full bg-slate-700 border border-slate-600 rounded-md px-2 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
                         />
-                        <button
+                        <Button
+                            variant="primary"
+                            size="sm"
                             onClick={() => handleLogRoll(lastRoll)}
-                            className="w-full px-3 py-1.5 rounded-md bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold transition-colors"
+                            className="w-full"
                         >
                             Log to Session
-                        </button>
+                        </Button>
                     </div>
                 )}
             </div>

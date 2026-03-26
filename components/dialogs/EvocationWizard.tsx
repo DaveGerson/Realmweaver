@@ -309,7 +309,7 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                                 <span aria-hidden="true" className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${useCampaignContext ? 'translate-x-5' : 'translate-x-0'}`} />
                             </button>
                         </div>
-                        <button onClick={onClose} className="p-1 rounded-md hover:bg-slate-800 text-slate-400 hover:text-white transition-colors" aria-label="Close Wizard"><Icons.X className="w-5 h-5" /></button>
+                        <Button variant="icon" onClick={onClose} className="text-slate-400 hover:text-white" aria-label="Close Wizard"><Icons.X className="w-5 h-5" /></Button>
                     </div>
                 </header>
 
@@ -619,7 +619,7 @@ const SimpleDetailedSection: React.FC<SimpleDetailedSectionProps> = ({ title, it
                         <div key={p.id} className="bg-slate-800/50 p-2 rounded-md space-y-1.5">
                             <div className="flex items-start gap-2">
                                 <textarea value={p.prompt} onChange={(e) => onChange(p.id, e.target.value)} placeholder={`Prompt for new ${title.slice(0, -1)}...`} rows={2} className="flex-grow bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-sm resize-y outline-none focus:ring-1 focus:ring-amber-500" />
-                                <button onClick={() => onRemove(p.id)} className="p-1 text-slate-500 hover:text-red-400 transition-colors mt-1"><Icons.Trash className="w-4 h-4" /></button>
+                                <Button variant="icon" onClick={() => onRemove(p.id)} className="text-slate-500 hover:text-red-400 mt-1"><Icons.Trash className="w-4 h-4" /></Button>
                             </div>
                             {linkOptions && linkNoun && (
                                 <div className="flex items-center gap-2">
@@ -651,7 +651,7 @@ const ScenePromptItem: React.FC<{
         <div className="bg-slate-800/50 p-2 rounded-md space-y-1.5">
             <div className="flex items-start gap-2">
                 <textarea value={scene.prompt} onChange={(e) => onChange(e.target.value, scene.type || 'none')} placeholder="Scene prompt..." rows={2} className="flex-grow bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-sm resize-y outline-none focus:ring-1 focus:ring-amber-500" />
-                <button onClick={onRemove} className="p-1 text-slate-500 hover:text-red-400 transition-colors mt-1"><Icons.Trash className="w-4 h-4" /></button>
+                <Button variant="icon" onClick={onRemove} className="text-slate-500 hover:text-red-400 mt-1"><Icons.Trash className="w-4 h-4" /></Button>
             </div>
             <div className="flex items-center gap-2">
                 <select value={scene.type || 'none'} onChange={(e) => onChange(scene.prompt, e.target.value as SceneType | 'none')} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-amber-500">
@@ -691,7 +691,7 @@ const AdventureDetailedSection: React.FC<AdventureDetailedSectionProps> = ({ ite
                         <div key={adventure.id} className="bg-slate-800/50 p-2 rounded-md space-y-2 border border-slate-700/50">
                             <div className="flex items-start gap-2">
                                 <textarea value={adventure.prompt} onChange={(e) => onChange(adventure.id, e.target.value)} placeholder="Adventure concept prompt..." rows={2} className="flex-grow bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-sm resize-y outline-none focus:ring-1 focus:ring-amber-500" />
-                                <button onClick={() => onRemove(adventure.id)} className="p-1 text-slate-500 hover:text-red-400 transition-colors mt-1"><Icons.Trash className="w-4 h-4" /></button>
+                                <Button variant="icon" onClick={() => onRemove(adventure.id)} className="text-slate-500 hover:text-red-400 mt-1"><Icons.Trash className="w-4 h-4" /></Button>
                             </div>
                             <div className="pl-4 border-l-2 border-slate-700 ml-2 space-y-2 pt-2">
                                 <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Scenes</h5>
@@ -756,9 +756,9 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({ title, items, selection
                                 <input type="checkbox" checked={selection[index]} onChange={(e) => onSelect(index, e.target.checked)} className="w-4 h-4 mr-3 bg-slate-800 border-slate-600 rounded text-amber-600 focus:ring-amber-500" />
                                 <span className="truncate" title={item.name || item.title}>{item.name || item.title}</span>
                             </label>
-                             <button onClick={() => onEdit(index)} className="p-1 text-slate-500 hover:text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all" aria-label="Edit">
+                             <Button variant="icon" onClick={() => onEdit(index)} className="text-slate-500 hover:text-white opacity-100 md:opacity-0 md:group-hover:opacity-100" aria-label="Edit">
                                 <Icons.FileText className="w-3.5 h-3.5" />
-                            </button>
+                            </Button>
                         </div>
                     ))}
                 </div>

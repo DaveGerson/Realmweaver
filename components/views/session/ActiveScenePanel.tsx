@@ -2,6 +2,7 @@
 import React, { useState, useCallback } from 'react';
 import type { Campaign, Scene, Location, NPC, SessionLog, DiceRoll } from '@/types';
 import { Icons, SceneIcon } from '@/components/common/Icons';
+import { Button } from '@/components/common/Button';
 import { twMerge } from 'tailwind-merge';
 import { campaignService } from '@/services/campaignService';
 import { EntityLink } from '@/components/common/EntityLink';
@@ -93,12 +94,13 @@ export const ActiveScenePanel: React.FC<ActiveScenePanelProps> = ({
                     {/* Previously... Recap Banner */}
                     {showRecap && previousSession?.recap && (
                         <div className="bg-slate-800/40 border border-slate-700/40 rounded-lg p-4 relative">
-                            <button
+                            <Button
+                                variant="icon"
                                 onClick={() => setShowRecap(false)}
-                                className="absolute top-2 right-2 text-slate-500 hover:text-slate-300"
+                                className="absolute top-2 right-2"
                             >
                                 <Icons.X className="w-4 h-4" />
-                            </button>
+                            </Button>
                             <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2">Previously...</h3>
                             <p className="text-sm text-slate-300 leading-relaxed">{previousSession.recap}</p>
                             {previousSession.looseEnds && (
@@ -117,13 +119,15 @@ export const ActiveScenePanel: React.FC<ActiveScenePanelProps> = ({
                             <h2 className="text-xl md:text-2xl font-bold text-white font-serif">{activeScene.title}</h2>
                             <span className="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 uppercase">{activeScene.type}</span>
                         </div>
-                        <button
+                        <Button
+                            variant="primary"
+                            size="sm"
                             onClick={onAdvanceScene}
-                            className="flex-shrink-0 flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-2 min-h-[44px] rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm transition-colors"
+                            className="flex-shrink-0 min-h-[44px]"
                         >
                             <Icons.SkipForward className="w-4 h-4" />
-                            <span className="hidden sm:inline">Next Scene</span>
-                        </button>
+                            <span className="hidden sm:inline ml-1.5">Next Scene</span>
+                        </Button>
                     </div>
 
                     {/* Read-Aloud Text */}
@@ -271,14 +275,16 @@ export const ActiveScenePanel: React.FC<ActiveScenePanelProps> = ({
                                                     title="Modifier (e.g. +5 for proficiency)"
                                                     aria-label="Roll modifier"
                                                 />
-                                                <button
+                                                <Button
+                                                    variant="primary"
+                                                    size="sm"
                                                     onClick={() => handleSkillCheckRoll(i, check.dc, check.skill)}
-                                                    className="px-3 py-1.5 min-h-[44px] rounded-md bg-amber-700 hover:bg-amber-600 text-white text-xs font-semibold transition-colors flex items-center gap-1"
+                                                    className="min-h-[44px]"
                                                     title={`Roll 1d20${modifier >= 0 ? '+' : ''}${modifier} vs DC ${check.dc}`}
                                                 >
-                                                    <Icons.Dice className="w-3 h-3" />
+                                                    <Icons.Dice className="w-3 h-3 mr-1" />
                                                     Roll
-                                                </button>
+                                                </Button>
                                             </div>
                                             {rollResult && (
                                                 <span className={twMerge(

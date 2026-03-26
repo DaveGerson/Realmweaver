@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import type { Campaign, Secret } from '@/types/index';
 import { Icons } from '@/components/common/Icons';
+import { Button } from '@/components/common/Button';
 import { twMerge } from 'tailwind-merge';
 import { campaignService } from '@/services/campaignService';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
@@ -362,14 +363,15 @@ const SecretCard: React.FC<SecretCardProps> = ({
           </button>
 
           {/* Delete — uses ConfirmDialog instead of timed double-click */}
-          <button
+          <Button
+            variant="icon"
             onClick={handleDeleteClick}
-            className="p-1.5 rounded-md transition-colors text-slate-600 hover:text-red-400 hover:bg-slate-700"
+            className="text-slate-600 hover:text-red-400 hover:bg-slate-700"
             title="Delete"
             aria-label="Delete secret"
           >
             <Icons.Trash className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -587,20 +589,21 @@ const AddSecretForm: React.FC<AddSecretFormProps> = ({ campaign, onAdd, onCancel
       )}
 
       <div className="flex gap-2">
-        <button
+        <Button
+          variant="primary"
           onClick={handleSubmit}
           disabled={!title.trim() || !content.trim()}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors"
+          className="flex-1"
         >
-          <Icons.Plus className="w-4 h-4" />
+          <Icons.Plus className="w-4 h-4 mr-1.5" />
           Add
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="secondary"
           onClick={onCancel}
-          className="px-3 py-2 rounded-md bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm transition-colors"
         >
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -690,18 +693,14 @@ export const SecretsTracker: React.FC<SecretsTrackerProps> = ({
               </span>
             )}
           </div>
-          <button
+          <Button
+            variant="icon"
             onClick={() => setShowAddForm(prev => !prev)}
-            className={twMerge(
-              'p-1.5 rounded-md transition-colors',
-              showAddForm
-                ? 'bg-amber-600/20 text-amber-400'
-                : 'text-slate-500 hover:text-amber-400 hover:bg-slate-700'
-            )}
+            className={showAddForm ? 'bg-amber-600/20 text-amber-400' : 'text-slate-500 hover:text-amber-400 hover:bg-slate-700'}
             title="Add new entry"
           >
             <Icons.Plus className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
 
         {/* Show/hide revealed toggle */}

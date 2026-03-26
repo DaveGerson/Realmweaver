@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Icons } from '../common/Icons';
+import { Button } from '../common/Button';
 import { DialogShell } from '../common/DialogShell';
 import { useToast } from '@/hooks/useToast';
 
@@ -69,14 +70,15 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             <Icons.FileDown className="w-6 h-6 text-amber-400" />
             <h2 className="text-lg font-bold font-serif">Export Campaign</h2>
           </div>
-          <button
+          <Button
+            variant="icon"
             onClick={onClose}
             disabled={isLoading}
-            className="p-1 rounded-md hover:bg-slate-800 text-slate-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="text-slate-400 hover:text-white"
             aria-label="Close"
           >
             <Icons.X className="w-5 h-5" />
-          </button>
+          </Button>
         </header>
         <div className="p-6 space-y-4">
           <div className="text-center">

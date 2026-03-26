@@ -430,14 +430,16 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm leading-snug">{error}</p>
                                 </div>
-                                <button
+                                <Button
                                     type="button"
+                                    variant="danger"
+                                    size="sm"
                                     onClick={handleGenerate}
                                     disabled={isLoading}
-                                    className="flex-shrink-0 text-xs text-red-300 hover:text-white bg-red-800/40 hover:bg-red-700/60 rounded px-2 py-1 transition-colors disabled:opacity-40"
+                                    className="flex-shrink-0 text-xs"
                                 >
                                     Try Again
-                                </button>
+                                </Button>
                             </div>
                         )}
                         <Button onClick={handleGenerate} disabled={isLoading} className="w-full">
@@ -650,13 +652,15 @@ const RoleplayPanel: React.FC<RoleplayPanelProps> = ({
                         <div className="flex-1 min-w-0">
                             <p className="text-sm leading-snug">{error}</p>
                         </div>
-                        <button
+                        <Button
                             type="button"
+                            variant="danger"
+                            size="sm"
                             onClick={onClearError}
-                            className="flex-shrink-0 text-xs text-red-300 hover:text-white bg-red-800/40 hover:bg-red-700/60 rounded px-2 py-1 transition-colors"
+                            className="flex-shrink-0 text-xs"
                         >
                             Dismiss
-                        </button>
+                        </Button>
                     </div>
                 )}
 
@@ -667,22 +671,26 @@ const RoleplayPanel: React.FC<RoleplayPanelProps> = ({
             <div className="px-4 pt-2 pb-4 flex-shrink-0 border-t border-slate-800 space-y-2">
                 {messages.length > 0 && (
                     <div className="flex gap-2 justify-end">
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={onClear}
-                            className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                            className="text-xs text-slate-500 hover:text-slate-300 px-2 py-1"
                             title="Clear conversation"
                         >
                             Clear
-                        </button>
+                        </Button>
                         {onSendToNotes && (
-                            <button
+                            <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={onSendToNotes}
-                                className="text-xs text-slate-500 hover:text-amber-400 transition-colors flex items-center gap-1"
+                                className="text-xs text-slate-500 hover:text-amber-400 gap-1 px-2 py-1"
                                 title="Send conversation to session notes"
                             >
                                 <Icons.FileText className="w-3 h-3" />
                                 Send to Notes
-                            </button>
+                            </Button>
                         )}
                     </div>
                 )}
@@ -697,15 +705,16 @@ const RoleplayPanel: React.FC<RoleplayPanelProps> = ({
                         className="flex-1 bg-slate-950 border border-slate-700 text-slate-200 rounded-md px-3 py-2 text-sm placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
                         aria-label="Roleplay message input"
                     />
-                    <button
+                    <Button
+                        variant="primary"
                         onClick={onSend}
                         disabled={!selectedNpc || isLoading || !input.trim()}
-                        className="flex-shrink-0 p-2 rounded-md bg-amber-600 hover:bg-amber-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        className="flex-shrink-0 rounded-md px-2 py-2"
                         aria-label="Send message"
                         title="Send (Enter)"
                     >
                         <Icons.Send className="w-4 h-4" />
-                    </button>
+                    </Button>
                 </div>
             </div>
         </div>
@@ -736,22 +745,24 @@ const TextResultDisplay = ({ text, onSendToNotes, toolLabel, onNavigate }: { tex
         <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 relative">
             <div className="absolute top-2 right-2 flex gap-1">
                 {onSendToNotes && (
-                    <button
+                    <Button
+                        variant="icon"
                         onClick={handleSendToNotes}
-                        className="p-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                        className="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
                         aria-label="Send to session notes"
                         title="Send to session notes"
                     >
                         {hasSent ? <Icons.Check className="w-4 h-4 text-green-400" /> : <Icons.FileText className="w-4 h-4" />}
-                    </button>
+                    </Button>
                 )}
-                <button
+                <Button
+                    variant="icon"
                     onClick={handleCopyToClipboard}
-                    className="p-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
                     aria-label="Copy to clipboard"
                 >
                     {hasCopied ? <Icons.Check className="w-4 h-4 text-green-400" /> : <Icons.Clipboard className="w-4 h-4" />}
-                </button>
+                </Button>
             </div>
             {onNavigate ? (
                 <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">

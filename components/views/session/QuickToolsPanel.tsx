@@ -127,19 +127,19 @@ export const QuickToolsPanel: React.FC<QuickToolsPanelProps> = ({
                     Quick NPC
                 </Button>
                 {canShowSecretsTracker && (
-                    <button
+                    <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => setShowSecrets(prev => !prev)}
                         className={twMerge(
-                            "w-full flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-lg text-sm transition-colors",
-                            showSecrets
-                                ? "bg-amber-900/30 text-amber-300 border border-amber-700/50"
-                                : "bg-slate-800 hover:bg-slate-700 text-slate-200"
+                            "w-full justify-start",
+                            showSecrets && "bg-amber-900/30 text-amber-300 border border-amber-700/50 hover:bg-amber-900/40"
                         )}
                     >
-                        <Icons.Lock className="w-4 h-4 text-amber-400" />
+                        <Icons.Lock className="w-4 h-4 mr-2 text-amber-400" />
                         Secrets & Clues
                         <Icons.ChevronDown className={twMerge("w-3 h-3 ml-auto text-slate-500 transition-transform", showSecrets && "rotate-180")} />
-                    </button>
+                    </Button>
                 )}
             </div>
 

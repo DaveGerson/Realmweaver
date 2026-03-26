@@ -470,21 +470,22 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                             </div>
                             <div className="flex items-center gap-2">
                                 {campaign.activeEncounter && campaign.activeEncounter.combatants.length > 0 && (
-                                    <button
+                                    <Button
+                                        variant="danger"
+                                        size="sm"
                                         onClick={handleEndCombat}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-600 text-white text-sm transition-colors"
                                         title="End combat and log summary"
                                     >
-                                        <Icons.Stop className="w-4 h-4" />
+                                        <Icons.Stop className="w-4 h-4 mr-1.5" />
                                         End Combat
-                                    </button>
+                                    </Button>
                                 )}
-                                <button
+                                <Button
+                                    variant="icon"
                                     onClick={() => setShowCombatPanel(false)}
-                                    className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
                                 >
                                     <Icons.X className="w-5 h-5" />
-                                </button>
+                                </Button>
                             </div>
                         </div>
                         <div className="flex-1 overflow-hidden">

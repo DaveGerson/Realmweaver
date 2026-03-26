@@ -47,13 +47,14 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart, onImportC
               className="hidden"
               aria-hidden="true"
             />
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={handleImportClick}
-              className="mt-4 block mx-auto text-sm text-slate-400 hover:text-amber-400 transition-colors underline underline-offset-4"
+              className="mt-4 underline underline-offset-4 text-slate-400 hover:text-amber-400"
             >
               Import an existing campaign
-            </button>
+            </Button>
           </>
         )}
       </div>

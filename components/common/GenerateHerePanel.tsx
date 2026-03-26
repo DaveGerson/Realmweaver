@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Icons } from '@/components/common/Icons';
+import { Button } from '@/components/common/Button';
 
 interface GenerateHerePanelProps {
   /** Label shown on the trigger button */
@@ -62,18 +63,19 @@ export const GenerateHerePanel: React.FC<GenerateHerePanelProps> = ({
   return (
     <div className="space-y-3">
       {!isOpen && (
-        <button
+        <Button
+          variant="primary"
+          size="sm"
           onClick={handleOpen}
           disabled={disabled || isGenerating}
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white transition-colors disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-slate-900"
         >
           {isGenerating ? (
-            <Icons.Loader className="w-3.5 h-3.5 animate-spin" />
+            <Icons.Loader className="w-3.5 h-3.5 animate-spin mr-2" />
           ) : (
-            <Icons.Sparkles className="w-3.5 h-3.5" />
+            <Icons.Sparkles className="w-3.5 h-3.5 mr-2" />
           )}
           {isGenerating ? 'Generating...' : buttonLabel}
-        </button>
+        </Button>
       )}
 
       {isOpen && (
@@ -91,25 +93,29 @@ export const GenerateHerePanel: React.FC<GenerateHerePanelProps> = ({
             autoFocus
           />
           <div className="flex flex-col sm:flex-row gap-2">
-            <button
+            <Button
+              variant="primary"
+              size="sm"
               onClick={handleSubmit}
               disabled={!prompt.trim() || isGenerating}
-              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white transition-colors disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+              className="flex-1 sm:flex-none"
             >
               {isGenerating ? (
-                <Icons.Loader className="w-3.5 h-3.5 animate-spin" />
+                <Icons.Loader className="w-3.5 h-3.5 animate-spin mr-2" />
               ) : (
-                <Icons.Wizard className="w-3.5 h-3.5" />
+                <Icons.Wizard className="w-3.5 h-3.5 mr-2" />
               )}
               {isGenerating ? 'Generating...' : 'Generate'}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={handleCancel}
               disabled={isGenerating}
-              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+              className="flex-1 sm:flex-none"
             >
               Cancel
-            </button>
+            </Button>
           </div>
           <p className="text-xs text-slate-500">
             Edit the prompt above to customize what gets generated, then click Generate.

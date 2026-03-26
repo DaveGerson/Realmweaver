@@ -3,6 +3,7 @@ import React, { useState, useCallback } from 'react';
 import type { NPC, Location } from '@/types/index';
 import type { AdventureForBatchAdd } from '@/types/index';
 import { Icons } from '@/components/common/Icons';
+import { Button } from '@/components/common/Button';
 import {
     generateStarterNpcs,
     generateStarterLocations,
@@ -85,20 +86,22 @@ const NpcCard: React.FC<NpcCardProps> = ({ npc, onUpdate, onRemove }) => {
                         placeholder="NPC name"
                     />
                 </div>
-                <button
+                <Button
+                    variant="icon"
                     onClick={() => setExpanded(p => !p)}
-                    className="text-slate-400 hover:text-slate-200 p-1 flex-shrink-0"
+                    className="flex-shrink-0"
                     title={expanded ? 'Collapse' : 'Expand'}
                 >
                     {expanded ? <Icons.ChevronUp className="w-4 h-4" /> : <Icons.ChevronDown className="w-4 h-4" />}
-                </button>
-                <button
+                </Button>
+                <Button
+                    variant="icon"
                     onClick={() => onRemove(npc._key)}
-                    className="text-slate-500 hover:text-red-400 p-1 flex-shrink-0"
+                    className="flex-shrink-0 hover:text-red-400"
                     title="Remove NPC"
                 >
                     <Icons.Trash className="w-4 h-4" />
-                </button>
+                </Button>
             </div>
 
             <textarea
@@ -172,20 +175,22 @@ const LocationCard: React.FC<LocationCardProps> = ({ loc, onUpdate, onRemove }) 
                         placeholder="Location name"
                     />
                 </div>
-                <button
+                <Button
+                    variant="icon"
                     onClick={() => setExpanded(p => !p)}
-                    className="text-slate-400 hover:text-slate-200 p-1 flex-shrink-0"
+                    className="flex-shrink-0"
                     title={expanded ? 'Collapse' : 'Expand'}
                 >
                     {expanded ? <Icons.ChevronUp className="w-4 h-4" /> : <Icons.ChevronDown className="w-4 h-4" />}
-                </button>
-                <button
+                </Button>
+                <Button
+                    variant="icon"
                     onClick={() => onRemove(loc._key)}
-                    className="text-slate-500 hover:text-red-400 p-1 flex-shrink-0"
+                    className="flex-shrink-0 hover:text-red-400"
                     title="Remove location"
                 >
                     <Icons.Trash className="w-4 h-4" />
-                </button>
+                </Button>
             </div>
 
             <textarea
@@ -484,13 +489,14 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
                             {stepLabels[step]}
                         </h2>
                     </div>
-                    <button
+                    <Button
+                        variant="icon"
                         onClick={onDismiss}
-                        className="text-slate-500 hover:text-slate-300 transition-colors ml-4 flex-shrink-0"
+                        className="ml-4 flex-shrink-0"
                         title="Skip wizard"
                     >
                         <Icons.X className="w-5 h-5" />
-                    </button>
+                    </Button>
                 </div>
 
                 <div className="px-6 pb-2 flex-shrink-0">
@@ -527,14 +533,16 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
                                             Pre-fills the description so you can explore the full workflow.
                                         </p>
                                     </div>
-                                    <button
+                                    <Button
                                         type="button"
+                                        variant="secondary"
+                                        size="sm"
                                         onClick={() => setWorldDescription(getWintersDaughterTemplate().setting)}
-                                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-200 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-md transition-colors"
+                                        className="flex-shrink-0"
                                     >
-                                        <Icons.Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                                        <Icons.Sparkles className="w-3.5 h-3.5 text-amber-400 mr-1.5" />
                                         Load
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
 
@@ -683,13 +691,14 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
                                                     <span className="text-xs text-slate-500 capitalize bg-slate-700 px-2 py-0.5 rounded-full flex-shrink-0">
                                                         {scene.type}
                                                     </span>
-                                                    <button
+                                                    <Button
+                                                        variant="icon"
                                                         onClick={() => handleSceneRemove(i)}
-                                                        className="text-slate-600 hover:text-red-400 transition-colors p-0.5 flex-shrink-0"
+                                                        className="flex-shrink-0 hover:text-red-400"
                                                         title="Remove scene"
                                                     >
                                                         <Icons.Trash className="w-3.5 h-3.5" />
-                                                    </button>
+                                                    </Button>
                                                 </div>
                                                 <p className="text-xs text-slate-400 leading-relaxed line-clamp-2">
                                                     {scene.readAloudText}
@@ -742,177 +751,181 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
                         On later steps it becomes a softer skip link. */}
                     {step !== 5 && (
                         step === 1 ? (
-                            <button
+                            <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={onDismiss}
-                                className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 sm:mr-auto transition-colors"
+                                className="sm:mr-auto text-slate-400 hover:text-slate-200"
                             >
-                                <Icons.ArrowLeft className="w-3.5 h-3.5" />
+                                <Icons.ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
                                 Back to campaigns
-                            </button>
+                            </Button>
                         ) : (
-                            <button
+                            <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={onDismiss}
-                                className="text-xs text-slate-500 hover:text-slate-300 sm:mr-auto"
+                                className="sm:mr-auto text-slate-500 hover:text-slate-300"
                             >
                                 Skip — I'll build my own
-                            </button>
+                            </Button>
                         )
                     )}
 
                     {/* Back button — steps 2-4 */}
                     {step > 1 && step < 5 && (
-                        <button
+                        <Button
+                            variant="secondary"
                             onClick={() => setStep(s => (s - 1) as WizardStep)}
                             disabled={isLoading}
-                            className="flex items-center gap-1.5 px-4 py-2 text-sm text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg transition-colors disabled:opacity-50"
                         >
-                            <Icons.ChevronLeft className="w-4 h-4" />
+                            <Icons.ChevronLeft className="w-4 h-4 mr-1.5" />
                             Back
-                        </button>
+                        </Button>
                     )}
 
                     {/* Primary action */}
                     {step === 1 && (
-                        <button
+                        <Button
+                            variant="primary"
                             onClick={handleStep1Next}
                             disabled={isLoading || worldDescription.trim().length < 20}
-                            className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {isLoading ? (
                                 <>
-                                    <Icons.Loader className="w-4 h-4 animate-spin" />
+                                    <Icons.Loader className="w-4 h-4 animate-spin mr-2" />
                                     Generating cast...
                                 </>
                             ) : (
                                 <>
                                     Next
-                                    <Icons.ChevronRight className="w-4 h-4" />
+                                    <Icons.ChevronRight className="w-4 h-4 ml-2" />
                                 </>
                             )}
-                        </button>
+                        </Button>
                     )}
 
                     {step === 2 && (
                         <div className="flex gap-2 sm:ml-auto">
-                            <button
+                            <Button
+                                variant="secondary"
                                 onClick={handleRegenerateNpcs}
                                 disabled={isLoading}
-                                className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg transition-colors disabled:opacity-50"
                                 title="Regenerate all NPCs"
                             >
                                 {isLoading ? (
-                                    <Icons.Loader className="w-4 h-4 animate-spin" />
+                                    <Icons.Loader className="w-4 h-4 animate-spin mr-1.5" />
                                 ) : (
-                                    <Icons.Sparkles className="w-4 h-4" />
+                                    <Icons.Sparkles className="w-4 h-4 mr-1.5" />
                                 )}
                                 Regenerate
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                variant="primary"
                                 onClick={handleStep2Next}
                                 disabled={isLoading}
-                                className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition-colors disabled:opacity-50"
                             >
                                 {isLoading ? (
                                     <>
-                                        <Icons.Loader className="w-4 h-4 animate-spin" />
+                                        <Icons.Loader className="w-4 h-4 animate-spin mr-2" />
                                         Generating locations...
                                     </>
                                 ) : (
                                     <>
                                         Next
-                                        <Icons.ChevronRight className="w-4 h-4" />
+                                        <Icons.ChevronRight className="w-4 h-4 ml-2" />
                                     </>
                                 )}
-                            </button>
+                            </Button>
                         </div>
                     )}
 
                     {step === 3 && (
                         <div className="flex gap-2 sm:ml-auto">
-                            <button
+                            <Button
+                                variant="secondary"
                                 onClick={handleRegenerateLocations}
                                 disabled={isLoading}
-                                className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg transition-colors disabled:opacity-50"
                                 title="Regenerate all locations"
                             >
                                 {isLoading ? (
-                                    <Icons.Loader className="w-4 h-4 animate-spin" />
+                                    <Icons.Loader className="w-4 h-4 animate-spin mr-1.5" />
                                 ) : (
-                                    <Icons.Sparkles className="w-4 h-4" />
+                                    <Icons.Sparkles className="w-4 h-4 mr-1.5" />
                                 )}
                                 Regenerate
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                variant="primary"
                                 onClick={handleStep3Next}
                                 disabled={isLoading}
-                                className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition-colors disabled:opacity-50"
                             >
                                 {isLoading ? (
                                     <>
-                                        <Icons.Loader className="w-4 h-4 animate-spin" />
+                                        <Icons.Loader className="w-4 h-4 animate-spin mr-2" />
                                         Generating adventure...
                                     </>
                                 ) : (
                                     <>
                                         Next
-                                        <Icons.ChevronRight className="w-4 h-4" />
+                                        <Icons.ChevronRight className="w-4 h-4 ml-2" />
                                     </>
                                 )}
-                            </button>
+                            </Button>
                         </div>
                     )}
 
                     {step === 4 && (
                         <div className="flex gap-2 sm:ml-auto">
-                            <button
+                            <Button
+                                variant="secondary"
                                 onClick={handleRegenerateAdventure}
                                 disabled={isLoading}
-                                className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg transition-colors disabled:opacity-50"
                                 title="Regenerate adventure"
                             >
                                 {isLoading ? (
-                                    <Icons.Loader className="w-4 h-4 animate-spin" />
+                                    <Icons.Loader className="w-4 h-4 animate-spin mr-1.5" />
                                 ) : (
-                                    <Icons.Sparkles className="w-4 h-4" />
+                                    <Icons.Sparkles className="w-4 h-4 mr-1.5" />
                                 )}
                                 Regenerate
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                variant="primary"
                                 onClick={handleStep4Next}
                                 disabled={isLoading || isSaving || !adventureDraft}
-                                className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {isSaving ? (
                                     <>
-                                        <Icons.Loader className="w-4 h-4 animate-spin" />
+                                        <Icons.Loader className="w-4 h-4 animate-spin mr-2" />
                                         Saving...
                                     </>
                                 ) : (
                                     <>
-                                        <Icons.CheckCircle className="w-4 h-4" />
+                                        <Icons.CheckCircle className="w-4 h-4 mr-2" />
                                         Save All & Finish
                                     </>
                                 )}
-                            </button>
+                            </Button>
                         </div>
                     )}
 
                     {step === 5 && (
                         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:ml-auto">
-                            <button
+                            <Button
+                                variant="secondary"
                                 onClick={() => onComplete('npcs')}
-                                className="flex items-center justify-center gap-2 px-4 py-2 text-sm text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg transition-colors"
                             >
-                                <Icons.NPCs className="w-4 h-4" />
+                                <Icons.NPCs className="w-4 h-4 mr-2" />
                                 Explore Your World
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                variant="primary"
                                 onClick={() => onComplete('adventures')}
-                                className="flex items-center justify-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition-colors"
                             >
-                                <Icons.Adventures className="w-4 h-4" />
+                                <Icons.Adventures className="w-4 h-4 mr-2" />
                                 Go to Adventure
-                            </button>
+                            </Button>
                         </div>
                     )}
                 </div>

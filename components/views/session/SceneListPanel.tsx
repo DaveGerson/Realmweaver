@@ -2,6 +2,7 @@
 import React, { useState, useCallback } from 'react';
 import type { Campaign, SessionLog, Scene, Beat } from '@/types';
 import { Icons } from '@/components/common/Icons';
+import { Button } from '@/components/common/Button';
 import { twMerge } from 'tailwind-merge';
 import { campaignService } from '@/services/campaignService';
 import { EntityLink } from '@/components/common/EntityLink';
@@ -178,14 +179,16 @@ export const SceneListPanel: React.FC<SceneListPanelProps> = ({
                         placeholder="Add a beat..."
                         className="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded-md px-2 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
                     />
-                    <button
+                    <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={handleAddBeat}
                         disabled={!beatInput.trim()}
-                        className="flex-shrink-0 p-1 rounded-md bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-slate-300 transition-colors"
+                        className="flex-shrink-0"
                         title="Add beat"
                     >
                         <Icons.Plus className="w-3.5 h-3.5" />
-                    </button>
+                    </Button>
                 </div>
             </div>
         </div>

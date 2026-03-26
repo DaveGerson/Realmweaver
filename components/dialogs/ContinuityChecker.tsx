@@ -11,6 +11,7 @@ import { EntityLink } from '@/components/common/EntityLink';
 import type { QuickCardEntityType } from '@/components/common/EntityQuickCard';
 import { twMerge } from 'tailwind-merge';
 import { DialogShell } from '@/components/common/DialogShell';
+import { Button } from '@/components/common/Button';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -138,15 +139,16 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue, onDismiss, onNavigate }) =
         </div>
 
         {/* Dismiss button */}
-        <button
+        <Button
+          variant="icon"
           type="button"
           onClick={() => onDismiss(issue.id)}
-          className="flex-shrink-0 text-slate-500 hover:text-slate-300 transition-colors p-1 rounded-md hover:bg-slate-700/50"
+          className="flex-shrink-0 text-slate-500 hover:text-slate-300 hover:bg-slate-700/50"
           aria-label="Dismiss issue"
           title="Dismiss for this session"
         >
           <Icons.X className="w-4 h-4" />
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -246,26 +248,29 @@ export const ContinuityChecker: React.FC<ContinuityCheckerProps> = ({
 
           <div className="flex items-center gap-2">
             {/* Re-check button */}
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               type="button"
               onClick={runCheck}
               disabled={isRunning}
-              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-amber-300 transition-colors px-2 py-1 rounded-md hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="gap-1.5 text-xs text-slate-400 hover:text-amber-300 px-2 py-1"
               aria-label="Re-run continuity check"
               title="Re-check for issues"
             >
               <Icons.RefreshCw className={twMerge('w-3.5 h-3.5', isRunning && 'animate-spin')} />
               <span className="hidden sm:inline">Re-check</span>
-            </button>
+            </Button>
 
-            <button
+            <Button
+              variant="icon"
               type="button"
               onClick={onClose}
-              className="text-slate-400 hover:text-slate-200 transition-colors p-1 rounded-md hover:bg-slate-700"
+              className="text-slate-400 hover:text-slate-200"
               aria-label="Close continuity checker"
             >
               <Icons.X className="w-5 h-5" />
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -339,13 +344,14 @@ export const ContinuityChecker: React.FC<ContinuityCheckerProps> = ({
           <p className="text-xs text-slate-500">
             {dismissedIds.size > 0 && `${dismissedIds.size} dismissed this session`}
           </p>
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             type="button"
             onClick={onClose}
-            className="bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm px-4 py-1.5 rounded-md transition-colors"
           >
             Close
-          </button>
+          </Button>
         </div>
       </div>
     </DialogShell>

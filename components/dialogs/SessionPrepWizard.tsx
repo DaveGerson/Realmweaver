@@ -332,12 +332,9 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
                         <Icons.Live className="w-5 h-5 text-amber-400" />
                         <h2 className="text-lg font-bold text-white font-serif">Session Prep Wizard</h2>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
-                    >
+                    <Button variant="icon" onClick={onClose} className="text-slate-400 hover:text-white">
                         <Icons.X className="w-5 h-5" />
-                    </button>
+                    </Button>
                 </div>
 
                 {/* Step Indicators */}

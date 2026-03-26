@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import type { Adventure, Campaign } from '../../types/index';
 import { Button } from '../common/Button';
-import { Clipboard, Check } from 'lucide-react';
+import { Icons } from '../common/Icons';
 
 interface PrepDocumentViewProps {
   adventure: Adventure;
@@ -112,7 +112,7 @@ export const PrepDocumentView: React.FC<PrepDocumentViewProps> = ({ adventure, c
           A full Markdown document for your adventure. Copy this into your favorite notes app.
         </p>
         <Button onClick={handleCopy} variant="secondary" size="sm">
-          {hasCopied ? <Check className="w-4 h-4 mr-2 text-green-400" /> : <Clipboard className="w-4 h-4 mr-2" />}
+          {hasCopied ? <Icons.Check className="w-4 h-4 mr-2 text-green-400" /> : <Icons.Clipboard className="w-4 h-4 mr-2" />}
           {hasCopied ? 'Copied!' : 'Copy to Clipboard'}
         </Button>
       </div>

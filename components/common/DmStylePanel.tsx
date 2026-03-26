@@ -4,6 +4,7 @@
 
 import React, { useState } from 'react';
 import { Icons } from './Icons';
+import { Button } from './Button';
 import type { DmStyle } from '../../types/index';
 import { isFeatureVisible, OVERRIDEABLE_FEATURES, FEATURE_LABELS } from '../../utils/dmStyleUtils';
 
@@ -44,13 +45,13 @@ export const DmStylePanel: React.FC<DmStylePanelProps> = ({
             <Icons.Sliders className="w-4 h-4 text-amber-400" />
             <h2 className="font-semibold text-slate-100">DM Style</h2>
           </div>
-          <button
+          <Button
+            variant="icon"
             onClick={onClose}
-            className="p-1 text-slate-500 hover:text-slate-200 transition-colors rounded-md"
             aria-label="Close"
           >
             <Icons.X className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
 
         {/* DM Style Selector */}
@@ -89,19 +90,21 @@ export const DmStylePanel: React.FC<DmStylePanelProps> = ({
 
           {/* Per-feature overrides */}
           <div>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => setShowOverrides(p => !p)}
-              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors w-full py-1"
+              className="w-full text-slate-400 hover:text-slate-200 justify-start py-1"
             >
-              <Icons.ChevronDown className={`w-3.5 h-3.5 transition-transform ${showOverrides ? '' : '-rotate-90'}`} />
+              <Icons.ChevronDown className={`w-3.5 h-3.5 transition-transform mr-1.5 ${showOverrides ? '' : '-rotate-90'}`} />
               Custom feature overrides
               {Object.keys(featureOverrides).length > 0 && (
                 <span className="ml-auto bg-amber-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                   {Object.keys(featureOverrides).length}
                 </span>
               )}
-            </button>
+            </Button>
 
             {showOverrides && (
               <div className="mt-2 space-y-1.5 animate-in fade-in duration-150">
@@ -163,13 +166,15 @@ export const DmStylePanel: React.FC<DmStylePanelProps> = ({
                   );
                 })}
                 {Object.keys(featureOverrides).length > 0 && (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={() => OVERRIDEABLE_FEATURES.forEach(f => onClearFeatureOverride(f))}
-                    className="w-full text-xs text-slate-500 hover:text-amber-400 transition-colors text-center py-1 mt-1"
+                    className="w-full text-slate-500 hover:text-amber-400 mt-1"
                   >
                     Reset all overrides to style defaults
-                  </button>
+                  </Button>
                 )}
               </div>
             )}

@@ -293,20 +293,22 @@ export const RealmChatWidget: React.FC<RealmChatWidgetProps> = ({ campaign, onAd
                     <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                          {!isMinimized && (
                              <>
-                                <button
+                                <Button
+                                    variant="icon"
                                     onClick={handleNewConversation}
-                                    className="p-1.5 rounded-md transition-colors text-slate-400 hover:text-amber-300 hover:bg-slate-700"
                                     title="New Conversation"
+                                    className="hover:text-amber-300"
                                 >
                                     <Icons.Plus className="w-4 h-4" />
-                                </button>
-                                <button
+                                </Button>
+                                <Button
+                                    variant="icon"
                                     onClick={() => setIsEntityPickerOpen(p => !p)}
-                                    className={`p-1.5 rounded-md transition-colors ${isEntityPickerOpen ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}
                                     title="Load Existing Entity"
+                                    className={isEntityPickerOpen ? 'bg-indigo-600 text-white hover:bg-indigo-500' : ''}
                                 >
                                     <Icons.FolderOpen className="w-4 h-4" />
-                                </button>
+                                </Button>
                                 <select
                                     value={tier}
                                     onChange={(e) => setTier(e.target.value as ModelTier)}
@@ -319,17 +321,17 @@ export const RealmChatWidget: React.FC<RealmChatWidgetProps> = ({ campaign, onAd
                              </>
                          )}
                         {isMinimized ? (
-                            <button onClick={() => setIsMinimized(false)} className="text-slate-400 hover:text-white p-1" title="Expand">
+                            <Button variant="icon" onClick={() => setIsMinimized(false)} title="Expand">
                                 <Icons.Maximize className="w-4 h-4" />
-                            </button>
+                            </Button>
                         ) : (
-                            <button onClick={() => setIsMinimized(true)} className="text-slate-400 hover:text-white p-1" title="Minimize">
+                            <Button variant="icon" onClick={() => setIsMinimized(true)} title="Minimize">
                                 <Icons.Minus className="w-4 h-4" />
-                            </button>
+                            </Button>
                         )}
-                        <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white p-1" title="Close">
+                        <Button variant="icon" onClick={() => setIsOpen(false)} title="Close">
                             <Icons.X className="w-4 h-4" />
-                        </button>
+                        </Button>
                     </div>
                 </header>
 
@@ -341,7 +343,9 @@ export const RealmChatWidget: React.FC<RealmChatWidgetProps> = ({ campaign, onAd
                             <div className="absolute inset-0 bg-slate-900 z-20 flex flex-col animate-in fade-in duration-200">
                                 <div className="p-3 border-b border-slate-700 flex justify-between items-center bg-slate-800">
                                     <h4 className="text-sm font-semibold text-slate-200">Load Entity to Edit</h4>
-                                    <button onClick={() => { setIsEntityPickerOpen(false); setEntityPickerSearch(''); }}><Icons.X className="w-4 h-4 text-slate-400" /></button>
+                                    <Button variant="icon" onClick={() => { setIsEntityPickerOpen(false); setEntityPickerSearch(''); }}>
+                                        <Icons.X className="w-4 h-4" />
+                                    </Button>
                                 </div>
                                 <div className="p-2 border-b border-slate-700/50 bg-slate-800/50">
                                     <input

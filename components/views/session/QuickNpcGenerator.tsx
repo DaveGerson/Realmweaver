@@ -3,6 +3,7 @@ import React, { useState, useCallback } from 'react';
 import type { Campaign, Scene, NPC } from '@/types';
 import type { Adventure } from '@/types';
 import { Icons } from '@/components/common/Icons';
+import { Button } from '@/components/common/Button';
 import { campaignService } from '@/services/campaignService';
 import { generateNpc } from '@/services/aiService';
 
@@ -88,23 +89,25 @@ export const QuickNpcGenerator: React.FC<QuickNpcGeneratorProps> = ({
                         className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 disabled:opacity-50"
                         autoFocus
                     />
-                    <button
+                    <Button
+                        variant="primary"
+                        size="sm"
                         onClick={handleGenerateQuickNpc}
                         disabled={!npcPrompt.trim() || npcGenerating}
-                        className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm transition-colors"
+                        className="w-full bg-emerald-600 hover:bg-emerald-500 focus:ring-emerald-500"
                     >
                         {npcGenerating ? (
                             <>
-                                <Icons.Loader className="w-4 h-4 animate-spin" />
+                                <Icons.Loader className="w-4 h-4 animate-spin mr-2" />
                                 Generating...
                             </>
                         ) : (
                             <>
-                                <Icons.Sparkles className="w-4 h-4" />
+                                <Icons.Sparkles className="w-4 h-4 mr-2" />
                                 Generate
                             </>
                         )}
-                    </button>
+                    </Button>
                 </>
             )}
 
@@ -116,35 +119,43 @@ export const QuickNpcGenerator: React.FC<QuickNpcGeneratorProps> = ({
                     {npcPreview.description && <p className="text-xs text-slate-300 line-clamp-3">{npcPreview.description}</p>}
                     {npcPreview.exampleQuote && <p className="text-xs text-amber-400/70 italic">"{npcPreview.exampleQuote}"</p>}
                     <div className="flex gap-1.5 pt-1">
-                        <button
+                        <Button
+                            variant="primary"
+                            size="sm"
                             onClick={handleSavePreviewNpc}
-                            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors"
+                            className="flex-1 bg-emerald-600 hover:bg-emerald-500 focus:ring-emerald-500"
                         >
-                            <Icons.CheckCircle className="w-3.5 h-3.5" />
+                            <Icons.CheckCircle className="w-3.5 h-3.5 mr-1" />
                             Save
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            size="sm"
                             onClick={handleGenerateQuickNpc}
                             disabled={npcGenerating}
-                            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold transition-colors disabled:opacity-50"
+                            className="flex-1"
                         >
-                            <Icons.Sparkles className="w-3.5 h-3.5" />
+                            <Icons.Sparkles className="w-3.5 h-3.5 mr-1" />
                             {npcGenerating ? 'Generating...' : 'Regenerate'}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            size="sm"
                             onClick={handleEditPreviewNpc}
-                            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold transition-colors"
+                            className="flex-1"
                         >
-                            <Icons.Edit className="w-3.5 h-3.5" />
+                            <Icons.Edit className="w-3.5 h-3.5 mr-1" />
                             Edit
-                        </button>
+                        </Button>
                     </div>
-                    <button
+                    <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => { setNpcPreview(null); setNpcEditMode(false); }}
-                        className="w-full text-xs text-slate-500 hover:text-slate-400 transition-colors"
+                        className="w-full text-slate-500 hover:text-slate-400"
                     >
                         Discard
-                    </button>
+                    </Button>
                 </div>
             )}
 
@@ -173,19 +184,23 @@ export const QuickNpcGenerator: React.FC<QuickNpcGeneratorProps> = ({
                         className="w-full bg-slate-900 border border-slate-600 rounded-md px-2 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 resize-none"
                     />
                     <div className="flex gap-1.5">
-                        <button
+                        <Button
+                            variant="primary"
+                            size="sm"
                             onClick={handleSavePreviewNpc}
-                            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors"
+                            className="flex-1 bg-emerald-600 hover:bg-emerald-500 focus:ring-emerald-500"
                         >
-                            <Icons.CheckCircle className="w-3.5 h-3.5" />
+                            <Icons.CheckCircle className="w-3.5 h-3.5 mr-1" />
                             Save
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            size="sm"
                             onClick={() => setNpcEditMode(false)}
-                            className="flex-1 px-2 py-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold transition-colors"
+                            className="flex-1"
                         >
                             Back to Preview
-                        </button>
+                        </Button>
                     </div>
                 </div>
             )}

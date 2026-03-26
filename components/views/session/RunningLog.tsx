@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import type { SessionLog } from '@/types';
 import { Icons } from '@/components/common/Icons';
+import { Button } from '@/components/common/Button';
 import { twMerge } from 'tailwind-merge';
 import { campaignService } from '@/services/campaignService';
 import { MentionInput } from '@/components/common/MentionInput';
@@ -357,13 +358,15 @@ export const RunningLog: React.FC<RunningLogProps> = ({ sessionLog, mobileTab })
                                 }
                             </button>
                         )}
-                        <button
+                        <Button
+                            variant="primary"
+                            size="sm"
                             onClick={handleAddNote}
                             disabled={!noteInput.trim()}
-                            className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm transition-colors flex-shrink-0"
+                            className="flex-shrink-0"
                         >
                             Add
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>
@@ -390,23 +393,26 @@ export const RunningLog: React.FC<RunningLogProps> = ({ sessionLog, mobileTab })
                                     if (e.key === 'Escape') setMobileExpanded(false);
                                 }}
                             />
-                            <button
+                            <Button
+                                variant="primary"
+                                size="sm"
                                 onClick={() => {
                                     const val = mobileInputRef.current?.value ?? '';
                                     handleMobileQuickAdd(val);
                                     if (mobileInputRef.current) mobileInputRef.current.value = '';
                                 }}
-                                className="flex-shrink-0 px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm transition-colors"
+                                className="flex-shrink-0"
                             >
                                 Add
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                variant="icon"
                                 onClick={() => setMobileExpanded(false)}
-                                className="flex-shrink-0 p-2 rounded-lg text-slate-400 hover:text-slate-200"
                                 aria-label="Collapse note input"
+                                className="flex-shrink-0"
                             >
                                 <Icons.X className="w-4 h-4" />
-                            </button>
+                            </Button>
                         </div>
                     ) : (
                         <button

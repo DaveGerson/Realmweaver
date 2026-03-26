@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Icons } from '@/components/common/Icons';
+import { Button } from '@/components/common/Button';
 import { DialogShell } from '@/components/common/DialogShell';
 import { SHORTCUTS, formatShortcut } from '@/utils/keyboardShortcuts';
 
@@ -23,14 +24,14 @@ export const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({ is
             <Icons.Keyboard className="w-4 h-4 text-amber-400" />
             <span className="text-sm font-semibold text-slate-100">Keyboard Shortcuts</span>
           </div>
-          <button
+          <Button
+            variant="icon"
             onClick={onClose}
-            className="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors"
             aria-label="Close shortcuts help"
             type="button"
           >
             <Icons.X className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
 
         {/* Shortcut list */}

@@ -183,13 +183,14 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
               </span>
             )}
           </div>
-          <button
+          <Button
+            variant="icon"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-100 transition-colors p-1 rounded"
+            className="text-slate-400 hover:text-slate-100"
             aria-label="Close"
           >
             <Icons.X className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
 
         {/* Body */}
@@ -368,12 +369,14 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
                                   </div>
                                 </div>
                                 {/* Show more / Show less toggle */}
-                                <button
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
                                   onClick={() => toggleUpdateExpanded(updateKey)}
-                                  className="text-[10px] text-slate-500 hover:text-amber-400 transition-colors mt-0.5"
+                                  className="text-[10px] text-slate-500 hover:text-amber-400 mt-0.5 px-0 py-0"
                                 >
                                   {isExpanded ? 'Show less' : 'Show more'}
-                                </button>
+                                </Button>
                               </div>
                             );
                           })}
