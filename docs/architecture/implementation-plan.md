@@ -1,7 +1,7 @@
 # Realmweaver — Sequenced Implementation Plan
 
 > **Created:** 2026-03-20
-> **Last Updated:** 2026-03-24
+> **Last Updated:** 2026-03-26
 > **Supersedes:** `TODO.md` (items either absorbed here or cut), UX_OVERHAUL_PLAN.md Sprint numbering
 > **Source documents:** `UX_OVERHAUL_PLAN.md`, `docs/SESSION_COCKPIT_ARCHETYPE_REVIEW.md`, `docs/DM_ARCHETYPES.md`, `TODO.md`
 > **Steering decisions:** Balanced archetypes (Worldbuilder as super-user ceiling), mid-tier combat, cloud-late, mobile-critical, Gemini-only, phase-at-a-time execution
@@ -21,6 +21,14 @@ Two additional sprints were completed after the core phases:
 **DM Workflow Sprint** — 34 targeted improvements across four areas: session prep workflow (prep notes, wizard preservation, quality guidance), session running workflow (persistent notes, copy read-aloud, DM Coach UX), entity editing (editable PCs, scene tabs, item fields, save indicators), entity creation (chat mode scenes, prompt chips, structured inputs, PC quick add), and campaign intelligence (sticky timeline, world sim fix, secrets linking).
 
 A follow-up UI Component Audit identified 36 remaining items (mostly Medium/Low priority) documented in `docs/architecture/`.
+
+**Phase 7 (Convention Cleanup) — 2026-03-26** — All 7 UX audit phases now delivered. 11 convention cleanup items plus 3 integration follow-ups were completed in this sprint:
+
+- *Button migration (UX-M5):* 219 Button component usages migrated across 29 files. All ad-hoc inline button styling replaced with the shared `Button` component for consistent hover states, focus rings, and sizing.
+- *Sidebar:* Drag-and-drop reordering converted from direct DOM manipulation (`classList.add/remove`) to React state. All sidebar sections (NPCs, Locations, Factions, Items, Adventures, Articles, Plots, Sessions, PCs) now expand by default. Article tree items now use the correct article icon (L10 fix). Post-wizard sidebar handoff expands all sections (L20 fix).
+- *Components:* DM Style selector now uses `role="radiogroup"` / `role="radio"` ARIA semantics. `BacklinksPanel` collapsed header now shows a reference count. Quick tools "tap to cycle" language replaced with device-neutral copy. `EntityCreationPanel` chat container height changed from fixed `h-[480px]` to `min-h-[480px] max-h-[70vh]`.
+- *Dashboard:* `CrossCampaignDashboard` gained a search/filter input for campaigns.
+- *Integration follow-ups:* `deleteAdventure` in `campaignService.ts` now cascades to remove scene references. `AdventureEditor` gained a delete button. `WelcomeScreen` import wiring was corrected.
 
 ---
 

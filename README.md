@@ -146,7 +146,7 @@ npm run test:e2e:headed  # E2E with visible browser
 
 ## Project Status
 
-**Phases A through F complete, plus UX refactoring sprint and Claude migration.**
+**All 7 UX audit phases complete, plus UX refactoring sprint and Claude migration.**
 
 | Phase | Status | What |
 |-------|--------|------|
@@ -160,6 +160,7 @@ npm run test:e2e:headed  # E2E with visible browser
 | F | Done | Growth (campaign wizard, templates, world simulation, style matching, cross-campaign) |
 | UX Refactor | Done | App shell decomposition, accessible dialog system, ENTITY_TYPE_CONFIG, hook extraction, utility extraction |
 | Claude Migration | Done | Gemini -> Claude Code CLI, provider abstraction layer, model tier system, Vite proxy middleware |
+| Phase 7 (UX Conv. Cleanup) | Done | Button migration (219 usages, 29 files), sidebar drag-drop React state, all sections expanded by default, CrossCampaignDashboard search/filter, DM Style ARIA radiogroup, EntityCreationPanel viewport-relative sizing, BacklinksPanel count, universal language, article icon fix, wizard handoff, deleteAdventure cascade, AdventureEditor delete button, WelcomeScreen import wiring |
 
 ---
 

@@ -1,7 +1,7 @@
 
 # Technical Design Document: RealmWeaver
 
-> **Last Updated:** 2026-03-24
+> **Last Updated:** 2026-03-26
 > **Audience:** Developers contributing to the RealmWeaver codebase
 
 ---
@@ -198,6 +198,15 @@ UI-only state (selected entity IDs, active view, modal states, `isMockMode`) liv
 - **Cycle detection:** `setLocationParent()` validates no circular parent-child chains
 - **Scene linking:** Scenes reference NPCs and locations; deletion cascades to these references
 
+### 4.5 deleteAdventure Cascade
+
+`deleteAdventure(id)` follows the same cascade pattern as other entity deletes but has two additional cleanup steps specific to the Adventure/Scene/Session relationship:
+
+1. **`Campaign.activeSceneId` cleared** — if the currently active scene belongs to the deleted adventure, `activeSceneId` is set to `undefined` so the Session Runner does not reference a non-existent scene.
+2. **`SessionLog.adventureId` nulled** — all session logs that reference the deleted adventure have their `adventureId` set to `null` (preserving the log itself but removing the now-broken link).
+
+These steps run inside a single `updateState()` call so the state transition is atomic and triggers one debounced save.
+
 ---
 
 ## 5. AI Service Architecture
@@ -344,12 +353,24 @@ export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items'
 
 `components/layout/ViewRouter.tsx` renders the correct component for each `EditorView`. This was extracted from `App.tsx` to reduce its line count from ~1165 to ~564.
 
-### 6.2 Three-Tier Component Pattern
+### 6.2 CampaignSidebar Patterns
+
+**Default-expanded sections** — all collapsible sections in `CampaignSidebar` open by default so the sidebar is immediately usable without user interaction. Individual section state persists in local React state for the session.
+
+**Drag-drop ordering** — Scene drag-and-drop within the sidebar tracks drag state in two React state variables (`draggingSceneId: string | null`, `dragOverSceneId: string | null`). Visual feedback (drop-target highlight) is applied by comparing these values during render. This replaces an earlier approach that applied CSS classes directly to DOM nodes via `element.classList`, which caused React state/DOM desync. The React-state approach ensures clean re-renders and compatibility with concurrent mode.
+
+**Wizard handoff** — when the First Campaign Wizard completes, it signals the sidebar to expand the relevant entity sections so newly created content is immediately visible without manual navigation.
+
+**Article tree icons** — `ArticleTreeItem` derives its icon from `ENTITY_TYPE_CONFIG` rather than a hardcoded fallback, so article section icons stay consistent with the rest of the app.
+
+### 6.3 Three-Tier Component Pattern
 
 **Dashboards** (`components/dashboards/`)
 - List views showing all entities of a type
 - Embed creation panel via `EntityCreationPanel` (chat/form toggle)
 - Use `useEntitySearch` for search/filter
+- Use `useRovingTabIndex` for keyboard list navigation
+- Show entity completeness dots (visual indicator of how many optional fields are filled)
 - Handle entity selection callbacks
 - 10 dashboards: NPC, Location, Faction, Item, Adventure, Article, SessionLog, PlayerCharacter, Plot, Note
 
@@ -367,7 +388,7 @@ export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items'
 - Accept `onNavigate` callback for `EntityLink` click handling
 - 12 editors + PrepDocumentView
 
-### 6.3 Custom Hooks
+### 6.4 Custom Hooks
 
 | Hook | Purpose | Returns |
 |------|---------|---------|
@@ -378,7 +399,7 @@ export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items'
 | `useEntitySearch` | Multi-field case-insensitive filter for entity arrays | `{ filteredEntities, searchTerm, setSearchTerm }` |
 | `useRovingTabIndex` | Roving tabindex for keyboard grid/list navigation | `{ getRovingProps }` |
 
-### 6.4 Dialog System
+### 6.5 Dialog System
 
 **`DialogShell`** provides:
 - `role="dialog" aria-modal="true"`
@@ -391,7 +412,7 @@ export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items'
 
 **`useToast`** — context-provider pattern. `ToastProvider` must wrap the app in `index.tsx`. Components call `const { addToast } = useToast()` then `addToast(message, variant)`.
 
-### 6.5 Entity Cross-Linking System
+### 6.6 Entity Cross-Linking System
 
 | Component | Purpose |
 |-----------|---------|
@@ -401,11 +422,12 @@ export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items'
 | `BacklinksPanel` | Displays all entities that reference the current entity (via `backlinkUtils`) |
 | `MentionInput` | Textarea with `@mention` autocomplete for 7 entity types |
 
-### 6.6 Shared Common Components
+### 6.7 Shared Common Components
 
 | Component | Purpose |
 |-----------|---------|
-| `Button` | Styled button with variant support (primary/secondary/ghost/danger) |
+| `Button` | Styled button — 5 variants (`primary`, `secondary`, `ghost`, `danger`, `icon`), 3 sizes (`sm`, `md`, `lg`); `twMerge` for className overrides |
+| `StepIndicator` | Multi-step wizard progress indicator (step number, label, completed/active state) |
 | `Textarea` / `AiTextarea` | Styled textarea; exports `inputBaseClasses`, `textareaBaseClasses` |
 | `Icons` | Centralized re-export from `lucide-react` — ALL icon imports must use this |
 | `EntityHistoryManager` | Version history tracking for entities that support undo/history |
@@ -558,6 +580,26 @@ export const textareaBaseClasses = `${inputBaseClasses} resize-none`;
 ```
 
 Use these for all text input and textarea elements.
+
+### 9.5 Button Component Pattern
+
+`components/common/Button.tsx` is the single source for interactive buttons with 219+ instances across the codebase.
+
+**Variants** map to design tokens:
+
+| Variant | Visual | Use case |
+|---------|--------|----------|
+| `primary` | `bg-amber-600 hover:bg-amber-500` | Primary actions (Save, Generate, Create) |
+| `secondary` | `bg-slate-700 hover:bg-slate-600` | Secondary actions (Cancel, Close) |
+| `ghost` | Transparent, `hover:bg-slate-700` | Toolbar actions, list row controls |
+| `danger` | `bg-red-700 hover:bg-red-600` | Destructive actions (Delete) |
+| `icon` | Square ghost variant sized to icon | Icon-only buttons; always include `aria-label` |
+
+**Sizes:** `sm` (compact toolbars), `md` (default), `lg` (hero/CTA).
+
+**`twMerge` composition** — the component merges the caller's `className` prop over base classes using `twMerge`, so one-off overrides (`w-full`, custom margin) are safe without specificity fights.
+
+**When NOT to use `Button`:** Card click targets, tab triggers, chip/pill toggles, and elements whose primary semantic role is not "action button" may remain raw `<button>` elements with their own styling. The goal is consistency for action buttons, not eliminating every raw `<button>`.
 
 ---
 

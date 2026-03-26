@@ -1,7 +1,7 @@
 # High-Level Design Document: RealmWeaver
 
-> **Last Updated:** 2026-03-24
-> **Status:** Phases A through F complete, plus UX refactoring sprint and Claude migration. Local-only SPA, fully functional.
+> **Last Updated:** 2026-03-26
+> **Status:** Phases A through F complete, plus UX refactoring sprint, Claude migration, and Phase 7 polish. Local-only SPA, fully functional.
 
 ---
 
@@ -20,6 +20,7 @@ RealmWeaver is an AI-native campaign management tool for tabletop RPG Game Maste
 | **World Intelligence** | Continuity Checker (8 rules), Plot Timeline, World Simulation Engine, Content Style Matching, Smart Context Builder (tiered, token-budget-aware) |
 | **Onboarding** | First Campaign Wizard (5-step), 4 template campaigns, DM Style progressive disclosure (guided/standard/power) |
 | **Persistence** | localStorage with debounced auto-save, JSON import/export, Obsidian markdown export |
+| **Cross-Campaign** | CrossCampaignDashboard with search/filter across all stored campaigns |
 
 ---
 
@@ -69,9 +70,13 @@ RealmWeaver is an AI-native campaign management tool for tabletop RPG Game Maste
 
 7. **Decomposed App shell** — `App.tsx` delegates view routing to `ViewRouter.tsx`, entity selection state to `useEntitySelection`, and modal lifecycle to `useModalState`. `SessionRunner` and `CampaignSidebar` are each decomposed into focused sub-components under `views/session/` and `layout/sidebar/` respectively.
 
-8. **Accessible dialog system** — All modals compose `DialogShell` for consistent focus trap, Escape-to-close, body scroll lock, and ARIA roles. Confirmations go through `useConfirmDialog` (context-provider); ephemeral feedback through `useToast` (context-provider). Direct use of `window.confirm` / `window.alert` is prohibited.
+8. **Accessible dialog system** — All modals compose `DialogShell` for consistent focus trap, Escape-to-close, body scroll lock, and ARIA roles. Confirmations go through `useConfirmDialog` (context-provider); ephemeral feedback through `useToast` (context-provider). Direct use of `window.confirm` / `window.alert` is prohibited. Phase 7 additions: `DmStylePanel` uses `role="radiogroup"` semantics; `BacklinksPanel` exposes collapsed link count to screen readers.
 
 9. **ENTITY_TYPE_CONFIG** — Canonical map in `utils/entityUtils.ts` from entity type key to `{ icon, color, label }`. All components that render entity type metadata (dashboards, quick cards, command palette, sidebar) derive from this config.
+
+10. **Shared Button component** — `components/common/Button.tsx` provides a unified button abstraction with 5 variants (`primary`, `secondary`, `ghost`, `danger`, `icon`) and 3 sizes (`sm`, `md`, `lg`). `twMerge` handles className composition and override. 219+ instances across the codebase use it. Cards, tabs, and chip elements with semantic roles may stay as raw `<button>` elements.
+
+11. **Sidebar persistence defaults** — All `CampaignSidebar` sections expand by default. Drag-and-drop reordering tracks state in React (`draggingSceneId`, `dragOverSceneId`) rather than via direct DOM manipulation. The First Campaign Wizard hands off to the sidebar and expands the relevant section automatically.
 
 ---
 
@@ -120,6 +125,18 @@ Article.relatedIds[]   -> Any entity  (references)
 Plot.relatedIds[]      -> Any entity  (involves)
 ```
 
+### Cascade Deletion
+
+Entity deletion in `campaignService` cleans up all references to keep data consistent:
+
+| Deleted entity | Cascade effect |
+|----------------|---------------|
+| NPC | Clears `factionId` from faction member list; removes from `Scene.npcIds` |
+| Faction | Nulls `factionId` on member NPCs; nulls `Location.factionId` |
+| Location | Nulls parent refs on child locations; nulls `Scene.locationId` |
+| Adventure | Clears `Campaign.activeSceneId` if it belongs to the adventure; nulls `SessionLog.adventureId` references |
+| Scene | Removed from `Adventure.scenes`; `Campaign.activeSceneId` cleared if it matches |
+
 ---
 
 ## 4. Feature Map
@@ -146,7 +163,7 @@ Plot.relatedIds[]      -> Any entity  (involves)
 | Command Palette | `common/CommandPalette.tsx` | `campaignService` |
 | First Campaign Wizard | `views/FirstCampaignWizard.tsx` | `aiService` -> `ai/evocationWizard` |
 | Campaign Templates | `views/CampaignCreator.tsx` | `data/templates/` |
-| Cross-Campaign | `views/CrossCampaignDashboard.tsx` | `campaignService` |
+| Cross-Campaign | `views/CrossCampaignDashboard.tsx` (with search/filter) | `campaignService` |
 | DM Style Settings | `common/DmStylePanel.tsx` | `utils/dmStyleUtils` |
 
 ---
@@ -182,7 +199,8 @@ Realmweaver/
 │
 ├── components/
 │   ├── common/                      # Shared primitives
-│   │   ├── Button.tsx               # Styled button with variant support
+│   │   ├── Button.tsx               # Styled button (5 variants, 3 sizes, twMerge composition; 219+ uses)
+│   │   ├── StepIndicator.tsx        # Multi-step wizard progress indicator
 │   │   ├── Icons.tsx                # Centralized re-export from lucide-react (mandatory)
 │   │   ├── Textarea.tsx             # AiTextarea + inputBaseClasses/textareaBaseClasses exports
 │   │   ├── DialogShell.tsx          # Base modal wrapper (focus trap, Escape, ARIA, scroll lock)

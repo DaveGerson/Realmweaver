@@ -29,7 +29,7 @@
 
 ### First Launch and the First Campaign Wizard
 
-When you open RealmWeaver for the first time, you land on the **Welcome Screen**. Click **"Create New Campaign"** to begin. After you name your world and write a brief setting description, the **First Campaign Wizard** launches automatically. This five-step guided setup walks you through:
+When you open RealmWeaver for the first time, you land on the **Welcome Screen**. Click **"Create New Campaign"** to begin, or click **"Import an existing campaign"** to load a previously exported RealmWeaver JSON file and pick up right where you left off. After you name your world and write a brief setting description, the **First Campaign Wizard** launches automatically. This five-step guided setup walks you through:
 
 1. **World Description** — refine your campaign's setting (at least a sentence or two works; more detail produces better AI output)
 2. **Starting NPCs** — the AI generates a set of characters based on your setting; edit names, traits, and secrets before saving
@@ -47,9 +47,18 @@ When creating a campaign, you can load a pre-built template (such as the Winter'
 
 RealmWeaver has three persistent areas:
 
-- **Sidebar (left)** — your campaign's table of contents, organized by entity type. Hover any category and click the **+** icon to create a new entity.
+- **Sidebar (left)** — your campaign's table of contents, organized by entity type. All entity sections start expanded so your content is immediately visible. Hover any category and click the **+** icon to create a new entity. After completing the First Campaign Wizard, all sections automatically expand to reveal the content that was just created.
 - **Main workspace (center)** — shows dashboards, editors, generators, and tools depending on what is selected.
 - **Header (top)** — quick access to tools: DM Coach, Evocation Wizard, Session Runner, Export, and the Mock Mode toggle.
+
+### Button Visual Hierarchy
+
+Buttons throughout RealmWeaver follow a consistent design system so you always know what a click will do:
+
+- **Amber (primary)** — the main action on any panel or dialog (e.g., Generate, Add to Campaign, Save)
+- **Gray (secondary)** — alternative or neutral actions alongside a primary button (e.g., Skip, Cancel, Back)
+- **Ghost (subtle)** — low-emphasis actions that should not compete visually (e.g., inline edit toggles, expand/collapse controls)
+- **Red (destructive)** — actions that delete or permanently remove data; these always require confirmation
 
 ---
 
@@ -61,7 +70,7 @@ Click the campaign title in the header to return to the **Campaign Selector**. F
 
 ### Cross-Campaign Dashboard
 
-The Cross-Campaign Dashboard shows all your campaigns as cards, each displaying entity counts, active plot count, last session date, and DM Style badge. From this view you can:
+The Cross-Campaign Dashboard shows all your campaigns as cards, each displaying entity counts, active plot count, last session date, and DM Style badge. Use the **search bar** at the top to filter campaigns by title or setting name — useful when you have many campaigns and want to jump to one quickly. From this view you can:
 
 - Switch to any campaign with one click
 - Duplicate a campaign (useful for branching what-if scenarios)
@@ -124,6 +133,10 @@ Connections make your world feel alive and improve AI generation quality:
 
 When you delete an entity, all references to it across your campaign are automatically removed.
 
+### Deleting Adventures
+
+To delete an adventure, open it in the editor and use the **Delete** button. Deleting an adventure also removes all its scenes and cleans up any references to those scenes elsewhere in your campaign.
+
 ### Adventures and Scenes
 
 An **Adventure** is a folder containing an ordered sequence of **Scenes**. Create an adventure first, then add scenes to it. Each generated scene includes:
@@ -135,6 +148,10 @@ An **Adventure** is a folder containing an ordered sequence of **Scenes**. Creat
 - **Beat Tracking** — mark which beats have been hit during play
 
 Drag and drop scenes in the sidebar to reorder them. Open an adventure and click the **Prep Document** tab to compile the entire adventure into a clean, printable markdown document that includes linked NPCs, locations, and scenes.
+
+### Backlinks Panel
+
+The **Backlinks Panel** appears in entity editors and shows every other entity in your campaign that references the current one. The collapsed header displays a count at a glance (for example, "Referenced By (3)"), so you can quickly see how connected an entity is without opening the panel. Expand it to see the full list and click any entry to navigate there directly.
 
 ### Entity History and Versions
 

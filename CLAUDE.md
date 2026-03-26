@@ -1,6 +1,6 @@
 # CLAUDE.md - AI Assistant Guide for Realmweaver
 
-> **Last Updated:** 2026-03-24
+> **Last Updated:** 2026-03-26
 
 ---
 
@@ -49,7 +49,9 @@ Realmweaver/
 │   ├── common/      # Button, Icons, Textarea, DialogShell, ConfirmDialog, ToastContainer,
 │   │                  ErrorBoundary, EntityCreationPanel, EntityLink, EntityQuickCard,
 │   │                  BacklinksPanel, LinkedText, MentionInput, CommandPalette, Breadcrumbs,
-│   │                  RegenerateButton, SkeletonCard, TabLayout, DmStylePanel, etc.
+│   │                  RegenerateButton, SkeletonCard, TabLayout, DmStylePanel,
+│   │                  StepIndicator, KeyboardShortcutsHelp, GenerateHerePanel,
+│   │                  SceneResourcesPanel, etc.
 │   ├── layout/      # Header, CampaignSidebar, ContentWrapper, ViewRouter + sidebar/ sub-components
 │   ├── views/       # WelcomeScreen, CampaignCreator, FirstCampaignWizard, CrossCampaignDashboard,
 │   │                  SessionRunner + session/ sub-components
@@ -68,7 +70,8 @@ Realmweaver/
 │   ├── importExportService.ts
 │   └── ai/                   # core.ts, modelConfig.ts, realmWeaver.ts, dmCoach.ts,
 │                               evocationWizard.ts, realmChat.ts, worldSimulation.ts,
-│                               styleMatching.ts, mockService.ts, providers/
+│                               styleMatching.ts, audioTranscription.ts, mockService.ts,
+│                               providers/
 ├── types/           # One file per entity, barrel export via index.ts
 └── utils/           # entityUtils.ts (factories + ENTITY_TYPE_CONFIG), backlinkUtils, dmStyleUtils, etc.
 ```
@@ -121,6 +124,7 @@ type CampaignState = {
 **Core API pattern** (same for all entity types — NPC, Location, Faction, Item, Adventure, Scene, Article, SessionLog, PlayerCharacter, Plot, Note, Secret):
 ```typescript
 campaignService.createNpc(data) / updateNpc(id, updates) / deleteNpc(id)
+// e.g. deleteAdventure(id) — deletion cascades to clean up all related references
 ```
 
 Relationship methods: `linkNpcToFaction`, `linkSceneToLocation`, `linkSceneToNpcs`, `setLocationParent`, etc.
@@ -131,7 +135,7 @@ Relationship methods: `linkNpcToFaction`, `linkSceneToLocation`, `linkSceneToNpc
 
 ### Three-Tier Hierarchy
 
-1. **Dashboards** — Entity list + `EntityCreationPanel` (chat/form toggle) + `useEntitySearch`
+1. **Dashboards** — Entity list + `EntityCreationPanel` (chat/form toggle) + `useEntitySearch`. All dashboards use `useEntitySearch` for search/filter and `useRovingTabIndex` for keyboard grid navigation. Dashboard cards display entity completeness indicators (green/amber/red dots).
 2. **Generators** — AI creation forms. Accept `isMockMode`, `campaignContext`. Call `aiService` functions.
 3. **Editors** — Detail views with tabs and inline AI-assist. Accept `onNavigate` for EntityLink clicks.
 
@@ -236,6 +240,7 @@ const ctx = buildCampaignContext(campaign, 'generation', 4000); // variant: 'gen
 | `EntityCreationPanel` | Required for all dashboard creation UIs |
 | Cascade deletion | Entity delete must clean up all relationship references |
 | No indigo outside RealmChat | Indigo is reserved for the AI assistant widget |
+| `<Button>` for action buttons | Use `Button` component (primary/secondary/ghost/danger/icon variants) for action buttons. Raw `<button>` only for cards, tabs, chips, toggles, semantic role buttons |
 
 ---
 
