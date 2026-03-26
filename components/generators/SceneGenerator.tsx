@@ -113,7 +113,7 @@ export const SceneGenerator: React.FC<SceneGeneratorProps> = ({
       <p className="text-sm text-slate-400">
         Describe a situation, and the AI will build a complete scene with read-aloud text and GM notes.
         {isOfficialSetting && (
-          <span className="block mt-1 text-amber-400 text-xs">Google Search enabled for canon accuracy.</span>
+          <span className="block mt-1 text-amber-400 text-xs">Official setting context will be used for canon accuracy.</span>
         )}
       </p>
 

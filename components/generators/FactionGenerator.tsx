@@ -113,7 +113,7 @@ export const FactionGenerator: React.FC<FactionGeneratorProps> = ({
       <p className="text-sm text-slate-400">
         Describe a faction or organization, and the AI will define its goals and purpose.
         {isOfficialSetting && (
-          <span className="block mt-1 text-amber-400 text-xs">Google Search enabled for canon accuracy.</span>
+          <span className="block mt-1 text-amber-400 text-xs">Official setting context will be used for canon accuracy.</span>
         )}
       </p>
 

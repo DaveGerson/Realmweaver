@@ -171,7 +171,7 @@ export const CampaignSettingEditor: React.FC<CampaignSettingEditorProps> = ({
           </select>
           <p className="text-xs text-amber-400 mt-1.5 flex items-center gap-1">
             <Icons.Sparkles className="w-3 h-3" />
-            Generators will use Google Search to ensure accuracy with {formData.officialSetting} lore.
+            Generators will use official setting context to ensure accuracy with {formData.officialSetting} lore.
           </p>
         </div>
       )}
@@ -191,7 +191,7 @@ export const CampaignSettingEditor: React.FC<CampaignSettingEditorProps> = ({
         />
       </div>
 
-      {/* Google Cloud API Key */}
+      {/* Google Cloud API Key (for audio transcription only) */}
       <div className="border-t border-slate-800 pt-6">
         <div className="flex items-center gap-2 mb-3">
           <Icons.Mic className="w-4 h-4 text-amber-400" />

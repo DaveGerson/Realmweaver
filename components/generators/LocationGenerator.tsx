@@ -132,7 +132,7 @@ export const LocationGenerator: React.FC<LocationGeneratorProps> = ({
       <p className="text-sm text-slate-400">
         Describe a location, and the AI will create a vivid description and hidden secrets.
         {isOfficialSetting && (
-          <span className="block mt-1 text-amber-400 text-xs">Google Search enabled for canon accuracy.</span>
+          <span className="block mt-1 text-amber-400 text-xs">Official setting context will be used for canon accuracy.</span>
         )}
       </p>
 

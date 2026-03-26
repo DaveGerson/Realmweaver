@@ -135,7 +135,7 @@ export const AdventureGenerator: React.FC<AdventureGeneratorProps> = ({
       <p className="text-sm text-slate-400">
         Describe a concept for an adventure, and the AI will generate a complete outline with a hook, theme, and multiple scenes to get you started.
         {isOfficialSetting && (
-          <span className="block mt-1 text-amber-400 text-xs">Google Search enabled for canon accuracy.</span>
+          <span className="block mt-1 text-amber-400 text-xs">Official setting context will be used for canon accuracy.</span>
         )}
       </p>
 

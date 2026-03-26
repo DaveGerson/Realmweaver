@@ -122,7 +122,7 @@ export const ItemGenerator: React.FC<ItemGeneratorProps> = ({
       <p className="text-sm text-slate-400">
         Describe a magical item, and the AI will create its description, rarity, and properties.
         {isOfficialSetting && (
-          <span className="block mt-1 text-amber-400 text-xs">Google Search enabled for canon accuracy.</span>
+          <span className="block mt-1 text-amber-400 text-xs">Official setting context will be used for canon accuracy.</span>
         )}
       </p>
 

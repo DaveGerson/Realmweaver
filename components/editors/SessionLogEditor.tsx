@@ -217,11 +217,9 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
       let text = '';
 
       if (file.name.endsWith('.docx')) {
-        // TODO: Add a .docx parser library (e.g., mammoth) for full support.
-        // For now, attempt a raw text read — this will produce garbled output for
-        // binary .docx files but avoids pulling in an unvetted dependency.
-        text = '[DOCX import requires a parser library — see TODO in SessionLogEditor.tsx]\n\n';
-        text += await file.text();
+        setIsImportingTranscript(false);
+        addToast('DOCX files are not yet supported. Please export as .txt or .md and try again.', 'error');
+        return;
       } else if (file.name.endsWith('.vtt')) {
         const raw = await file.text();
         text = parseVtt(raw);

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Sparkles } from 'lucide-react';
+import { Icons } from './Icons';
 import { twMerge } from 'tailwind-merge';
 
 interface AiTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -51,7 +51,7 @@ export const AiTextarea: React.FC<AiTextareaProps> = ({
             disabled={isGenerating}
             className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 disabled:opacity-50 transition-colors"
           >
-            <Sparkles className={`w-3.5 h-3.5 ${isGenerating ? 'animate-pulse' : ''}`} />
+            <Icons.Sparkles className={`w-3.5 h-3.5 ${isGenerating ? 'animate-pulse' : ''}`} />
             {isGenerating ? 'Generating...' : 'Generate'}
           </button>
         )}
