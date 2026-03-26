@@ -376,13 +376,15 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampai
           {/* DM Style Selector */}
           <div>
             <label className="block text-sm font-medium text-slate-400 mb-3">How do you like to run your games?</label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div role="radiogroup" aria-label="DM Style" className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {DM_STYLE_OPTIONS.map((option) => {
                 const isSelected = dmStyle === option.value;
                 return (
                   <button
                     key={option.value}
                     type="button"
+                    role="radio"
+                    aria-checked={isSelected}
                     onClick={() => setDmStyle(option.value)}
                     className={[
                       'relative flex flex-col items-start gap-2 p-4 rounded-lg border-2 text-left transition-all duration-150',

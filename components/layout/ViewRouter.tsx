@@ -204,6 +204,7 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
         adventure={selectedAdventure}
         campaign={campaign}
         onUpdate={campaignService.updateAdventure}
+        onDelete={(id) => { campaignService.deleteAdventure(id); onResetSelections(); }}
         onNavigate={onNavigate}
       />
     );

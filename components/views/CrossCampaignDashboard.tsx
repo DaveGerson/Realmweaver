@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Campaign } from '../../types/index';
 import type { DmStyle } from '../../types/CampaignSetting';
 import { Icons } from '../common/Icons';
@@ -220,6 +220,8 @@ export const CrossCampaignDashboard: React.FC<CrossCampaignDashboardProps> = ({
   onDuplicateCampaign,
   onDeleteCampaign,
 }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+
   // Sort: put campaigns with more recent session activity first.
   // For campaigns with no sessions, fall back to title order.
   const sortedCampaigns = [...campaigns].sort((a, b) => {
@@ -233,6 +235,16 @@ export const CrossCampaignDashboard: React.FC<CrossCampaignDashboardProps> = ({
     const bCount = b.npcs.length + b.locations.length + b.factions.length + b.adventures.length;
     return bCount - aCount;
   });
+
+  const filteredCampaigns = useMemo(() => {
+    const trimmed = searchTerm.trim().toLowerCase();
+    if (!trimmed) return sortedCampaigns;
+    return sortedCampaigns.filter(c =>
+      c.title.toLowerCase().includes(trimmed) ||
+      (c.setting && c.setting.toLowerCase().includes(trimmed)) ||
+      (c.officialSetting && c.officialSetting.toLowerCase().includes(trimmed))
+    );
+  }, [sortedCampaigns, searchTerm]);
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-900 p-4 sm:p-6 lg:p-8">
@@ -250,9 +262,23 @@ export const CrossCampaignDashboard: React.FC<CrossCampaignDashboardProps> = ({
           </p>
         </div>
 
+        {/* Search bar */}
+        {campaigns.length > 0 && (
+          <div className="relative max-w-sm mb-5">
+            <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Search campaigns..."
+              className="w-full bg-slate-800 border border-slate-700 rounded-md pl-9 pr-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
+            />
+          </div>
+        )}
+
         {/* Campaign grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {sortedCampaigns.map(campaign => (
+          {filteredCampaigns.map(campaign => (
             <CampaignCard
               key={campaign.id}
               campaign={campaign}
@@ -262,9 +288,14 @@ export const CrossCampaignDashboard: React.FC<CrossCampaignDashboardProps> = ({
             />
           ))}
 
-          {/* "Create new" always at the end */}
-          <CreateNewCard onClick={onCreateCampaign} />
+          {/* "Create new" always at the end, hidden when filtering */}
+          {!searchTerm.trim() && <CreateNewCard onClick={onCreateCampaign} />}
         </div>
+
+        {/* Empty search state */}
+        {searchTerm.trim() && filteredCampaigns.length === 0 && (
+          <p className="text-slate-500 text-sm mt-2">No campaigns match "{searchTerm.trim()}".</p>
+        )}
       </div>
     </div>
   );

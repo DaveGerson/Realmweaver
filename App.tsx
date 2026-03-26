@@ -50,6 +50,7 @@ const App: FC = () => {
   const [isMockMode, setIsMockMode] = useState(true);
   // Holds template data loaded in CampaignCreator; imported once campaign transitions to 'editing'
   const [pendingTemplateData, setPendingTemplateData] = useState<Record<string, unknown> | null>(null);
+  const [sidebarExpandAll, setSidebarExpandAll] = useState(false);
 
   const activeCampaign = useMemo(
     () => campaigns.find(c => c.id === activeCampaignId),
@@ -303,7 +304,7 @@ const App: FC = () => {
   const appContent = () => {
     switch (appStatus) {
       case 'welcome':
-        return <WelcomeScreen onStart={() => campaignService.prepareNewCampaign()} />;
+        return <WelcomeScreen onStart={() => campaignService.prepareNewCampaign()} onImportCampaign={handleImportCampaign} />;
       case 'creating':
         return (
           <CampaignCreator
@@ -398,6 +399,7 @@ const App: FC = () => {
                     onSetDmStyle={campaignService.setDmStyle}
                     onSetFeatureOverride={campaignService.setFeatureOverride}
                     onClearFeatureOverride={campaignService.clearFeatureOverride}
+                    expandAllSections={sidebarExpandAll}
                   />
                 </div>
 
@@ -470,6 +472,7 @@ const App: FC = () => {
                       }}
                       onComplete={(view) => {
                         setIsFirstCampaignWizardOpen(false);
+                        setSidebarExpandAll(true);
                         handleSelectView(view);
                       }}
                     />

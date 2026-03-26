@@ -42,6 +42,7 @@ interface CampaignSidebarProps {
     onSetDmStyle?: (style: import('../../types/index').DmStyle) => void;
     onSetFeatureOverride?: (feature: string, visible: boolean) => void;
     onClearFeatureOverride?: (feature: string) => void;
+    expandAllSections?: boolean;
 }
 
 export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
@@ -60,11 +61,15 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
     onSetDmStyle,
     onSetFeatureOverride,
     onClearFeatureOverride,
+    expandAllSections,
 }) => {
     const [expandedAdventures, setExpandedAdventures] = useState<Record<string, boolean>>({});
     const [expandedArticles, setExpandedArticles] = useState<Record<string, boolean>>({});
     const [expandedViews, setExpandedViews] = useState<Partial<Record<EditorView, boolean>>>({
         npcs: true,
+        locations: true,
+        factions: true,
+        items: true,
     });
     const [filterText, setFilterText] = useState('');
     const [debouncedFilter, setDebouncedFilter] = useState('');
@@ -97,6 +102,12 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
         };
     }, []);
 
+    useEffect(() => {
+        if (expandAllSections) {
+            setExpandedViews({ npcs: true, locations: true, factions: true, items: true });
+        }
+    }, [expandAllSections]);
+
     const matchesFilter = useCallback((name: string) => {
         if (!debouncedFilter) return true;
         return name.toLowerCase().includes(debouncedFilter);
@@ -122,32 +133,29 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
         return !!expandedViews[view];
     };
 
+    const [draggingSceneId, setDraggingSceneId] = useState<string | null>(null);
+    const [dragOverSceneId, setDragOverSceneId] = useState<string | null>(null);
+
     // --- Drag and Drop Handlers ---
     const handleDragStart = (e: React.DragEvent, adventureId: string, sceneId: string) => {
         e.dataTransfer.setData('application/json', JSON.stringify({ adventureId, sceneId }));
         e.dataTransfer.effectAllowed = 'move';
-        (e.target as HTMLElement).classList.add('opacity-50');
+        setDraggingSceneId(sceneId);
     };
 
-    const handleDragOver = (e: React.DragEvent) => {
+    const handleDragOver = (e: React.DragEvent, sceneId: string) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-        const target = (e.target as HTMLElement).closest('button');
-        if (target) {
-            target.classList.add('border-t-2', 'border-amber-500', '-mt-0.5');
-        }
+        setDragOverSceneId(sceneId);
     };
 
-    const handleDragLeave = (e: React.DragEvent) => {
-        const target = (e.target as HTMLElement).closest('button');
-        if (target) {
-            target.classList.remove('border-t-2', 'border-amber-500', '-mt-0.5');
-        }
+    const handleDragLeave = () => {
+        setDragOverSceneId(null);
     };
 
     const handleDrop = (e: React.DragEvent, targetAdventureId: string, targetSceneId: string) => {
         e.preventDefault();
-        handleDragLeave(e);
+        setDragOverSceneId(null);
         const data = e.dataTransfer.getData('application/json');
         if (data) {
             const { adventureId: draggedAdventureId, sceneId: draggedSceneId } = JSON.parse(data);
@@ -157,9 +165,9 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
         }
     };
 
-    const handleDragEnd = (e: React.DragEvent) => {
-        (e.target as HTMLElement).classList.remove('opacity-50');
-        document.querySelectorAll('.border-amber-500').forEach(el => el.classList.remove('border-t-2', 'border-amber-500', '-mt-0.5'));
+    const handleDragEnd = () => {
+        setDraggingSceneId(null);
+        setDragOverSceneId(null);
     };
 
     const entityGroups: {
@@ -481,14 +489,16 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                                                     key={scene.id}
                                                     draggable="true"
                                                     onDragStart={(e) => handleDragStart(e, adventure.id, scene.id)}
-                                                    onDragOver={handleDragOver}
+                                                    onDragOver={(e) => handleDragOver(e, scene.id)}
                                                     onDragLeave={handleDragLeave}
                                                     onDrop={(e) => handleDrop(e, adventure.id, scene.id)}
                                                     onDragEnd={handleDragEnd}
                                                     onClick={() => { onSelect('adventure', adventure.id); onSelect('scene', scene.id); }}
                                                     className={twMerge(
                                                         'w-full text-left text-sm truncate px-2 py-1.5 rounded-md flex items-center transition-all duration-100',
-                                                        selectedIds.scene === scene.id ? 'bg-slate-700 text-white' : 'hover:bg-slate-800 text-slate-400'
+                                                        selectedIds.scene === scene.id ? 'bg-slate-700 text-white' : 'hover:bg-slate-800 text-slate-400',
+                                                        draggingSceneId === scene.id ? 'opacity-50' : '',
+                                                        dragOverSceneId === scene.id ? 'border-t-2 border-amber-500 -mt-0.5' : ''
                                                     )}
                                                     title={scene.title}
                                                 >
@@ -549,7 +559,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                                         )}
                                         title={article.title}
                                     >
-                                        <Icons.Scenes className="w-4 h-4 mr-2 flex-shrink-0"/>
+                                        <Icons.BookCopy className="w-4 h-4 mr-2 flex-shrink-0"/>
                                         <span className="truncate">{article.title}</span>
                                     </button>
                                 ) : (

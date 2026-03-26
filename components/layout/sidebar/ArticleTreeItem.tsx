@@ -42,7 +42,7 @@ export const ArticleTreeItem: React.FC<ArticleTreeItemProps> = ({
           )}
           title={article.title}
         >
-          <Icons.Scenes className="w-4 h-4 mr-2 flex-shrink-0" />
+          <Icons.BookCopy className="w-4 h-4 mr-2 flex-shrink-0" />
           <span className="truncate">{article.title}</span>
         </button>
       </div>

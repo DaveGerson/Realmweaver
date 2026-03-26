@@ -156,7 +156,7 @@ export const QuickToolsPanel: React.FC<QuickToolsPanelProps> = ({
 
             {/* Secrets & Clues Panel */}
             {canShowSecretsTracker && showSecrets && (
-                <div className="border-t border-slate-800 flex-shrink-0 max-h-[400px] overflow-hidden flex flex-col">
+                <div className="border-t border-slate-800 flex-shrink-0 max-h-[40vh] overflow-hidden flex flex-col">
                     <SecretsTracker
                         campaign={campaign}
                         activeSessionId={campaign.activeSessionId}
@@ -191,7 +191,7 @@ export const QuickToolsPanel: React.FC<QuickToolsPanelProps> = ({
                                         {plotStatusBadge(status)}
                                         <span className="text-[10px] text-slate-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
                                             <Icons.RefreshCw className="w-2.5 h-2.5" />
-                                            tap to cycle
+                                            Click to cycle
                                         </span>
                                     </div>
                                 </button>

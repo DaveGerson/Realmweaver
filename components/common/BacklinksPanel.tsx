@@ -13,7 +13,7 @@ import { computeBacklinks } from '@/utils/backlinkUtils';
 import { EntityLink } from '@/components/common/EntityLink';
 import { Icons } from '@/components/common/Icons';
 import type { QuickCardEntityType } from '@/components/common/EntityQuickCard';
-import type { BacklinkEntry } from '@/utils/backlinkUtils';
+import type { BacklinkEntry, GroupedBacklinks } from '@/utils/backlinkUtils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -164,7 +164,7 @@ export const BacklinksPanel: React.FC<BacklinksPanelProps> = ({
     return state.campaigns.find((c) => c.id === state.activeCampaignId) ?? null;
   }, [state.campaigns, state.activeCampaignId]);
 
-  const backlinks = useMemo(() => {
+  const backlinks = useMemo((): GroupedBacklinks => {
     if (!campaign) return {};
     return computeBacklinks(entityId, entityType, campaign);
   }, [entityId, entityType, campaign]);
@@ -182,8 +182,10 @@ export const BacklinksPanel: React.FC<BacklinksPanelProps> = ({
         aria-expanded={!isCollapsed}
       >
         <Icons.Link className="w-4 h-4 text-slate-400 flex-shrink-0" />
-        <span className="text-sm font-semibold text-slate-200 flex-1">Referenced By</span>
-        {totalCount > 0 && (
+        <span className="text-sm font-semibold text-slate-200 flex-1">
+          Referenced By{isCollapsed && totalCount > 0 ? ` (${totalCount})` : ''}
+        </span>
+        {!isCollapsed && totalCount > 0 && (
           <span className="text-xs bg-slate-700 text-slate-300 rounded-full px-2 py-0.5 font-mono">
             {totalCount}
           </span>

@@ -11,7 +11,6 @@ import type {
     Article,
     AdventureForBatchAdd,
     SessionLog,
-    SessionLogEntry,
     SessionLogEntryType,
     PlayerCharacter,
     BatchAddData,
@@ -1012,6 +1011,28 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 if (!campaign) return;
                 const adventure = campaign.adventures.find(a => a.id === id);
                 if (adventure) Object.assign(adventure, updatedData);
+            });
+        },
+        deleteAdventure(id: string) {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign) return;
+                const adventure = campaign.adventures.find(a => a.id === id);
+                if (!adventure) return;
+
+                // Clear activeSceneId if it belongs to this adventure
+                if (campaign.activeSceneId && adventure.scenes.some(s => s.id === campaign.activeSceneId)) {
+                    campaign.activeSceneId = undefined;
+                }
+
+                // Clear adventureId on any session logs referencing this adventure
+                if (campaign.sessionLogs) {
+                    campaign.sessionLogs.forEach(log => {
+                        if (log.adventureId === id) log.adventureId = undefined;
+                    });
+                }
+
+                campaign.adventures = campaign.adventures.filter(a => a.id !== id);
             });
         },
         createScene(adventureId: string, newSceneData: Omit<Scene, 'id'>) {
