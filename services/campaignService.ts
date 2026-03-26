@@ -26,9 +26,10 @@ import type {
 } from '../types/index';
 import { importCampaignFromJson } from './importExportService';
 import { parseCharacterSheetPdf } from './aiService';
+import { storageService } from './storageService';
 
 type AppStatus = 'loading' | 'welcome' | 'selecting' | 'creating' | 'editing';
-export type SaveStatus = 'idle' | 'saved' | 'saving' | 'error';
+export type SaveStatus = 'idle' | 'saved' | 'saving' | 'error' | 'quota-warning';
 
 type CampaignState = {
   campaigns: Campaign[];
@@ -36,6 +37,8 @@ type CampaignState = {
   appStatus: AppStatus;
   saveStatus: SaveStatus;
   lastSavedAt: string | null;
+  /** True when another browser tab has modified campaign data since this tab last saved. */
+  conflictDetected: boolean;
 };
 
 /**
@@ -53,6 +56,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         appStatus: 'loading',
         saveStatus: 'idle',
         lastSavedAt: null,
+        conflictDetected: false,
     };
 
     let saveTimeout: any = null;
@@ -77,22 +81,37 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         if (!shouldPersist || state.appStatus === 'loading') {
             return;
         }
-        try {
-            localStorage.setItem(CAMPAIGNS_STORAGE_KEY, JSON.stringify(state.campaigns));
-            if (state.activeCampaignId) {
-                localStorage.setItem(ACTIVE_CAMPAIGN_ID_KEY, state.activeCampaignId);
-            } else {
-                localStorage.removeItem(ACTIVE_CAMPAIGN_ID_KEY);
-            }
-            
-            // Update status to saved
+
+        const campaignsResult = storageService.save(
+            CAMPAIGNS_STORAGE_KEY,
+            JSON.stringify(state.campaigns)
+        );
+
+        let activeIdResult = { success: true, quotaWarning: false };
+        if (state.activeCampaignId) {
+            activeIdResult = storageService.save(
+                ACTIVE_CAMPAIGN_ID_KEY,
+                state.activeCampaignId
+            );
+        } else {
+            storageService.remove(ACTIVE_CAMPAIGN_ID_KEY);
+        }
+
+        const overallSuccess = campaignsResult.success && activeIdResult.success;
+        const quotaWarning = campaignsResult.quotaWarning || activeIdResult.quotaWarning;
+
+        if (overallSuccess) {
             _internalUpdate(draft => {
-                draft.saveStatus = 'saved';
+                draft.saveStatus = quotaWarning ? 'quota-warning' : 'saved';
                 draft.lastSavedAt = new Date().toISOString();
             });
-            console.log("Campaign auto-saved successfully.");
-        } catch (e) {
-            console.error("Failed to save state to localStorage", e);
+            if (quotaWarning) {
+                console.warn('[campaignService] Save succeeded via IndexedDB fallback — localStorage quota exceeded.');
+            } else {
+                console.log('Campaign auto-saved successfully.');
+            }
+        } else {
+            console.error('[campaignService] Failed to save state:', campaignsResult.error);
             _internalUpdate(draft => {
                 draft.saveStatus = 'error';
             });
@@ -221,8 +240,20 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 _internalUpdate(draft => { draft.appStatus = 'welcome'; });
                 return;
             }
-            const savedCampaigns = localStorage.getItem(CAMPAIGNS_STORAGE_KEY);
-            const savedActiveId = localStorage.getItem(ACTIVE_CAMPAIGN_ID_KEY);
+
+            // Wire cross-tab conflict detection (5.5).
+            // The window `storage` event fires when ANOTHER tab writes to localStorage.
+            // We set a flag so the UI can prompt the user to reload.
+            storageService.onConflict((key) => {
+                if (key === CAMPAIGNS_STORAGE_KEY) {
+                    _internalUpdate(draft => {
+                        draft.conflictDetected = true;
+                    });
+                }
+            });
+
+            const savedCampaigns = storageService.loadSync(CAMPAIGNS_STORAGE_KEY);
+            const savedActiveId = storageService.loadSync(ACTIVE_CAMPAIGN_ID_KEY);
 
             _internalUpdate(draft => {
                 if (savedCampaigns) {
@@ -267,8 +298,8 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         }
                     } catch (e) {
                         console.error("Failed to parse saved campaigns, clearing storage.", e);
-                        localStorage.removeItem(CAMPAIGNS_STORAGE_KEY);
-                        localStorage.removeItem(ACTIVE_CAMPAIGN_ID_KEY);
+                        storageService.remove(CAMPAIGNS_STORAGE_KEY);
+                        storageService.remove(ACTIVE_CAMPAIGN_ID_KEY);
                         draft.appStatus = 'welcome';
                     }
                 } else {

@@ -4,6 +4,7 @@ import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { DialogShell } from '../common/DialogShell';
 import { useToast } from '@/hooks/useToast';
+import type { ExportValidationResult } from '@/services/importExportService';
 
 export interface ExportEntityCounts {
   npcs: number;
@@ -19,7 +20,7 @@ export interface ExportEntityCounts {
 
 interface ExportModalProps {
   onClose: () => void;
-  onExportJson: () => void;
+  onExportJson: () => ExportValidationResult;
   onExportObsidian: () => void;
   campaignTitle: string;
   entityCounts?: ExportEntityCounts;
@@ -39,8 +40,14 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     setLoadingFormat(format);
     try {
       if (format === 'json') {
-        onExportJson();
-        addToast(`"${campaignTitle}" exported as JSON backup.`, 'success');
+        const result = onExportJson();
+        if (!result.roundTripOk && result.warning) {
+          // Round-trip verification failed — show warning but still close
+          // (download already triggered inside exportCampaignAsJson)
+          addToast(result.warning, 'error');
+        } else {
+          addToast(`"${campaignTitle}" exported as JSON backup.`, 'success');
+        }
       } else {
         onExportObsidian();
         addToast(`"${campaignTitle}" exported as Obsidian Markdown.`, 'success');
