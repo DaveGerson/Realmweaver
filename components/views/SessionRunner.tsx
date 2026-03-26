@@ -1,12 +1,13 @@
 
-import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef, Suspense } from 'react';
 import type { Campaign, Scene, SessionLog, NPC, Combatant, CombatantType, Encounter, PlotSessionStatus } from '@/types';
 import { Icons } from '@/components/common/Icons';
 import { Button } from '@/components/common/Button';
 import { twMerge } from 'tailwind-merge';
 import { campaignService } from '@/services/campaignService';
 import { CombatTracker } from '@/components/tools/CombatTracker';
-import { SessionEndWizard } from '@/components/dialogs/SessionEndWizard';
+// Lazy-loaded — only bundled when the session end flow is triggered
+const SessionEndWizard = React.lazy(() => import('@/components/dialogs/SessionEndWizard').then(m => ({ default: m.SessionEndWizard })));
 import { estimatePcHp } from '@/utils/entityUtils';
 import { isFeatureVisible } from '@/utils/dmStyleUtils';
 import type { QuickCardEntityType } from '@/components/common/EntityQuickCard';
@@ -446,13 +447,15 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
 
             {/* Session End Wizard */}
             {showEndWizard && (
-                <SessionEndWizard
-                    campaign={campaign}
-                    sessionLog={sessionLog}
-                    isMockMode={isMockMode}
-                    onComplete={onEndSession}
-                    onCancel={() => setShowEndWizard(false)}
-                />
+                <Suspense fallback={null}>
+                    <SessionEndWizard
+                        campaign={campaign}
+                        sessionLog={sessionLog}
+                        isMockMode={isMockMode}
+                        onComplete={onEndSession}
+                        onCancel={() => setShowEndWizard(false)}
+                    />
+                </Suspense>
             )}
 
             {/* Combat Tracker Slide-out Panel */}

@@ -17,6 +17,43 @@ const FACTION_PROMPT_CHIPS = [
   'A rebel alliance',
 ];
 
+interface FactionCardProps {
+  faction: Faction;
+  leader?: NPC;
+  index: number;
+  onSelectFaction: (id: string) => void;
+  getRovingProps: (index: number) => Record<string, unknown>;
+}
+
+const FactionCard = React.memo(function FactionCard({ faction, leader, index, onSelectFaction, getRovingProps }: FactionCardProps) {
+  const goalsSnippet = faction.goals ? faction.goals.slice(0, 80) + (faction.goals.length > 80 ? '…' : '') : '';
+  const memberCount = faction.memberIds?.length ?? 0;
+  return (
+    <button
+      onClick={() => onSelectFaction(faction.id)}
+      className="card-parchment p-4 rounded-lg border border-slate-800 border-l-4 border-l-violet-500 text-left hover:border-slate-700 hover:border-l-violet-400 transition-all space-y-2"
+      {...getRovingProps(index)}
+    >
+      <h3 className="font-semibold text-violet-400 leading-tight">{faction.name}</h3>
+      {goalsSnippet && (
+        <p className="text-xs text-slate-400 leading-relaxed">{goalsSnippet}</p>
+      )}
+      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+        {memberCount > 0 && (
+          <span className="text-[10px] bg-violet-900/40 text-violet-300 border border-violet-500/30 rounded-full px-2 py-0.5">
+            {memberCount} {memberCount === 1 ? 'member' : 'members'}
+          </span>
+        )}
+        {leader && (
+          <span className="text-[10px] text-slate-500">
+            Led by {leader.name}
+          </span>
+        )}
+      </div>
+    </button>
+  );
+});
+
 interface FactionDashboardProps {
   factions: Faction[];
   npcs?: NPC[];
@@ -96,32 +133,15 @@ export const FactionDashboard: React.FC<FactionDashboardProps> = ({ factions, np
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredFactions.map((faction, index) => {
             const leader = npcs.find(n => n.id === faction.leaderId);
-            const goalsSnippet = faction.goals ? faction.goals.slice(0, 80) + (faction.goals.length > 80 ? '…' : '') : '';
-            const memberCount = faction.memberIds?.length ?? 0;
             return (
-              <button
+              <FactionCard
                 key={faction.id}
-                onClick={() => onSelectFaction(faction.id)}
-                className="card-parchment p-4 rounded-lg border border-slate-800 border-l-4 border-l-violet-500 text-left hover:border-slate-700 hover:border-l-violet-400 transition-all space-y-2"
-                {...getRovingProps(index)}
-              >
-                <h3 className="font-semibold text-violet-400 leading-tight">{faction.name}</h3>
-                {goalsSnippet && (
-                  <p className="text-xs text-slate-400 leading-relaxed">{goalsSnippet}</p>
-                )}
-                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                  {memberCount > 0 && (
-                    <span className="text-[10px] bg-violet-900/40 text-violet-300 border border-violet-500/30 rounded-full px-2 py-0.5">
-                      {memberCount} {memberCount === 1 ? 'member' : 'members'}
-                    </span>
-                  )}
-                  {leader && (
-                    <span className="text-[10px] text-slate-500">
-                      Led by {leader.name}
-                    </span>
-                  )}
-                </div>
-              </button>
+                faction={faction}
+                leader={leader}
+                index={index}
+                onSelectFaction={onSelectFaction}
+                getRovingProps={getRovingProps}
+              />
             );
           })}
           {filteredFactions.length === 0 && factions.length > 0 && (

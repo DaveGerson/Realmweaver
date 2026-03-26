@@ -17,6 +17,43 @@ const LOCATION_PROMPT_CHIPS = [
   'A hidden cave',
 ];
 
+interface LocationCardProps {
+  location: Location;
+  parent?: Location;
+  index: number;
+  onSelectLocation: (id: string) => void;
+  getRovingProps: (index: number) => Record<string, unknown>;
+}
+
+const LocationCard = React.memo(function LocationCard({ location, parent, index, onSelectLocation, getRovingProps }: LocationCardProps) {
+  const connectionCount = location.connections?.length ?? 0;
+  const descSnippet = location.description ? location.description.slice(0, 80) + (location.description.length > 80 ? '…' : '') : '';
+  return (
+    <button
+      onClick={() => onSelectLocation(location.id)}
+      className="card-parchment p-4 rounded-lg border border-slate-800 border-l-4 border-l-emerald-500 text-left hover:border-slate-700 hover:border-l-emerald-400 transition-all space-y-2"
+      {...getRovingProps(index)}
+    >
+      <h3 className="font-semibold text-emerald-400 leading-tight">{location.name}</h3>
+      {descSnippet && (
+        <p className="text-xs text-slate-400 leading-relaxed">{descSnippet}</p>
+      )}
+      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+        {connectionCount > 0 && (
+          <span className="text-[10px] bg-emerald-900/40 text-emerald-300 border border-emerald-500/30 rounded-full px-2 py-0.5">
+            {connectionCount} {connectionCount === 1 ? 'connection' : 'connections'}
+          </span>
+        )}
+        {parent && (
+          <span className="text-[10px] text-slate-500 flex items-center gap-1">
+            <Icons.ChevronRight className="w-3 h-3" />{parent.name}
+          </span>
+        )}
+      </div>
+    </button>
+  );
+});
+
 interface LocationDashboardProps {
   locations: Location[];
   factions?: Faction[];
@@ -98,32 +135,15 @@ export const LocationDashboard: React.FC<LocationDashboardProps> = ({ locations,
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredLocations.map((location, index) => {
             const parent = locations.find(l => l.id === location.parentLocationId);
-            const connectionCount = location.connections?.length ?? 0;
-            const descSnippet = location.description ? location.description.slice(0, 80) + (location.description.length > 80 ? '…' : '') : '';
             return (
-              <button
+              <LocationCard
                 key={location.id}
-                onClick={() => onSelectLocation(location.id)}
-                className="card-parchment p-4 rounded-lg border border-slate-800 border-l-4 border-l-emerald-500 text-left hover:border-slate-700 hover:border-l-emerald-400 transition-all space-y-2"
-                {...getRovingProps(index)}
-              >
-                <h3 className="font-semibold text-emerald-400 leading-tight">{location.name}</h3>
-                {descSnippet && (
-                  <p className="text-xs text-slate-400 leading-relaxed">{descSnippet}</p>
-                )}
-                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                  {connectionCount > 0 && (
-                    <span className="text-[10px] bg-emerald-900/40 text-emerald-300 border border-emerald-500/30 rounded-full px-2 py-0.5">
-                      {connectionCount} {connectionCount === 1 ? 'connection' : 'connections'}
-                    </span>
-                  )}
-                  {parent && (
-                    <span className="text-[10px] text-slate-500 flex items-center gap-1">
-                      <Icons.ChevronRight className="w-3 h-3" />{parent.name}
-                    </span>
-                  )}
-                </div>
-              </button>
+                location={location}
+                parent={parent}
+                index={index}
+                onSelectLocation={onSelectLocation}
+                getRovingProps={getRovingProps}
+              />
             );
           })}
           {filteredLocations.length === 0 && locations.length > 0 && (

@@ -17,6 +17,47 @@ const ITEM_PROMPT_CHIPS = [
   'A legendary artifact',
 ];
 
+const RARITY_COLORS: Record<string, string> = {
+  common: 'bg-slate-700/60 text-slate-300 border-slate-600/30',
+  uncommon: 'bg-green-900/40 text-green-300 border-green-500/30',
+  rare: 'bg-blue-900/40 text-blue-300 border-blue-500/30',
+  'very rare': 'bg-purple-900/40 text-purple-300 border-purple-500/30',
+  legendary: 'bg-orange-900/40 text-orange-300 border-orange-500/30',
+  artifact: 'bg-red-900/40 text-red-300 border-red-500/30',
+};
+
+interface ItemCardProps {
+  item: Item;
+  index: number;
+  onSelectItem: (id: string) => void;
+  getRovingProps: (index: number) => Record<string, unknown>;
+}
+
+const ItemCard = React.memo(function ItemCard({ item, index, onSelectItem, getRovingProps }: ItemCardProps) {
+  const descSnippet = item.description ? item.description.slice(0, 80) + (item.description.length > 80 ? '…' : '') : '';
+  const rarityStyle = RARITY_COLORS[item.rarity] ?? RARITY_COLORS['common'];
+  return (
+    <button
+      onClick={() => onSelectItem(item.id)}
+      className="card-parchment p-4 rounded-lg border border-slate-800 border-l-4 border-l-sky-500 text-left hover:border-slate-700 hover:border-l-sky-400 transition-all space-y-2"
+      {...getRovingProps(index)}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="font-semibold text-sky-400 leading-tight">{item.name}</h3>
+        <span className={`flex-shrink-0 text-[10px] border rounded-full px-2 py-0.5 capitalize ${rarityStyle}`}>
+          {item.rarity}
+        </span>
+      </div>
+      {descSnippet && (
+        <p className="text-xs text-slate-400 leading-relaxed">{descSnippet}</p>
+      )}
+      {item.properties && (
+        <p className="text-xs text-slate-500 italic line-clamp-1">{item.properties}</p>
+      )}
+    </button>
+  );
+});
+
 interface ItemDashboardProps {
   items: Item[];
   onItemCreated: (data: Omit<Item, 'id'>) => void;
@@ -84,39 +125,15 @@ export const ItemDashboard: React.FC<ItemDashboardProps> = ({ items, onItemCreat
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredItems.map((item, index) => {
-            const descSnippet = item.description ? item.description.slice(0, 80) + (item.description.length > 80 ? '…' : '') : '';
-            const rarityColors: Record<string, string> = {
-              common: 'bg-slate-700/60 text-slate-300 border-slate-600/30',
-              uncommon: 'bg-green-900/40 text-green-300 border-green-500/30',
-              rare: 'bg-blue-900/40 text-blue-300 border-blue-500/30',
-              'very rare': 'bg-purple-900/40 text-purple-300 border-purple-500/30',
-              legendary: 'bg-orange-900/40 text-orange-300 border-orange-500/30',
-              artifact: 'bg-red-900/40 text-red-300 border-red-500/30',
-            };
-            const rarityStyle = rarityColors[item.rarity] ?? rarityColors['common'];
-            return (
-              <button
-                key={item.id}
-                onClick={() => onSelectItem(item.id)}
-                className="card-parchment p-4 rounded-lg border border-slate-800 border-l-4 border-l-sky-500 text-left hover:border-slate-700 hover:border-l-sky-400 transition-all space-y-2"
-                {...getRovingProps(index)}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-semibold text-sky-400 leading-tight">{item.name}</h3>
-                  <span className={`flex-shrink-0 text-[10px] border rounded-full px-2 py-0.5 capitalize ${rarityStyle}`}>
-                    {item.rarity}
-                  </span>
-                </div>
-                {descSnippet && (
-                  <p className="text-xs text-slate-400 leading-relaxed">{descSnippet}</p>
-                )}
-                {item.properties && (
-                  <p className="text-xs text-slate-500 italic line-clamp-1">{item.properties}</p>
-                )}
-              </button>
-            );
-          })}
+          {filteredItems.map((item, index) => (
+            <ItemCard
+              key={item.id}
+              item={item}
+              index={index}
+              onSelectItem={onSelectItem}
+              getRovingProps={getRovingProps}
+            />
+          ))}
           {filteredItems.length === 0 && items.length > 0 && (
             <div className="md:col-span-2 xl:col-span-3 text-center py-10">
               <Icons.Search className="w-10 h-10 mx-auto mb-3 text-slate-700" />

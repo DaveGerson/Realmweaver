@@ -14,7 +14,7 @@ interface SidebarEntityListProps {
   emptyMessage?: string;
 }
 
-export const SidebarEntityList: React.FC<SidebarEntityListProps> = ({
+export const SidebarEntityList: React.FC<SidebarEntityListProps> = React.memo(({
   items,
   selectedId,
   onSelect,
@@ -41,4 +41,4 @@ export const SidebarEntityList: React.FC<SidebarEntityListProps> = ({
       ))}
     </>
   );
-};
+});

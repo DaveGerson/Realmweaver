@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import type { Campaign } from '@/types/Campaign';
 import type { Adventure, Scene } from '@/types/index';
 import type { EditorView, GeneratorType } from '@/App';
@@ -30,7 +30,17 @@ import { PlotEditor } from '@/components/editors/PlotEditor';
 import { CampaignSettingEditor } from '@/components/editors/CampaignSettingEditor';
 import { CombatTracker } from '@/components/tools/CombatTracker';
 import { SecretsTracker } from '@/components/tools/SecretsTracker';
-import { RelationshipGraph } from '@/components/visualizers/RelationshipGraph';
+import { Icons } from '@/components/common/Icons';
+
+// Lazy-loaded visualizers — contain heavy dependencies (D3, dagre, React Flow)
+const RelationshipGraph = React.lazy(() => import('@/components/visualizers/RelationshipGraph').then(m => ({ default: m.RelationshipGraph })));
+
+const VisualizerFallback = () => (
+  <div className="flex items-center justify-center p-8 text-slate-400">
+    <Icons.Loader className="w-5 h-5 animate-spin mr-2" />
+    Loading...
+  </div>
+);
 
 export interface ViewRouterProps {
   campaign: Campaign;
@@ -484,10 +494,12 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
 
   if (activeView === 'relationships') {
     return (
-      <RelationshipGraph
-        campaign={campaign}
-        onNodeSelect={(type, id) => onNavigate(type, id)}
-      />
+      <Suspense fallback={<VisualizerFallback />}>
+        <RelationshipGraph
+          campaign={campaign}
+          onNodeSelect={(type, id) => onNavigate(type, id)}
+        />
+      </Suspense>
     );
   }
 

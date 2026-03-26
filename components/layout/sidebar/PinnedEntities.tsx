@@ -12,7 +12,7 @@ interface PinnedEntitiesProps {
   onUnpin: (type: string, id: string) => void;
 }
 
-export const PinnedEntities: React.FC<PinnedEntitiesProps> = ({
+export const PinnedEntities: React.FC<PinnedEntitiesProps> = React.memo(({
   campaign,
   pinnedEntities,
   onSelectPinned,
@@ -57,4 +57,4 @@ export const PinnedEntities: React.FC<PinnedEntitiesProps> = ({
       </div>
     </div>
   );
-};
+});

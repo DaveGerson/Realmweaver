@@ -1,11 +1,12 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, Suspense } from 'react';
 import type { Plot } from '../../types/index';
 import type { SessionLog } from '../../types/index';
 import { useEntitySearch } from '@/hooks/useEntitySearch';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
-import { PlotTimeline } from '../visualizers/PlotTimeline';
+// Lazy-loaded — only bundled when the timeline panel is expanded
+const PlotTimeline = React.lazy(() => import('../visualizers/PlotTimeline').then(m => ({ default: m.PlotTimeline })));
 
 /** Returns a Tailwind color class for a completeness dot given a percentage 0-100. */
 function completenessColor(pct: number): string {
@@ -109,12 +110,19 @@ export const PlotDashboard: React.FC<PlotDashboardProps> = ({ plots, sessionLogs
         </button>
         {timelineOpen && (
           <div className="px-5 pb-5 pt-2 border-t border-slate-800">
-            <PlotTimeline
-              plots={plots}
-              sessionLogs={sessionLogs}
-              onSelectPlot={onSelectPlot}
-              onSelectSession={onSelectSession}
-            />
+            <Suspense fallback={
+              <div className="flex items-center justify-center p-8 text-slate-400">
+                <Icons.Loader className="w-5 h-5 animate-spin mr-2" />
+                Loading...
+              </div>
+            }>
+              <PlotTimeline
+                plots={plots}
+                sessionLogs={sessionLogs}
+                onSelectPlot={onSelectPlot}
+                onSelectSession={onSelectSession}
+              />
+            </Suspense>
           </div>
         )}
       </div>

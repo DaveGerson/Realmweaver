@@ -9,7 +9,7 @@ interface RecentItemsProps {
   onSelectRecent: (type: CommandPaletteEntityType, id: string) => void;
 }
 
-export const RecentItems: React.FC<RecentItemsProps> = ({ recentItems, onSelectRecent }) => {
+export const RecentItems: React.FC<RecentItemsProps> = React.memo(({ recentItems, onSelectRecent }) => {
   const [showAll, setShowAll] = useState(false);
 
   if (recentItems.length === 0) return null;
@@ -48,4 +48,4 @@ export const RecentItems: React.FC<RecentItemsProps> = ({ recentItems, onSelectR
       </div>
     </div>
   );
-};
+});

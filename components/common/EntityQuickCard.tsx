@@ -75,7 +75,7 @@ export interface EntityQuickCardProps {
   onPointerLeave?: () => void;
 }
 
-export const EntityQuickCard: React.FC<EntityQuickCardProps> = ({
+export const EntityQuickCard: React.FC<EntityQuickCardProps> = React.memo(({
   entityType,
   entityId,
   triggerRect,
@@ -198,7 +198,7 @@ export const EntityQuickCard: React.FC<EntityQuickCardProps> = ({
     </div>,
     document.body
   );
-};
+});
 
 // ─── Editable field component ─────────────────────────────────────────────────
 

@@ -1,5 +1,5 @@
 
-import React, { FC, useState, useEffect, useMemo, useSyncExternalStore } from 'react';
+import React, { FC, useState, useEffect, useMemo, useSyncExternalStore, Suspense } from 'react';
 import { WelcomeScreen } from './components/views/WelcomeScreen';
 import { CampaignCreator } from './components/views/CampaignCreator';
 import { FirstCampaignWizard } from './components/views/FirstCampaignWizard';
@@ -7,12 +7,14 @@ import { CrossCampaignDashboard } from './components/views/CrossCampaignDashboar
 import { Header } from './components/layout/Header';
 import { CampaignSidebar } from './components/layout/CampaignSidebar';
 import { ViewRouter } from './components/layout/ViewRouter';
-import { DmCoach } from './components/dialogs/DmCoach';
-import { EvocationWizard } from './components/dialogs/EvocationWizard';
-import { WorldSimulationWizard } from './components/dialogs/WorldSimulationWizard';
-import { ExportModal } from './components/dialogs/ExportModal';
 import type { ExportEntityCounts } from './components/dialogs/ExportModal';
-import { ContinuityChecker } from './components/dialogs/ContinuityChecker';
+
+// Lazy-loaded dialogs — only bundled when opened
+const DmCoach = React.lazy(() => import('./components/dialogs/DmCoach').then(m => ({ default: m.DmCoach })));
+const EvocationWizard = React.lazy(() => import('./components/dialogs/EvocationWizard').then(m => ({ default: m.EvocationWizard })));
+const WorldSimulationWizard = React.lazy(() => import('./components/dialogs/WorldSimulationWizard').then(m => ({ default: m.WorldSimulationWizard })));
+const ExportModal = React.lazy(() => import('./components/dialogs/ExportModal').then(m => ({ default: m.ExportModal })));
+const ContinuityChecker = React.lazy(() => import('./components/dialogs/ContinuityChecker').then(m => ({ default: m.ContinuityChecker })));
 import { RealmChatWidget } from './components/RealmChat/RealmChatWidget';
 import { Breadcrumbs } from './components/common/Breadcrumbs';
 import { CommandPalette } from './components/common/CommandPalette';
@@ -481,78 +483,88 @@ const App: FC = () => {
 
                 {isCoachOpen && (
                   <ErrorBoundary>
-                    <DmCoach
-                      campaign={activeCampaign}
-                      activeContext={coachContext}
-                      activeSceneNpcIds={activeSceneNpcIds}
-                      onClose={() => setIsCoachOpen(false)}
-                      onSendToNotes={(content) => campaignService.addAutoEvent('coach-used', content)}
-                      onResultGenerated={(content) => campaignService.addAutoEvent('coach-used', content)}
-                      isMockMode={isMockMode}
-                      onNavigate={handleEntityNavigate}
-                    />
+                    <Suspense fallback={null}>
+                      <DmCoach
+                        campaign={activeCampaign}
+                        activeContext={coachContext}
+                        activeSceneNpcIds={activeSceneNpcIds}
+                        onClose={() => setIsCoachOpen(false)}
+                        onSendToNotes={(content) => campaignService.addAutoEvent('coach-used', content)}
+                        onResultGenerated={(content) => campaignService.addAutoEvent('coach-used', content)}
+                        isMockMode={isMockMode}
+                        onNavigate={handleEntityNavigate}
+                      />
+                    </Suspense>
                   </ErrorBoundary>
                 )}
 
                 {isWizardOpen && (
                   <ErrorBoundary>
-                    <EvocationWizard
-                      campaign={activeCampaign}
-                      onClose={() => setIsWizardOpen(false)}
-                      onAddToCampaign={(data) => {
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        const count = Object.values(data).reduce((sum: number, arr: any) => sum + (Array.isArray(arr) ? arr.length : 0), 0) as number;
-                        campaignService.batchAddToCampaign(data);
-                        setIsWizardOpen(false);
-                        if (count > 0) {
-                          addToast(`${count} entit${count === 1 ? 'y' : 'ies'} added to your campaign!`, 'success');
-                        }
-                      }}
-                      isMockMode={isMockMode}
-                    />
+                    <Suspense fallback={null}>
+                      <EvocationWizard
+                        campaign={activeCampaign}
+                        onClose={() => setIsWizardOpen(false)}
+                        onAddToCampaign={(data) => {
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          const count = Object.values(data).reduce((sum: number, arr: any) => sum + (Array.isArray(arr) ? arr.length : 0), 0) as number;
+                          campaignService.batchAddToCampaign(data);
+                          setIsWizardOpen(false);
+                          if (count > 0) {
+                            addToast(`${count} entit${count === 1 ? 'y' : 'ies'} added to your campaign!`, 'success');
+                          }
+                        }}
+                        isMockMode={isMockMode}
+                      />
+                    </Suspense>
                   </ErrorBoundary>
                 )}
 
                 {isWorldSimOpen && (
                   <ErrorBoundary>
-                    <WorldSimulationWizard
-                      campaign={activeCampaign}
-                      isMockMode={isMockMode}
-                      onClose={() => setIsWorldSimOpen(false)}
-                      onApplyEvents={(_events) => { setIsWorldSimOpen(false); }}
-                    />
+                    <Suspense fallback={null}>
+                      <WorldSimulationWizard
+                        campaign={activeCampaign}
+                        isMockMode={isMockMode}
+                        onClose={() => setIsWorldSimOpen(false)}
+                        onApplyEvents={(_events) => { setIsWorldSimOpen(false); }}
+                      />
+                    </Suspense>
                   </ErrorBoundary>
                 )}
 
                 {isExportModalOpen && (
                   <ErrorBoundary>
-                    <ExportModal
-                      campaignTitle={activeCampaign.title}
-                      onClose={() => setIsExportModalOpen(false)}
-                      onExportJson={() => exportCampaignAsJson(activeCampaign)}
-                      onExportObsidian={() => exportCampaignAsObsidian(activeCampaign)}
-                      entityCounts={{
-                        npcs: activeCampaign.npcs.length,
-                        locations: activeCampaign.locations.length,
-                        factions: activeCampaign.factions.length,
-                        items: activeCampaign.items.length,
-                        adventures: activeCampaign.adventures.length,
-                        articles: activeCampaign.articles.length,
-                        sessionLogs: (activeCampaign.sessionLogs ?? []).length,
-                        plots: (activeCampaign.plots ?? []).length,
-                        playerCharacters: (activeCampaign.playerCharacters ?? []).length,
-                      } satisfies ExportEntityCounts}
-                    />
+                    <Suspense fallback={null}>
+                      <ExportModal
+                        campaignTitle={activeCampaign.title}
+                        onClose={() => setIsExportModalOpen(false)}
+                        onExportJson={() => exportCampaignAsJson(activeCampaign)}
+                        onExportObsidian={() => exportCampaignAsObsidian(activeCampaign)}
+                        entityCounts={{
+                          npcs: activeCampaign.npcs.length,
+                          locations: activeCampaign.locations.length,
+                          factions: activeCampaign.factions.length,
+                          items: activeCampaign.items.length,
+                          adventures: activeCampaign.adventures.length,
+                          articles: activeCampaign.articles.length,
+                          sessionLogs: (activeCampaign.sessionLogs ?? []).length,
+                          plots: (activeCampaign.plots ?? []).length,
+                          playerCharacters: (activeCampaign.playerCharacters ?? []).length,
+                        } satisfies ExportEntityCounts}
+                      />
+                    </Suspense>
                   </ErrorBoundary>
                 )}
 
                 {isContinuityCheckerOpen && (
                   <ErrorBoundary>
-                    <ContinuityChecker
-                      campaign={activeCampaign}
-                      onNavigate={handleEntityNavigate}
-                      onClose={() => setIsContinuityCheckerOpen(false)}
-                    />
+                    <Suspense fallback={null}>
+                      <ContinuityChecker
+                        campaign={activeCampaign}
+                        onNavigate={handleEntityNavigate}
+                        onClose={() => setIsContinuityCheckerOpen(false)}
+                      />
+                    </Suspense>
                   </ErrorBoundary>
                 )}
 

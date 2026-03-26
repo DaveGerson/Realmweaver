@@ -17,6 +17,41 @@ const NPC_PROMPT_CHIPS = [
   'A rival adventurer',
 ];
 
+interface NpcCardProps {
+  npc: NPC;
+  faction?: Faction;
+  index: number;
+  onSelectNpc: (id: string) => void;
+  getRovingProps: (index: number) => Record<string, unknown>;
+}
+
+const NpcCard = React.memo(function NpcCard({ npc, faction, index, onSelectNpc, getRovingProps }: NpcCardProps) {
+  const descSnippet = npc.description ? npc.description.slice(0, 80) + (npc.description.length > 80 ? '…' : '') : '';
+  return (
+    <button
+      key={npc.id}
+      onClick={() => onSelectNpc(npc.id)}
+      className="card-parchment p-4 rounded-lg border border-slate-800 border-l-4 border-l-amber-500 text-left hover:border-slate-700 hover:border-l-amber-400 transition-all space-y-2"
+      {...getRovingProps(index)}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="font-semibold text-amber-400 leading-tight">{npc.name}</h3>
+        {faction && (
+          <span className="flex-shrink-0 text-[10px] bg-violet-900/50 text-violet-300 border border-violet-500/30 rounded-full px-2 py-0.5 truncate max-w-[120px]">
+            {faction.name}
+          </span>
+        )}
+      </div>
+      {descSnippet && (
+        <p className="text-xs text-slate-400 leading-relaxed">{descSnippet}</p>
+      )}
+      {npc.traits && (
+        <p className="text-xs text-slate-500 italic line-clamp-1">{npc.traits}</p>
+      )}
+    </button>
+  );
+});
+
 interface NpcDashboardProps {
   npcs: NPC[];
   factions?: Faction[];
@@ -90,29 +125,15 @@ export const NpcDashboard: React.FC<NpcDashboardProps> = ({ npcs, factions = [],
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredNpcs.map((npc, index) => {
             const faction = factions.find(f => f.id === npc.factionId);
-            const descSnippet = npc.description ? npc.description.slice(0, 80) + (npc.description.length > 80 ? '…' : '') : '';
             return (
-              <button
+              <NpcCard
                 key={npc.id}
-                onClick={() => onSelectNpc(npc.id)}
-                className="card-parchment p-4 rounded-lg border border-slate-800 border-l-4 border-l-amber-500 text-left hover:border-slate-700 hover:border-l-amber-400 transition-all space-y-2"
-                {...getRovingProps(index)}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-semibold text-amber-400 leading-tight">{npc.name}</h3>
-                  {faction && (
-                    <span className="flex-shrink-0 text-[10px] bg-violet-900/50 text-violet-300 border border-violet-500/30 rounded-full px-2 py-0.5 truncate max-w-[120px]">
-                      {faction.name}
-                    </span>
-                  )}
-                </div>
-                {descSnippet && (
-                  <p className="text-xs text-slate-400 leading-relaxed">{descSnippet}</p>
-                )}
-                {npc.traits && (
-                  <p className="text-xs text-slate-500 italic line-clamp-1">{npc.traits}</p>
-                )}
-              </button>
+                npc={npc}
+                faction={faction}
+                index={index}
+                onSelectNpc={onSelectNpc}
+                getRovingProps={getRovingProps}
+              />
             );
           })}
           {filteredNpcs.length === 0 && npcs.length > 0 && (

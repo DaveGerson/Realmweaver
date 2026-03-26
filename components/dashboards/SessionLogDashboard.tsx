@@ -1,11 +1,12 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, Suspense } from 'react';
 import type { Campaign, SessionLog } from '../../types/index';
 import { useEntitySearch } from '@/hooks/useEntitySearch';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { createDefaultSession } from '../../utils/entityUtils';
-import { SessionPrepWizard } from '../dialogs/SessionPrepWizard';
+// Lazy-loaded — only bundled when the prep wizard is opened
+const SessionPrepWizard = React.lazy(() => import('../dialogs/SessionPrepWizard').then(m => ({ default: m.SessionPrepWizard })));
 import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
 
 /** Returns a Tailwind color class for a completeness dot given a percentage 0-100. */
@@ -239,11 +240,13 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
 
       {/* Session Prep Wizard */}
       {isPrepWizardOpen && (
-          <SessionPrepWizard
-              campaign={campaign}
-              onComplete={handleWizardComplete}
-              onClose={() => setIsPrepWizardOpen(false)}
-          />
+          <Suspense fallback={null}>
+              <SessionPrepWizard
+                  campaign={campaign}
+                  onComplete={handleWizardComplete}
+                  onClose={() => setIsPrepWizardOpen(false)}
+              />
+          </Suspense>
       )}
     </>
   );
