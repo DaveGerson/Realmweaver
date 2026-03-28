@@ -29,7 +29,8 @@ export type CommandPaletteEntityType =
   | 'session-log'
   | 'plot'
   | 'player-character'
-  | 'scene';
+  | 'scene'
+  | 'note';
 
 export interface RecentItem {
   type: CommandPaletteEntityType;
@@ -114,6 +115,7 @@ const ENTITY_CONFIG: Record<CommandPaletteEntityType, { label: string; colorClas
   plot:             makePaletteConfig('plot'),
   'player-character': { ...makePaletteConfig('player-character'), label: 'Character' },
   scene: { label: 'Scene', colorClass: 'bg-red-500/10 border-red-500/30', textClass: 'text-red-400', icon: 'Scenes' },
+  note:             makePaletteConfig('note'),
 };
 
 // ---------------------------------------------------------------------------
