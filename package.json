@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -11,7 +12,14 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "electron:dev": "NODE_ENV=development electron dist-electron/main.js",
+    "electron:build-main": "tsc -p electron/tsconfig.json",
+    "electron:build": "npm run build && npm run electron:build-main",
+    "electron:dist": "npm run electron:build && electron-builder",
+    "electron:dist-mac": "npm run electron:build && electron-builder --mac",
+    "electron:dist-win": "npm run electron:build && electron-builder --win",
+    "electron:dist-all": "npm run electron:build && electron-builder --mac --win"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
@@ -30,6 +38,8 @@
     "@playwright/test": "^1.58.2",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "electron": "^33.3.1",
+    "electron-builder": "^25.1.8",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
     "vitest": "^4.1.0"
