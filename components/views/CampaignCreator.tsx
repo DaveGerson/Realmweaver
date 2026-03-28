@@ -4,7 +4,8 @@ import { Button } from '../common/Button';
 import { Icons } from '../common/Icons';
 import type { SettingType } from '../../types/index';
 import type { DmStyle } from '../../types/index';
-import { TEMPLATE_META, loadTemplateData, type TemplateMeta } from '../../data/templates/index';
+import { getAllTemplateMeta, loadTemplateData, type TemplateMeta } from '../../data/templates/index';
+import type { TestCampaignMeta } from '../../data/test-campaigns/index';
 
 interface CampaignCreatorProps {
   onCreateCampaign: (title: string, setting: string, settingType: SettingType, officialSetting?: string, dmStyle?: DmStyle) => void;
@@ -75,12 +76,16 @@ interface TemplateCardProps {
 }
 
 const TemplateCard: React.FC<TemplateCardProps> = ({ meta, onSelect, isLoading }) => {
+  const isLocal = 'isTestCampaign' in meta && (meta as TestCampaignMeta).isTestCampaign;
   return (
-    <div className="flex flex-col bg-slate-800 border border-slate-700 rounded-lg p-4 gap-3 hover:border-slate-600 transition-colors">
+    <div className={`flex flex-col bg-slate-800 border rounded-lg p-4 gap-3 hover:border-slate-600 transition-colors ${isLocal ? 'border-amber-700/50' : 'border-slate-700'}`}>
       <div>
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h3 className="font-semibold text-slate-100 text-sm leading-tight">{meta.title}</h3>
+            <h3 className="font-semibold text-slate-100 text-sm leading-tight">
+              {meta.title}
+              {isLocal && <span className="ml-2 text-[10px] font-medium bg-amber-600/20 text-amber-400 border border-amber-600/30 rounded px-1.5 py-0.5 align-middle">Local</span>}
+            </h3>
             <p className="text-amber-400 text-xs mt-0.5">{meta.subtitle}</p>
           </div>
           <span className="shrink-0 text-xs bg-slate-700 text-slate-400 rounded px-2 py-0.5 whitespace-nowrap">
@@ -170,7 +175,7 @@ const TemplateSelectorStep: React.FC<TemplateSelectorStepProps> = ({
       </header>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
-        {TEMPLATE_META.map(meta => (
+        {getAllTemplateMeta().map(meta => (
           <TemplateCard
             key={meta.id}
             meta={meta}
@@ -224,7 +229,14 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampai
       if (templateData.setting && typeof templateData.setting === 'string') {
         setSettingDescription(templateData.setting);
       }
-      setSettingType('custom');
+      // Detect official settings from template data
+      if (templateData.settingType === 'official' && typeof templateData.officialSetting === 'string'
+        && OFFICIAL_SETTINGS.includes(templateData.officialSetting)) {
+        setSettingType('official');
+        setOfficialSetting(templateData.officialSetting);
+      } else {
+        setSettingType('custom');
+      }
 
       // Proceed to the campaign form step with template data attached
       if (onTemplateSelected) {

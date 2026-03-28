@@ -24,6 +24,7 @@ type SelectedIds = {
     sessionLog: string | null;
     playerCharacter: string | null;
     plot: string | null;
+    note: string | null;
 }
 
 interface CampaignSidebarProps {
@@ -31,7 +32,7 @@ interface CampaignSidebarProps {
     activeView: EditorView;
     onSelectView: (view: EditorView) => void;
     selectedIds: SelectedIds;
-    onSelect: (type: 'adventure' | 'scene' | 'npc' | 'location' | 'faction' | 'item' | 'article' | 'session-log' | 'player-character' | 'plot', id: string) => void;
+    onSelect: (type: 'adventure' | 'scene' | 'npc' | 'location' | 'faction' | 'item' | 'article' | 'session-log' | 'player-character' | 'plot' | 'note', id: string) => void;
     onShowGenerator: (type: GeneratorType) => void;
     onReorderScene: (adventureId: string, draggedSceneId: string, targetSceneId: string) => void;
     recentItems?: RecentItem[];
@@ -192,6 +193,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
         .sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime());
     const filteredPlayerCharacters = (campaign.playerCharacters || []).filter(pc => matchesFilter(pc.characterSocial.characterName));
     const filteredPlots = (campaign.plots || []).filter(p => matchesFilter(p.title));
+    const filteredNotes = (campaign.notes || []).filter(n => matchesFilter(n.title));
     const filteredAdventures = campaign.adventures.filter(a => {
         if (matchesFilter(a.title)) return true;
         return a.scenes.some(s => matchesFilter(s.title));
@@ -207,7 +209,7 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
     // Determine if entire buckets should be hidden
     const hasCampaignStateItems = !debouncedFilter || filteredSessionLogs.length > 0 || filteredPlayerCharacters.length > 0 || filteredPlots.length > 0;
     const hasStorylineItems = !debouncedFilter || filteredAdventures.length > 0;
-    const hasWorldPlanningItems = !debouncedFilter || filteredTopLevelArticles.length > 0 || filteredEntityGroups.some(g => g.items.length > 0);
+    const hasWorldPlanningItems = !debouncedFilter || filteredTopLevelArticles.length > 0 || filteredEntityGroups.some(g => g.items.length > 0) || filteredNotes.length > 0;
 
     return (
         <aside className="w-full h-full bg-slate-900 flex-shrink-0 flex flex-col border-r border-slate-800">
@@ -574,6 +576,51 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
                                     />
                                 )
                             ))}
+                        </div>
+                    </div>
+                    )}
+
+                    {/* Campaign Notes */}
+                    {(!debouncedFilter || filteredNotes.length > 0) && (
+                    <div className="space-y-1 mt-1">
+                        <div className="flex items-center justify-between px-3 py-2 group">
+                            <button
+                            onClick={() => onSelectView('notes')}
+                            className={twMerge(
+                                'flex items-center gap-3 text-sm transition-colors w-full min-h-[44px] md:min-h-0',
+                                activeView === 'notes' ? 'text-amber-300 font-semibold' : 'text-slate-400 hover:text-slate-200'
+                            )}
+                            >
+                            <Icons.Notes className="w-4 h-4" />
+                            <span>Campaign Notes</span>
+                            </button>
+                            <button
+                                onClick={() => { onSelectView('notes'); }}
+                                title="Create a new note"
+                                className="text-slate-400 hover:text-amber-400 transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100"
+                            >
+                                <Icons.Plus className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <div className="pl-4 border-l border-slate-700 ml-5 space-y-0.5">
+                            {debouncedFilter && filteredNotes.length === 0 ? (
+                                <p className="px-2 py-1 text-xs text-slate-600 italic">No results</p>
+                            ) : (
+                                filteredNotes.map(note => (
+                                    <button
+                                        key={note.id}
+                                        onClick={() => onSelect('note', note.id)}
+                                        className={twMerge(
+                                            'w-full text-left text-sm truncate px-2 py-1.5 rounded-md flex items-center transition-all duration-100',
+                                            selectedIds.note === note.id ? 'bg-slate-700 text-white' : 'hover:bg-slate-800 text-slate-400'
+                                        )}
+                                        title={note.title}
+                                    >
+                                        <Icons.Notes className="w-3 h-3 mr-2 flex-shrink-0"/>
+                                        <span className="truncate">{note.title}</span>
+                                    </button>
+                                ))
+                            )}
                         </div>
                     </div>
                     )}

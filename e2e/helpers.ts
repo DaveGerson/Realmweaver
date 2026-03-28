@@ -24,7 +24,7 @@ export async function gotoFresh(page: Page): Promise<void> {
   });
   await page.reload();
   await expect(
-    page.getByRole('button', { name: /create your first campaign/i })
+    page.getByRole('button', { name: /create a campaign/i })
   ).toBeVisible({ timeout: 8000 });
 }
 
@@ -98,7 +98,7 @@ export async function createCampaign(
 
   if (!isOnTemplateSelect && !isOnCreatorForm) {
     // Welcome screen path — button text unchanged
-    const createFirstBtn = page.getByRole('button', { name: /create your first campaign/i });
+    const createFirstBtn = page.getByRole('button', { name: /create a campaign/i });
     // CrossCampaignDashboard path — the "Create new campaign" dashed card
     const selectorCreateBtn = page.getByRole('button', { name: /create new campaign/i });
 
@@ -137,13 +137,13 @@ export async function createCampaign(
     await page.getByRole('radio', { name: /official setting/i }).check();
   }
 
-  // DM Style card buttons
+  // DM Style card radios (role="radio" with aria-checked)
   const styleLabels: Record<DmStyleOption, RegExp> = {
     guided: /i'm new to dming/i,
     standard: /i keep it simple/i,
     power: /give me everything/i,
   };
-  await page.getByRole('button', { name: styleLabels[dmStyle] }).click();
+  await page.getByRole('radio', { name: styleLabels[dmStyle] }).click();
 
   // Submit
   await page.getByRole('button', { name: /weave campaign/i }).click();
@@ -157,7 +157,8 @@ export async function createCampaign(
   // It renders as a fixed full-screen overlay with a close button titled "Skip wizard".
   const skipWizardBtn = page.locator('button[title="Skip wizard"]');
   if (await skipWizardBtn.isVisible({ timeout: 500 }).catch(() => false)) {
-    await skipWizardBtn.click();
+    // On mobile the header z-index can intercept pointer events; use force:true.
+    await skipWizardBtn.click({ force: true });
     // Wait for the overlay to disappear
     await expect(skipWizardBtn).not.toBeVisible({ timeout: 3000 });
   }
@@ -236,7 +237,8 @@ export async function openCampaignSelector(page: Page): Promise<void> {
   await openCampaignDropdown(page);
   // The dropdown has both "All Campaigns" and "Switch Campaign" (both call the same action).
   // Use exact match on "All Campaigns" to avoid strict-mode violation.
-  await page.getByRole('button', { name: 'All Campaigns', exact: true }).click();
+  // The dropdown items use role="menuitem", not role="button".
+  await page.getByRole('menuitem', { name: 'All Campaigns', exact: true }).click();
   await expect(page.getByRole('heading', { name: /all campaigns|your campaigns/i })).toBeVisible({ timeout: 3000 });
 }
 

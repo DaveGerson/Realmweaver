@@ -27,6 +27,8 @@ import { ArticleEditor } from '@/components/editors/ArticleEditor';
 import { SessionLogEditor } from '@/components/editors/SessionLogEditor';
 import { PlayerCharacterEditor } from '@/components/editors/PlayerCharacterEditor';
 import { PlotEditor } from '@/components/editors/PlotEditor';
+import { NoteEditor } from '@/components/editors/NoteEditor';
+import { NoteDashboard } from '@/components/dashboards/NoteDashboard';
 import { CampaignSettingEditor } from '@/components/editors/CampaignSettingEditor';
 import { CombatTracker } from '@/components/tools/CombatTracker';
 import { SecretsTracker } from '@/components/tools/SecretsTracker';
@@ -61,6 +63,7 @@ export interface ViewRouterProps {
   selectedSessionLog: NonNullable<Campaign['sessionLogs']>[number] | null;
   selectedPlayerCharacter: NonNullable<Campaign['playerCharacters']>[number] | null;
   selectedPlot: NonNullable<Campaign['plots']>[number] | null;
+  selectedNote: NonNullable<Campaign['notes']>[number] | null;
 
   // Callbacks
   onEndSession: () => void;
@@ -79,6 +82,7 @@ export interface ViewRouterProps {
   onSetSelectedSessionLogId: (id: string | null) => void;
   onSetSelectedPlayerCharacterId: (id: string | null) => void;
   onSetSelectedPlotId: (id: string | null) => void;
+  onSetSelectedNoteId: (id: string | null) => void;
   onGoLive: (sessionLogId: string) => void;
   onImportPC: (file: File) => Promise<string>;
   onAddToast: (message: string, variant?: 'success' | 'error' | 'info') => void;
@@ -101,6 +105,7 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
   selectedSessionLog,
   selectedPlayerCharacter,
   selectedPlot,
+  selectedNote,
   onEndSession,
   onOpenCoach,
   onNavigate,
@@ -117,6 +122,7 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
   onSetSelectedSessionLogId,
   onSetSelectedPlayerCharacterId,
   onSetSelectedPlotId,
+  onSetSelectedNoteId,
   onGoLive,
   onImportPC,
   onAddToast,
@@ -186,6 +192,19 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
         onUpdate={campaignService.updatePlot}
         onDelete={(id) => { campaignService.deletePlot(id); onResetSelections(); }}
         isMockMode={isMockMode}
+        onNavigate={onNavigate}
+      />
+    );
+  }
+
+  if (selectedNote) {
+    return (
+      <NoteEditor
+        note={selectedNote}
+        onUpdate={campaignService.updateNote}
+        onDelete={(id) => { campaignService.deleteNote(id); onResetSelections(); }}
+        isMockMode={isMockMode}
+        campaignContext={campaignContext}
         onNavigate={onNavigate}
       />
     );
@@ -385,6 +404,20 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
           onSetSelectedSessionLogId(id);
           onSetActiveView('session-logs');
         }}
+      />
+    );
+  }
+
+  if (activeView === 'notes') {
+    return (
+      <NoteDashboard
+        notes={campaign.notes || []}
+        onNoteCreated={(noteData) => {
+          const newId = campaignService.createNote(noteData);
+          onSetActiveView('notes');
+          onSetSelectedNoteId(newId);
+        }}
+        onSelectNote={onSetSelectedNoteId}
       />
     );
   }

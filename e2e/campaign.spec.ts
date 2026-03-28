@@ -210,20 +210,16 @@ test('delete campaign removes it from selector', async ({ page }) => {
   await openCampaignSelector(page);
   await expect(page.getByText('Doomed Campaign')).toBeVisible();
 
-  // CrossCampaignDashboard uses a two-click confirm pattern (no window.confirm dialog).
-  // The delete button has an onBlur handler that resets confirmDelete to false.
-  // We find the button once (by aria-label in initial state), then click it twice
-  // as the SAME DOM element reference to avoid losing focus between clicks.
+  // CrossCampaignDashboard uses useConfirmDialog with confirmLabel 'Delete Campaign'.
+  // Click the delete button once, then confirm in the dialog overlay.
   const doomedCard = page.locator('.group').filter({ hasText: 'Doomed Campaign' });
   const deleteBtn = doomedCard.getByRole('button', { name: /^delete doomed campaign$/i });
   await expect(deleteBtn).toBeVisible({ timeout: 3000 });
-  // Accept all window.confirm dialogs that fire during deletion
-  page.on('dialog', (d) => d.accept());
-  // First click → sets confirmDelete=true
   await deleteBtn.click();
-  // The component's two-click pattern: button is now in confirm state
-  const confirmBtn = doomedCard.getByRole('button', { name: /confirm delete/i });
-  await expect(confirmBtn).toBeVisible({ timeout: 2000 });
+
+  // ConfirmDialog overlay appears with "Delete Campaign" confirm button
+  const confirmBtn = page.locator('[role="dialog"]').getByRole('button', { name: /delete campaign/i });
+  await expect(confirmBtn).toBeVisible({ timeout: 3000 });
   await confirmBtn.click();
 
   await page.screenshot({ path: 'e2e/screenshots/campaign-deleted.png' });
@@ -246,7 +242,7 @@ test('campaign creator requires a title before submitting', async ({ page }) => 
   await gotoFresh(page);
 
   // Navigate to the creator — Phase F shows template selector first
-  await page.getByRole('button', { name: /create your first campaign/i }).click();
+  await page.getByRole('button', { name: /create a campaign/i }).click();
   await expect(page.getByRole('heading', { name: /start with a template/i })).toBeVisible({ timeout: 5000 });
 
   // Skip templates to reach the campaign form

@@ -691,6 +691,23 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     campaign.adventures.push(adventure);
                 });
 
+                // --- Items ---
+                const rawItems: any[] = templateData.items || [];
+                rawItems.forEach((i: any) => {
+                    const item: Item = {
+                        id: crypto.randomUUID(),
+                        name: i.name || 'Unnamed Item',
+                        description: i.description || '',
+                        rarity: i.rarity || 'common',
+                        properties: i.properties || '',
+                        itemType: i.itemType,
+                        attunement: i.attunement,
+                        weight: i.weight,
+                        value: i.value,
+                    };
+                    campaign.items.push(item);
+                });
+
                 // --- Plots ---
                 const rawPlots: any[] = templateData.plots || [];
                 rawPlots.forEach((p: any) => {

@@ -31,6 +31,9 @@ dist-ssr
 .claude/settings.local.json
 /reference_files/*
 
+# Test campaigns (may contain licensed/non-shareable content)
+data/test-campaigns/
+
 # Playwright
 playwright-report/
 test-results/
@@ -43,3 +46,4 @@ e2e/screenshots/
 .planning/
 docs/superpowers/
 docs/ux-audit/screenshots/
+/reference_files/

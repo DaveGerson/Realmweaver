@@ -139,12 +139,16 @@ test.describe('Entity CRUD', () => {
     await switchToFormMode(page);
     await quickGenerate(page, 'A guard with a secret', /generate npc/i);
 
-    // Editor is already open after generation. Playwright auto-accepts dialogs.
-    page.on('dialog', (dialog) => dialog.accept());
-
+    // Editor is already open after generation.
     const deleteBtn = page.getByRole('button', { name: /delete npc/i });
     await expect(deleteBtn).toBeVisible({ timeout: 5000 });
     await deleteBtn.click();
+
+    // The app uses useConfirmDialog which renders a ConfirmDialog overlay.
+    // The confirm button defaults to "Confirm" text.
+    const confirmBtn = page.locator('[role="dialog"]').getByRole('button', { name: /confirm/i });
+    await expect(confirmBtn).toBeVisible({ timeout: 3000 });
+    await confirmBtn.click();
 
     // After deletion the app navigates back to the NPCs dashboard (count = 0)
     await expect(

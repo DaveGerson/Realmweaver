@@ -1,6 +1,12 @@
 // Template index — metadata only, does not import full JSON until template is selected.
 // Full template data is loaded via dynamic import when "Use This Template" is clicked.
 
+import {
+  getAvailableTestCampaigns,
+  loadTestCampaignData,
+  type TestCampaignMeta,
+} from '../test-campaigns/index';
+
 export interface TemplateEntityCounts {
   npcs: number;
   locations: number;
@@ -20,6 +26,8 @@ export interface TemplateMeta {
   entityCounts: TemplateEntityCounts;
   fileName: string;
 }
+
+export type { TestCampaignMeta };
 
 export const TEMPLATE_META: TemplateMeta[] = [
   {
@@ -97,13 +105,21 @@ export const TEMPLATE_META: TemplateMeta[] = [
 ];
 
 /**
+ * Returns all available templates — built-in plus any local test campaigns on disk.
+ * Test campaigns are appended at the front so they appear first in the selector.
+ */
+export function getAllTemplateMeta(): TemplateMeta[] {
+  const testCampaigns = getAvailableTestCampaigns();
+  return [...testCampaigns, ...TEMPLATE_META];
+}
+
+/**
  * Dynamically loads the full template JSON for a given template id.
+ * Checks both built-in templates and local test campaigns.
  * Returns null if the template id is not found.
  */
 export async function loadTemplateData(templateId: string): Promise<Record<string, unknown> | null> {
-  const meta = TEMPLATE_META.find(t => t.id === templateId);
-  if (!meta) return null;
-
+  // Try built-in templates first
   switch (templateId) {
     case 'dungeon-crawl':
       return (await import('./dungeon-crawl.json')).default as Record<string, unknown>;
@@ -113,7 +129,8 @@ export async function loadTemplateData(templateId: string): Promise<Record<strin
       return (await import('./sandbox-exploration.json')).default as Record<string, unknown>;
     case 'one-shot':
       return (await import('./one-shot.json')).default as Record<string, unknown>;
-    default:
-      return null;
   }
+
+  // Fall through to test campaigns
+  return loadTestCampaignData(templateId);
 }

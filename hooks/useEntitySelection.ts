@@ -16,6 +16,7 @@ export interface EntitySelectionState {
   selectedSessionLogId: string | null;
   selectedPlayerCharacterId: string | null;
   selectedPlotId: string | null;
+  selectedNoteId: string | null;
 
   // Navigation
   navStack: NavStackEntry[];
@@ -34,13 +35,14 @@ export interface EntitySelectionState {
   selectedSessionLog: NonNullable<Campaign['sessionLogs']>[number] | null;
   selectedPlayerCharacter: NonNullable<Campaign['playerCharacters']>[number] | null;
   selectedPlot: NonNullable<Campaign['plots']>[number] | null;
+  selectedNote: NonNullable<Campaign['notes']>[number] | null;
 
   // Breadcrumbs
   breadcrumbSegments: BreadcrumbSegment[];
 
   // Handlers
   handleSelect: (
-    type: 'adventure' | 'scene' | 'npc' | 'location' | 'faction' | 'item' | 'article' | 'session-log' | 'player-character' | 'plot',
+    type: 'adventure' | 'scene' | 'npc' | 'location' | 'faction' | 'item' | 'article' | 'session-log' | 'player-character' | 'plot' | 'note',
     id: string
   ) => void;
   handleSelectView: (view: EditorView) => void;
@@ -60,6 +62,7 @@ export interface EntitySelectionState {
   setSelectedSessionLogId: (id: string | null) => void;
   setSelectedPlayerCharacterId: (id: string | null) => void;
   setSelectedPlotId: (id: string | null) => void;
+  setSelectedNoteId: (id: string | null) => void;
   setActiveView: (view: EditorView) => void;
 }
 
@@ -82,6 +85,7 @@ export function useEntitySelection({ activeCampaign, onSidebarClose }: UseEntity
   const [selectedSessionLogId, setSelectedSessionLogId] = useState<string | null>(null);
   const [selectedPlayerCharacterId, setSelectedPlayerCharacterId] = useState<string | null>(null);
   const [selectedPlotId, setSelectedPlotId] = useState<string | null>(null);
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
 
   const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
   const [navStack, setNavStack] = useState<NavStackEntry[]>([]);
@@ -127,6 +131,10 @@ export function useEntitySelection({ activeCampaign, onSidebarClose }: UseEntity
     () => activeCampaign?.plots?.find(n => n.id === selectedPlotId) || null,
     [activeCampaign, selectedPlotId]
   );
+  const selectedNote = useMemo(
+    () => activeCampaign?.notes?.find(n => n.id === selectedNoteId) || null,
+    [activeCampaign, selectedNoteId]
+  );
 
   // --- Helpers ---
 
@@ -148,6 +156,7 @@ export function useEntitySelection({ activeCampaign, onSidebarClose }: UseEntity
     setSelectedSessionLogId(null);
     setSelectedPlayerCharacterId(null);
     setSelectedPlotId(null);
+    setSelectedNoteId(null);
     setActiveGenerator(null);
   };
 
@@ -167,6 +176,7 @@ export function useEntitySelection({ activeCampaign, onSidebarClose }: UseEntity
         case 'session-logs': selectedId = selectedSessionLogId; break;
         case 'player-characters': selectedId = selectedPlayerCharacterId; break;
         case 'plots': selectedId = selectedPlotId; break;
+        case 'notes': selectedId = selectedNoteId; break;
         case 'adventures': selectedId = selectedAdventureId; break;
         default: selectedId = null;
       }
@@ -196,6 +206,7 @@ export function useEntitySelection({ activeCampaign, onSidebarClose }: UseEntity
       setSelectedSessionLogId(entry.view === 'session-logs' ? entry.selectedId : null);
       setSelectedPlayerCharacterId(entry.view === 'player-characters' ? entry.selectedId : null);
       setSelectedPlotId(entry.view === 'plots' ? entry.selectedId : null);
+      setSelectedNoteId(entry.view === 'notes' ? entry.selectedId : null);
       setSelectedAdventureId(entry.adventureId ?? null);
       setSelectedSceneId(entry.sceneId ?? null);
       setActiveGenerator(null);
@@ -213,7 +224,7 @@ export function useEntitySelection({ activeCampaign, onSidebarClose }: UseEntity
   };
 
   const handleSelect = (
-    type: 'adventure' | 'scene' | 'npc' | 'location' | 'faction' | 'item' | 'article' | 'session-log' | 'player-character' | 'plot',
+    type: 'adventure' | 'scene' | 'npc' | 'location' | 'faction' | 'item' | 'article' | 'session-log' | 'player-character' | 'plot' | 'note',
     id: string
   ) => {
     if (type === 'scene') {
@@ -309,6 +320,15 @@ export function useEntitySelection({ activeCampaign, onSidebarClose }: UseEntity
           if (plt) trackRecentItem('plot', id, plt.title);
           break;
         }
+        case 'note': {
+          const nte = activeCampaign?.notes?.find(n => n.id === id);
+          if (nte) pushNavStack(nte.title);
+          resetSelections();
+          setActiveView('notes');
+          setSelectedNoteId(id);
+          if (nte) trackRecentItem('note', id, nte.title);
+          break;
+        }
       }
     }
     onSidebarClose();
@@ -327,6 +347,7 @@ export function useEntitySelection({ activeCampaign, onSidebarClose }: UseEntity
       adventure: 'adventure',
       article: 'article',
       plot: 'plot',
+      note: 'note',
       'session-log': 'session-log',
       'player-character': 'player-character',
       scene: 'scene',
@@ -348,7 +369,7 @@ export function useEntitySelection({ activeCampaign, onSidebarClose }: UseEntity
       items: 'Items', adventures: 'Adventures', lorebook: 'Lorebook',
       'session-logs': 'Sessions', 'player-characters': 'Characters', plots: 'Plots',
       combat: 'Combat Tracker', relationships: 'World Graph', 'session-runner': 'Session Live',
-      secrets: 'Secrets & Clues',
+      secrets: 'Secrets & Clues', notes: 'Notes',
     };
 
     const categoryCrumb: BreadcrumbSegment = {
@@ -364,6 +385,7 @@ export function useEntitySelection({ activeCampaign, onSidebarClose }: UseEntity
     if (selectedPlayerCharacter) return [campaignCrumb, categoryCrumb, { label: selectedPlayerCharacter.characterSocial.characterName }];
     if (selectedSessionLog) return [campaignCrumb, categoryCrumb, { label: selectedSessionLog.title }];
     if (selectedPlot) return [campaignCrumb, categoryCrumb, { label: selectedPlot.title }];
+    if (selectedNote) return [campaignCrumb, categoryCrumb, { label: selectedNote.title }];
     if (selectedScene && selectedAdventure) {
       return [
         campaignCrumb,
@@ -385,22 +407,22 @@ export function useEntitySelection({ activeCampaign, onSidebarClose }: UseEntity
   }, [
     activeCampaign, activeView,
     selectedNpc, selectedLocation, selectedFaction, selectedItem, selectedArticle,
-    selectedPlayerCharacter, selectedSessionLog, selectedPlot, selectedScene, selectedAdventure,
+    selectedPlayerCharacter, selectedSessionLog, selectedPlot, selectedNote, selectedScene, selectedAdventure,
   ]);
 
   return {
     selectedAdventureId, selectedSceneId, selectedNpcId, selectedLocationId,
     selectedFactionId, selectedItemId, selectedArticleId, selectedSessionLogId,
-    selectedPlayerCharacterId, selectedPlotId,
+    selectedPlayerCharacterId, selectedPlotId, selectedNoteId,
     navStack, activeView, activeGenerator, recentItems,
     selectedAdventure, selectedScene, selectedNpc, selectedLocation,
     selectedFaction, selectedItem, selectedArticle, selectedSessionLog,
-    selectedPlayerCharacter, selectedPlot,
+    selectedPlayerCharacter, selectedPlot, selectedNote,
     breadcrumbSegments,
     handleSelect, handleSelectView, handleGoBack, handleEntityNavigate,
     pushNavStack, resetSelections, trackRecentItem, setActiveGenerator,
     setSelectedAdventureId, setSelectedSceneId, setSelectedNpcId, setSelectedLocationId,
     setSelectedFactionId, setSelectedItemId, setSelectedArticleId, setSelectedSessionLogId,
-    setSelectedPlayerCharacterId, setSelectedPlotId, setActiveView,
+    setSelectedPlayerCharacterId, setSelectedPlotId, setSelectedNoteId, setActiveView,
   };
 }

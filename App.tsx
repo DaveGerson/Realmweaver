@@ -31,7 +31,7 @@ import { useModalState } from '@/hooks/useModalState';
 import { useEntitySelection } from '@/hooks/useEntitySelection';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 
-export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'combat' | 'relationships' | 'session-runner' | 'secrets';
+export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'notes' | 'combat' | 'relationships' | 'session-runner' | 'secrets';
 export type GeneratorType = 'npc' | 'location' | 'faction' | 'item' | 'scene' | 'article';
 
 export interface NavStackEntry {
@@ -80,18 +80,18 @@ const App: FC = () => {
   const {
     selectedAdventureId, selectedSceneId, selectedNpcId, selectedLocationId,
     selectedFactionId, selectedItemId, selectedArticleId, selectedSessionLogId,
-    selectedPlayerCharacterId, selectedPlotId,
+    selectedPlayerCharacterId, selectedPlotId, selectedNoteId,
     navStack, activeView, activeGenerator, recentItems,
     selectedAdventure, selectedScene, selectedNpc, selectedLocation,
     selectedFaction, selectedItem, selectedArticle, selectedSessionLog,
-    selectedPlayerCharacter, selectedPlot,
+    selectedPlayerCharacter, selectedPlot, selectedNote,
     breadcrumbSegments,
     handleSelect, handleSelectView, handleGoBack, handleEntityNavigate,
     resetSelections, setActiveGenerator,
     setSelectedAdventureId, setSelectedSceneId, setSelectedNpcId,
     setSelectedLocationId, setSelectedFactionId, setSelectedItemId,
     setSelectedArticleId, setSelectedSessionLogId,
-    setSelectedPlayerCharacterId, setSelectedPlotId, setActiveView,
+    setSelectedPlayerCharacterId, setSelectedPlotId, setSelectedNoteId, setActiveView,
   } = sel;
 
   // --- Effects ---
@@ -381,6 +381,7 @@ const App: FC = () => {
                       sessionLog: selectedSessionLogId,
                       playerCharacter: selectedPlayerCharacterId,
                       plot: selectedPlotId,
+                      note: selectedNoteId,
                     }}
                     onSelect={handleSelect}
                     recentItems={recentItems}
@@ -431,6 +432,7 @@ const App: FC = () => {
                       selectedSessionLog={selectedSessionLog}
                       selectedPlayerCharacter={selectedPlayerCharacter}
                       selectedPlot={selectedPlot}
+                      selectedNote={selectedNote}
                       onEndSession={handleEndSession}
                       onOpenCoach={() => setIsCoachOpen(true)}
                       onNavigate={handleEntityNavigate}
@@ -447,6 +449,7 @@ const App: FC = () => {
                       onSetSelectedSessionLogId={setSelectedSessionLogId}
                       onSetSelectedPlayerCharacterId={setSelectedPlayerCharacterId}
                       onSetSelectedPlotId={setSelectedPlotId}
+                      onSetSelectedNoteId={setSelectedNoteId}
                       onGoLive={handleGoLive}
                       onImportPC={handleImportPC}
                       onAddToast={addToast}
