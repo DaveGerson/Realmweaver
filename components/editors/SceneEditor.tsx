@@ -6,6 +6,7 @@ import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
+import { MentionInput } from '../common/MentionInput';
 import { generateNpc } from '../../services/aiService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
 import { RegenerateButton } from '../common/RegenerateButton';
@@ -141,6 +142,12 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
     }
   };
 
+  // Used by MentionInput fields (onChange receives string, not event)
+  const handleMentionFieldChange = (field: keyof Scene) => (value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    onUpdate(scene.id, { [field]: value });
+  };
+
   const handleFieldRegenerate = (field: 'readAloudText' | 'gmNotes' | 'rewards') => (newValue: string) => {
     setFormData(prev => ({ ...prev, [field]: newValue }));
     onUpdate(scene.id, { [field]: newValue });
@@ -258,32 +265,40 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                 </div>
               </div>
 
-              <AiTextarea
-                label="Read-Aloud Text"
-                name="readAloudText"
-                value={formData.readAloudText}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                rows={5}
-                placeholder="Evocative 'box text' to read to your players to set the scene."
-                regenerateButton={<RegenerateButton fieldName="readAloudText" currentValue={formData.readAloudText} entityType="Scene" entityContext={sceneEntityContext} onRegenerate={handleFieldRegenerate('readAloudText')} isMockMode={isMockMode} campaignContext={campaignContext} />}
-              />
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <div className="flex items-center">
+                    <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Read-Aloud Text</label>
+                    <RegenerateButton fieldName="readAloudText" currentValue={formData.readAloudText} entityType="Scene" entityContext={sceneEntityContext} onRegenerate={handleFieldRegenerate('readAloudText')} isMockMode={isMockMode} campaignContext={campaignContext} />
+                  </div>
+                </div>
+                <MentionInput
+                  value={formData.readAloudText}
+                  onChange={handleMentionFieldChange('readAloudText')}
+                  rows={5}
+                  placeholder="Evocative 'box text' to read to your players to set the scene. (type @ to mention entities)"
+                />
+              </div>
               {formData.readAloudText && onNavigate && (
                 <p className="text-lg italic text-amber-100/90 leading-relaxed font-serif border-l-4 border-amber-700/40 pl-4 mt-1">
                   <LinkedText text={formData.readAloudText} onNavigate={onNavigate} />
                 </p>
               )}
 
-              <AiTextarea
-                label="GM Notes"
-                name="gmNotes"
-                value={formData.gmNotes}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                rows={8}
-                placeholder="GM-only notes: scene goals, character motivations, potential outcomes, hidden details..."
-                regenerateButton={<RegenerateButton fieldName="gmNotes" currentValue={formData.gmNotes} entityType="Scene" entityContext={sceneEntityContext} onRegenerate={handleFieldRegenerate('gmNotes')} isMockMode={isMockMode} campaignContext={campaignContext} />}
-              />
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <div className="flex items-center">
+                    <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider">GM Notes</label>
+                    <RegenerateButton fieldName="gmNotes" currentValue={formData.gmNotes} entityType="Scene" entityContext={sceneEntityContext} onRegenerate={handleFieldRegenerate('gmNotes')} isMockMode={isMockMode} campaignContext={campaignContext} />
+                  </div>
+                </div>
+                <MentionInput
+                  value={formData.gmNotes}
+                  onChange={handleMentionFieldChange('gmNotes')}
+                  rows={8}
+                  placeholder="GM-only notes: scene goals, character motivations, potential outcomes, hidden details... (type @ to mention entities)"
+                />
+              </div>
 
             </div>
           )}

@@ -4,7 +4,7 @@ import type { Plot, PlotStatus, SessionLog, Campaign } from '../../types/index';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
-import { AiTextarea } from '../common/Textarea';
+import { MentionInput } from '../common/MentionInput';
 import { generateScene } from '../../services/aiService';
 import { RegenerateButton } from '../common/RegenerateButton';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
@@ -59,6 +59,12 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, campaign, onUpdate
     }
   }
   
+  // Used by MentionInput fields (onChange receives string, not event)
+  const handleMentionFieldChange = (field: keyof Plot) => (value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    onUpdate(plot.id, { [field]: value } as Partial<Plot>);
+  };
+
   const handleFieldRegenerate = (field: 'description') => (newValue: string) => {
     setFormData(prev => ({ ...prev, [field]: newValue }));
     onUpdate(plot.id, { [field]: newValue });
@@ -158,16 +164,20 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, campaign, onUpdate
                 </div>
             </div>
 
-            <AiTextarea
-            label="Description & Notes"
-            name="description"
-            value={formData.description}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            rows={8}
-            placeholder="Describe the main conflict, key beats, and current state of this plot arc."
-            regenerateButton={<RegenerateButton fieldName="description" currentValue={formData.description} entityType="Plot" entityContext={plotEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />}
-            />
+            <div>
+              <div className="flex justify-between items-center mb-1.5">
+                <div className="flex items-center">
+                  <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Description &amp; Notes</label>
+                  <RegenerateButton fieldName="description" currentValue={formData.description} entityType="Plot" entityContext={plotEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />
+                </div>
+              </div>
+              <MentionInput
+                value={formData.description}
+                onChange={handleMentionFieldChange('description')}
+                rows={8}
+                placeholder="Describe the main conflict, key beats, and current state of this plot arc. (type @ to mention entities)"
+              />
+            </div>
             {formData.description && onNavigate && (
                 <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
                     <LinkedText text={formData.description} onNavigate={onNavigate} />

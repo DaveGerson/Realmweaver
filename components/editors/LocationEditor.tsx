@@ -4,7 +4,8 @@ import type { Location, LocationConnection, PointOfInterest, PoiInteraction, Loo
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
-import { AiTextarea, textareaBaseClasses } from '../common/Textarea';
+import { textareaBaseClasses } from '../common/Textarea';
+import { MentionInput } from '../common/MentionInput';
 import { generatePoiFromLoot, generateNpc } from '../../services/aiService';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { RegenerateButton } from '../common/RegenerateButton';
@@ -77,6 +78,12 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     const newFactionId = value === "none" ? undefined : value;
     setFormData(prev => ({ ...prev, controllingFactionId: newFactionId }));
     onUpdate(location.id, { controllingFactionId: newFactionId });
+  };
+
+  // Used by MentionInput fields (onChange receives string, not event)
+  const handleMentionFieldChange = (field: keyof Location) => (value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    onUpdate(location.id, { [field]: value });
   };
 
   const handleFieldRegenerate = (field: 'description' | 'secrets') => (newValue: string) => {
@@ -299,30 +306,40 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                 </div>
               </div>
 
-              <AiTextarea
-                label="Description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                rows={5}
-                regenerateButton={<RegenerateButton fieldName="description" currentValue={formData.description} entityType="Location" entityContext={locationEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />}
-              />
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <div className="flex items-center">
+                    <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Description</label>
+                    <RegenerateButton fieldName="description" currentValue={formData.description} entityType="Location" entityContext={locationEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />
+                  </div>
+                </div>
+                <MentionInput
+                  value={formData.description}
+                  onChange={handleMentionFieldChange('description')}
+                  rows={5}
+                  placeholder="Describe this location... (type @ to mention entities)"
+                />
+              </div>
               {formData.description && onNavigate && (
                   <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
                       <LinkedText text={formData.description} onNavigate={onNavigate} />
                   </p>
               )}
 
-              <AiTextarea
-                label="Secrets & Hidden Details"
-                name="secrets"
-                value={formData.secrets}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                rows={3}
-                regenerateButton={<RegenerateButton fieldName="secrets" currentValue={formData.secrets} entityType="Location" entityContext={locationEntityContext} onRegenerate={handleFieldRegenerate('secrets')} isMockMode={isMockMode} campaignContext={campaignContext} />}
-              />
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <div className="flex items-center">
+                    <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Secrets &amp; Hidden Details</label>
+                    <RegenerateButton fieldName="secrets" currentValue={formData.secrets} entityType="Location" entityContext={locationEntityContext} onRegenerate={handleFieldRegenerate('secrets')} isMockMode={isMockMode} campaignContext={campaignContext} />
+                  </div>
+                </div>
+                <MentionInput
+                  value={formData.secrets}
+                  onChange={handleMentionFieldChange('secrets')}
+                  rows={3}
+                  placeholder="Hidden details, secret passages, buried knowledge... (type @ to mention entities)"
+                />
+              </div>
               {formData.secrets && onNavigate && (
                   <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
                       <LinkedText text={formData.secrets} onNavigate={onNavigate} />

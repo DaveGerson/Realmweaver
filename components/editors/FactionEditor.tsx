@@ -5,6 +5,7 @@ import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
+import { MentionInput } from '../common/MentionInput';
 import { generateNpc } from '../../services/aiService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
 import { RegenerateButton } from '../common/RegenerateButton';
@@ -74,6 +75,12 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
       onDelete(faction.id);
     }
   }
+
+  // Used by MentionInput fields (onChange receives string, not event)
+  const handleMentionFieldChange = (field: keyof Faction) => (value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    onUpdate(faction.id, { [field]: value });
+  };
 
   const handleFieldRegenerate = (field: keyof Omit<Faction, 'id' | 'leaderId' | 'memberIds' | 'headquartersLocationId' | 'alignment'>) => (newValue: string) => {
     setFormData(prev => ({ ...prev, [field]: newValue }));
@@ -148,16 +155,20 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
               </div>
 
               {/* Description */}
-              <AiTextarea
-                label="Description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                rows={4}
-                placeholder="The faction's purpose, public image, and typical members."
-                regenerateButton={<RegenerateButton fieldName="description" currentValue={formData.description} entityType="Faction" entityContext={factionEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />}
-              />
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <div className="flex items-center">
+                    <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Description</label>
+                    <RegenerateButton fieldName="description" currentValue={formData.description} entityType="Faction" entityContext={factionEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />
+                  </div>
+                </div>
+                <MentionInput
+                  value={formData.description}
+                  onChange={handleMentionFieldChange('description')}
+                  rows={4}
+                  placeholder="The faction's purpose, public image, and typical members. (type @ to mention entities)"
+                />
+              </div>
               {formData.description && onNavigate && (
                   <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
                       <LinkedText text={formData.description} onNavigate={onNavigate} />
@@ -165,16 +176,20 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
               )}
 
               {/* Goals */}
-              <AiTextarea
-                label="Goals"
-                name="goals"
-                value={formData.goals}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                rows={3}
-                placeholder="The faction's primary short-term and long-term objectives."
-                regenerateButton={<RegenerateButton fieldName="goals" currentValue={formData.goals} entityType="Faction" entityContext={factionEntityContext} onRegenerate={handleFieldRegenerate('goals')} isMockMode={isMockMode} campaignContext={campaignContext} />}
-              />
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <div className="flex items-center">
+                    <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Goals</label>
+                    <RegenerateButton fieldName="goals" currentValue={formData.goals} entityType="Faction" entityContext={factionEntityContext} onRegenerate={handleFieldRegenerate('goals')} isMockMode={isMockMode} campaignContext={campaignContext} />
+                  </div>
+                </div>
+                <MentionInput
+                  value={formData.goals}
+                  onChange={handleMentionFieldChange('goals')}
+                  rows={3}
+                  placeholder="The faction's primary short-term and long-term objectives. (type @ to mention entities)"
+                />
+              </div>
               {formData.goals && onNavigate && (
                   <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
                       <LinkedText text={formData.goals} onNavigate={onNavigate} />
