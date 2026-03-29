@@ -39,6 +39,32 @@ function finalise(acc: Map<string, BacklinkEntry[]>): GroupedBacklinks {
 }
 
 // ---------------------------------------------------------------------------
+// @-mention backlink scanner
+// ---------------------------------------------------------------------------
+
+/**
+ * Scan a list of entities for those that have @-mentioned the target entity
+ * (via mentionedEntityIds), and add a "Mentioned in" backlink entry for each.
+ */
+function scanMentionedEntityIds(
+  acc: Map<string, BacklinkEntry[]>,
+  entityId: string,
+  entities: Array<{ id: string; name: string; mentionedEntityIds?: string[] }>,
+  sourceType: string,
+): void {
+  for (const entity of entities) {
+    if (entity.mentionedEntityIds?.includes(entityId)) {
+      addEntry(acc, sourceType, {
+        id: entity.id,
+        name: entity.name,
+        entityType: sourceType,
+        relationshipLabel: 'Mentioned in',
+      });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Per-entity-type scanner functions
 // ---------------------------------------------------------------------------
 
@@ -118,6 +144,15 @@ function computeBacklinksForNpc(entityId: string, campaign: Campaign): GroupedBa
     }
   }
 
+  // @-mention backlinks
+  const allScenes = campaign.adventures.flatMap(a => a.scenes);
+  scanMentionedEntityIds(acc, entityId, campaign.npcs, 'npc');
+  scanMentionedEntityIds(acc, entityId, campaign.locations, 'location');
+  scanMentionedEntityIds(acc, entityId, campaign.factions, 'faction');
+  scanMentionedEntityIds(acc, entityId, campaign.articles.map(a => ({ id: a.id, name: a.title, mentionedEntityIds: a.mentionedEntityIds })), 'article');
+  scanMentionedEntityIds(acc, entityId, campaign.plots.map(p => ({ id: p.id, name: p.title, mentionedEntityIds: p.mentionedEntityIds })), 'plot');
+  scanMentionedEntityIds(acc, entityId, allScenes.map(s => ({ id: s.id, name: s.title, mentionedEntityIds: s.mentionedEntityIds })), 'scene');
+
   return finalise(acc);
 }
 
@@ -191,6 +226,15 @@ function computeBacklinksForLocation(entityId: string, campaign: Campaign): Grou
     }
   }
 
+  // @-mention backlinks
+  const allScenes = campaign.adventures.flatMap(a => a.scenes);
+  scanMentionedEntityIds(acc, entityId, campaign.npcs, 'npc');
+  scanMentionedEntityIds(acc, entityId, campaign.locations, 'location');
+  scanMentionedEntityIds(acc, entityId, campaign.factions, 'faction');
+  scanMentionedEntityIds(acc, entityId, campaign.articles.map(a => ({ id: a.id, name: a.title, mentionedEntityIds: a.mentionedEntityIds })), 'article');
+  scanMentionedEntityIds(acc, entityId, campaign.plots.map(p => ({ id: p.id, name: p.title, mentionedEntityIds: p.mentionedEntityIds })), 'plot');
+  scanMentionedEntityIds(acc, entityId, allScenes.map(s => ({ id: s.id, name: s.title, mentionedEntityIds: s.mentionedEntityIds })), 'scene');
+
   return finalise(acc);
 }
 
@@ -245,6 +289,15 @@ function computeBacklinksForFaction(entityId: string, campaign: Campaign): Group
     }
   }
 
+  // @-mention backlinks
+  const allScenes = campaign.adventures.flatMap(a => a.scenes);
+  scanMentionedEntityIds(acc, entityId, campaign.npcs, 'npc');
+  scanMentionedEntityIds(acc, entityId, campaign.locations, 'location');
+  scanMentionedEntityIds(acc, entityId, campaign.factions, 'faction');
+  scanMentionedEntityIds(acc, entityId, campaign.articles.map(a => ({ id: a.id, name: a.title, mentionedEntityIds: a.mentionedEntityIds })), 'article');
+  scanMentionedEntityIds(acc, entityId, campaign.plots.map(p => ({ id: p.id, name: p.title, mentionedEntityIds: p.mentionedEntityIds })), 'plot');
+  scanMentionedEntityIds(acc, entityId, allScenes.map(s => ({ id: s.id, name: s.title, mentionedEntityIds: s.mentionedEntityIds })), 'scene');
+
   return finalise(acc);
 }
 
@@ -274,6 +327,14 @@ function computeBacklinksForItem(entityId: string, campaign: Campaign): GroupedB
       });
     }
   }
+
+  // @-mention backlinks
+  const allScenes = campaign.adventures.flatMap(a => a.scenes);
+  scanMentionedEntityIds(acc, entityId, campaign.npcs, 'npc');
+  scanMentionedEntityIds(acc, entityId, campaign.locations, 'location');
+  scanMentionedEntityIds(acc, entityId, campaign.articles.map(a => ({ id: a.id, name: a.title, mentionedEntityIds: a.mentionedEntityIds })), 'article');
+  scanMentionedEntityIds(acc, entityId, campaign.plots.map(p => ({ id: p.id, name: p.title, mentionedEntityIds: p.mentionedEntityIds })), 'plot');
+  scanMentionedEntityIds(acc, entityId, allScenes.map(s => ({ id: s.id, name: s.title, mentionedEntityIds: s.mentionedEntityIds })), 'scene');
 
   return finalise(acc);
 }
@@ -337,6 +398,13 @@ function computeBacklinksForArticle(entityId: string, campaign: Campaign): Group
     }
   }
 
+  // @-mention backlinks
+  scanMentionedEntityIds(acc, entityId, campaign.npcs, 'npc');
+  scanMentionedEntityIds(acc, entityId, campaign.locations, 'location');
+  scanMentionedEntityIds(acc, entityId, campaign.factions, 'faction');
+  scanMentionedEntityIds(acc, entityId, campaign.articles.map(a => ({ id: a.id, name: a.title, mentionedEntityIds: a.mentionedEntityIds })), 'article');
+  scanMentionedEntityIds(acc, entityId, campaign.plots.map(p => ({ id: p.id, name: p.title, mentionedEntityIds: p.mentionedEntityIds })), 'plot');
+
   return finalise(acc);
 }
 
@@ -366,6 +434,13 @@ function computeBacklinksForPlot(entityId: string, campaign: Campaign): GroupedB
       });
     }
   }
+
+  // @-mention backlinks
+  scanMentionedEntityIds(acc, entityId, campaign.npcs, 'npc');
+  scanMentionedEntityIds(acc, entityId, campaign.locations, 'location');
+  scanMentionedEntityIds(acc, entityId, campaign.factions, 'faction');
+  scanMentionedEntityIds(acc, entityId, campaign.articles.map(a => ({ id: a.id, name: a.title, mentionedEntityIds: a.mentionedEntityIds })), 'article');
+  scanMentionedEntityIds(acc, entityId, campaign.plots.map(p => ({ id: p.id, name: p.title, mentionedEntityIds: p.mentionedEntityIds })), 'plot');
 
   return finalise(acc);
 }

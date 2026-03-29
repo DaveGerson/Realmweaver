@@ -24,4 +24,5 @@ export interface Scene {
   rewards: string; // Loot, XP, or other rewards
   locationId?: string; // Reference to a campaign-level Location
   npcIds: string[]; // References to campaign-level NPCs
+  mentionedEntityIds?: string[]; // IDs of entities referenced via @-mentions in text fields
 }

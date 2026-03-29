@@ -41,4 +41,5 @@ export interface Location {
   pointsOfInterest?: PointOfInterest[];
   controllingFactionId?: string; // The faction that controls or influences this area
   history: HistoryEntry[];
+  mentionedEntityIds?: string[]; // IDs of entities referenced via @-mentions in text fields
 }

@@ -11,4 +11,5 @@ export interface Faction {
   resources?: string;
   influence?: string;
   headquartersLocationId?: string;
+  mentionedEntityIds?: string[]; // IDs of entities referenced via @-mentions in text fields
 }

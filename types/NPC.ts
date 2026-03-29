@@ -24,4 +24,5 @@ export interface NPC {
   knowsPlayerHistory: { playerId: string; details: string }[]; // Deprecated but kept for compatibility
   relationships: EntityRelationship[];
   history: HistoryEntry[];
+  mentionedEntityIds?: string[]; // IDs of entities referenced via @-mentions in text fields
 }
