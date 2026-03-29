@@ -18,6 +18,7 @@ import type { TabDefinition } from '../common/TabLayout';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
 import { SceneResourcesPanel } from '../common/SceneResourcesPanel';
 import { SceneSmartLinkBar } from '../common/SceneSmartLinkBar';
+import { LinkSuggestionsPanel } from '../common/LinkSuggestionsPanel';
 import type { EntityCandidate } from '../../services/linking/matchingEngine';
 
 // ─── Save Status Indicator ────────────────────────────────────────────────────
@@ -98,11 +99,13 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
   const [formData, setFormData] = useState(scene);
   const [activeTab, setActiveTab] = useState('narrative');
   const [isGeneratingNpc, setIsGeneratingNpc] = useState(false);
+  const [dismissedSuggestionIds, setDismissedSuggestionIds] = useState<Set<string>>(new Set());
   const { confirm } = useConfirmDialog();
 
-  // Reset to first tab when entity changes
+  // Reset to first tab and clear dismissed suggestions when entity changes
   useEffect(() => {
     setActiveTab('narrative');
+    setDismissedSuggestionIds(new Set());
   }, [scene.id]);
 
   useEffect(() => {
@@ -412,6 +415,37 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                   setFormData(prev => ({ ...prev, locationId }));
                   onUpdate(scene.id, { locationId });
                 }}
+              />
+
+              {/* Link Suggestions Panel — broader entity suggestions with user review */}
+              <LinkSuggestionsPanel
+                textFields={[formData.readAloudText, formData.gmNotes]}
+                linkedNpcIds={formData.npcIds}
+                linkedLocationId={formData.locationId ?? null}
+                allCandidates={[
+                  ...allNpcs.map((n): EntityCandidate => ({ id: n.id, name: n.name, type: 'npc' })),
+                  ...allLocations.map((l): EntityCandidate => ({ id: l.id, name: l.name, type: 'location' })),
+                ]}
+                onAccept={(entityId, action) => {
+                  const npcMatch = allNpcs.find(n => n.id === entityId);
+                  if (npcMatch) {
+                    handleNpcToggle(entityId);
+                    return;
+                  }
+                  const locationMatch = allLocations.find(l => l.id === entityId);
+                  if (locationMatch) {
+                    setFormData(prev => ({ ...prev, locationId: entityId }));
+                    onUpdate(scene.id, { locationId: entityId });
+                    return;
+                  }
+                  // Generic fallback: log unhandled action for future entity types
+                  console.warn('[LinkSuggestionsPanel] Unhandled accept action:', action, entityId);
+                }}
+                onDismiss={(entityId) => {
+                  setDismissedSuggestionIds(prev => new Set([...prev, entityId]));
+                }}
+                onNavigate={onNavigate}
+                dismissedIds={dismissedSuggestionIds}
               />
 
               {/* NPCs Involved */}

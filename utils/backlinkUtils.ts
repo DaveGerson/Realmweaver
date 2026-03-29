@@ -98,7 +98,7 @@ function computeBacklinksForNpc(entityId: string, campaign: Campaign): GroupedBa
           id: scene.id,
           name: scene.title,
           entityType: 'scene',
-          relationshipLabel: 'Appears in',
+          relationshipLabel: `${adventure.title} \u2014 Appears in`,
         });
       }
     }
@@ -208,7 +208,7 @@ function computeBacklinksForLocation(entityId: string, campaign: Campaign): Grou
           id: scene.id,
           name: scene.title,
           entityType: 'scene',
-          relationshipLabel: 'Setting for',
+          relationshipLabel: `${adventure.title} \u2014 Setting for`,
         });
       }
     }
