@@ -16,6 +16,8 @@ import { TabLayout } from '../common/TabLayout';
 import type { TabDefinition } from '../common/TabLayout';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
 import { SceneResourcesPanel } from '../common/SceneResourcesPanel';
+import { SceneSmartLinkBar } from '../common/SceneSmartLinkBar';
+import type { EntityCandidate } from '../../services/linking/matchingEngine';
 
 // ─── Save Status Indicator ────────────────────────────────────────────────────
 
@@ -381,6 +383,21 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* Smart Link Bar — detects unlinked entity mentions in scene text */}
+              <SceneSmartLinkBar
+                readAloudText={formData.readAloudText}
+                gmNotes={formData.gmNotes}
+                currentNpcIds={formData.npcIds}
+                currentLocationId={formData.locationId ?? null}
+                allNpcs={allNpcs.map((n): EntityCandidate => ({ id: n.id, name: n.name, type: 'npc' }))}
+                allLocations={allLocations.map((l): EntityCandidate => ({ id: l.id, name: l.name, type: 'location' }))}
+                onAddNpc={handleNpcToggle}
+                onSetLocation={(locationId) => {
+                  setFormData(prev => ({ ...prev, locationId }));
+                  onUpdate(scene.id, { locationId });
+                }}
+              />
 
               {/* NPCs Involved */}
               <div>
