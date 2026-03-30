@@ -27,6 +27,7 @@ import type {
 import { importCampaignFromJson } from './importExportService';
 import { parseCharacterSheetPdf } from './aiService';
 import { storageService } from './storageService';
+import { autoLinkScenes, autoLinkNpcFactions } from './linking/autoLinker';
 
 type AppStatus = 'loading' | 'welcome' | 'selecting' | 'creating' | 'editing';
 export type SaveStatus = 'idle' | 'saved' | 'saving' | 'error' | 'quota-warning';
@@ -720,6 +721,15 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     };
                     campaign.plots.push(plot);
                 });
+
+                // --- Auto-link scenes and NPC factions from text ---
+                const allScenes = campaign.adventures.flatMap(a => a.scenes);
+                const sceneResult = autoLinkScenes(allScenes, campaign.npcs, campaign.locations);
+                const factionResult = autoLinkNpcFactions(campaign.npcs as any[], campaign.factions);
+                console.log(
+                    `[autoLinker] Linked ${sceneResult.npcsAdded} NPC refs in ${sceneResult.scenesUpdated} scenes, ` +
+                    `${sceneResult.locationsSet} locations, ${factionResult.npcsUpdated} NPC-faction links`
+                );
             });
         },
 

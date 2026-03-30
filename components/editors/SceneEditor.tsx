@@ -6,6 +6,7 @@ import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
+import { MentionInput } from '../common/MentionInput';
 import { generateNpc } from '../../services/aiService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
 import { RegenerateButton } from '../common/RegenerateButton';
@@ -16,6 +17,9 @@ import { TabLayout } from '../common/TabLayout';
 import type { TabDefinition } from '../common/TabLayout';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
 import { SceneResourcesPanel } from '../common/SceneResourcesPanel';
+import { SceneSmartLinkBar } from '../common/SceneSmartLinkBar';
+import { LinkSuggestionsPanel } from '../common/LinkSuggestionsPanel';
+import type { EntityCandidate } from '../../services/linking/matchingEngine';
 
 // ─── Save Status Indicator ────────────────────────────────────────────────────
 
@@ -95,11 +99,13 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
   const [formData, setFormData] = useState(scene);
   const [activeTab, setActiveTab] = useState('narrative');
   const [isGeneratingNpc, setIsGeneratingNpc] = useState(false);
+  const [dismissedSuggestionIds, setDismissedSuggestionIds] = useState<Set<string>>(new Set());
   const { confirm } = useConfirmDialog();
 
-  // Reset to first tab when entity changes
+  // Reset to first tab and clear dismissed suggestions when entity changes
   useEffect(() => {
     setActiveTab('narrative');
+    setDismissedSuggestionIds(new Set());
   }, [scene.id]);
 
   useEffect(() => {
@@ -137,6 +143,12 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
     if (confirmed) {
       onDelete(scene.id);
     }
+  };
+
+  // Used by MentionInput fields (onChange receives string, not event)
+  const handleMentionFieldChange = (field: keyof Scene) => (value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    onUpdate(scene.id, { [field]: value });
   };
 
   const handleFieldRegenerate = (field: 'readAloudText' | 'gmNotes' | 'rewards') => (newValue: string) => {
@@ -256,32 +268,40 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                 </div>
               </div>
 
-              <AiTextarea
-                label="Read-Aloud Text"
-                name="readAloudText"
-                value={formData.readAloudText}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                rows={5}
-                placeholder="Evocative 'box text' to read to your players to set the scene."
-                regenerateButton={<RegenerateButton fieldName="readAloudText" currentValue={formData.readAloudText} entityType="Scene" entityContext={sceneEntityContext} onRegenerate={handleFieldRegenerate('readAloudText')} isMockMode={isMockMode} campaignContext={campaignContext} />}
-              />
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <div className="flex items-center">
+                    <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Read-Aloud Text</label>
+                    <RegenerateButton fieldName="readAloudText" currentValue={formData.readAloudText} entityType="Scene" entityContext={sceneEntityContext} onRegenerate={handleFieldRegenerate('readAloudText')} isMockMode={isMockMode} campaignContext={campaignContext} />
+                  </div>
+                </div>
+                <MentionInput
+                  value={formData.readAloudText}
+                  onChange={handleMentionFieldChange('readAloudText')}
+                  rows={5}
+                  placeholder="Evocative 'box text' to read to your players to set the scene. (type @ to mention entities)"
+                />
+              </div>
               {formData.readAloudText && onNavigate && (
                 <p className="text-lg italic text-amber-100/90 leading-relaxed font-serif border-l-4 border-amber-700/40 pl-4 mt-1">
                   <LinkedText text={formData.readAloudText} onNavigate={onNavigate} />
                 </p>
               )}
 
-              <AiTextarea
-                label="GM Notes"
-                name="gmNotes"
-                value={formData.gmNotes}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                rows={8}
-                placeholder="GM-only notes: scene goals, character motivations, potential outcomes, hidden details..."
-                regenerateButton={<RegenerateButton fieldName="gmNotes" currentValue={formData.gmNotes} entityType="Scene" entityContext={sceneEntityContext} onRegenerate={handleFieldRegenerate('gmNotes')} isMockMode={isMockMode} campaignContext={campaignContext} />}
-              />
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <div className="flex items-center">
+                    <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider">GM Notes</label>
+                    <RegenerateButton fieldName="gmNotes" currentValue={formData.gmNotes} entityType="Scene" entityContext={sceneEntityContext} onRegenerate={handleFieldRegenerate('gmNotes')} isMockMode={isMockMode} campaignContext={campaignContext} />
+                  </div>
+                </div>
+                <MentionInput
+                  value={formData.gmNotes}
+                  onChange={handleMentionFieldChange('gmNotes')}
+                  rows={8}
+                  placeholder="GM-only notes: scene goals, character motivations, potential outcomes, hidden details... (type @ to mention entities)"
+                />
+              </div>
 
             </div>
           )}
@@ -381,6 +401,52 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* Smart Link Bar — detects unlinked entity mentions in scene text */}
+              <SceneSmartLinkBar
+                readAloudText={formData.readAloudText}
+                gmNotes={formData.gmNotes}
+                currentNpcIds={formData.npcIds}
+                currentLocationId={formData.locationId ?? null}
+                allNpcs={allNpcs.map((n): EntityCandidate => ({ id: n.id, name: n.name, type: 'npc' }))}
+                allLocations={allLocations.map((l): EntityCandidate => ({ id: l.id, name: l.name, type: 'location' }))}
+                onAddNpc={handleNpcToggle}
+                onSetLocation={(locationId) => {
+                  setFormData(prev => ({ ...prev, locationId }));
+                  onUpdate(scene.id, { locationId });
+                }}
+              />
+
+              {/* Link Suggestions Panel — broader entity suggestions with user review */}
+              <LinkSuggestionsPanel
+                textFields={[formData.readAloudText, formData.gmNotes]}
+                linkedNpcIds={formData.npcIds}
+                linkedLocationId={formData.locationId ?? null}
+                allCandidates={[
+                  ...allNpcs.map((n): EntityCandidate => ({ id: n.id, name: n.name, type: 'npc' })),
+                  ...allLocations.map((l): EntityCandidate => ({ id: l.id, name: l.name, type: 'location' })),
+                ]}
+                onAccept={(entityId, action) => {
+                  const npcMatch = allNpcs.find(n => n.id === entityId);
+                  if (npcMatch) {
+                    handleNpcToggle(entityId);
+                    return;
+                  }
+                  const locationMatch = allLocations.find(l => l.id === entityId);
+                  if (locationMatch) {
+                    setFormData(prev => ({ ...prev, locationId: entityId }));
+                    onUpdate(scene.id, { locationId: entityId });
+                    return;
+                  }
+                  // Generic fallback: log unhandled action for future entity types
+                  console.warn('[LinkSuggestionsPanel] Unhandled accept action:', action, entityId);
+                }}
+                onDismiss={(entityId) => {
+                  setDismissedSuggestionIds(prev => new Set([...prev, entityId]));
+                }}
+                onNavigate={onNavigate}
+                dismissedIds={dismissedSuggestionIds}
+              />
 
               {/* NPCs Involved */}
               <div>

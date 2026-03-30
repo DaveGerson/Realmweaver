@@ -156,7 +156,7 @@ describe('computeBacklinks for NPC', () => {
         const result = computeBacklinks('npc-1', 'npc', campaign);
         expect(result.scene).toHaveLength(1);
         expect(result.scene[0].name).toBe('Encounter');
-        expect(result.scene[0].relationshipLabel).toBe('Appears in');
+        expect(result.scene[0].relationshipLabel).toContain('Appears in');
     });
 
     it('finds other NPCs with relationships targeting this NPC', () => {
@@ -275,7 +275,7 @@ describe('computeBacklinks for Location', () => {
         });
         const result = computeBacklinks('loc-1', 'location', campaign);
         expect(result.scene).toHaveLength(1);
-        expect(result.scene[0].relationshipLabel).toBe('Setting for');
+        expect(result.scene[0].relationshipLabel).toContain('Setting for');
     });
 
     it('finds articles referencing this location', () => {

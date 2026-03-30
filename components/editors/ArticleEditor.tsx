@@ -4,7 +4,7 @@ import type { Article, ArticleCategory, Campaign } from '../../types/index';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
-import { AiTextarea } from '../common/Textarea';
+import { MentionInput } from '../common/MentionInput';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { RegenerateButton } from '../common/RegenerateButton';
 import { EntityLink } from '../common/EntityLink';
@@ -77,6 +77,12 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
     }
   }
 
+  // Used by MentionInput fields (onChange receives string, not event)
+  const handleMentionFieldChange = (field: keyof Article) => (value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    onUpdate(article.id, { [field]: value });
+  };
+
   const handleFieldRegenerate = (field: 'content') => (newValue: string) => {
     setFormData(prev => ({ ...prev, [field]: newValue }));
     onUpdate(article.id, { [field]: newValue });
@@ -141,15 +147,20 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
             </div>
         </div>
 
-        <AiTextarea
-          label="Content"
-          name="content"
-          value={formData.content}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          rows={15}
-          regenerateButton={<RegenerateButton fieldName="content" currentValue={formData.content} entityType="Article" entityContext={articleEntityContext} onRegenerate={handleFieldRegenerate('content')} isMockMode={isMockMode} campaignContext={campaignContext} />}
-        />
+        <div>
+          <div className="flex justify-between items-center mb-1.5">
+            <div className="flex items-center">
+              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Content</label>
+              <RegenerateButton fieldName="content" currentValue={formData.content} entityType="Article" entityContext={articleEntityContext} onRegenerate={handleFieldRegenerate('content')} isMockMode={isMockMode} campaignContext={campaignContext} />
+            </div>
+          </div>
+          <MentionInput
+            value={formData.content}
+            onChange={handleMentionFieldChange('content')}
+            rows={15}
+            placeholder="Write the article content here... (type @ to mention entities)"
+          />
+        </div>
         {formData.content && onNavigate && (
             <div className="text-sm text-slate-300 leading-relaxed mt-1 px-1 whitespace-pre-wrap">
                 <LinkedText text={formData.content} onNavigate={onNavigate} />

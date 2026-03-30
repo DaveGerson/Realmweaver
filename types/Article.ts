@@ -10,4 +10,5 @@ export interface Article {
   parentArticleId?: string;
   subArticleIds: string[];
   relatedEntityIds?: string[]; // IDs of NPCs, Locations, Factions, Items linked to this lore
+  mentionedEntityIds?: string[]; // IDs of entities referenced via @-mentions in text fields
 }

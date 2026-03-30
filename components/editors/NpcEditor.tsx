@@ -5,6 +5,7 @@ import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
+import { MentionInput } from '../common/MentionInput';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { RegenerateButton } from '../common/RegenerateButton';
 import { EntityLink } from '../common/EntityLink';
@@ -75,6 +76,12 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
       onDelete(npc.id);
     }
   }
+
+  // Used by MentionInput fields (onChange receives string, not event)
+  const handleMentionFieldChange = (field: keyof NPC) => (value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    onUpdate(npc.id, { [field]: value });
+  };
 
   const handleFieldRegenerate = (field: keyof Omit<NPC, 'id' | 'factionId' | 'knowsPlayerHistory' | 'relationships' | 'history'>) => (newValue: string) => {
     setFormData(prev => ({ ...prev, [field]: newValue }));
@@ -174,16 +181,20 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
               </div>
 
               {/* Description */}
-              <AiTextarea
-                label="Description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                rows={4}
-                placeholder="Physical appearance, typical attire, mannerisms..."
-                regenerateButton={<RegenerateButton fieldName="description" currentValue={formData.description} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />}
-              />
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <div className="flex items-center">
+                    <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Description</label>
+                    <RegenerateButton fieldName="description" currentValue={formData.description} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('description')} isMockMode={isMockMode} campaignContext={campaignContext} />
+                  </div>
+                </div>
+                <MentionInput
+                  value={formData.description}
+                  onChange={handleMentionFieldChange('description')}
+                  rows={4}
+                  placeholder="Physical appearance, typical attire, mannerisms... (type @ to mention entities)"
+                />
+              </div>
               {formData.description && onNavigate && (
                   <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
                       <LinkedText text={formData.description} onNavigate={onNavigate} />
@@ -191,16 +202,20 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
               )}
 
               {/* Traits */}
-              <AiTextarea
-                label="Personality Traits"
-                name="traits"
-                value={formData.traits}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                rows={2}
-                placeholder="e.g., 'Taps fingers when impatient, speaks in riddles.'"
-                regenerateButton={<RegenerateButton fieldName="traits" currentValue={formData.traits} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('traits')} isMockMode={isMockMode} campaignContext={campaignContext} />}
-              />
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <div className="flex items-center">
+                    <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Personality Traits</label>
+                    <RegenerateButton fieldName="traits" currentValue={formData.traits} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('traits')} isMockMode={isMockMode} campaignContext={campaignContext} />
+                  </div>
+                </div>
+                <MentionInput
+                  value={formData.traits}
+                  onChange={handleMentionFieldChange('traits')}
+                  rows={2}
+                  placeholder="e.g., 'Taps fingers when impatient, speaks in riddles.' (type @ to mention entities)"
+                />
+              </div>
             </div>
           )}
 
@@ -208,16 +223,20 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
           {activeTab === 'personality' && (
             <div className="space-y-6">
               {/* Motivations */}
-              <AiTextarea
-                label="Motivations"
-                name="motivations"
-                value={formData.motivations}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                rows={2}
-                placeholder="What drives this character?"
-                regenerateButton={<RegenerateButton fieldName="motivations" currentValue={formData.motivations} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('motivations')} isMockMode={isMockMode} campaignContext={campaignContext} />}
-              />
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <div className="flex items-center">
+                    <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Motivations</label>
+                    <RegenerateButton fieldName="motivations" currentValue={formData.motivations} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('motivations')} isMockMode={isMockMode} campaignContext={campaignContext} />
+                  </div>
+                </div>
+                <MentionInput
+                  value={formData.motivations}
+                  onChange={handleMentionFieldChange('motivations')}
+                  rows={2}
+                  placeholder="What drives this character? (type @ to mention entities)"
+                />
+              </div>
               {formData.motivations && onNavigate && (
                   <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
                       <LinkedText text={formData.motivations} onNavigate={onNavigate} />
@@ -225,16 +244,20 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
               )}
 
               {/* Secrets */}
-              <AiTextarea
-                label="Secrets"
-                name="secrets"
-                value={formData.secrets}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                rows={3}
-                placeholder="What are they hiding? What important information do they know?"
-                regenerateButton={<RegenerateButton fieldName="secrets" currentValue={formData.secrets} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('secrets')} isMockMode={isMockMode} campaignContext={campaignContext} />}
-              />
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <div className="flex items-center">
+                    <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Secrets</label>
+                    <RegenerateButton fieldName="secrets" currentValue={formData.secrets} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('secrets')} isMockMode={isMockMode} campaignContext={campaignContext} />
+                  </div>
+                </div>
+                <MentionInput
+                  value={formData.secrets}
+                  onChange={handleMentionFieldChange('secrets')}
+                  rows={3}
+                  placeholder="What are they hiding? What important information do they know? (type @ to mention entities)"
+                />
+              </div>
               {formData.secrets && onNavigate && (
                   <p className="text-sm text-slate-300 leading-relaxed mt-1 px-1">
                       <LinkedText text={formData.secrets} onNavigate={onNavigate} />
@@ -254,15 +277,20 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
               />
 
               {/* Backstory */}
-              <AiTextarea
-                label="Backstory"
-                name="backstory"
-                value={formData.backstory}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                rows={5}
-                regenerateButton={<RegenerateButton fieldName="backstory" currentValue={formData.backstory} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('backstory')} isMockMode={isMockMode} campaignContext={campaignContext} />}
-              />
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <div className="flex items-center">
+                    <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Backstory</label>
+                    <RegenerateButton fieldName="backstory" currentValue={formData.backstory} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('backstory')} isMockMode={isMockMode} campaignContext={campaignContext} />
+                  </div>
+                </div>
+                <MentionInput
+                  value={formData.backstory}
+                  onChange={handleMentionFieldChange('backstory')}
+                  rows={5}
+                  placeholder="The character's history and background... (type @ to mention entities)"
+                />
+              </div>
             </div>
           )}
 
