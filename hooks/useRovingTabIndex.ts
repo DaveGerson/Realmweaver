@@ -1,7 +1,7 @@
 
 import React, { useRef, useCallback } from 'react';
 
-interface RovingProps {
+export interface RovingProps {
   tabIndex: number;
   onKeyDown: (e: React.KeyboardEvent<HTMLElement>) => void;
   ref: (el: HTMLElement | null) => void;
@@ -82,6 +82,19 @@ export function useRovingTabIndex(
 
   const setRef = useCallback((index: number) => (el: HTMLElement | null) => {
     itemsRef.current[index] = el;
+    if (el === null) {
+      // Item unmounted (e.g. a search filter shrank the list). Trim trailing
+      // empty slots and, if the tracked focus position fell off the end,
+      // clamp it and re-anchor tabIndex so the grid stays Tab-reachable
+      // (otherwise every remaining item would render with tabIndex -1).
+      const items = itemsRef.current;
+      while (items.length > 0 && items[items.length - 1] === null) items.pop();
+      if (focusedIndexRef.current >= items.length) {
+        focusedIndexRef.current = Math.max(0, items.length - 1);
+        const anchor = items[focusedIndexRef.current];
+        if (anchor) anchor.tabIndex = 0;
+      }
+    }
   }, []);
 
   const moveFocus = useCallback((newIndex: number) => {

@@ -1188,10 +1188,15 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     campaign.activeSceneId = undefined;
                 }
 
-                // Clear adventureId on any session logs referencing this adventure
+                // Clear adventureId on any session logs referencing this adventure,
+                // and strip the adventure's (now deleted) scenes from planned lists
+                const deletedSceneIds = new Set(adventure.scenes.map(s => s.id));
                 if (campaign.sessionLogs) {
                     campaign.sessionLogs.forEach(log => {
                         if (log.adventureId === id) log.adventureId = undefined;
+                        if (log.plannedSceneIds?.some(sid => deletedSceneIds.has(sid))) {
+                            log.plannedSceneIds = log.plannedSceneIds.filter(sid => !deletedSceneIds.has(sid));
+                        }
                     });
                 }
 

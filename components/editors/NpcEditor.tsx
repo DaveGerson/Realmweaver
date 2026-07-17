@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { reconcileEntityFormData } from '../../utils/formReconciliation';
 import type { NPC, Faction, EntityRelationship, PlayerCharacter, Campaign } from '../../types/index';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
@@ -54,24 +55,8 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
 
   useEffect(() => {
     const prevNpc = prevNpcRef.current;
-    if (prevNpc.id !== npc.id) {
-      // Switched to viewing a different NPC entirely — fully adopt it.
-      setFormData(npc);
-    } else if (prevNpc !== npc) {
-      // Same NPC, but the underlying object changed (e.g. an async AI generation
-      // or bidirectional relationship sync mutated it elsewhere). Only adopt
-      // fields the user hasn't started editing since the last sync — any field
-      // where formData still matches what we last saw from `npc`. Fields the
-      // user has locally changed (unblurred edits) are preserved.
-      setFormData(prev => {
-        const merged = { ...prev };
-        (Object.keys(npc) as (keyof NPC)[]).forEach((key) => {
-          if (prev[key] === prevNpc[key]) {
-            merged[key] = npc[key];
-          }
-        });
-        return merged;
-      });
+    if (prevNpc !== npc) {
+      setFormData(prev => reconcileEntityFormData(prev, prevNpc, npc));
     }
     prevNpcRef.current = npc;
   }, [npc]);

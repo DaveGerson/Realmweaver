@@ -1,17 +1,5 @@
-import { describe, it, expect, beforeAll } from 'vitest';
-import { setupTestEnvironment } from './helpers/testStoreFactory';
-
-// FactionEditor pulls in the campaignService singleton (which touches localStorage
-// on import) and other UI modules, so set up the environment before importing it —
-// mirrors the dynamic-import pattern used in entityFieldSave.test.ts.
-setupTestEnvironment();
-
-let reconcileEntityFormData: typeof import('../components/editors/FactionEditor').reconcileEntityFormData;
-
-beforeAll(async () => {
-  const mod = await import('../components/editors/FactionEditor');
-  reconcileEntityFormData = mod.reconcileEntityFormData;
-});
+import { describe, it, expect } from 'vitest';
+import { reconcileEntityFormData } from '../utils/formReconciliation';
 
 interface TestEntity {
   id: string;

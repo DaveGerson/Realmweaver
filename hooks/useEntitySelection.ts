@@ -1,5 +1,5 @@
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import type { Campaign } from '@/types/Campaign';
 import type { BreadcrumbSegment } from '@/components/common/Breadcrumbs';
 import type { RecentItem, CommandPaletteEntityType } from '@/components/common/CommandPalette';
@@ -138,14 +138,14 @@ export function useEntitySelection({ activeCampaign, onSidebarClose }: UseEntity
 
   // --- Helpers ---
 
-  const trackRecentItem = (type: CommandPaletteEntityType, id: string, name: string) => {
+  const trackRecentItem = useCallback((type: CommandPaletteEntityType, id: string, name: string) => {
     setRecentItems(prev => {
       const filtered = prev.filter(r => !(r.type === type && r.id === id));
       return [{ type, id, name }, ...filtered].slice(0, 10);
     });
-  };
+  }, []);
 
-  const resetSelections = () => {
+  const resetSelections = useCallback(() => {
     setSelectedNpcId(null);
     setSelectedLocationId(null);
     setSelectedFactionId(null);
@@ -158,13 +158,13 @@ export function useEntitySelection({ activeCampaign, onSidebarClose }: UseEntity
     setSelectedPlotId(null);
     setSelectedNoteId(null);
     setActiveGenerator(null);
-  };
+  }, []);
 
   /**
    * Captures the CURRENT view/selection state and pushes it onto the nav stack
    * before navigating away. Max depth of 20 entries.
    */
-  const pushNavStack = (label: string) => {
+  const pushNavStack = useCallback((label: string) => {
     setNavStack(prev => {
       let selectedId: string | null = null;
       switch (activeView) {
@@ -189,9 +189,13 @@ export function useEntitySelection({ activeCampaign, onSidebarClose }: UseEntity
       };
       return [...prev, entry].slice(-20);
     });
-  };
+  }, [
+    activeView, selectedNpcId, selectedLocationId, selectedFactionId, selectedItemId,
+    selectedArticleId, selectedSessionLogId, selectedPlayerCharacterId, selectedPlotId,
+    selectedNoteId, selectedAdventureId, selectedSceneId,
+  ]);
 
-  const handleGoBack = () => {
+  const handleGoBack = useCallback(() => {
     if (navStack.length === 0) return;
     const entry = navStack[navStack.length - 1];
 
@@ -211,16 +215,16 @@ export function useEntitySelection({ activeCampaign, onSidebarClose }: UseEntity
 
     setNavStack(prev => prev.slice(0, -1));
     onSidebarClose();
-  };
+  }, [navStack, onSidebarClose]);
 
-  const handleSelectView = (view: EditorView) => {
+  const handleSelectView = useCallback((view: EditorView) => {
     setNavStack([]);
     setActiveView(view);
     resetSelections();
     onSidebarClose();
-  };
+  }, [resetSelections, onSidebarClose]);
 
-  const handleSelect = (
+  const handleSelect = useCallback((
     type: 'adventure' | 'scene' | 'npc' | 'location' | 'faction' | 'item' | 'article' | 'session-log' | 'player-character' | 'plot' | 'note',
     id: string
   ) => {
@@ -329,13 +333,13 @@ export function useEntitySelection({ activeCampaign, onSidebarClose }: UseEntity
       }
     }
     onSidebarClose();
-  };
+  }, [activeCampaign, pushNavStack, resetSelections, trackRecentItem, onSidebarClose]);
 
   /**
    * Bridge between EntityLink's QuickCardEntityType system and handleSelect.
    * Editors receive this as their onNavigate prop.
    */
-  const handleEntityNavigate = (entityType: string, entityId: string) => {
+  const handleEntityNavigate = useCallback((entityType: string, entityId: string) => {
     const typeMap: Record<string, string> = {
       npc: 'npc',
       location: 'location',
@@ -351,7 +355,7 @@ export function useEntitySelection({ activeCampaign, onSidebarClose }: UseEntity
     };
     const selectType = typeMap[entityType] ?? entityType;
     handleSelect(selectType as Parameters<typeof handleSelect>[0], entityId);
-  };
+  }, [handleSelect]);
 
   // --- Breadcrumbs ---
   const breadcrumbSegments = useMemo((): BreadcrumbSegment[] => {

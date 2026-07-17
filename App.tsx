@@ -443,12 +443,9 @@ const App: FC = () => {
                     key={activeView} forces the boundary to remount (clearing any
                     caught error) when the sidebar navigates to a different view,
                     instead of leaving the previous view's error fallback stuck on
-                    screen. Built via createElement rather than JSX because this
-                    project's React type setup doesn't route `key` through
-                    LibraryManagedAttributes for class components, which makes the
-                    JSX form fail to typecheck even though it's otherwise valid.
+                    screen.
                   */}
-                  {React.createElement(ErrorBoundary, { key: activeView },
+                  <ErrorBoundary key={activeView}>
                     <ViewRouter
                       campaign={activeCampaign}
                       activeView={activeView}
@@ -488,7 +485,7 @@ const App: FC = () => {
                       onImportPC={handleImportPC}
                       onAddToast={addToast}
                     />
-                  )}
+                  </ErrorBoundary>
                 </main>
 
                 {/* Floating Widgets */}

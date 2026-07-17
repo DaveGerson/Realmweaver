@@ -8,7 +8,7 @@ import { Icons } from '../common/Icons';
 import { EntityCreationPanel } from '../common/EntityCreationPanel';
 import { createDefaultNpc } from '../../utils/entityUtils';
 import { useEntitySearch } from '../../hooks/useEntitySearch';
-import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
+import { useRovingTabIndex, type RovingProps } from '../../hooks/useRovingTabIndex';
 
 const NPC_PROMPT_CHIPS = [
   'A mysterious merchant',
@@ -22,7 +22,7 @@ interface NpcCardProps {
   faction?: Faction;
   index: number;
   onSelectNpc: (id: string) => void;
-  getRovingProps: (index: number) => Record<string, unknown>;
+  getRovingProps: (index: number) => RovingProps;
 }
 
 const NpcCard = React.memo(function NpcCard({ npc, faction, index, onSelectNpc, getRovingProps }: NpcCardProps) {

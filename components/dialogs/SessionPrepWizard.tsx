@@ -548,7 +548,7 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-sm font-medium text-slate-200 truncate">{npc!.name}</p>
-                                                    {npc!.race && <p className="text-xs text-slate-500 truncate">{npc!.race}</p>}
+                                                    {npc!.description && <p className="text-xs text-slate-500 truncate">{npc!.description}</p>}
                                                 </div>
                                                 {wasAuto && (
                                                     <span className="text-[10px] text-slate-600 uppercase tracking-wider flex-shrink-0">auto</span>

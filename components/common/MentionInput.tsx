@@ -85,7 +85,9 @@ function escapeRegExp(value: string): string {
 export function findMentionedIdsInText(text: string, candidates: { id: string; name: string }[]): string[] {
   const ids: string[] = [];
   for (const { id, name } of candidates) {
-    const pattern = new RegExp(`@${escapeRegExp(name)}(?![\\w])`);
+    // Unicode-aware boundary (matches services/linking/matchingEngine.ts) so a
+    // name isn't treated as "ended" by an accented letter (e.g. `@Ann` in `@Annë`).
+    const pattern = new RegExp(`@${escapeRegExp(name)}(?![\\p{L}\\p{N}])`, 'u');
     if (pattern.test(text)) {
       ids.push(id);
     }

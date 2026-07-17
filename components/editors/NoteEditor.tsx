@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
+import { reconcileEntityFormData } from '../../utils/formReconciliation';
 import type { Note } from '../../types/index';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
@@ -67,23 +68,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete
 
   useEffect(() => {
     const prevNote = prevNoteRef.current;
-    if (prevNote.id !== note.id) {
-      // Switched to viewing a different note entirely — fully adopt it.
-      setFormData(note);
-    } else if (prevNote !== note) {
-      // Same note, but the underlying object changed elsewhere. Only adopt
-      // fields the user hasn't started editing since the last sync — any field
-      // where formData still matches what we last saw from `note`. Fields the
-      // user has locally changed (unblurred edits) are preserved.
-      setFormData(prev => {
-        const merged = { ...prev };
-        (Object.keys(note) as (keyof Note)[]).forEach((key) => {
-          if (prev[key] === prevNote[key]) {
-            merged[key] = note[key];
-          }
-        });
-        return merged;
-      });
+    if (prevNote !== note) {
+      setFormData(prev => reconcileEntityFormData(prev, prevNote, note));
     }
     prevNoteRef.current = note;
   }, [note]);

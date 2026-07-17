@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { reconcileEntityFormData } from '../../utils/formReconciliation';
 import type { Scene, SceneType, NPC, Location, SkillCheck } from '../../types/index';
 import type { Campaign } from '../../types/index';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
@@ -114,23 +115,8 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
 
   useEffect(() => {
     const prevScene = prevSceneRef.current;
-    if (prevScene.id !== scene.id) {
-      // Switched to viewing a different scene entirely — fully adopt it.
-      setFormData(scene);
-    } else if (prevScene !== scene) {
-      // Same scene, but the underlying object changed elsewhere (e.g. an async
-      // AI generation). Only adopt fields the user hasn't started editing since
-      // the last sync — any field where formData still matches what we last saw
-      // from `scene`. Fields the user has locally changed (unblurred edits) are preserved.
-      setFormData(prev => {
-        const merged = { ...prev };
-        (Object.keys(scene) as (keyof Scene)[]).forEach((key) => {
-          if (prev[key] === prevScene[key]) {
-            merged[key] = scene[key];
-          }
-        });
-        return merged;
-      });
+    if (prevScene !== scene) {
+      setFormData(prev => reconcileEntityFormData(prev, prevScene, scene));
     }
     prevSceneRef.current = scene;
   }, [scene]);

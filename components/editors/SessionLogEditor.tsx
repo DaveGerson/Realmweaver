@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { reconcileEntityFormData } from '../../utils/formReconciliation';
 import type { SessionLog, SessionLogEntry, Campaign } from '../../types';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useToast } from '@/hooks/useToast';
@@ -61,23 +62,8 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
 
   useEffect(() => {
     const prevLog = prevLogRef.current;
-    if (prevLog.id !== log.id) {
-      // Switched to viewing a different session log entirely — fully adopt it.
-      setFormData(log);
-    } else if (prevLog !== log) {
-      // Same session log, but the underlying object changed elsewhere. Only
-      // adopt fields the user hasn't started editing since the last sync — any
-      // field where formData still matches what we last saw from `log`. Fields
-      // the user has locally changed (unblurred edits) are preserved.
-      setFormData(prev => {
-        const merged = { ...prev };
-        (Object.keys(log) as (keyof SessionLog)[]).forEach((key) => {
-          if (prev[key] === prevLog[key]) {
-            merged[key] = log[key];
-          }
-        });
-        return merged;
-      });
+    if (prevLog !== log) {
+      setFormData(prev => reconcileEntityFormData(prev, prevLog, log));
     }
     prevLogRef.current = log;
   }, [log]);

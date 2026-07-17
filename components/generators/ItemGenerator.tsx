@@ -46,6 +46,9 @@ export const ItemGenerator: React.FC<ItemGeneratorProps> = ({
 
   const isMountedRef = useRef(true);
   useEffect(() => {
+    // Set true in the effect body (not just via the initial ref value) so the
+    // guard survives StrictMode's mount -> cleanup -> remount cycle in dev.
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
     };

@@ -8,7 +8,7 @@ import { Icons } from '../common/Icons';
 import { EntityCreationPanel } from '../common/EntityCreationPanel';
 import { createDefaultLocation } from '../../utils/entityUtils';
 import { useEntitySearch } from '../../hooks/useEntitySearch';
-import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
+import { useRovingTabIndex, type RovingProps } from '../../hooks/useRovingTabIndex';
 
 const LOCATION_PROMPT_CHIPS = [
   'A haunted tavern',
@@ -22,7 +22,7 @@ interface LocationCardProps {
   parent?: Location;
   index: number;
   onSelectLocation: (id: string) => void;
-  getRovingProps: (index: number) => Record<string, unknown>;
+  getRovingProps: (index: number) => RovingProps;
 }
 
 const LocationCard = React.memo(function LocationCard({ location, parent, index, onSelectLocation, getRovingProps }: LocationCardProps) {

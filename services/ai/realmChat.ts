@@ -53,7 +53,7 @@ export const chatWithRealmWeaver = async (
     approvedEntitiesLog: string[],
     campaignContext: string,
     tier: ModelTier,
-    focusedEntityType?: 'npc' | 'location' | 'faction' | 'item' | 'adventure' | 'article'
+    focusedEntityType?: 'npc' | 'location' | 'faction' | 'item' | 'adventure' | 'article' | 'scene'
 ): Promise<RealmChatResponse> => {
     const modelName = mapTierToModel(tier);
     

@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { reconcileEntityFormData } from '../../utils/formReconciliation';
 import type { Plot, PlotStatus, SessionLog, Campaign } from '../../types/index';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
@@ -35,23 +36,8 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, campaign, onUpdate
 
   useEffect(() => {
     const prevPlot = prevPlotRef.current;
-    if (prevPlot.id !== plot.id) {
-      // Switched to viewing a different plot entirely — fully adopt it.
-      setFormData(plot);
-    } else if (prevPlot !== plot) {
-      // Same plot, but the underlying object changed elsewhere. Only adopt
-      // fields the user hasn't started editing since the last sync — any field
-      // where formData still matches what we last saw from `plot`. Fields the
-      // user has locally changed (unblurred edits) are preserved.
-      setFormData(prev => {
-        const merged = { ...prev };
-        (Object.keys(plot) as (keyof Plot)[]).forEach((key) => {
-          if (prev[key] === prevPlot[key]) {
-            merged[key] = plot[key];
-          }
-        });
-        return merged;
-      });
+    if (prevPlot !== plot) {
+      setFormData(prev => reconcileEntityFormData(prev, prevPlot, plot));
     }
     prevPlotRef.current = plot;
   }, [plot]);

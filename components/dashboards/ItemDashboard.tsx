@@ -8,7 +8,7 @@ import { Icons } from '../common/Icons';
 import { EntityCreationPanel } from '../common/EntityCreationPanel';
 import { createDefaultItem } from '../../utils/entityUtils';
 import { useEntitySearch } from '../../hooks/useEntitySearch';
-import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
+import { useRovingTabIndex, type RovingProps } from '../../hooks/useRovingTabIndex';
 
 const ITEM_PROMPT_CHIPS = [
   'A cursed weapon',
@@ -30,7 +30,7 @@ interface ItemCardProps {
   item: Item;
   index: number;
   onSelectItem: (id: string) => void;
-  getRovingProps: (index: number) => Record<string, unknown>;
+  getRovingProps: (index: number) => RovingProps;
 }
 
 const ItemCard = React.memo(function ItemCard({ item, index, onSelectItem, getRovingProps }: ItemCardProps) {

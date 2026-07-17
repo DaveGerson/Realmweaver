@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
+import { useRovingTabIndex, type RovingProps } from '../../hooks/useRovingTabIndex';
 import { useEntitySearch } from '@/hooks/useEntitySearch';
 import type { Adventure, AdventureForBatchAdd, Campaign } from '../../types/index';
 import { AdventureGenerator } from '../generators/AdventureGenerator';
@@ -39,7 +39,7 @@ interface AdventureCardProps {
   adv: Adventure;
   index: number;
   onSelectAdventure: (id: string) => void;
-  getRovingProps: (index: number) => Record<string, unknown>;
+  getRovingProps: (index: number) => RovingProps;
 }
 
 const AdventureCard = React.memo(function AdventureCard({ adv, index, onSelectAdventure, getRovingProps }: AdventureCardProps) {

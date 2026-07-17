@@ -5,7 +5,7 @@ import {
   getAvailableTestCampaigns,
   loadTestCampaignData,
   type TestCampaignMeta,
-} from '../test-campaigns/index';
+} from '../testCampaigns';
 
 export interface TemplateEntityCounts {
   npcs: number;

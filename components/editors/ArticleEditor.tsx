@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { reconcileEntityFormData } from '../../utils/formReconciliation';
 import type { Article, ArticleCategory, Campaign } from '../../types/index';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
@@ -44,23 +45,8 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
 
   useEffect(() => {
     const prevArticle = prevArticleRef.current;
-    if (prevArticle.id !== article.id) {
-      // Switched to viewing a different article entirely — fully adopt it.
-      setFormData(article);
-    } else if (prevArticle !== article) {
-      // Same article, but the underlying object changed elsewhere. Only adopt
-      // fields the user hasn't started editing since the last sync — any field
-      // where formData still matches what we last saw from `article`. Fields
-      // the user has locally changed (unblurred edits) are preserved.
-      setFormData(prev => {
-        const merged = { ...prev };
-        (Object.keys(article) as (keyof Article)[]).forEach((key) => {
-          if (prev[key] === prevArticle[key]) {
-            merged[key] = article[key];
-          }
-        });
-        return merged;
-      });
+    if (prevArticle !== article) {
+      setFormData(prev => reconcileEntityFormData(prev, prevArticle, article));
     }
     prevArticleRef.current = article;
   }, [article]);

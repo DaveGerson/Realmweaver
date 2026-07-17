@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { reconcileEntityFormData } from '../../utils/formReconciliation';
 import type { Adventure, Campaign } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
@@ -49,24 +50,8 @@ export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, cam
 
   useEffect(() => {
     const prevAdventure = prevAdventureRef.current;
-    if (prevAdventure.id !== adventure.id) {
-      // Switched to viewing a different adventure entirely — fully adopt it.
-      setFormData(adventure);
-    } else if (prevAdventure !== adventure) {
-      // Same adventure, but the underlying object changed elsewhere (e.g. an
-      // async AI generation). Only adopt fields the user hasn't started editing
-      // since the last sync — any field where formData still matches what we
-      // last saw from `adventure`. Fields the user has locally changed
-      // (unblurred edits) are preserved.
-      setFormData(prev => {
-        const merged = { ...prev };
-        (Object.keys(adventure) as (keyof Adventure)[]).forEach((key) => {
-          if (prev[key] === prevAdventure[key]) {
-            merged[key] = adventure[key];
-          }
-        });
-        return merged;
-      });
+    if (prevAdventure !== adventure) {
+      setFormData(prev => reconcileEntityFormData(prev, prevAdventure, adventure));
     }
     prevAdventureRef.current = adventure;
   }, [adventure]);

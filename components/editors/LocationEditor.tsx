@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { reconcileEntityFormData } from '../../utils/formReconciliation';
 import type { Location, LocationConnection, PointOfInterest, PoiInteraction, LootItem, Faction, SessionLog, Article, Campaign } from '../../types/index';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
@@ -57,24 +58,8 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
 
   useEffect(() => {
     const prevLocation = prevLocationRef.current;
-    if (prevLocation.id !== location.id) {
-      // Switched to viewing a different location entirely — fully adopt it.
-      setFormData(location);
-    } else if (prevLocation !== location) {
-      // Same location, but the underlying object changed (e.g. an async AI
-      // generation mutated it elsewhere). Only adopt fields the user hasn't
-      // started editing since the last sync — any field where formData still
-      // matches what we last saw from `location`. Fields the user has locally
-      // changed (unblurred edits) are preserved.
-      setFormData(prev => {
-        const merged = { ...prev };
-        (Object.keys(location) as (keyof Location)[]).forEach((key) => {
-          if (prev[key] === prevLocation[key]) {
-            merged[key] = location[key];
-          }
-        });
-        return merged;
-      });
+    if (prevLocation !== location) {
+      setFormData(prev => reconcileEntityFormData(prev, prevLocation, location));
     }
     prevLocationRef.current = location;
   }, [location]);

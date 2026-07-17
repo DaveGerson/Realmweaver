@@ -1,5 +1,5 @@
 
-import type { NPC, Location, Faction, Item, Adventure, Article, AdventureForBatchAdd } from './index';
+import type { NPC, Location, Faction, Item, Adventure, Article, AdventureForBatchAdd, Scene } from './index';
 
 export type DraftEntityStatus = 'draft' | 'approved';
 
@@ -9,7 +9,8 @@ export type DraftEntity =
   | ({ type: 'faction'; data: Partial<Faction>; status: DraftEntityStatus } & { id: string })
   | ({ type: 'item'; data: Partial<Item>; status: DraftEntityStatus } & { id: string })
   | ({ type: 'adventure'; data: Partial<AdventureForBatchAdd>; status: DraftEntityStatus } & { id: string })
-  | ({ type: 'article'; data: Partial<Article>; status: DraftEntityStatus } & { id: string });
+  | ({ type: 'article'; data: Partial<Article>; status: DraftEntityStatus } & { id: string })
+  | ({ type: 'scene'; data: Partial<Scene>; status: DraftEntityStatus } & { id: string });
 
 export interface ChatMessage {
   id: string;

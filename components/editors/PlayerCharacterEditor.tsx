@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
+import { reconcileEntityFormData } from '../../utils/formReconciliation';
 import type { PlayerCharacter, AbilityScores } from '../../types/index';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
@@ -65,23 +66,8 @@ export const PlayerCharacterEditor: React.FC<PlayerCharacterEditorProps> = ({ pc
 
   useEffect(() => {
     const prevPc = prevPcRef.current;
-    if (prevPc.id !== pc.id) {
-      // Switched to viewing a different character entirely — fully adopt it.
-      setFormData(pc);
-    } else if (prevPc !== pc) {
-      // Same character, but the underlying object changed elsewhere. Only adopt
-      // fields the user hasn't started editing since the last sync — any field
-      // where formData still matches what we last saw from `pc`. Fields the
-      // user has locally changed (unblurred edits) are preserved.
-      setFormData(prev => {
-        const merged = { ...prev };
-        (Object.keys(pc) as (keyof PlayerCharacter)[]).forEach((key) => {
-          if (prev[key] === prevPc[key]) {
-            merged[key] = pc[key];
-          }
-        });
-        return merged;
-      });
+    if (prevPc !== pc) {
+      setFormData(prev => reconcileEntityFormData(prev, prevPc, pc));
     }
     prevPcRef.current = pc;
   }, [pc]);
