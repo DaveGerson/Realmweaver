@@ -31,6 +31,13 @@ const TIMEOUT_MS = 120_000;
 const MAX_BUFFER = 1024 * 1024; // 1MB output buffer
 const DIRECT_PROMPT_LIMIT = 100_000; // 100KB -- above this, use temp file
 
+// Same-origin allowlist for the local dev/runtime server. Only requests whose
+// Origin (when the browser sends one) resolves to localhost/127.0.0.1/[::1]
+// are allowed to invoke the CLI -- this blocks DNS-rebinding / cross-origin
+// pages (and other LAN hosts, in combination with the `server.host` default
+// in vite.config.ts) from silently spending the user's Claude usage.
+const ALLOWED_ORIGIN_RE = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i;
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -42,6 +49,15 @@ interface CliRequest {
   systemPrompt?: string;
   maxTurns?: number;
 }
+
+/**
+ * Thrown when the Claude CLI itself reports failure via its JSON result
+ * envelope (`is_error: true`). Kept as a distinct class -- rather than a
+ * hardcoded string comparison -- so the outer catch can reliably tell "the
+ * CLI reported an error" apart from "this output wasn't a JSON envelope at
+ * all", regardless of what message text the CLI happened to return.
+ */
+class CliEnvelopeError extends Error {}
 
 // ---------------------------------------------------------------------------
 // Plugin
@@ -63,6 +79,16 @@ export function aiProxyPlugin(): Plugin {
         if (req.method !== 'POST') {
           res.writeHead(405, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Method not allowed' }));
+          return;
+        }
+
+        // Reject cross-origin requests. Same-origin browser requests to this
+        // endpoint don't set an Origin header that fails this check; a
+        // request forged from another origin (or DNS-rebinding attack) does.
+        const origin = req.headers.origin;
+        if (typeof origin === 'string' && origin && !ALLOWED_ORIGIN_RE.test(origin)) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Origin not allowed' }));
           return;
         }
 
@@ -89,14 +115,16 @@ export function aiProxyPlugin(): Plugin {
                 const envelope = JSON.parse(rawOutput);
                 if (envelope && typeof envelope === 'object' && 'result' in envelope) {
                   if (envelope.is_error) {
-                    throw new Error(envelope.result || 'Claude CLI returned an error');
+                    throw new CliEnvelopeError(envelope.result || 'Claude CLI returned an error');
                   }
                   result = envelope.result;
                 }
               } catch (parseErr) {
-                // If it's not valid JSON envelope, use raw output as-is
-                // (this handles the case where --output-format is not json)
-                if ((parseErr as Error).message?.includes('Claude CLI returned an error')) {
+                // Always propagate a CLI-reported error, regardless of what
+                // message text it carries. Only a genuine JSON.parse failure
+                // (output wasn't a JSON envelope at all -- e.g. --output-format
+                // was not json) falls through to use raw output as-is.
+                if (parseErr instanceof CliEnvelopeError) {
                   throw parseErr;
                 }
               }
@@ -110,10 +138,20 @@ export function aiProxyPlugin(): Plugin {
           })
           .catch((err: unknown) => {
             const error = err instanceof Error ? err : new Error(String(err));
-            const code = (err as { code?: string }).code;
-            const isTimeout = error.message.includes('timeout') ||
-              error.message.includes('ETIMEDOUT') ||
-              code === 'ETIMEDOUT';
+            // Node's execFile/spawn `timeout` option kills the process with
+            // SIGTERM and sets `.killed = true` on the resulting error, but
+            // does NOT set `.code` to 'ETIMEDOUT' and does NOT put the word
+            // "timeout" in `.message` -- so those two checks alone never
+            // catch a real CLI timeout. `.killed` (execFile path) and the
+            // synthetic ETIMEDOUT code set in invokeClaudeCli's spawn path
+            // are the reliable signals.
+            const rawCode = (err as { code?: string }).code;
+            const killed = (err as { killed?: boolean }).killed === true;
+            const isTimeout = killed ||
+              rawCode === 'ETIMEDOUT' ||
+              error.message.includes('timeout') ||
+              error.message.includes('ETIMEDOUT');
+            const code = isTimeout ? 'ETIMEDOUT' : rawCode;
             const status = isTimeout ? 504 : 500;
 
             console.error(`[ai-proxy] Error (${status}):`, error.message);
@@ -183,10 +221,21 @@ async function invokeClaudeCli(request: CliRequest): Promise<string> {
         reject(new Error(`Failed to start claude subprocess: ${err.message}`));
       });
 
-      child.on('close', (code) => {
+      child.on('close', (code, signal) => {
         const stdout = Buffer.concat(stdoutChunks).toString();
         if (code === 0) {
           resolve(stdout);
+        } else if (signal === 'SIGTERM' && code === null) {
+          // spawn's `timeout` option kills the child with SIGTERM (the
+          // default killSignal) once TIMEOUT_MS elapses, leaving `code`
+          // null. Mark this distinctly so callers can detect a real timeout
+          // instead of a generic non-zero exit.
+          const timeoutErr = new Error(
+            `claude CLI timed out after ${TIMEOUT_MS}ms`
+          ) as Error & { code?: string; killed?: boolean };
+          timeoutErr.code = 'ETIMEDOUT';
+          timeoutErr.killed = true;
+          reject(timeoutErr);
         } else {
           const stderr = Buffer.concat(stderrChunks).toString();
           reject(new Error(stderr || `claude exited with code ${code}`));

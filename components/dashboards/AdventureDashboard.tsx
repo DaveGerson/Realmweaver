@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
+import { useRovingTabIndex, type RovingProps } from '../../hooks/useRovingTabIndex';
 import { useEntitySearch } from '@/hooks/useEntitySearch';
 import type { Adventure, AdventureForBatchAdd, Campaign } from '../../types/index';
 import { AdventureGenerator } from '../generators/AdventureGenerator';
@@ -39,7 +39,7 @@ interface AdventureCardProps {
   adv: Adventure;
   index: number;
   onSelectAdventure: (id: string) => void;
-  getRovingProps: (index: number) => Record<string, unknown>;
+  getRovingProps: (index: number) => RovingProps;
 }
 
 const AdventureCard = React.memo(function AdventureCard({ adv, index, onSelectAdventure, getRovingProps }: AdventureCardProps) {
@@ -83,7 +83,7 @@ interface AdventureDashboardProps {
 }
 
 export const AdventureDashboard: React.FC<AdventureDashboardProps> = ({ adventures, onAdventureCreated, onSelectAdventure, isMockMode, isOfficialSetting, campaignContext }) => {
-  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: 3 });
+  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: { base: 1, md: 2, xl: 3 } });
 
   // Normalize: adventure uses `title`, hook needs `name`
   const normalizedAdventures = useMemo(

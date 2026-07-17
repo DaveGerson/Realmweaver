@@ -100,6 +100,81 @@ describe('storageService: quota detection (5.3)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 5.4 — IndexedDB fallback read-back
+// ---------------------------------------------------------------------------
+
+/** Minimal fake indexedDB backed by a plain object, async like the real one. */
+function makeFakeIndexedDb(backing: Record<string, string>) {
+    const makeRequest = (result: unknown, effect?: () => void) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const req: any = { result };
+        setTimeout(() => {
+            effect?.();
+            req.onsuccess?.();
+        }, 0);
+        return req;
+    };
+    const db = {
+        objectStoreNames: { contains: () => true },
+        transaction: () => ({
+            objectStore: () => ({
+                put: (value: string, key: string) => makeRequest(undefined, () => { backing[key] = value; }),
+                get: (key: string) => makeRequest(backing[key] ?? null),
+                delete: (key: string) => makeRequest(undefined, () => { delete backing[key]; }),
+            }),
+        }),
+        close: () => {},
+    };
+    return {
+        open: () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const req: any = {};
+            setTimeout(() => {
+                req.result = db;
+                req.onsuccess?.();
+            }, 0);
+            return req;
+        },
+    };
+}
+
+describe('storageService: IndexedDB fallback read-back (5.4)', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+        vi.stubGlobal('indexedDB', undefined);
+    });
+
+    it('drops the stale localStorage copy after a quota-fallback IDB write so load() returns the fresh value', async () => {
+        const idbBacking: Record<string, string> = {};
+        vi.stubGlobal('indexedDB', makeFakeIndexedDb(idbBacking));
+
+        const svc = createStorageService();
+        svc.save('data-key', 'old value'); // lands in localStorage
+
+        // Next write to the primary key hits the quota
+        const quotaError = new DOMException('quota', 'QuotaExceededError');
+        const origSetItem = localStorage.setItem.bind(localStorage);
+        vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, value: string) => {
+            if (key === 'data-key') throw quotaError;
+            origSetItem(key, value);
+        });
+
+        const result = svc.save('data-key', 'new value');
+        expect(result.success).toBe(true);
+        expect(result.backend).toBe('indexedDB');
+
+        // Let the fire-and-forget IDB write + stale-copy removal settle
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        expect(idbBacking['data-key']).toBe('new value');
+        // The stale localStorage copy must be gone, otherwise load() would
+        // shadow the fresher IndexedDB value on the next startup.
+        expect(localStorage.getItem('data-key')).toBeNull();
+        await expect(svc.load('data-key')).resolves.toBe('new value');
+    });
+});
+
+// ---------------------------------------------------------------------------
 // 5.5 — Multi-tab conflict detection
 // ---------------------------------------------------------------------------
 //

@@ -30,8 +30,18 @@ export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [draftData, setDraftData] = useState<any>(initialData);
   const [draftId, setDraftId] = useState<string>(crypto.randomUUID()); // Local session ID for the draft
+  const [isFinalizing, setIsFinalizing] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    // Set true in the effect body (not just via the initial ref value) so the
+    // guard survives StrictMode's mount -> cleanup -> remount cycle in dev.
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -100,6 +110,9 @@ export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
         entityType
       );
 
+      // Component may have unmounted (e.g. user navigated away) while this request was in flight.
+      if (!isMountedRef.current) return;
+
       const newAiMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'model',
@@ -117,10 +130,13 @@ export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
       }
 
     } catch (error) {
+      if (!isMountedRef.current) return;
       console.error(error);
       setHistory(prev => [...prev, { id: crypto.randomUUID(), role: 'model', text: "Sorry, I encountered an error talking to the Weave.", timestamp: Date.now() }]);
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -129,6 +145,8 @@ export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
   };
 
   const handleFinalize = () => {
+      if (isFinalizing) return;
+      setIsFinalizing(true);
       onEntityCreated(draftData);
   };
 
@@ -217,7 +235,7 @@ export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
                         <Icons.Sparkles className="w-4 h-4 text-amber-400" />
                         <span className="text-sm font-semibold text-slate-200">Live Preview</span>
                     </div>
-                    <Button size="sm" onClick={handleFinalize} className="bg-green-600 hover:bg-green-500">
+                    <Button size="sm" onClick={handleFinalize} disabled={isFinalizing} className="bg-green-600 hover:bg-green-500">
                         <Icons.CheckCircle className="w-4 h-4 mr-2" /> Create Entity
                     </Button>
                 </div>

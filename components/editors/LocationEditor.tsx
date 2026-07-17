@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { reconcileEntityFormData } from '../../utils/formReconciliation';
 import type { Location, LocationConnection, PointOfInterest, PoiInteraction, LootItem, Faction, SessionLog, Article, Campaign } from '../../types/index';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { textareaBaseClasses } from '../common/Textarea';
-import { MentionInput } from '../common/MentionInput';
+import { MentionInput, resolveMentionCandidates, findMentionedIdsInText } from '../common/MentionInput';
 import { generatePoiFromLoot, generateNpc } from '../../services/aiService';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { RegenerateButton } from '../common/RegenerateButton';
@@ -46,13 +47,21 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
   const [activeTab, setActiveTab] = useState('overview');
   const { confirm } = useConfirmDialog();
 
+  // Tracks the last `location` prop we've reconciled against, so incoming prop
+  // updates can be merged field-by-field instead of overwriting formData wholesale.
+  const prevLocationRef = useRef(location);
+
   // Reset to first tab when the entity changes
   useEffect(() => {
     setActiveTab('overview');
   }, [location.id]);
 
   useEffect(() => {
-    setFormData(location);
+    const prevLocation = prevLocationRef.current;
+    if (prevLocation !== location) {
+      setFormData(prev => reconcileEntityFormData(prev, prevLocation, location));
+    }
+    prevLocationRef.current = location;
   }, [location]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -84,6 +93,28 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
   const handleMentionFieldChange = (field: keyof Location) => (value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     onUpdate(location.id, { [field]: value });
+  };
+
+  // --- @-mention tracking across all MentionInput fields ---
+  // Candidates already known to be mentioned (from a prior session), used both to
+  // hydrate MentionInput's internal map and to seed each field's initial ID set.
+  const mentionCandidates = useMemo(
+    () => resolveMentionCandidates(campaign, location.mentionedEntityIds),
+    [campaign, location.mentionedEntityIds],
+  );
+  const [mentionedIdsByField, setMentionedIdsByField] = useState<Record<string, string[]>>(() => ({
+    description: findMentionedIdsInText(location.description, mentionCandidates),
+    secrets: findMentionedIdsInText(location.secrets, mentionCandidates),
+  }));
+  // Reports the merged set of mentioned IDs (across every mention field) whenever any field changes.
+  const handleMentionedIdsChange = (field: string) => (ids: string[]) => {
+    setMentionedIdsByField(prev => {
+      const next = { ...prev, [field]: ids };
+      const merged = Array.from(new Set(Object.values(next).flat()));
+      setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
+      onUpdate(location.id, { mentionedEntityIds: merged });
+      return next;
+    });
   };
 
   const handleFieldRegenerate = (field: 'description' | 'secrets') => (newValue: string) => {
@@ -316,6 +347,8 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                 <MentionInput
                   value={formData.description}
                   onChange={handleMentionFieldChange('description')}
+                  onMentionedIdsChange={handleMentionedIdsChange('description')}
+                  initialMentions={mentionCandidates}
                   rows={5}
                   placeholder="Describe this location... (type @ to mention entities)"
                 />
@@ -336,6 +369,8 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                 <MentionInput
                   value={formData.secrets}
                   onChange={handleMentionFieldChange('secrets')}
+                  onMentionedIdsChange={handleMentionedIdsChange('secrets')}
+                  initialMentions={mentionCandidates}
                   rows={3}
                   placeholder="Hidden details, secret passages, buried knowledge... (type @ to mention entities)"
                 />

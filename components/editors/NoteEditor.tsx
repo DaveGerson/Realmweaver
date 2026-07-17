@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect, useSyncExternalStore } from 'react';
+import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
+import { reconcileEntityFormData } from '../../utils/formReconciliation';
 import type { Note } from '../../types/index';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
@@ -61,8 +62,16 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete
   const [formData, setFormData] = useState(note);
   const { confirm } = useConfirmDialog();
 
+  // Tracks the last `note` prop we've reconciled against, so incoming prop
+  // updates can be merged field-by-field instead of overwriting formData wholesale.
+  const prevNoteRef = useRef(note);
+
   useEffect(() => {
-    setFormData(note);
+    const prevNote = prevNoteRef.current;
+    if (prevNote !== note) {
+      setFormData(prev => reconcileEntityFormData(prev, prevNote, note));
+    }
+    prevNoteRef.current = note;
   }, [note]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {

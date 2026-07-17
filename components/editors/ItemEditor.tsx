@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect, useSyncExternalStore } from 'react';
+import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
+import { reconcileEntityFormData } from '../../utils/formReconciliation';
 import type { Item, ItemRarity, ItemType } from '../../types/index';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
@@ -66,8 +67,16 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onUpdate, onDelete
   const [formData, setFormData] = useState(item);
   const { confirm } = useConfirmDialog();
 
+  // Tracks the last `item` prop we've reconciled against, so incoming prop
+  // updates can be merged field-by-field instead of overwriting formData wholesale.
+  const prevItemRef = useRef(item);
+
   useEffect(() => {
-    setFormData(item);
+    const prevItem = prevItemRef.current;
+    if (prevItem !== item) {
+      setFormData(prev => reconcileEntityFormData(prev, prevItem, item));
+    }
+    prevItemRef.current = item;
   }, [item]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {

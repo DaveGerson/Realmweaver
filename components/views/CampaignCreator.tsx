@@ -5,7 +5,7 @@ import { Icons } from '../common/Icons';
 import type { SettingType } from '../../types/index';
 import type { DmStyle } from '../../types/index';
 import { getAllTemplateMeta, loadTemplateData, type TemplateMeta } from '../../data/templates/index';
-import type { TestCampaignMeta } from '../../data/test-campaigns/index';
+import type { TestCampaignMeta } from '../../data/testCampaigns';
 
 interface CampaignCreatorProps {
   onCreateCampaign: (title: string, setting: string, settingType: SettingType, officialSetting?: string, dmStyle?: DmStyle) => void;

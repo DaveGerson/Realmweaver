@@ -285,9 +285,21 @@ export function createStorageService() {
 
         // Fall back to IndexedDB (async; we don't await here to keep the
         // calling save path synchronous, but we track the pending write).
-        idbSet(key, value).catch((idbErr) => {
-          console.error('[storageService] IndexedDB fallback write failed:', idbErr);
-        });
+        // Once the IDB write succeeds, drop the stale localStorage copy:
+        // `load()` prefers localStorage, so leaving the old value there would
+        // shadow the fresher IndexedDB data on the next startup (and removing
+        // it also frees quota for future saves).
+        idbSet(key, value)
+          .then(() => {
+            try {
+              _ls()?.removeItem(key);
+            } catch {
+              // ignore — worst case load() returns the stale localStorage copy
+            }
+          })
+          .catch((idbErr) => {
+            console.error('[storageService] IndexedDB fallback write failed:', idbErr);
+          });
 
         console.warn('[storageService] localStorage quota exceeded — falling back to IndexedDB for key:', key);
         return {

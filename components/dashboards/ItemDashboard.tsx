@@ -8,7 +8,7 @@ import { Icons } from '../common/Icons';
 import { EntityCreationPanel } from '../common/EntityCreationPanel';
 import { createDefaultItem } from '../../utils/entityUtils';
 import { useEntitySearch } from '../../hooks/useEntitySearch';
-import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
+import { useRovingTabIndex, type RovingProps } from '../../hooks/useRovingTabIndex';
 
 const ITEM_PROMPT_CHIPS = [
   'A cursed weapon',
@@ -30,7 +30,7 @@ interface ItemCardProps {
   item: Item;
   index: number;
   onSelectItem: (id: string) => void;
-  getRovingProps: (index: number) => Record<string, unknown>;
+  getRovingProps: (index: number) => RovingProps;
 }
 
 const ItemCard = React.memo(function ItemCard({ item, index, onSelectItem, getRovingProps }: ItemCardProps) {
@@ -69,7 +69,7 @@ interface ItemDashboardProps {
 
 export const ItemDashboard: React.FC<ItemDashboardProps> = ({ items, onItemCreated, onSelectItem, isMockMode, isOfficialSetting, campaignContext }) => {
   const { filteredEntities: filteredItems, searchTerm, setSearchTerm } = useEntitySearch(items, ['name', 'description', 'properties']);
-  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: 3 });
+  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: { base: 1, md: 2, xl: 3 } });
 
   const handleItemCreated = (data: any) => {
     const { id, ...itemData } = data;

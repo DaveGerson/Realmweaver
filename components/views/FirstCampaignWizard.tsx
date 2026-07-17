@@ -463,6 +463,26 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
         }
     };
 
+    // ── Dismissal guard ────────────────────────────────────────────────────
+    // Escape, backdrop click, the header X, and the footer skip/back-to-campaigns
+    // links all funnel through here so accidental dismissal can't silently discard
+    // hand-edited NPCs/locations/an adventure that haven't been saved yet (step 5
+    // is post-save, so nothing to protect there).
+    const hasUnsavedDraftContent =
+        step > 1 && step < 5 && (npcDrafts.length > 0 || locationDrafts.length > 0 || adventureDraft !== null);
+
+    const handleDismiss = useCallback(async () => {
+        if (hasUnsavedDraftContent) {
+            const shouldDiscard = await confirm(
+                'Discard campaign setup?',
+                "You've generated NPCs, locations, or an adventure that haven't been saved yet. Leaving now will discard all of it.",
+                { confirmLabel: 'Discard', cancelLabel: 'Keep working', variant: 'danger' }
+            );
+            if (!shouldDiscard) return;
+        }
+        onDismiss();
+    }, [hasUnsavedDraftContent, confirm, onDismiss]);
+
     // ── Step labels ────────────────────────────────────────────────────────
 
     const stepLabels: Record<WizardStep, string> = {
@@ -476,7 +496,7 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
     // ── Render ────────────────────────────────────────────────────────────
 
     return (
-        <DialogShell isOpen={true} onClose={onDismiss} ariaLabel="Campaign Setup Wizard" className="relative w-full max-w-2xl mx-4">
+        <DialogShell isOpen={true} onClose={handleDismiss} ariaLabel="Campaign Setup Wizard" className="relative w-full max-w-2xl mx-4">
             <div className="relative w-full max-h-[90vh] flex flex-col bg-slate-900 border border-slate-700 rounded-xl shadow-2xl">
 
                 {/* Header */}
@@ -491,7 +511,7 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
                     </div>
                     <Button
                         variant="icon"
-                        onClick={onDismiss}
+                        onClick={handleDismiss}
                         className="ml-4 flex-shrink-0"
                         title="Skip wizard"
                     >
@@ -754,7 +774,7 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={onDismiss}
+                                onClick={handleDismiss}
                                 className="sm:mr-auto text-slate-400 hover:text-slate-200"
                             >
                                 <Icons.ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
@@ -764,7 +784,7 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={onDismiss}
+                                onClick={handleDismiss}
                                 className="sm:mr-auto text-slate-500 hover:text-slate-300"
                             >
                                 Skip — I'll build my own

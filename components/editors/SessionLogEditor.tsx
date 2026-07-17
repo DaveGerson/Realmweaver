@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { reconcileEntityFormData } from '../../utils/formReconciliation';
 import type { SessionLog, SessionLogEntry, Campaign } from '../../types';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useToast } from '@/hooks/useToast';
@@ -55,8 +56,16 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
 
   const activePlots = campaign.plots.filter(p => p.status === 'active');
 
+  // Tracks the last `log` prop we've reconciled against, so incoming prop
+  // updates can be merged field-by-field instead of overwriting formData wholesale.
+  const prevLogRef = useRef(log);
+
   useEffect(() => {
-    setFormData(log);
+    const prevLog = prevLogRef.current;
+    if (prevLog !== log) {
+      setFormData(prev => reconcileEntityFormData(prev, prevLog, log));
+    }
+    prevLogRef.current = log;
   }, [log]);
 
   // Clean up the audio transcription session on unmount

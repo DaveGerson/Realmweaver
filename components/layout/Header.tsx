@@ -76,8 +76,13 @@ export const Header: React.FC<HeaderProps> = ({
 
   const handleMenuKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     if (!isMenuOpen) return;
+    // Explicitly typed intermediate: the ambient `react` module ships no type
+    // declarations in this project, so `menuRef.current` resolves to `any` and
+    // Array.from's generic inference collapses to `unknown`. Annotating the
+    // element with its real DOM type restores proper typing for `items`.
+    const menuEl: HTMLDivElement | null = menuRef.current;
     const items = Array.from(
-      menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []
+      menuEl?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []
     );
     const focused = document.activeElement as HTMLElement;
     const currentIdx = items.indexOf(focused);

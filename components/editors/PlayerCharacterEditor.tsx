@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect, useSyncExternalStore } from 'react';
+import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
+import { reconcileEntityFormData } from '../../utils/formReconciliation';
 import type { PlayerCharacter, AbilityScores } from '../../types/index';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
@@ -59,8 +60,16 @@ export const PlayerCharacterEditor: React.FC<PlayerCharacterEditorProps> = ({ pc
   const [showEditStats, setShowEditStats] = useState(false);
   const { confirm } = useConfirmDialog();
 
+  // Tracks the last `pc` prop we've reconciled against, so incoming prop
+  // updates can be merged field-by-field instead of overwriting formData wholesale.
+  const prevPcRef = useRef(pc);
+
   useEffect(() => {
-    setFormData(pc);
+    const prevPc = prevPcRef.current;
+    if (prevPc !== pc) {
+      setFormData(prev => reconcileEntityFormData(prev, prevPc, pc));
+    }
+    prevPcRef.current = pc;
   }, [pc]);
 
   const handleDelete = async () => {

@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Icons } from '@/components/common/Icons';
 import { campaignService } from '@/services/campaignService';
+import type { Campaign } from '@/types/index';
 import { twMerge } from 'tailwind-merge';
 
 // --- Entity type definitions for the mention system ---
@@ -72,15 +73,60 @@ export interface ParsedMentions {
   mentionedEntityIds: string[];
 }
 
-/** Returns entity IDs currently mentioned in the text, based on the tracked map. */
-function extractMentionedIds(text: string, mentionMap: Map<string, string>): string[] {
+/** Escapes regex special characters so a name can be safely embedded in a RegExp. */
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Returns entity IDs whose `@Name` mention is actually present in `text`, requiring
+ * a word boundary after the name so e.g. `@Ann` doesn't falsely match inside `@Anna`.
+ */
+export function findMentionedIdsInText(text: string, candidates: { id: string; name: string }[]): string[] {
   const ids: string[] = [];
-  for (const [name, id] of mentionMap.entries()) {
-    if (text.includes(`@${name}`)) {
+  for (const { id, name } of candidates) {
+    // Unicode-aware boundary (matches services/linking/matchingEngine.ts) so a
+    // name isn't treated as "ended" by an accented letter (e.g. `@Ann` in `@Annë`).
+    const pattern = new RegExp(`@${escapeRegExp(name)}(?![\\p{L}\\p{N}])`, 'u');
+    if (pattern.test(text)) {
       ids.push(id);
     }
   }
   return ids;
+}
+
+/** Returns entity IDs currently mentioned in the text, based on the tracked map. */
+function extractMentionedIds(text: string, mentionMap: Map<string, string>): string[] {
+  const candidates = Array.from(mentionMap.entries()).map(([name, id]) => ({ id, name }));
+  return findMentionedIdsInText(text, candidates);
+}
+
+/** Builds the flat list of all mentionable entities in the active campaign. */
+function buildAllMentionCandidates(campaign: Campaign): MentionCandidate[] {
+  return [
+    ...campaign.npcs.map(e => ({ id: e.id, name: e.name, type: 'npc' as MentionEntityType })),
+    ...campaign.locations.map(e => ({ id: e.id, name: e.name, type: 'location' as MentionEntityType })),
+    ...campaign.factions.map(e => ({ id: e.id, name: e.name, type: 'faction' as MentionEntityType })),
+    ...campaign.items.map(e => ({ id: e.id, name: e.name, type: 'item' as MentionEntityType })),
+    ...campaign.adventures.map(e => ({ id: e.id, name: e.title, type: 'adventure' as MentionEntityType })),
+    ...campaign.articles.map(e => ({ id: e.id, name: e.title, type: 'article' as MentionEntityType })),
+    ...campaign.plots.map(e => ({ id: e.id, name: e.title, type: 'plot' as MentionEntityType })),
+  ];
+}
+
+/**
+ * Resolves a list of previously-persisted `mentionedEntityIds` back into
+ * `{ id, name, type }` candidates, so callers can hydrate a MentionInput's
+ * `initialMentions` prop (and reconstruct which fields they came from) when an
+ * editor re-opens, instead of losing track of mentions from prior sessions.
+ */
+export function resolveMentionCandidates(
+  campaign: Campaign | undefined,
+  ids: string[] | undefined,
+): MentionCandidate[] {
+  if (!campaign || !ids || ids.length === 0) return [];
+  const idSet = new Set(ids);
+  return buildAllMentionCandidates(campaign).filter(c => idSet.has(c.id));
 }
 
 // --- MentionInput Props ---
@@ -92,6 +138,14 @@ export interface MentionInputProps {
   onChange: (value: string) => void;
   /** Called whenever the set of mentioned entity IDs changes. */
   onMentionedIdsChange?: (ids: string[]) => void;
+  /**
+   * Entities already known to be mentioned in `value` (e.g. resolved from a
+   * persisted `mentionedEntityIds` array via `resolveMentionCandidates`).
+   * Seeds the internal name→ID map on mount so previously tracked mentions
+   * keep being recognised (and reported via `onMentionedIdsChange`) after the
+   * editor re-opens, instead of only working for mentions selected in this session.
+   */
+  initialMentions?: MentionCandidate[];
   /** Placeholder text shown when input is empty. */
   placeholder?: string;
   /** Number of visible rows (textarea). Defaults to 3. */
@@ -124,6 +178,7 @@ export const MentionInput: React.FC<MentionInputProps> = ({
   value,
   onChange,
   onMentionedIdsChange,
+  initialMentions,
   placeholder = 'Type @ to mention an entity...',
   rows = 3,
   className,
@@ -144,8 +199,12 @@ export const MentionInput: React.FC<MentionInputProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // Maps entity name (as inserted) → entity ID, so we can report IDs later
-  const mentionMapRef = useRef<Map<string, string>>(new Map());
+  // Maps entity name (as inserted) → entity ID, so we can report IDs later.
+  // Seeded from `initialMentions` (if provided) so mentions tracked in a prior
+  // session are still recognised after the component remounts.
+  const mentionMapRef = useRef<Map<string, string>>(
+    new Map(initialMentions?.map(c => [c.name, c.id])),
+  );
 
   // Candidate snapshot is refreshed whenever the dropdown opens or query changes,
   // ensuring newly created entities are available without a full page reload.
@@ -157,16 +216,7 @@ export const MentionInput: React.FC<MentionInputProps> = ({
       const campaign = state.campaigns.find(c => c.id === state.activeCampaignId);
       if (!campaign) { setCandidateSnapshot([]); return; }
 
-      const all: MentionCandidate[] = [
-        ...campaign.npcs.map(e => ({ id: e.id, name: e.name, type: 'npc' as MentionEntityType })),
-        ...campaign.locations.map(e => ({ id: e.id, name: e.name, type: 'location' as MentionEntityType })),
-        ...campaign.factions.map(e => ({ id: e.id, name: e.name, type: 'faction' as MentionEntityType })),
-        ...campaign.items.map(e => ({ id: e.id, name: e.name, type: 'item' as MentionEntityType })),
-        ...campaign.adventures.map(e => ({ id: e.id, name: e.title, type: 'adventure' as MentionEntityType })),
-        ...campaign.articles.map(e => ({ id: e.id, name: e.title, type: 'article' as MentionEntityType })),
-        ...campaign.plots.map(e => ({ id: e.id, name: e.title, type: 'plot' as MentionEntityType })),
-      ];
-      setCandidateSnapshot(all);
+      setCandidateSnapshot(buildAllMentionCandidates(campaign));
     }
   }, [isOpen, query]);
 

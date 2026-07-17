@@ -206,14 +206,10 @@ describe('getModifierSymbol', () => {
     });
 
     it('returns Ctrl when navigator is undefined', () => {
-        // In node environment, navigator may not exist
-        const saved = globalThis.navigator;
-        try {
-            (globalThis as any).navigator = undefined;
-            expect(getModifierSymbol()).toBe('Ctrl');
-        } finally {
-            (globalThis as any).navigator = saved;
-        }
+        // `navigator` is a read-only global accessor in this environment, so it
+        // can't be assigned directly — stub it instead (afterEach unstubs it).
+        vi.stubGlobal('navigator', undefined);
+        expect(getModifierSymbol()).toBe('Ctrl');
     });
 });
 

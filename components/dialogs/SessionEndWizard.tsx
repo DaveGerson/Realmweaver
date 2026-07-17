@@ -147,17 +147,13 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
 
     // Save and complete
     const handleSaveAndEnd = useCallback(() => {
-        // Update session log with recap data
+        // Update session log with recap data, including the per-plot progression for this
+        // session (plotProgressions lives on the SessionLog, not on the Plot entities).
         campaignService.updateSessionLog(sessionLog.id, {
             recap,
             looseEnds,
             plotProgressions: plotStatuses,
         });
-
-        // Update plot statuses on the plot entities themselves
-        for (const [plotId, status] of Object.entries(plotStatuses)) {
-            campaignService.updatePlotProgression(plotId, status);
-        }
 
         // End the session (archives encounter, marks completed, clears active state)
         campaignService.endSession();

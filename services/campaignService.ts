@@ -216,10 +216,72 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         }
     };
 
-    const _removeEntityFromArticles = (draftCampaign: Campaign, entityId: string) => {
+    /**
+     * Sweeps every known cross-entity reference array/field for a deleted
+     * entity's id and strips it out. Safe to call unconditionally for any
+     * deleted entity type (NPC, Location, Faction, Item, Plot, etc.) since it
+     * only ever matches by exact id equality — entities that never reference
+     * the deleted id are left untouched.
+     *
+     * Covers: NPC relationships + mentionedEntityIds, Location/Faction/Scene
+     * mentionedEntityIds, Plot relatedEntityIds + mentionedEntityIds, Article
+     * relatedEntityIds + mentionedEntityIds, and SessionLog relatedPlotIds +
+     * plotProgressions (for when the deleted entity is a Plot).
+     */
+    const _purgeEntityReferences = (draftCampaign: Campaign, entityId: string) => {
+        draftCampaign.npcs.forEach(npc => {
+            if (npc.relationships) {
+                npc.relationships = npc.relationships.filter(r => r.targetId !== entityId);
+            }
+            if (npc.mentionedEntityIds) {
+                npc.mentionedEntityIds = npc.mentionedEntityIds.filter(id => id !== entityId);
+            }
+        });
+
+        draftCampaign.locations.forEach(loc => {
+            if (loc.mentionedEntityIds) {
+                loc.mentionedEntityIds = loc.mentionedEntityIds.filter(id => id !== entityId);
+            }
+        });
+
+        draftCampaign.factions.forEach(faction => {
+            if (faction.mentionedEntityIds) {
+                faction.mentionedEntityIds = faction.mentionedEntityIds.filter(id => id !== entityId);
+            }
+        });
+
+        draftCampaign.adventures.forEach(adv => {
+            adv.scenes.forEach(scene => {
+                if (scene.mentionedEntityIds) {
+                    scene.mentionedEntityIds = scene.mentionedEntityIds.filter(id => id !== entityId);
+                }
+            });
+        });
+
+        (draftCampaign.plots || []).forEach(plot => {
+            if (plot.relatedEntityIds) {
+                plot.relatedEntityIds = plot.relatedEntityIds.filter(id => id !== entityId);
+            }
+            if (plot.mentionedEntityIds) {
+                plot.mentionedEntityIds = plot.mentionedEntityIds.filter(id => id !== entityId);
+            }
+        });
+
         draftCampaign.articles.forEach(article => {
             if (article.relatedEntityIds) {
                 article.relatedEntityIds = article.relatedEntityIds.filter(id => id !== entityId);
+            }
+            if (article.mentionedEntityIds) {
+                article.mentionedEntityIds = article.mentionedEntityIds.filter(id => id !== entityId);
+            }
+        });
+
+        (draftCampaign.sessionLogs || []).forEach(log => {
+            if (log.relatedPlotIds) {
+                log.relatedPlotIds = log.relatedPlotIds.filter(id => id !== entityId);
+            }
+            if (log.plotProgressions && entityId in log.plotProgressions) {
+                delete log.plotProgressions[entityId];
             }
         });
     };
@@ -253,63 +315,84 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 }
             });
 
-            const savedCampaigns = storageService.loadSync(CAMPAIGNS_STORAGE_KEY);
-            const savedActiveId = storageService.loadSync(ACTIVE_CAMPAIGN_ID_KEY);
+            // Use the async, IndexedDB-aware `load()` (not `loadSync()`) so that data
+            // which only made it to IndexedDB — because a previous save() hit the
+            // localStorage quota and fell back to IDB — is not silently lost on the
+            // next app load. Kept as a fire-and-forget inner async block (rather than
+            // marking `init` itself `async`) so `init`'s public signature stays
+            // `() => void` for callers/tests that replace it with a synchronous stub.
+            // `appStatus` starts (and stays) 'loading' until this resolves, which the
+            // UI already renders a loading state for.
+            void (async () => {
+                const [savedCampaigns, savedActiveId] = await Promise.all([
+                    storageService.load(CAMPAIGNS_STORAGE_KEY),
+                    storageService.load(ACTIVE_CAMPAIGN_ID_KEY),
+                ]);
 
-            _internalUpdate(draft => {
-                if (savedCampaigns) {
-                    try {
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        const campaignsData: any[] = JSON.parse(savedCampaigns);
-                        // Migrate old data: ensure arrays exists
-                        draft.campaigns = campaignsData.map(c => ({
-                            ...c,
-                            settingType: c.settingType || 'custom',
-                            plots: (c.plots || []).map((p: any) => ({
-                                ...p,
-                                title: p.title || p.name || 'Untitled Plot',
-                                relatedEntityIds: p.relatedEntityIds || p.keyNpcIds || [],
-                            })),
-                            notes: c.notes || [],
-                            secrets: c.secrets || [],
-                            articles: (c.articles || []).map((a: any) => ({
-                                ...a,
-                                subArticleIds: a.subArticleIds || [],
-                                relatedEntityIds: a.relatedEntityIds || [],
-                            })),
-                            sessionLogs: (c.sessionLogs || []).map((l: any) => ({
-                                ...l,
-                                structuredNotes: l.structuredNotes || [],
-                                relatedPlotIds: l.relatedPlotIds || []
-                            })),
-                            playerCharacters: c.playerCharacters || [],
-                            npcs: (c.npcs || []).map((n: any) => ({...n, relationships: n.relationships || [], history: n.history || []})),
-                            locations: (c.locations || []).map((l: any) => ({...l, history: l.history || []})),
-                            // Ensure activeEncounter is initialized if missing in older saves
-                            activeEncounter: c.activeEncounter || { id: crypto.randomUUID(), round: 1, turnIndex: 0, combatants: [] }
-                        }));
+                _internalUpdate(draft => {
+                    if (savedCampaigns) {
+                        try {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            const campaignsData: any[] = JSON.parse(savedCampaigns);
+                            // Migrate old data: ensure arrays exists
+                            draft.campaigns = campaignsData.map(c => ({
+                                ...c,
+                                settingType: c.settingType || 'custom',
+                                plots: (c.plots || []).map((p: any) => ({
+                                    ...p,
+                                    title: p.title || p.name || 'Untitled Plot',
+                                    relatedEntityIds: p.relatedEntityIds || p.keyNpcIds || [],
+                                })),
+                                notes: c.notes || [],
+                                secrets: c.secrets || [],
+                                articles: (c.articles || []).map((a: any) => ({
+                                    ...a,
+                                    subArticleIds: a.subArticleIds || [],
+                                    relatedEntityIds: a.relatedEntityIds || [],
+                                })),
+                                sessionLogs: (c.sessionLogs || []).map((l: any) => ({
+                                    ...l,
+                                    structuredNotes: l.structuredNotes || [],
+                                    relatedPlotIds: l.relatedPlotIds || []
+                                })),
+                                playerCharacters: c.playerCharacters || [],
+                                npcs: (c.npcs || []).map((n: any) => ({...n, relationships: n.relationships || [], history: n.history || []})),
+                                locations: (c.locations || []).map((l: any) => ({...l, history: l.history || []})),
+                                // Ensure required array fields exist on factions/adventures too — older or
+                                // hand-edited/imported saves can be missing these, and CRUD code
+                                // (_synchronizeNpcFactionLink, deleteFaction, deleteLocation, etc.)
+                                // assumes they are always present.
+                                factions: (c.factions || []).map((f: any) => ({ ...f, memberIds: f.memberIds || [] })),
+                                adventures: (c.adventures || []).map((a: any) => ({
+                                    ...a,
+                                    scenes: (a.scenes || []).map((s: any) => ({ ...s, npcIds: s.npcIds || [] })),
+                                })),
+                                // Ensure activeEncounter is initialized if missing in older saves
+                                activeEncounter: c.activeEncounter || { id: crypto.randomUUID(), round: 1, turnIndex: 0, combatants: [] }
+                            }));
 
-                        if (savedActiveId && draft.campaigns.some(c => c.id === savedActiveId)) {
-                            draft.activeCampaignId = savedActiveId;
-                            draft.appStatus = 'editing';
-                        } else if (draft.campaigns.length > 0) {
-                            draft.appStatus = 'selecting';
-                        } else {
+                            if (savedActiveId && draft.campaigns.some(c => c.id === savedActiveId)) {
+                                draft.activeCampaignId = savedActiveId;
+                                draft.appStatus = 'editing';
+                            } else if (draft.campaigns.length > 0) {
+                                draft.appStatus = 'selecting';
+                            } else {
+                                draft.appStatus = 'welcome';
+                            }
+                        } catch (e) {
+                            console.error("Failed to parse saved campaigns, clearing storage.", e);
+                            storageService.remove(CAMPAIGNS_STORAGE_KEY);
+                            storageService.remove(ACTIVE_CAMPAIGN_ID_KEY);
                             draft.appStatus = 'welcome';
                         }
-                    } catch (e) {
-                        console.error("Failed to parse saved campaigns, clearing storage.", e);
-                        storageService.remove(CAMPAIGNS_STORAGE_KEY);
-                        storageService.remove(ACTIVE_CAMPAIGN_ID_KEY);
+                    } else {
+                        // No saved campaigns — show welcome screen for fresh onboarding.
+                        // The demo campaign ("Winter's Daughter") is now available as a
+                        // template via utils/demoTemplates.ts instead of being auto-seeded.
                         draft.appStatus = 'welcome';
                     }
-                } else {
-                    // No saved campaigns — show welcome screen for fresh onboarding.
-                    // The demo campaign ("Winter's Daughter") is now available as a
-                    // template via utils/demoTemplates.ts instead of being auto-seeded.
-                    draft.appStatus = 'welcome';
-                }
-            });
+                });
+            })();
         },
 
         // --- Campaign Level Actions ---
@@ -502,6 +585,14 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     id: remapRequired(l.id),
                     // Clear "active" status — no live session in a copy
                     status: (l.status === 'active' ? 'planned' : l.status) as typeof l.status,
+                    adventureId: remap(l.adventureId),
+                    plannedSceneIds: (l.plannedSceneIds ?? []).map(remapRequired),
+                    relatedPlotIds: (l.relatedPlotIds ?? []).map(remapRequired),
+                    plotProgressions: l.plotProgressions
+                        ? Object.fromEntries(
+                              Object.entries(l.plotProgressions).map(([plotId, status]) => [remap(plotId) ?? plotId, status])
+                          )
+                        : l.plotProgressions,
                 })),
 
                 playerCharacters: (source.playerCharacters ?? []).map(pc => ({
@@ -545,6 +636,15 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     importedCampaign.playerCharacters = importedCampaign.playerCharacters || [];
                     importedCampaign.npcs = (importedCampaign.npcs || []).map(n => ({...n, relationships: n.relationships || [], history: n.history || []}));
                     importedCampaign.locations = (importedCampaign.locations || []).map(l => ({...l, history: l.history || []}));
+                    // Imported JSON is only lightly validated (id/name checks) — backfill
+                    // required array fields on factions/adventures so later CRUD (faction
+                    // membership sync, location/adventure deletion, etc.) can't crash on
+                    // an undefined array.
+                    importedCampaign.factions = (importedCampaign.factions || []).map(f => ({ ...f, memberIds: f.memberIds || [] }));
+                    importedCampaign.adventures = (importedCampaign.adventures || []).map(a => ({
+                        ...a,
+                        scenes: (a.scenes || []).map(s => ({ ...s, npcIds: s.npcIds || [] })),
+                    }));
                     importedCampaign.activeEncounter = importedCampaign.activeEncounter || { id: crypto.randomUUID(), round: 1, turnIndex: 0, combatants: [] };
                     
                     draft.campaigns.push(importedCampaign);
@@ -842,9 +942,9 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 
                 // Unlink from faction
                 _synchronizeNpcFactionLink(campaign, id, npcToDelete.factionId, undefined);
-                
-                // Cleanup article references
-                _removeEntityFromArticles(campaign, id);
+
+                // Cleanup all cross-entity references (articles, plots, other NPCs' relationships, etc.)
+                _purgeEntityReferences(campaign, id);
 
                 // Remove from NPC list
                 campaign.npcs.splice(npcIndex, 1);
@@ -911,8 +1011,8 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     if (child) child.parentLocationId = undefined;
                 });
                 
-                // Cleanup article references
-                _removeEntityFromArticles(campaign, id);
+                // Cleanup all cross-entity references (articles, plots, NPC relationships, etc.)
+                _purgeEntityReferences(campaign, id);
 
                 // Remove the location
                 campaign.locations.splice(locIndex, 1);
@@ -958,9 +1058,9 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     if (loc.controllingFactionId === id) loc.controllingFactionId = undefined;
                 });
 
-                // Cleanup article references
-                _removeEntityFromArticles(campaign, id);
-                
+                // Cleanup all cross-entity references (articles, plots, NPC relationships, etc.)
+                _purgeEntityReferences(campaign, id);
+
                 // Remove faction
                 campaign.factions = campaign.factions.filter(f => f.id !== id);
             });
@@ -985,7 +1085,9 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         deleteItem(id: string) {
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
-                if (campaign) campaign.items = campaign.items.filter(i => i.id !== id);
+                if (!campaign) return;
+                _purgeEntityReferences(campaign, id);
+                campaign.items = campaign.items.filter(i => i.id !== id);
             });
         },
 
@@ -1039,7 +1141,10 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     const child = campaign.articles.find(c => c.id === childId);
                     if (child) child.parentArticleId = undefined;
                 });
-                
+
+                // Cleanup all cross-entity references (e.g. @-mentions of this article)
+                _purgeEntityReferences(campaign, id);
+
                 // Remove the article
                 campaign.articles.splice(articleIndex, 1);
             });
@@ -1083,12 +1188,20 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     campaign.activeSceneId = undefined;
                 }
 
-                // Clear adventureId on any session logs referencing this adventure
+                // Clear adventureId on any session logs referencing this adventure,
+                // and strip the adventure's (now deleted) scenes from planned lists
+                const deletedSceneIds = new Set(adventure.scenes.map(s => s.id));
                 if (campaign.sessionLogs) {
                     campaign.sessionLogs.forEach(log => {
                         if (log.adventureId === id) log.adventureId = undefined;
+                        if (log.plannedSceneIds?.some(sid => deletedSceneIds.has(sid))) {
+                            log.plannedSceneIds = log.plannedSceneIds.filter(sid => !deletedSceneIds.has(sid));
+                        }
                     });
                 }
+
+                // Cleanup all cross-entity references (e.g. @-mentions of this adventure)
+                _purgeEntityReferences(campaign, id);
 
                 campaign.adventures = campaign.adventures.filter(a => a.id !== id);
             });
@@ -1119,6 +1232,18 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 if (!campaign) return;
                 const adventure = campaign.adventures.find(a => a.id === adventureId);
                 if (adventure) adventure.scenes = adventure.scenes.filter(s => s.id !== sceneId);
+
+                // Clear activeSceneId if it referenced the deleted scene
+                if (campaign.activeSceneId === sceneId) {
+                    campaign.activeSceneId = undefined;
+                }
+
+                // Strip the deleted scene id out of every session's planned scene list
+                (campaign.sessionLogs || []).forEach(log => {
+                    if (log.plannedSceneIds?.includes(sceneId)) {
+                        log.plannedSceneIds = log.plannedSceneIds.filter(id => id !== sceneId);
+                    }
+                });
             });
         },
         reorderScene(adventureId: string, draggedSceneId: string, targetSceneId: string) {
@@ -1162,9 +1287,15 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         deleteSessionLog(id: string) {
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
-                if (campaign) {
-                    campaign.sessionLogs = (campaign.sessionLogs || []).filter(l => l.id !== id);
+                if (!campaign) return;
+
+                // Clear the live-session pointers if the deleted log was the active one
+                if (campaign.activeSessionId === id) {
+                    campaign.activeSessionId = undefined;
+                    campaign.activeSceneId = undefined;
                 }
+
+                campaign.sessionLogs = (campaign.sessionLogs || []).filter(l => l.id !== id);
             });
         },
 
@@ -1224,9 +1355,9 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         deletePlot(id: string) {
              updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
-                if (campaign) {
-                    campaign.plots = (campaign.plots || []).filter(n => n.id !== id);
-                }
+                if (!campaign) return;
+                _purgeEntityReferences(campaign, id);
+                campaign.plots = (campaign.plots || []).filter(n => n.id !== id);
             });
         },
 

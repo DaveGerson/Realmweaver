@@ -8,7 +8,7 @@ import { Icons } from '../common/Icons';
 import { EntityCreationPanel } from '../common/EntityCreationPanel';
 import { createDefaultLocation } from '../../utils/entityUtils';
 import { useEntitySearch } from '../../hooks/useEntitySearch';
-import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
+import { useRovingTabIndex, type RovingProps } from '../../hooks/useRovingTabIndex';
 
 const LOCATION_PROMPT_CHIPS = [
   'A haunted tavern',
@@ -22,7 +22,7 @@ interface LocationCardProps {
   parent?: Location;
   index: number;
   onSelectLocation: (id: string) => void;
-  getRovingProps: (index: number) => Record<string, unknown>;
+  getRovingProps: (index: number) => RovingProps;
 }
 
 const LocationCard = React.memo(function LocationCard({ location, parent, index, onSelectLocation, getRovingProps }: LocationCardProps) {
@@ -66,7 +66,8 @@ interface LocationDashboardProps {
 
 export const LocationDashboard: React.FC<LocationDashboardProps> = ({ locations, factions = [], onLocationCreated, onSelectLocation, isMockMode, isOfficialSetting, campaignContext }) => {
   const { filteredEntities: filteredLocations, searchTerm, setSearchTerm } = useEntitySearch(locations, ['name', 'description', 'secrets']);
-  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: 3 });
+  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: { base: 1, md: 2, xl: 3 } });
+  const locationsById = React.useMemo(() => new Map(locations.map(l => [l.id, l])), [locations]);
 
   const handleLocationCreated = (data: any) => {
     const { id, ...locationData } = data;
@@ -134,7 +135,7 @@ export const LocationDashboard: React.FC<LocationDashboardProps> = ({ locations,
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredLocations.map((location, index) => {
-            const parent = locations.find(l => l.id === location.parentLocationId);
+            const parent = location.parentLocationId ? locationsById.get(location.parentLocationId) : undefined;
             return (
               <LocationCard
                 key={location.id}

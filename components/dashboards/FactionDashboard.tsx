@@ -8,7 +8,7 @@ import { Icons } from '../common/Icons';
 import { EntityCreationPanel } from '../common/EntityCreationPanel';
 import { createDefaultFaction } from '../../utils/entityUtils';
 import { useEntitySearch } from '../../hooks/useEntitySearch';
-import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
+import { useRovingTabIndex, type RovingProps } from '../../hooks/useRovingTabIndex';
 
 const FACTION_PROMPT_CHIPS = [
   'A thieves\' guild',
@@ -22,7 +22,7 @@ interface FactionCardProps {
   leader?: NPC;
   index: number;
   onSelectFaction: (id: string) => void;
-  getRovingProps: (index: number) => Record<string, unknown>;
+  getRovingProps: (index: number) => RovingProps;
 }
 
 const FactionCard = React.memo(function FactionCard({ faction, leader, index, onSelectFaction, getRovingProps }: FactionCardProps) {
@@ -67,7 +67,8 @@ interface FactionDashboardProps {
 
 export const FactionDashboard: React.FC<FactionDashboardProps> = ({ factions, npcs = [], locations = [], onFactionCreated, onSelectFaction, isMockMode, isOfficialSetting, campaignContext }) => {
   const { filteredEntities: filteredFactions, searchTerm, setSearchTerm } = useEntitySearch(factions, ['name', 'description', 'goals']);
-  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: 3 });
+  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: { base: 1, md: 2, xl: 3 } });
+  const npcsById = React.useMemo(() => new Map(npcs.map(n => [n.id, n])), [npcs]);
 
   const handleFactionCreated = (data: any) => {
     const { id, ...factionData } = data;
@@ -132,7 +133,7 @@ export const FactionDashboard: React.FC<FactionDashboardProps> = ({ factions, np
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredFactions.map((faction, index) => {
-            const leader = npcs.find(n => n.id === faction.leaderId);
+            const leader = faction.leaderId ? npcsById.get(faction.leaderId) : undefined;
             return (
               <FactionCard
                 key={faction.id}

@@ -6,14 +6,7 @@ import { Button } from '@/components/common/Button';
 import { twMerge } from 'tailwind-merge';
 import { campaignService } from '@/services/campaignService';
 import { MentionInput } from '@/components/common/MentionInput';
-
-// Browser speech recognition API types
-declare global {
-    interface Window {
-        SpeechRecognition: new () => SpeechRecognition;
-        webkitSpeechRecognition: new () => SpeechRecognition;
-    }
-}
+import { useToast } from '@/hooks/useToast';
 
 const NOTE_TAG_OPTIONS = ['Combat', 'NPC', 'Decision', 'Loot', 'Discovery'] as const;
 
@@ -67,6 +60,15 @@ export const RunningLog: React.FC<RunningLogProps> = ({ sessionLog, mobileTab })
     const recognitionRef = useRef<SpeechRecognition | null>(null);
     const noteInputWrapperRef = useRef<HTMLDivElement>(null);
     const mobileInputRef = useRef<HTMLInputElement>(null);
+    // Tracks whether the current recognition session is ending because the DM clicked
+    // the mic button, vs. the engine stopping it on its own (timeout/error) — used to
+    // decide whether onend/onerror should surface a "dictation stopped" warning.
+    const manualStopRef = useRef(false);
+    // Set by onerror just before onend fires for the same session, so onend can report
+    // *why* recognition stopped (the spec always follows an error with an end event).
+    const lastErrorRef = useRef<string | null>(null);
+
+    const { addToast } = useToast();
 
     const hasSpeechRecognition = typeof window !== 'undefined' &&
         (!!window.SpeechRecognition || !!window.webkitSpeechRecognition);
@@ -124,10 +126,14 @@ export const RunningLog: React.FC<RunningLogProps> = ({ sessionLog, mobileTab })
         if (!hasSpeechRecognition) return;
 
         if (isRecording) {
+            manualStopRef.current = true;
             recognitionRef.current?.stop();
             setIsRecording(false);
             return;
         }
+
+        manualStopRef.current = false;
+        lastErrorRef.current = null;
 
         const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = new SpeechRecognitionCtor();
@@ -144,20 +150,38 @@ export const RunningLog: React.FC<RunningLogProps> = ({ sessionLog, mobileTab })
             }
         };
 
-        recognition.onerror = () => {
-            setIsRecording(false);
-            recognitionRef.current = null;
+        // Just remember the reason — onend always follows onerror per spec, and that's
+        // where we decide whether to surface it (so a manual stop() never double-warns).
+        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+            lastErrorRef.current = event.error;
         };
 
         recognition.onend = () => {
             setIsRecording(false);
             recognitionRef.current = null;
+
+            const error = lastErrorRef.current;
+            const wasManual = manualStopRef.current;
+            lastErrorRef.current = null;
+            manualStopRef.current = false;
+
+            // A deliberate click of the mic button, or an intentional abort (e.g. unmount),
+            // needs no warning. Anything else means the engine dropped dictation on its own
+            // and whatever the DM said after that point was never captured.
+            if (wasManual || error === 'aborted') return;
+
+            addToast(
+                error
+                    ? `Voice dictation stopped (${error}). Anything said after that wasn't captured — tap the mic to resume.`
+                    : "Voice dictation stopped. Anything said after that wasn't captured — tap the mic to resume.",
+                'error'
+            );
         };
 
         recognitionRef.current = recognition;
         recognition.start();
         setIsRecording(true);
-    }, [isRecording, hasSpeechRecognition]);
+    }, [isRecording, hasSpeechRecognition, addToast]);
 
     const startEditing = (noteId: string, content: string) => {
         setEditingNoteId(noteId);

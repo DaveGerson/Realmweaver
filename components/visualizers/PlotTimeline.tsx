@@ -34,7 +34,7 @@ const PLOT_COLORS = [
 
 // Returns the PlotSessionStatus recorded for a given plot in a given session,
 // or null if the session has no record of this plot.
-function getPlotSessionStatus(
+export function getPlotSessionStatus(
   session: SessionLog,
   plotId: string
 ): PlotSessionStatus | 'resolved' | null {
@@ -49,10 +49,19 @@ function getPlotSessionStatus(
   return null;
 }
 
-// Determines whether a plot appeared in a session at all (used for drawing the
-// colored bar vs. a gap)
-function plotInSession(session: SessionLog, plotId: string): boolean {
-  return getPlotSessionStatus(session, plotId) !== null;
+// PlotSessionStatus (session.plotProgressions) has no 'resolved' value of its own —
+// resolution lives on the Plot itself (Plot.status). Combine the two so a plot marked
+// resolved actually renders as resolved somewhere on the timeline: we surface it on the
+// most recent session column, since that's the closest thing to "when" a DM would place it.
+export function getEffectiveSessionStatus(
+  session: SessionLog,
+  plot: Plot,
+  isMostRecentSession: boolean
+): PlotSessionStatus | 'resolved' | null {
+  if (plot.status === 'resolved' && isMostRecentSession) {
+    return 'resolved';
+  }
+  return getPlotSessionStatus(session, plot.id);
 }
 
 interface TooltipState {
@@ -417,8 +426,8 @@ export const PlotTimeline: React.FC<PlotTimelineProps> = ({
 
                       {/* Session cells */}
                       {sessions.map((session, si) => {
-                        const status = getPlotSessionStatus(session, plot.id);
-                        const active = plotInSession(session, plot.id);
+                        const status = getEffectiveSessionStatus(session, plot, si === sessions.length - 1);
+                        const active = status !== null;
 
                         // Build tooltip string
                         const sessionLabel = session.title || `Session ${si + 1}`;

@@ -323,6 +323,110 @@ describe('validateImportedCampaign — Adventure entity validation', () => {
 });
 
 // ---------------------------------------------------------------------------
+// validateImportedCampaign — required array field backfilling
+// ---------------------------------------------------------------------------
+
+describe('validateImportedCampaign — required array field backfilling', () => {
+  it('defaults Faction.memberIds to [] when missing from a hand-edited import', () => {
+    const data = minimalCampaign();
+    data['factions'] = [{ id: 'f1', name: 'Thieves Guild' }]; // no memberIds
+
+    const result = validateImportedCampaign(data);
+
+    expect(result.success).toBe(true);
+    const faction = result.campaign?.factions[0];
+    expect(Array.isArray(faction?.memberIds)).toBe(true);
+    expect(faction?.memberIds).toEqual([]);
+  });
+
+  it('defaults Location.subLocationIds and history to [] when missing', () => {
+    const data = minimalCampaign();
+    data['locations'] = [{ id: 'l1', name: 'Old Tower' }]; // no subLocationIds/history
+
+    const result = validateImportedCampaign(data);
+
+    expect(result.success).toBe(true);
+    const location = result.campaign?.locations[0];
+    expect(location?.subLocationIds).toEqual([]);
+    expect(location?.history).toEqual([]);
+  });
+
+  it('defaults NPC.relationships, history, and knowsPlayerHistory to []', () => {
+    const data = minimalCampaign();
+    data['npcs'] = [{ id: 'n1', name: 'Stranger' }];
+
+    const result = validateImportedCampaign(data);
+
+    expect(result.success).toBe(true);
+    const npc = result.campaign?.npcs[0];
+    expect(npc?.relationships).toEqual([]);
+    expect(npc?.history).toEqual([]);
+    expect(npc?.knowsPlayerHistory).toEqual([]);
+  });
+
+  it('defaults Adventure.scenes and Scene.npcIds/skillChecks to []', () => {
+    const data = minimalCampaign();
+    data['adventures'] = [{ id: 'a1', title: 'The Heist', scenes: [{ id: 's1', title: 'Break-in' }] }];
+
+    const result = validateImportedCampaign(data);
+
+    expect(result.success).toBe(true);
+    const adventure = result.campaign?.adventures[0];
+    expect(Array.isArray(adventure?.scenes)).toBe(true);
+    const scene = adventure?.scenes[0] as unknown as { npcIds: unknown; skillChecks: unknown };
+    expect(scene.npcIds).toEqual([]);
+    expect(scene.skillChecks).toEqual([]);
+  });
+
+  it('defaults a missing Adventure.scenes array entirely to []', () => {
+    const data = minimalCampaign();
+    data['adventures'] = [{ id: 'a1', title: 'No Scenes Field' }]; // scenes omitted
+
+    const result = validateImportedCampaign(data);
+
+    expect(result.success).toBe(true);
+    expect(result.campaign?.adventures[0].scenes).toEqual([]);
+  });
+
+  it('defaults Article.subArticleIds, Plot.relatedEntityIds, and Note.tags to []', () => {
+    const data = minimalCampaign();
+    data['articles'] = [{ id: 'art1', title: 'Lore Entry', category: 'lore', content: '' }];
+    data['plots'] = [{ id: 'p1', title: 'Main Plot', description: '', status: 'active' }];
+    data['notes'] = [{ id: 'note1', title: 'Reminder', content: '', createdAt: '', lastModified: '' }];
+
+    const result = validateImportedCampaign(data);
+
+    expect(result.success).toBe(true);
+    expect(result.campaign?.articles[0].subArticleIds).toEqual([]);
+    expect(result.campaign?.plots[0].relatedEntityIds).toEqual([]);
+    expect(result.campaign?.notes[0].tags).toEqual([]);
+  });
+
+  it('defaults SessionLog array fields (plannedSceneIds, relatedPlotIds, structuredNotes, encounterLog) to []', () => {
+    const data = minimalCampaign();
+    data['sessionLogs'] = [{ id: 'sl1', title: 'Session 1', status: 'completed', sessionDate: '2026-01-01', prepNotes: '', runningNotes: '', recap: '', notableEvents: '', looseEnds: '' }];
+
+    const result = validateImportedCampaign(data);
+
+    expect(result.success).toBe(true);
+    const log = result.campaign?.sessionLogs[0];
+    expect(log?.plannedSceneIds).toEqual([]);
+    expect(log?.relatedPlotIds).toEqual([]);
+    expect(log?.structuredNotes).toEqual([]);
+    expect(log?.encounterLog).toEqual([]);
+  });
+
+  it('does not overwrite existing valid array fields', () => {
+    const data = minimalCampaign();
+    data['factions'] = [{ id: 'f1', name: 'Thieves Guild', memberIds: ['npc-1', 'npc-2'] }];
+
+    const result = validateImportedCampaign(data);
+
+    expect(result.campaign?.factions[0].memberIds).toEqual(['npc-1', 'npc-2']);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // validateImportedCampaign — mixed valid/invalid arrays
 // ---------------------------------------------------------------------------
 
@@ -392,6 +496,23 @@ describe('validateExportRoundTrip', () => {
     expect(result.roundTripOk).toBe(false);
     expect(typeof result.warning).toBe('string');
     expect(result.warning).toContain('npcs');
+  });
+
+  it('returns roundTripOk:false when the parsed JSON has fewer secrets than the original', () => {
+    const campaign = {
+      ...campaignFixture(),
+      secrets: [
+        { id: 's1', title: 'Secret 1', content: '', category: 'secret', isRevealed: false, createdAt: '2026-01-01' },
+      ],
+    } as Campaign;
+    // Corrupt the JSON string so secrets array is empty after parse
+    const parsed = { ...campaign, secrets: [] };
+    const corruptJson = JSON.stringify(parsed, null, 2);
+
+    const result = validateExportRoundTrip(campaign, corruptJson);
+
+    expect(result.roundTripOk).toBe(false);
+    expect(result.warning).toContain('secrets');
   });
 
   it('returns roundTripOk:false when JSON.parse throws (malformed string)', () => {

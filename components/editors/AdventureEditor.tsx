@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { reconcileEntityFormData } from '../../utils/formReconciliation';
 import type { Adventure, Campaign } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
@@ -38,13 +39,21 @@ export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, cam
   const [isGeneratingScene, setIsGeneratingScene] = useState(false);
   const { confirm } = useConfirmDialog();
 
+  // Tracks the last `adventure` prop we've reconciled against, so incoming prop
+  // updates can be merged field-by-field instead of overwriting formData wholesale.
+  const prevAdventureRef = useRef(adventure);
+
   // Reset to first tab when the adventure changes
   useEffect(() => {
     setActiveTab('overview');
   }, [adventure.id]);
 
   useEffect(() => {
-    setFormData(adventure);
+    const prevAdventure = prevAdventureRef.current;
+    if (prevAdventure !== adventure) {
+      setFormData(prev => reconcileEntityFormData(prev, prevAdventure, adventure));
+    }
+    prevAdventureRef.current = adventure;
   }, [adventure]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Campaign, SettingType } from '../../types/index';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
@@ -44,14 +44,30 @@ export const CampaignSettingEditor: React.FC<CampaignSettingEditorProps> = ({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
+  // Tracks the last `campaign` prop we've reconciled against, so incoming prop
+  // updates can be merged field-by-field instead of overwriting formData wholesale.
+  const prevCampaignRef = useRef(campaign);
+
   useEffect(() => {
-    setFormData({
-      title: campaign.title,
-      setting: campaign.setting,
-      settingType: campaign.settingType,
-      officialSetting: campaign.officialSetting || OFFICIAL_SETTINGS[0],
-      gcpApiKey: campaign.gcpApiKey || '',
-    });
+    const prevCampaign = prevCampaignRef.current;
+    if (prevCampaign !== campaign) {
+      // The campaign object changed (e.g. an async action elsewhere mutated it).
+      // Only adopt fields the user hasn't started editing since the last sync —
+      // any field where formData still matches what we last derived from
+      // `campaign`. Fields the user has locally changed (unblurred edits) are preserved.
+      setFormData(prev => {
+        const merged = { ...prev };
+        if (prev.title === prevCampaign.title) merged.title = campaign.title;
+        if (prev.setting === prevCampaign.setting) merged.setting = campaign.setting;
+        if (prev.settingType === prevCampaign.settingType) merged.settingType = campaign.settingType;
+        if (prev.officialSetting === (prevCampaign.officialSetting || OFFICIAL_SETTINGS[0])) {
+          merged.officialSetting = campaign.officialSetting || OFFICIAL_SETTINGS[0];
+        }
+        if (prev.gcpApiKey === (prevCampaign.gcpApiKey || '')) merged.gcpApiKey = campaign.gcpApiKey || '';
+        return merged;
+      });
+    }
+    prevCampaignRef.current = campaign;
   }, [campaign]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {

@@ -359,6 +359,13 @@ const testImportExport = async () => {
 };
 
 export const runSmokeTests = async (isMockMode: boolean) => {
+  // Dev-only safety net: this suite wipes real localStorage save keys and fires
+  // live AI calls, so it must never execute in a production build regardless of
+  // how/where it gets invoked from.
+  if (!import.meta.env.DEV) {
+    console.warn('[SmokeTest] Skipped: smoke tests only run in development builds.');
+    return;
+  }
   // Clear any saved campaign from a previous session to ensure a clean test run.
   localStorage.removeItem('realmweaver-campaigns');
   localStorage.removeItem('realmweaver-active-campaign-id');

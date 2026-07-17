@@ -81,14 +81,23 @@ export class ClaudeCliProvider implements AIProvider {
       }
     }
 
-    const raw = await this.callApi({
-      prompt: userPrompt,
-      model: TIER_TO_CLI_MODEL[model],
-      outputFormat: 'json',
-      systemPrompt,
-    });
-
-    return this.parseJsonResponse<T>(raw);
+    // Parsing is performed *inside* the retried callback (rather than after
+    // `await this.callApi(...)` resolves) so that a malformed/truncated JSON
+    // payload on one attempt -- e.g. the model got cut off mid-response --
+    // triggers a genuine retry via withRetry's documented "JSON parse errors"
+    // condition, instead of failing immediately with zero retries.
+    return withRetry(
+      async () => {
+        const raw = await this.rawCallApi({
+          prompt: userPrompt,
+          model: TIER_TO_CLI_MODEL[model],
+          outputFormat: 'json',
+          systemPrompt,
+        });
+        return this.parseJsonResponse<T>(raw);
+      },
+      { maxAttempts: 2, delayMs: 1500, label: `${TIER_TO_CLI_MODEL[model]} json` }
+    );
   }
 
   async generateText(options: GenerateTextOptions): Promise<string> {
@@ -177,7 +186,16 @@ export class ClaudeCliProvider implements AIProvider {
       const errorBody = await response.json().catch(() => ({}));
       const errorMessage = (errorBody as { error?: string }).error
         || `AI request failed with status ${response.status}`;
-      throw new Error(errorMessage);
+      const err = new Error(errorMessage) as Error & { code?: string };
+      // Propagate the proxy's error code (set reliably in
+      // vite-plugin-ai-proxy.ts from process signals, not message text) so
+      // withRetry's `code === 'ETIMEDOUT'` check can actually match a real
+      // CLI timeout regardless of the message wording. A 504 with no code
+      // in the body is also treated as a timeout, since that's the only
+      // status the proxy returns for timeouts.
+      err.code = (errorBody as { code?: string }).code
+        || (response.status === 504 ? 'ETIMEDOUT' : undefined);
+      throw err;
     }
 
     const data: { result: string } = await response.json();

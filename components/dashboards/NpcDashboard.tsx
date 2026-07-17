@@ -8,7 +8,7 @@ import { Icons } from '../common/Icons';
 import { EntityCreationPanel } from '../common/EntityCreationPanel';
 import { createDefaultNpc } from '../../utils/entityUtils';
 import { useEntitySearch } from '../../hooks/useEntitySearch';
-import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
+import { useRovingTabIndex, type RovingProps } from '../../hooks/useRovingTabIndex';
 
 const NPC_PROMPT_CHIPS = [
   'A mysterious merchant',
@@ -22,7 +22,7 @@ interface NpcCardProps {
   faction?: Faction;
   index: number;
   onSelectNpc: (id: string) => void;
-  getRovingProps: (index: number) => Record<string, unknown>;
+  getRovingProps: (index: number) => RovingProps;
 }
 
 const NpcCard = React.memo(function NpcCard({ npc, faction, index, onSelectNpc, getRovingProps }: NpcCardProps) {
@@ -64,7 +64,8 @@ interface NpcDashboardProps {
 
 export const NpcDashboard: React.FC<NpcDashboardProps> = ({ npcs, factions = [], onNpcCreated, onSelectNpc, isMockMode, isOfficialSetting, campaignContext }) => {
   const { filteredEntities: filteredNpcs, searchTerm, setSearchTerm } = useEntitySearch(npcs, ['name', 'description', 'traits']);
-  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: 3 });
+  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: { base: 1, md: 2, xl: 3 } });
+  const factionsById = React.useMemo(() => new Map(factions.map(f => [f.id, f])), [factions]);
 
   const handleNpcCreated = (data: any) => {
     const { id, ...npcData } = data;
@@ -124,7 +125,7 @@ export const NpcDashboard: React.FC<NpcDashboardProps> = ({ npcs, factions = [],
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredNpcs.map((npc, index) => {
-            const faction = factions.find(f => f.id === npc.factionId);
+            const faction = npc.factionId ? factionsById.get(npc.factionId) : undefined;
             return (
               <NpcCard
                 key={npc.id}

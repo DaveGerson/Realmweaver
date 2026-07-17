@@ -1,5 +1,5 @@
 
-import React, { FC, useState, useEffect, useMemo, useSyncExternalStore, Suspense } from 'react';
+import React, { FC, useState, useEffect, useMemo, useCallback, useSyncExternalStore, Suspense } from 'react';
 import { WelcomeScreen } from './components/views/WelcomeScreen';
 import { CampaignCreator } from './components/views/CampaignCreator';
 import { FirstCampaignWizard } from './components/views/FirstCampaignWizard';
@@ -8,6 +8,7 @@ import { Header } from './components/layout/Header';
 import { CampaignSidebar } from './components/layout/CampaignSidebar';
 import { ViewRouter } from './components/layout/ViewRouter';
 import type { ExportEntityCounts } from './components/dialogs/ExportModal';
+import type { CommandPaletteEntityType } from './components/common/CommandPalette';
 
 // Lazy-loaded dialogs — only bundled when opened
 const DmCoach = React.lazy(() => import('./components/dialogs/DmCoach').then(m => ({ default: m.DmCoach })));
@@ -97,6 +98,8 @@ const App: FC = () => {
   // --- Effects ---
 
   useEffect(() => {
+    // Dev-only: never let this run against a real user's saved campaigns/API calls.
+    if (!import.meta.env.DEV) return;
     runSmokeTests(isMockMode).catch(err => console.error('Smoke tests failed:', err));
   }, [isMockMode]);
 
@@ -289,6 +292,48 @@ const App: FC = () => {
     }
   };
 
+  // Stable prop identities for CampaignSidebar — recomputed only when the
+  // underlying selection values change, so an unrelated store update (e.g.
+  // typing in an entity editor) doesn't force the sidebar to recompute every
+  // filtered entity list on every keystroke.
+  const sidebarSelectedIds = useMemo(() => ({
+    adventure: selectedAdventureId,
+    scene: selectedSceneId,
+    npc: selectedNpcId,
+    location: selectedLocationId,
+    faction: selectedFactionId,
+    item: selectedItemId,
+    article: selectedArticleId,
+    sessionLog: selectedSessionLogId,
+    playerCharacter: selectedPlayerCharacterId,
+    plot: selectedPlotId,
+    note: selectedNoteId,
+  }), [
+    selectedAdventureId, selectedSceneId, selectedNpcId, selectedLocationId,
+    selectedFactionId, selectedItemId, selectedArticleId, selectedSessionLogId,
+    selectedPlayerCharacterId, selectedPlotId, selectedNoteId,
+  ]);
+
+  const handleSelectRecent = useCallback(
+    (type: CommandPaletteEntityType, id: string) => handleSelect(type as Parameters<typeof handleSelect>[0], id),
+    [handleSelect]
+  );
+  const handleSelectPinned = useCallback(
+    (type: string, id: string) => handleSelect(type as Parameters<typeof handleSelect>[0], id),
+    [handleSelect]
+  );
+  const handleUnpinEntity = useCallback(
+    (type: string, id: string) => campaignService.unpinEntity(type, id),
+    []
+  );
+  const handleShowGenerator = useCallback((type: GeneratorType) => {
+    if (type === 'scene' && !selectedAdventureId) {
+      addToast('Please select an adventure first to add a scene to it.', 'info');
+      return;
+    }
+    setActiveGenerator(type);
+  }, [selectedAdventureId, addToast, setActiveGenerator]);
+
   const handleGoLive = (sessionLogId: string) => {
     campaignService.goLive(sessionLogId);
     setActiveView('session-runner');
@@ -370,34 +415,14 @@ const App: FC = () => {
                     campaign={activeCampaign}
                     activeView={activeView}
                     onSelectView={handleSelectView}
-                    selectedIds={{
-                      adventure: selectedAdventureId,
-                      scene: selectedSceneId,
-                      npc: selectedNpcId,
-                      location: selectedLocationId,
-                      faction: selectedFactionId,
-                      item: selectedItemId,
-                      article: selectedArticleId,
-                      sessionLog: selectedSessionLogId,
-                      playerCharacter: selectedPlayerCharacterId,
-                      plot: selectedPlotId,
-                      note: selectedNoteId,
-                    }}
+                    selectedIds={sidebarSelectedIds}
                     onSelect={handleSelect}
                     recentItems={recentItems}
-                    onSelectRecent={(type, id) => handleSelect(type as Parameters<typeof handleSelect>[0], id)}
+                    onSelectRecent={handleSelectRecent}
                     pinnedEntities={activeCampaign?.pinnedEntities}
-                    onSelectPinned={(type, id) => handleSelect(type as Parameters<typeof handleSelect>[0], id)}
-                    onUnpin={(type, id) => campaignService.unpinEntity(type, id)}
-                    onShowGenerator={(type) => {
-                      if (type === 'scene') {
-                        if (!selectedAdventureId) {
-                          addToast('Please select an adventure first to add a scene to it.', 'info');
-                          return;
-                        }
-                      }
-                      setActiveGenerator(type);
-                    }}
+                    onSelectPinned={handleSelectPinned}
+                    onUnpin={handleUnpinEntity}
+                    onShowGenerator={handleShowGenerator}
                     onReorderScene={campaignService.reorderScene}
                     onSetDmStyle={campaignService.setDmStyle}
                     onSetFeatureOverride={campaignService.setFeatureOverride}
@@ -414,7 +439,13 @@ const App: FC = () => {
                       onGoBack={handleGoBack}
                     />
                   )}
-                  <ErrorBoundary>
+                  {/*
+                    key={activeView} forces the boundary to remount (clearing any
+                    caught error) when the sidebar navigates to a different view,
+                    instead of leaving the previous view's error fallback stuck on
+                    screen.
+                  */}
+                  <ErrorBoundary key={activeView}>
                     <ViewRouter
                       campaign={activeCampaign}
                       activeView={activeView}
