@@ -172,9 +172,10 @@ Entity deletion in `campaignService` cleans up all references to keep data consi
 
 | Layer | Framework | Count | Purpose |
 |-------|-----------|-------|---------|
-| Unit | Vitest | 97 | Service logic, context builder, utilities, archetype scenarios |
-| E2E | Playwright | 38 | User workflows: campaign CRUD, navigation, session runner, DM tools |
+| Unit | Vitest | 516 (34 files) | Service logic, context builder, utilities, linking engine, storage/migration, archetype scenarios |
+| E2E | Playwright | 118 (6 skipped) | User workflows: campaign CRUD, navigation, session runner, DM tools |
 | Smoke | Built-in (`smokeTest.ts`) | ~20 | Service function availability, entity CRUD on app startup |
+| Type Check | `npm run typecheck` (`tsc --noEmit`) | 0 errors | Standalone quality gate; not yet wired into CI (no `.github/workflows`) |
 | Manual | Mock mode | — | Full app testing without API key |
 
 ---
@@ -213,7 +214,7 @@ Realmweaver/
 │   │   ├── EntityQuickCard.tsx      # Floating entity preview (portal-rendered, mobile bottom sheet)
 │   │   ├── BacklinksPanel.tsx       # "Referenced By" inbound cross-references
 │   │   ├── LinkedText.tsx           # Auto-linkify entity names in text
-│   │   ├── MentionInput.tsx         # Textarea with @mention autocomplete
+│   │   ├── MentionInput.tsx         # Textarea with @mention autocomplete; accepts `initialMentions` so persisted mentions are recognized after an editor remount
 │   │   ├── CommandPalette.tsx       # Ctrl+K global entity search
 │   │   ├── Breadcrumbs.tsx          # Navigation breadcrumb trail
 │   │   ├── RegenerateButton.tsx     # Inline AI field regeneration with preview panel
@@ -285,6 +286,7 @@ Realmweaver/
 │
 ├── utils/
 │   ├── entityUtils.ts               # Entity factories + ENTITY_TYPE_CONFIG
+│   ├── formReconciliation.ts        # Merge in-progress editor form state with incoming entity prop updates
 │   ├── entityDetailExtractors.ts    # Extract display strings from entity fields
 │   ├── entityFieldSave.ts           # Dispatch field saves by entity type
 │   ├── backlinkUtils.ts             # Compute inbound cross-references
@@ -295,6 +297,7 @@ Realmweaver/
 │   └── popoverPosition.ts           # Popover screen coordinate calculation
 │
 ├── data/templates/                  # 4 campaign templates (JSON)
+├── data/testCampaigns.ts            # Loader for local-only test campaigns dropped into data/test-campaigns/ (gitignored; no-op on a fresh clone)
 ├── e2e/                             # Playwright E2E tests
 ├── tests/                           # Vitest unit tests
 └── docs/                            # Architecture and design documentation
