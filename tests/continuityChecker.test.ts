@@ -246,7 +246,7 @@ describe('checkContinuity — circular location hierarchy', () => {
         expect(circular!.severity).toBe('error');
     });
 
-    it('detects a two-node cycle', () => {
+    it('detects a two-node cycle and reports it exactly once', () => {
         const campaign = makeCampaign({
             locations: [
                 makeLocation({ id: 'loc-1', name: 'A', parentLocationId: 'loc-2' }),
@@ -255,10 +255,11 @@ describe('checkContinuity — circular location hierarchy', () => {
         });
         const issues = checkContinuity(campaign);
         const circular = issues.filter(i => i.ruleId === 'circular-location');
-        expect(circular.length).toBeGreaterThanOrEqual(1);
+        expect(circular.length).toBe(1);
+        expect(circular[0].entityIds.sort()).toEqual(['loc-1', 'loc-2']);
     });
 
-    it('detects a three-node cycle', () => {
+    it('detects a three-node cycle and reports it exactly once (dedup by cycle membership, not the starting node)', () => {
         const campaign = makeCampaign({
             locations: [
                 makeLocation({ id: 'loc-1', name: 'A', parentLocationId: 'loc-2' }),
@@ -268,7 +269,25 @@ describe('checkContinuity — circular location hierarchy', () => {
         });
         const issues = checkContinuity(campaign);
         const circular = issues.filter(i => i.ruleId === 'circular-location');
-        expect(circular.length).toBeGreaterThanOrEqual(1);
+        // Previously each of the 3 locations independently walked into the same
+        // cycle and produced its own issue (keyed on its own always-unique id),
+        // so all 3 survived a de-dup step that never actually matched anything.
+        expect(circular.length).toBe(1);
+        expect(circular[0].entityIds.sort()).toEqual(['loc-1', 'loc-2', 'loc-3']);
+    });
+
+    it('reports two separate issues for two disjoint cycles', () => {
+        const campaign = makeCampaign({
+            locations: [
+                makeLocation({ id: 'loc-1', name: 'A', parentLocationId: 'loc-2' }),
+                makeLocation({ id: 'loc-2', name: 'B', parentLocationId: 'loc-1' }),
+                makeLocation({ id: 'loc-3', name: 'C', parentLocationId: 'loc-4' }),
+                makeLocation({ id: 'loc-4', name: 'D', parentLocationId: 'loc-3' }),
+            ],
+        });
+        const issues = checkContinuity(campaign);
+        const circular = issues.filter(i => i.ruleId === 'circular-location');
+        expect(circular.length).toBe(2);
     });
 
     it('does not flag a valid parent chain', () => {

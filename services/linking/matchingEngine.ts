@@ -20,9 +20,11 @@ export interface EntityCandidate {
 
 const MIN_NAME_LENGTH = 3;
 
+const WORD_CHAR = /[\p{L}\p{N}]/u;
+
 function isWordBoundary(text: string, start: number, end: number): boolean {
-  const before = start === 0 || /[^a-zA-Z0-9]/.test(text[start - 1]);
-  const after = end >= text.length || /[^a-zA-Z0-9]/.test(text[end]);
+  const before = start === 0 || !WORD_CHAR.test(text[start - 1]);
+  const after = end >= text.length || !WORD_CHAR.test(text[end]);
   return before && after;
 }
 

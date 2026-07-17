@@ -1,6 +1,6 @@
 
 import type { NPC, Location, Faction, RollableTable, Item, Scene, Adventure, Article, PointOfInterest, PlayerCharacter, RealmChatResponse, ChatMessage, DraftEntity, ModelTier, Campaign } from '../types/index';
-import type { BatchAddData, AdventureForBatchAdd } from '../types/index';
+import type { BatchAddData, AdventureForBatchAdd, SceneType, SceneStatus } from '../types/index';
 import type { WorldEvent } from './ai/worldSimulation';
 
 import * as aiRealmWeaver from './ai/realmWeaver';
@@ -193,6 +193,35 @@ export const generateStarterLocations = (
     return aiEvocationWizard.generateStarterLocations(worldDescription, npcs, campaignContext);
 };
 
+const SCENE_TYPES: readonly SceneType[] = ['combat', 'social', 'exploration', 'puzzle'];
+const SCENE_STATUSES: readonly SceneStatus[] = ['planned', 'in-progress', 'completed'];
+
+/**
+ * Mock data returns `scenes[].type` / `scenes[].status` as plain `string`
+ * (mockService.ts isn't schema-typed against Scene), so it doesn't
+ * structurally satisfy `AdventureForBatchAdd`. This narrows those two
+ * fields to their real literal union types (falling back to a sane default
+ * if the mock ever returns an unrecognized value) instead of widening
+ * `AdventureForBatchAdd` or casting through `any`.
+ */
+const toAdventureForBatchAdd = (raw: {
+    title: string;
+    hook: string;
+    theme: string;
+    level: number;
+    scenes: Array<Omit<Scene, 'id' | 'type' | 'status'> & { type: string; status: string }>;
+}): AdventureForBatchAdd => ({
+    title: raw.title,
+    hook: raw.hook,
+    theme: raw.theme,
+    level: raw.level,
+    scenes: raw.scenes.map(scene => ({
+        ...scene,
+        type: (SCENE_TYPES as string[]).includes(scene.type) ? (scene.type as SceneType) : 'social',
+        status: (SCENE_STATUSES as string[]).includes(scene.status) ? (scene.status as SceneStatus) : 'planned',
+    })),
+});
+
 export const generateStarterAdventure = (
     worldDescription: string,
     npcs: Array<Omit<NPC, 'id' | 'factionId'>>,
@@ -201,7 +230,8 @@ export const generateStarterAdventure = (
     campaignContext?: string
 ): Promise<AdventureForBatchAdd> => {
     if (isMockMode) {
-        return mockService.generateStarterAdventure(worldDescription, npcs, locations, campaignContext);
+        return mockService.generateStarterAdventure(worldDescription, npcs, locations, campaignContext)
+            .then(toAdventureForBatchAdd);
     }
     return aiEvocationWizard.generateStarterAdventure(worldDescription, npcs, locations, campaignContext);
 };

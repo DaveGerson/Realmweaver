@@ -1,6 +1,7 @@
 
-import React, { useEffect, useRef } from 'react';
-import { twMerge } from 'tailwind-merge';
+import React from 'react';
+import { DialogShell } from './DialogShell';
+import { Button } from './Button';
 
 export interface ConfirmDialogProps {
   isOpen: boolean;
@@ -13,12 +14,6 @@ export interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
-// Shared base classes matching Button's output for ref-bearing buttons in focus trap
-const BTN_BASE = 'inline-flex items-center justify-center rounded-md font-semibold text-sm px-4 py-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 transition-colors';
-const CANCEL_BTN = twMerge(BTN_BASE, 'bg-slate-700 text-slate-100 hover:bg-slate-600 focus:ring-slate-500');
-const CONFIRM_BTN = twMerge(BTN_BASE, 'bg-amber-600 text-white hover:bg-amber-500 focus:ring-amber-500');
-const DANGER_BTN = twMerge(BTN_BASE, 'bg-red-800 text-white hover:bg-red-700 focus:ring-red-600');
-
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   isOpen,
   title,
@@ -29,64 +24,9 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onConfirm,
   onCancel,
 }) => {
-  const cancelRef = useRef<HTMLButtonElement>(null);
-  const confirmRef = useRef<HTMLButtonElement>(null);
-
-  // Focus the cancel button when the dialog opens
-  useEffect(() => {
-    if (isOpen) {
-      cancelRef.current?.focus();
-    }
-  }, [isOpen]);
-
-  // Escape key and focus trap
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onCancel();
-        return;
-      }
-      if (e.key === 'Tab') {
-        const focusable = [cancelRef.current, confirmRef.current].filter(Boolean) as HTMLElement[];
-        if (focusable.length < 2) return;
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (e.shiftKey) {
-          if (document.activeElement === first) {
-            e.preventDefault();
-            last.focus();
-          }
-        } else {
-          if (document.activeElement === last) {
-            e.preventDefault();
-            first.focus();
-          }
-        }
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onCancel]);
-
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="confirm-dialog-title"
-    >
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60"
-        onClick={onCancel}
-        aria-hidden="true"
-      />
-
-      {/* Panel */}
-      <div className="relative z-10 w-full max-w-md bg-slate-800 border border-slate-700 rounded-lg shadow-2xl animate-fade-in">
+    <DialogShell isOpen={isOpen} onClose={onCancel} ariaLabel={title}>
+      <div className="relative w-full max-w-md bg-slate-800 border border-slate-700 rounded-lg shadow-2xl animate-fade-in">
         <div className="p-6">
           <h2
             id="confirm-dialog-title"
@@ -98,19 +38,14 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         </div>
 
         <div className="flex justify-end gap-3 px-6 pb-5">
-          {/* Raw buttons with refs for focus-trap keyboard navigation */}
-          <button ref={cancelRef} className={CANCEL_BTN} onClick={onCancel}>
+          <Button variant="secondary" onClick={onCancel}>
             {cancelLabel}
-          </button>
-          <button
-            ref={confirmRef}
-            className={variant === 'danger' ? DANGER_BTN : CONFIRM_BTN}
-            onClick={onConfirm}
-          >
+          </Button>
+          <Button variant={variant === 'danger' ? 'danger' : 'primary'} onClick={onConfirm}>
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
-    </div>
+    </DialogShell>
   );
 };

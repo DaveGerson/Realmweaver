@@ -44,18 +44,31 @@ export const EntityHistoryManager: React.FC<EntityHistoryManagerProps> = ({ subj
             
             if (entity) {
                 entity.history.forEach(h => {
-                    let linkedName = 'Unknown';
-                    let date = undefined;
-                    
-                    if (h.referenceType === 'session') {
+                    let linkedName = 'Manual Entry';
+                    let date: string | undefined = undefined;
+
+                    // Resolve the linked entity by referenceId across every possible target
+                    // collection rather than trusting referenceType alone: HistoryReferenceType
+                    // only distinguishes 'session' | 'article' | 'manual', so references created
+                    // against a subject type outside that union (e.g. 'faction') are stored with
+                    // a best-effort referenceType but still carry the real target's id.
+                    if (h.referenceId) {
                         const session = campaign.sessionLogs.find(s => s.id === h.referenceId);
-                        linkedName = session ? session.title : 'Unknown Session';
-                        date = session?.sessionDate;
-                    } else if (h.referenceType === 'article') {
                         const article = campaign.articles.find(a => a.id === h.referenceId);
-                        linkedName = article ? article.title : 'Unknown Article';
-                    } else {
-                        linkedName = 'Manual Entry';
+                        const faction = campaign.factions.find(f => f.id === h.referenceId);
+
+                        if (session) {
+                            linkedName = session.title;
+                            date = session.sessionDate;
+                        } else if (article) {
+                            linkedName = article.title;
+                        } else if (faction) {
+                            linkedName = faction.name;
+                        } else if (h.referenceType === 'session') {
+                            linkedName = 'Unknown Session';
+                        } else if (h.referenceType === 'article') {
+                            linkedName = 'Unknown Article';
+                        }
                     }
 
                     allEvents.push({
@@ -136,10 +149,13 @@ export const EntityHistoryManager: React.FC<EntityHistoryManagerProps> = ({ subj
 
             if (!targetEntity) return;
 
+            // HistoryReferenceType only covers 'session' | 'article' | 'manual', so a 'faction'
+            // subject (no matching union member) falls back to 'manual' here rather than being
+            // mislabeled as 'article' — the reverse lookup above resolves the real name by id.
             const newEntry: HistoryEntry = {
                 id: crypto.randomUUID(),
                 summary,
-                referenceType: subjectType === 'session' ? 'session' : 'article',
+                referenceType: subjectType === 'session' ? 'session' : subjectType === 'article' ? 'article' : 'manual',
                 referenceId: subjectId
             };
 

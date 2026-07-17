@@ -1,5 +1,5 @@
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useCallback } from 'react';
 import type { Campaign } from '@/types/Campaign';
 import type { Adventure, Scene } from '@/types/index';
 import type { EditorView, GeneratorType } from '@/App';
@@ -127,6 +127,14 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
   onImportPC,
   onAddToast,
 }) => {
+  // Stable identity so RelationshipGraph's D3 mount effect (which depends on this
+  // callback) doesn't tear down and rebuild the whole graph on every unrelated
+  // ViewRouter re-render (e.g. autosave ticks, RealmChat-driven entity updates).
+  const handleGraphNodeSelect = useCallback(
+    (type: string, id: string) => onNavigate(type, id),
+    [onNavigate]
+  );
+
   // Session Runner takes priority when active
   if (activeView === 'session-runner' && campaign.activeSessionId) {
     const activeSessionLog = campaign.sessionLogs?.find(s => s.id === campaign.activeSessionId);
@@ -530,7 +538,7 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
       <Suspense fallback={<VisualizerFallback />}>
         <RelationshipGraph
           campaign={campaign}
-          onNodeSelect={(type, id) => onNavigate(type, id)}
+          onNodeSelect={handleGraphNodeSelect}
         />
       </Suspense>
     );

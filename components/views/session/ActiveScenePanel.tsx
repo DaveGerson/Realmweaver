@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import type { Campaign, Scene, Location, NPC, SessionLog, DiceRoll } from '@/types';
 import { Icons, SceneIcon } from '@/components/common/Icons';
 import { Button } from '@/components/common/Button';
@@ -65,6 +65,14 @@ export const ActiveScenePanel: React.FC<ActiveScenePanelProps> = ({
     const [showRecap, setShowRecap] = useState(true);
     const [skillCheckRolls, setSkillCheckRolls] = useState<Record<number, { d20: number; modifier: number; total: number; passed: boolean }>>({});
     const [skillCheckModifiers, setSkillCheckModifiers] = useState<Record<number, number>>({});
+
+    // Skill check rolls are keyed by array index, which is only meaningful within a
+    // single scene's skillChecks list. Reset them whenever the active scene changes so a
+    // stale roll from the previous scene can't display against the new scene's checks.
+    useEffect(() => {
+        setSkillCheckRolls({});
+        setSkillCheckModifiers({});
+    }, [activeScene?.id]);
 
     const handleSkillCheckRoll = useCallback((checkIndex: number, dc: number, skillName: string) => {
         const modifier = skillCheckModifiers[checkIndex] ?? 0;

@@ -7,15 +7,60 @@ interface RovingProps {
   ref: (el: HTMLElement | null) => void;
 }
 
+/**
+ * Column count per Tailwind breakpoint, matching the `grid-cols-*` classes
+ * used on the corresponding grid. `base` applies below the smallest listed
+ * breakpoint. Keys are checked widest-first against `window.innerWidth`.
+ */
+export interface ResponsiveColumns {
+  base: number;
+  sm?: number;
+  md?: number;
+  lg?: number;
+  xl?: number;
+  '2xl'?: number;
+}
+
 interface UseRovingTabIndexOptions {
   /** Direction: 'horizontal' | 'vertical' | 'both'. Defaults to 'both'. */
   direction?: 'horizontal' | 'vertical' | 'both';
-  /** Number of columns when direction is 'both'. Defaults to 1 (single column). */
-  columns?: number;
+  /**
+   * Number of columns when direction is 'both'. Defaults to 1 (single column).
+   * Pass a plain number for a fixed column count, or a `ResponsiveColumns`
+   * map to match a grid whose column count changes across breakpoints
+   * (e.g. `grid-cols-1 md:grid-cols-2 xl:grid-cols-3` -> `{ base: 1, md: 2, xl: 3 }`).
+   */
+  columns?: number | ResponsiveColumns;
 }
 
 interface UseRovingTabIndexReturn {
   getRovingProps: (index: number) => RovingProps;
+}
+
+// Tailwind's default breakpoints, widest first so the first match wins.
+const BREAKPOINTS: Array<[keyof Omit<ResponsiveColumns, 'base'>, number]> = [
+  ['2xl', 1536],
+  ['xl', 1280],
+  ['lg', 1024],
+  ['md', 768],
+  ['sm', 640],
+];
+
+/**
+ * Resolves a `columns` option to the actual number of columns rendered at
+ * the current viewport width. Exported for unit testing.
+ */
+export function resolveColumns(columns: number | ResponsiveColumns): number {
+  if (typeof columns === 'number') return Math.max(1, columns);
+
+  const width = typeof window !== 'undefined' ? window.innerWidth : 0;
+  for (const [key, minWidth] of BREAKPOINTS) {
+    const value = columns[key];
+    if (value !== undefined && width >= minWidth) {
+      return Math.max(1, value);
+    }
+  }
+  return Math.max(1, columns.base);
 }
 
 /**
@@ -63,7 +108,7 @@ export function useRovingTabIndex(
       let newIndex = index;
       let handled = false;
 
-      const cols = Math.max(1, columns);
+      const cols = resolveColumns(columns);
 
       if (
         (direction === 'horizontal' || direction === 'both') &&
@@ -109,7 +154,7 @@ export function useRovingTabIndex(
 
   const getRovingProps = useCallback(
     (index: number): RovingProps => ({
-      tabIndex: index === 0 ? 0 : -1,
+      tabIndex: index === focusedIndexRef.current ? 0 : -1,
       onKeyDown: handleKeyDown(index),
       ref: setRef(index),
     }),

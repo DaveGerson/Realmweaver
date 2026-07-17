@@ -77,15 +77,12 @@ interface IssueCardProps {
 
 const IssueCard: React.FC<IssueCardProps> = ({ issue, onDismiss, onNavigate }) => {
   // Build entity link pairs, deduplicating by ID
-  const uniqueEntities = issue.entityIds.reduce<Array<{ id: string; type: string }>>(
-    (acc, id, idx) => {
-      if (!acc.some(e => e.id === id)) {
-        acc.push({ id, type: issue.entityTypes[idx] });
-      }
-      return acc;
-    },
-    []
-  );
+  const uniqueEntities: Array<{ id: string; type: string }> = [];
+  issue.entityIds.forEach((id, idx) => {
+    if (!uniqueEntities.some(e => e.id === id)) {
+      uniqueEntities.push({ id, type: issue.entityTypes[idx] });
+    }
+  });
 
   // Derive a display name for entity links by looking them up in the campaign
   // We only have the ID and type here, so we label them by truncated ID unless

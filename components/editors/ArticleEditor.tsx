@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Article, ArticleCategory, Campaign } from '../../types/index';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
-import { MentionInput } from '../common/MentionInput';
+import { MentionInput, resolveMentionCandidates, findMentionedIdsInText } from '../common/MentionInput';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { RegenerateButton } from '../common/RegenerateButton';
 import { EntityLink } from '../common/EntityLink';
@@ -38,8 +38,31 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
   const allLocations = campaign?.locations ?? [];
   const allFactions = campaign?.factions ?? [];
 
+  // Tracks the last `article` prop we've reconciled against, so incoming prop
+  // updates can be merged field-by-field instead of overwriting formData wholesale.
+  const prevArticleRef = useRef(article);
+
   useEffect(() => {
-    setFormData(article);
+    const prevArticle = prevArticleRef.current;
+    if (prevArticle.id !== article.id) {
+      // Switched to viewing a different article entirely — fully adopt it.
+      setFormData(article);
+    } else if (prevArticle !== article) {
+      // Same article, but the underlying object changed elsewhere. Only adopt
+      // fields the user hasn't started editing since the last sync — any field
+      // where formData still matches what we last saw from `article`. Fields
+      // the user has locally changed (unblurred edits) are preserved.
+      setFormData(prev => {
+        const merged = { ...prev };
+        (Object.keys(article) as (keyof Article)[]).forEach((key) => {
+          if (prev[key] === prevArticle[key]) {
+            merged[key] = article[key];
+          }
+        });
+        return merged;
+      });
+    }
+    prevArticleRef.current = article;
   }, [article]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -81,6 +104,27 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
   const handleMentionFieldChange = (field: keyof Article) => (value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     onUpdate(article.id, { [field]: value });
+  };
+
+  // --- @-mention tracking across all MentionInput fields ---
+  // Candidates already known to be mentioned (from a prior session), used both to
+  // hydrate MentionInput's internal map and to seed each field's initial ID set.
+  const mentionCandidates = useMemo(
+    () => resolveMentionCandidates(campaign, article.mentionedEntityIds),
+    [campaign, article.mentionedEntityIds],
+  );
+  const [mentionedIdsByField, setMentionedIdsByField] = useState<Record<string, string[]>>(() => ({
+    content: findMentionedIdsInText(article.content, mentionCandidates),
+  }));
+  // Reports the merged set of mentioned IDs (across every mention field) whenever any field changes.
+  const handleMentionedIdsChange = (field: string) => (ids: string[]) => {
+    setMentionedIdsByField(prev => {
+      const next = { ...prev, [field]: ids };
+      const merged = Array.from(new Set(Object.values(next).flat()));
+      setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
+      onUpdate(article.id, { mentionedEntityIds: merged });
+      return next;
+    });
   };
 
   const handleFieldRegenerate = (field: 'content') => (newValue: string) => {
@@ -157,6 +201,8 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
           <MentionInput
             value={formData.content}
             onChange={handleMentionFieldChange('content')}
+            onMentionedIdsChange={handleMentionedIdsChange('content')}
+            initialMentions={mentionCandidates}
             rows={15}
             placeholder="Write the article content here... (type @ to mention entities)"
           />

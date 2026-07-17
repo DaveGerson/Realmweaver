@@ -75,4 +75,15 @@ describe('TextMatchingEngine', () => {
     expect(info.name).toBe('TextMatchingEngine');
     expect(info.version).toBeDefined();
   });
+
+  it('does not treat unicode letters as word boundaries (no false substring match)', () => {
+    const unicodeCandidates: EntityCandidate[] = [
+      { id: '6', name: 'Ana', type: 'npc' },
+      { id: '7', name: 'Anaïs', type: 'npc' },
+    ];
+    const matches = engine.findMatches('Anaïs walked into the room.', unicodeCandidates);
+    const names = matches.map(m => m.entityName);
+    expect(names).toContain('Anaïs');
+    expect(names).not.toContain('Ana');
+  });
 });

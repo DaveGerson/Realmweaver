@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useSyncExternalStore } from 'react';
+import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import type { PlayerCharacter, AbilityScores } from '../../types/index';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
@@ -59,8 +59,31 @@ export const PlayerCharacterEditor: React.FC<PlayerCharacterEditorProps> = ({ pc
   const [showEditStats, setShowEditStats] = useState(false);
   const { confirm } = useConfirmDialog();
 
+  // Tracks the last `pc` prop we've reconciled against, so incoming prop
+  // updates can be merged field-by-field instead of overwriting formData wholesale.
+  const prevPcRef = useRef(pc);
+
   useEffect(() => {
-    setFormData(pc);
+    const prevPc = prevPcRef.current;
+    if (prevPc.id !== pc.id) {
+      // Switched to viewing a different character entirely — fully adopt it.
+      setFormData(pc);
+    } else if (prevPc !== pc) {
+      // Same character, but the underlying object changed elsewhere. Only adopt
+      // fields the user hasn't started editing since the last sync — any field
+      // where formData still matches what we last saw from `pc`. Fields the
+      // user has locally changed (unblurred edits) are preserved.
+      setFormData(prev => {
+        const merged = { ...prev };
+        (Object.keys(pc) as (keyof PlayerCharacter)[]).forEach((key) => {
+          if (prev[key] === prevPc[key]) {
+            merged[key] = pc[key];
+          }
+        });
+        return merged;
+      });
+    }
+    prevPcRef.current = pc;
   }, [pc]);
 
   const handleDelete = async () => {

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useSyncExternalStore } from 'react';
+import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import type { Item, ItemRarity, ItemType } from '../../types/index';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
@@ -66,8 +66,31 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onUpdate, onDelete
   const [formData, setFormData] = useState(item);
   const { confirm } = useConfirmDialog();
 
+  // Tracks the last `item` prop we've reconciled against, so incoming prop
+  // updates can be merged field-by-field instead of overwriting formData wholesale.
+  const prevItemRef = useRef(item);
+
   useEffect(() => {
-    setFormData(item);
+    const prevItem = prevItemRef.current;
+    if (prevItem.id !== item.id) {
+      // Switched to viewing a different item entirely — fully adopt it.
+      setFormData(item);
+    } else if (prevItem !== item) {
+      // Same item, but the underlying object changed elsewhere. Only adopt
+      // fields the user hasn't started editing since the last sync — any field
+      // where formData still matches what we last saw from `item`. Fields the
+      // user has locally changed (unblurred edits) are preserved.
+      setFormData(prev => {
+        const merged = { ...prev };
+        (Object.keys(item) as (keyof Item)[]).forEach((key) => {
+          if (prev[key] === prevItem[key]) {
+            merged[key] = item[key];
+          }
+        });
+        return merged;
+      });
+    }
+    prevItemRef.current = item;
   }, [item]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {

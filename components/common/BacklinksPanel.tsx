@@ -164,7 +164,11 @@ export const BacklinksPanel: React.FC<BacklinksPanelProps> = ({
     return state.campaigns.find((c) => c.id === state.activeCampaignId) ?? null;
   }, [state.campaigns, state.activeCampaignId]);
 
-  const backlinks = useMemo((): GroupedBacklinks => {
+  // Explicitly typed: the ambient `react` module ships no type declarations
+  // in this project, so `useMemo`'s return resolves to `any` and downstream
+  // generic inference (Object.entries below) collapses to `unknown`.
+  // Annotating the binding restores proper typing for `backlinks`.
+  const backlinks: GroupedBacklinks = useMemo((): GroupedBacklinks => {
     if (!campaign) return {};
     return computeBacklinks(entityId, entityType, campaign);
   }, [entityId, entityType, campaign]);

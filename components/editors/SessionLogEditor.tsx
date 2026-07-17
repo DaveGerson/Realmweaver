@@ -55,8 +55,31 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
 
   const activePlots = campaign.plots.filter(p => p.status === 'active');
 
+  // Tracks the last `log` prop we've reconciled against, so incoming prop
+  // updates can be merged field-by-field instead of overwriting formData wholesale.
+  const prevLogRef = useRef(log);
+
   useEffect(() => {
-    setFormData(log);
+    const prevLog = prevLogRef.current;
+    if (prevLog.id !== log.id) {
+      // Switched to viewing a different session log entirely — fully adopt it.
+      setFormData(log);
+    } else if (prevLog !== log) {
+      // Same session log, but the underlying object changed elsewhere. Only
+      // adopt fields the user hasn't started editing since the last sync — any
+      // field where formData still matches what we last saw from `log`. Fields
+      // the user has locally changed (unblurred edits) are preserved.
+      setFormData(prev => {
+        const merged = { ...prev };
+        (Object.keys(log) as (keyof SessionLog)[]).forEach((key) => {
+          if (prev[key] === prevLog[key]) {
+            merged[key] = log[key];
+          }
+        });
+        return merged;
+      });
+    }
+    prevLogRef.current = log;
   }, [log]);
 
   // Clean up the audio transcription session on unmount

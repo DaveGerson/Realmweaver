@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
-import type { Campaign, Adventure, Scene, Plot, NPC, Location } from '../../types/index';
+import type { Campaign, Adventure, Scene, Plot, NPC, Location, SessionLog } from '../../types/index';
 import { Icons, SceneIcon } from '../common/Icons';
 import { Button } from '../common/Button';
 import { twMerge } from 'tailwind-merge';
@@ -42,15 +42,6 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
         () => campaign.adventures.find(a => a.id === selectedAdventureId) ?? null,
         [campaign.adventures, selectedAdventureId]
     );
-
-    const defaultCheckedScenes = useMemo<Set<string>>(() => {
-        if (!selectedAdventure) return new Set();
-        return new Set(
-            selectedAdventure.scenes
-                .filter(s => s.status === 'planned' || s.status === 'in-progress')
-                .map(s => s.id)
-        );
-    }, [selectedAdventure]);
 
     const [selectedSceneIds, setSelectedSceneIds] = useState<Set<string>>(new Set());
 
@@ -242,10 +233,6 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
     const effectiveTitle = sessionTitle.trim() || defaultTitle;
 
     // ── Navigation ────────────────────────────────────────────────────────────
-    const currentIndex = STEP_ORDER.indexOf(currentStep);
-    const canGoPrev = currentIndex > 0;
-    const canGoNext = currentIndex < STEP_ORDER.length - 1;
-
     const computeStepOrder = useCallback((): WizardStep[] => {
         // If no adventure selected, skip scenes and entities steps
         if (!selectedAdventureId) {
@@ -274,10 +261,14 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
     // Display dot for a step — check if it's in the active flow
     const activeSteps = useMemo(() => computeStepOrder(), [computeStepOrder]);
     const displayIndex = activeSteps.indexOf(currentStep);
+    // Derived from the active (possibly adventure-less, shortened) step order rather than
+    // the fixed STEP_ORDER, so Back/Next reflect the flow actually being shown.
+    const canGoPrev = displayIndex > 0;
+    const canGoNext = displayIndex < activeSteps.length - 1;
 
     // ── Go Live ───────────────────────────────────────────────────────────────
     const handleGoLive = useCallback(() => {
-        const sessionData = {
+        const sessionData: Omit<SessionLog, 'id'> = {
             title: effectiveTitle,
             status: 'planned' as const,
             sessionDate: new Date().toISOString(),

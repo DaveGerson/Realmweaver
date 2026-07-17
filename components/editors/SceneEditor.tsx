@@ -1,12 +1,12 @@
 
-import React, { useState, useEffect, useSyncExternalStore } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import type { Scene, SceneType, NPC, Location, SkillCheck } from '../../types/index';
 import type { Campaign } from '../../types/index';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
-import { MentionInput } from '../common/MentionInput';
+import { MentionInput, resolveMentionCandidates, findMentionedIdsInText } from '../common/MentionInput';
 import { generateNpc } from '../../services/aiService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
 import { RegenerateButton } from '../common/RegenerateButton';
@@ -102,6 +102,10 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
   const [dismissedSuggestionIds, setDismissedSuggestionIds] = useState<Set<string>>(new Set());
   const { confirm } = useConfirmDialog();
 
+  // Tracks the last `scene` prop we've reconciled against, so incoming prop
+  // updates can be merged field-by-field instead of overwriting formData wholesale.
+  const prevSceneRef = useRef(scene);
+
   // Reset to first tab and clear dismissed suggestions when entity changes
   useEffect(() => {
     setActiveTab('narrative');
@@ -109,7 +113,26 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
   }, [scene.id]);
 
   useEffect(() => {
-    setFormData(scene);
+    const prevScene = prevSceneRef.current;
+    if (prevScene.id !== scene.id) {
+      // Switched to viewing a different scene entirely — fully adopt it.
+      setFormData(scene);
+    } else if (prevScene !== scene) {
+      // Same scene, but the underlying object changed elsewhere (e.g. an async
+      // AI generation). Only adopt fields the user hasn't started editing since
+      // the last sync — any field where formData still matches what we last saw
+      // from `scene`. Fields the user has locally changed (unblurred edits) are preserved.
+      setFormData(prev => {
+        const merged = { ...prev };
+        (Object.keys(scene) as (keyof Scene)[]).forEach((key) => {
+          if (prev[key] === prevScene[key]) {
+            merged[key] = scene[key];
+          }
+        });
+        return merged;
+      });
+    }
+    prevSceneRef.current = scene;
   }, [scene]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -149,6 +172,28 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
   const handleMentionFieldChange = (field: keyof Scene) => (value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     onUpdate(scene.id, { [field]: value });
+  };
+
+  // --- @-mention tracking across all MentionInput fields ---
+  // Candidates already known to be mentioned (from a prior session), used both to
+  // hydrate MentionInput's internal map and to seed each field's initial ID set.
+  const mentionCandidates = useMemo(
+    () => resolveMentionCandidates(campaign, scene.mentionedEntityIds),
+    [campaign, scene.mentionedEntityIds],
+  );
+  const [mentionedIdsByField, setMentionedIdsByField] = useState<Record<string, string[]>>(() => ({
+    readAloudText: findMentionedIdsInText(scene.readAloudText, mentionCandidates),
+    gmNotes: findMentionedIdsInText(scene.gmNotes, mentionCandidates),
+  }));
+  // Reports the merged set of mentioned IDs (across every mention field) whenever any field changes.
+  const handleMentionedIdsChange = (field: string) => (ids: string[]) => {
+    setMentionedIdsByField(prev => {
+      const next = { ...prev, [field]: ids };
+      const merged = Array.from(new Set(Object.values(next).flat()));
+      setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
+      onUpdate(scene.id, { mentionedEntityIds: merged });
+      return next;
+    });
   };
 
   const handleFieldRegenerate = (field: 'readAloudText' | 'gmNotes' | 'rewards') => (newValue: string) => {
@@ -278,6 +323,8 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                 <MentionInput
                   value={formData.readAloudText}
                   onChange={handleMentionFieldChange('readAloudText')}
+                  onMentionedIdsChange={handleMentionedIdsChange('readAloudText')}
+                  initialMentions={mentionCandidates}
                   rows={5}
                   placeholder="Evocative 'box text' to read to your players to set the scene. (type @ to mention entities)"
                 />
@@ -298,6 +345,8 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                 <MentionInput
                   value={formData.gmNotes}
                   onChange={handleMentionFieldChange('gmNotes')}
+                  onMentionedIdsChange={handleMentionedIdsChange('gmNotes')}
+                  initialMentions={mentionCandidates}
                   rows={8}
                   placeholder="GM-only notes: scene goals, character motivations, potential outcomes, hidden details... (type @ to mention entities)"
                 />

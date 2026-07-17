@@ -5,10 +5,17 @@ import { aiProxyPlugin } from './vite-plugin-ai-proxy';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
+    // SECURITY: This dev server IS the production runtime (see CLAUDE.md) and
+    // exposes /api/ai/generate, which shells out to the local Claude CLI with
+    // client-supplied prompt/model/systemPrompt. Bind to localhost only by
+    // default so the endpoint isn't reachable from other devices on the LAN;
+    // opt into a wider bind explicitly via REALMWEAVER_DEV_HOST if you know
+    // what you're doing (e.g. testing from another device you trust).
+    const host = env.REALMWEAVER_DEV_HOST || '127.0.0.1';
     return {
       server: {
         port: 4200,
-        host: '0.0.0.0',
+        host,
         strictPort: false,
       },
       plugins: [

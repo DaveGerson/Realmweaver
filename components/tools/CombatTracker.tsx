@@ -15,6 +15,32 @@ interface CombatTrackerProps {
   campaignPcs: PlayerCharacter[];
 }
 
+/**
+ * Removes a combatant from the encounter, preserving whose turn it actually is.
+ * Filtering the array shifts every subsequent index down by one, so we re-locate
+ * the combatant that was active *before* the removal by identity rather than by
+ * index, and only fall back to clamping/resetting turnIndex when the active
+ * combatant itself was the one removed (or the index was already out of bounds).
+ */
+export const removeCombatantFromEncounter = (encounter: Encounter, id: string): Encounter => {
+  return produce(encounter, draft => {
+    const activeCombatantId = draft.combatants[draft.turnIndex]?.id;
+    draft.combatants = draft.combatants.filter(c => c.id !== id);
+
+    if (draft.combatants.length === 0) {
+      draft.turnIndex = 0;
+      return;
+    }
+
+    if (activeCombatantId !== undefined && activeCombatantId !== id) {
+      const newIndex = draft.combatants.findIndex(c => c.id === activeCombatantId);
+      draft.turnIndex = newIndex >= 0 ? newIndex : 0;
+    } else if (draft.turnIndex >= draft.combatants.length) {
+      draft.turnIndex = 0;
+    }
+  });
+};
+
 export const CombatTracker: React.FC<CombatTrackerProps> = ({ encounter, onUpdate, campaignNpcs, campaignPcs }) => {
   const [isAdding, setIsAdding] = useState(false);
   const { confirm } = useConfirmDialog();
@@ -48,14 +74,7 @@ export const CombatTracker: React.FC<CombatTrackerProps> = ({ encounter, onUpdat
   };
 
   const removeCombatant = (id: string) => {
-      const nextEncounter = produce(encounter, draft => {
-          draft.combatants = draft.combatants.filter(c => c.id !== id);
-          // Adjust turn index if removing active or previous combatant
-          if (encounter.turnIndex >= draft.combatants.length) {
-              draft.turnIndex = 0;
-          }
-      });
-      onUpdate(nextEncounter);
+      onUpdate(removeCombatantFromEncounter(encounter, id));
   };
 
   // Handlers for Encounter Flow

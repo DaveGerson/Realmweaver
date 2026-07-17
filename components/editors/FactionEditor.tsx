@@ -1,11 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Faction, NPC, Location, Campaign } from '../../types/index';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
-import { MentionInput } from '../common/MentionInput';
+import { MentionInput, resolveMentionCandidates, findMentionedIdsInText } from '../common/MentionInput';
 import { generateNpc } from '../../services/aiService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
 import { RegenerateButton } from '../common/RegenerateButton';
@@ -36,11 +36,46 @@ const FACTION_TABS: TabDefinition[] = [
   { id: 'connections',  label: 'Connections',  icon: Icons.Link },
 ];
 
+/**
+ * Reconciles a locally-edited form state (`prev`) with a freshly-arrived entity
+ * prop (`incoming`), given the last entity snapshot we reconciled against
+ * (`prevSeen`).
+ *
+ * Editors mirror their entity prop into local `formData` so unblurred keystrokes
+ * don't get committed on every render, but naively resetting `formData` whenever
+ * the entity prop changes silently discards in-progress edits: an async action
+ * (AI generation, bidirectional relationship sync, etc.) can mutate the same
+ * entity elsewhere while the user is still typing, producing a new prop
+ * reference before the user has blurred the field.
+ *
+ * This merges field-by-field instead: a field is only overwritten with the
+ * incoming value if it still matches what we last saw (i.e. the user hasn't
+ * started editing it since); any field where the user has an uncommitted local
+ * edit is preserved. Switching to a different entity (`id` changed) always
+ * fully adopts the incoming entity.
+ */
+export function reconcileEntityFormData<T extends { id: string }>(prev: T, prevSeen: T, incoming: T): T {
+  if (prevSeen.id !== incoming.id) {
+    return incoming;
+  }
+  const merged = { ...prev };
+  (Object.keys(incoming) as (keyof T)[]).forEach((key) => {
+    if (prev[key] === prevSeen[key]) {
+      merged[key] = incoming[key];
+    }
+  });
+  return merged;
+}
+
 export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, allLocations = [], campaign, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(faction);
   const [isGeneratingMember, setIsGeneratingMember] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const { confirm } = useConfirmDialog();
+
+  // Tracks the last `faction` prop we've reconciled against, so incoming prop
+  // updates can be merged field-by-field instead of overwriting formData wholesale.
+  const prevFactionRef = useRef(faction);
 
   // Reset to first tab when the entity changes
   useEffect(() => {
@@ -48,7 +83,11 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
   }, [faction.id]);
 
   useEffect(() => {
-    setFormData(faction);
+    const prevFaction = prevFactionRef.current;
+    if (prevFaction !== faction) {
+      setFormData(prev => reconcileEntityFormData(prev, prevFaction, faction));
+    }
+    prevFactionRef.current = faction;
   }, [faction]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -80,6 +119,28 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
   const handleMentionFieldChange = (field: keyof Faction) => (value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     onUpdate(faction.id, { [field]: value });
+  };
+
+  // --- @-mention tracking across all MentionInput fields ---
+  // Candidates already known to be mentioned (from a prior session), used both to
+  // hydrate MentionInput's internal map and to seed each field's initial ID set.
+  const mentionCandidates = useMemo(
+    () => resolveMentionCandidates(campaign, faction.mentionedEntityIds),
+    [campaign, faction.mentionedEntityIds],
+  );
+  const [mentionedIdsByField, setMentionedIdsByField] = useState<Record<string, string[]>>(() => ({
+    description: findMentionedIdsInText(faction.description, mentionCandidates),
+    goals: findMentionedIdsInText(faction.goals, mentionCandidates),
+  }));
+  // Reports the merged set of mentioned IDs (across every mention field) whenever any field changes.
+  const handleMentionedIdsChange = (field: string) => (ids: string[]) => {
+    setMentionedIdsByField(prev => {
+      const next = { ...prev, [field]: ids };
+      const merged = Array.from(new Set(Object.values(next).flat()));
+      setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
+      onUpdate(faction.id, { mentionedEntityIds: merged });
+      return next;
+    });
   };
 
   const handleFieldRegenerate = (field: keyof Omit<Faction, 'id' | 'leaderId' | 'memberIds' | 'headquartersLocationId' | 'alignment'>) => (newValue: string) => {
@@ -165,6 +226,8 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
                 <MentionInput
                   value={formData.description}
                   onChange={handleMentionFieldChange('description')}
+                  onMentionedIdsChange={handleMentionedIdsChange('description')}
+                  initialMentions={mentionCandidates}
                   rows={4}
                   placeholder="The faction's purpose, public image, and typical members. (type @ to mention entities)"
                 />
@@ -186,6 +249,8 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
                 <MentionInput
                   value={formData.goals}
                   onChange={handleMentionFieldChange('goals')}
+                  onMentionedIdsChange={handleMentionedIdsChange('goals')}
+                  initialMentions={mentionCandidates}
                   rows={3}
                   placeholder="The faction's primary short-term and long-term objectives. (type @ to mention entities)"
                 />

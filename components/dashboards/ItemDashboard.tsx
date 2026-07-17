@@ -69,7 +69,7 @@ interface ItemDashboardProps {
 
 export const ItemDashboard: React.FC<ItemDashboardProps> = ({ items, onItemCreated, onSelectItem, isMockMode, isOfficialSetting, campaignContext }) => {
   const { filteredEntities: filteredItems, searchTerm, setSearchTerm } = useEntitySearch(items, ['name', 'description', 'properties']);
-  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: 3 });
+  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: { base: 1, md: 2, xl: 3 } });
 
   const handleItemCreated = (data: any) => {
     const { id, ...itemData } = data;

@@ -156,6 +156,7 @@ function checkBrokenReferences(campaign: Campaign, makeId: MakeId): ContinuityIs
 function checkCircularLocationHierarchy(campaign: Campaign, makeId: MakeId): ContinuityIssue[] {
   const issues: ContinuityIssue[] = [];
   const parentMap = new Map<string, string>();
+  const locationsById = new Map(campaign.locations.map(loc => [loc.id, loc]));
 
   for (const loc of campaign.locations) {
     if (loc.parentLocationId) {
@@ -163,38 +164,44 @@ function checkCircularLocationHierarchy(campaign: Campaign, makeId: MakeId): Con
     }
   }
 
+  // Every location that walks into the same cycle would otherwise report its
+  // own copy of the issue, so we key de-duplication on the cycle's actual
+  // membership (a canonical, order-independent key) rather than on whichever
+  // location happened to start the walk.
+  const reportedCycles = new Set<string>();
+
   for (const loc of campaign.locations) {
     // Walk up the parent chain; if we visit the same node twice, it's a cycle.
-    const visited = new Set<string>();
+    const path: string[] = [];
+    const pathIndex = new Map<string, number>();
     let currentId: string | undefined = loc.id;
     while (currentId) {
-      if (visited.has(currentId)) {
-        issues.push({
-          id: makeId('circular-location'),
-          severity: 'error',
-          ruleId: 'circular-location',
-          title: 'Circular location hierarchy detected',
-          description: `"${loc.name}" is part of a parent-child location cycle. This can cause infinite loops in the UI.`,
-          entityIds: [loc.id],
-          entityTypes: ['location'],
-          suggestedFix: 'Remove one of the parent assignments to break the cycle.',
-        });
+      if (pathIndex.has(currentId)) {
+        const cycleNodes = path.slice(pathIndex.get(currentId)!);
+        const cycleKey = [...cycleNodes].sort().join('|');
+        if (!reportedCycles.has(cycleKey)) {
+          reportedCycles.add(cycleKey);
+          const cycleNames = cycleNodes.map(id => locationsById.get(id)?.name ?? id);
+          issues.push({
+            id: makeId('circular-location'),
+            severity: 'error',
+            ruleId: 'circular-location',
+            title: 'Circular location hierarchy detected',
+            description: `"${cycleNames.join('" → "')}" form a parent-child location cycle. This can cause infinite loops in the UI.`,
+            entityIds: cycleNodes,
+            entityTypes: cycleNodes.map(() => 'location'),
+            suggestedFix: 'Remove one of the parent assignments to break the cycle.',
+          });
+        }
         break;
       }
-      visited.add(currentId);
+      pathIndex.set(currentId, path.length);
+      path.push(currentId);
       currentId = parentMap.get(currentId);
     }
   }
 
-  // De-duplicate: if multiple locations are in the same cycle we can get N issues for 1 cycle.
-  // Keep only the first occurrence per unique description.
-  const seen = new Set<string>();
-  return issues.filter(issue => {
-    const key = issue.entityIds[0];
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  return issues;
 }
 
 // ─── Rule 3: Orphaned Entities (info) ────────────────────────────────────────

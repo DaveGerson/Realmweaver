@@ -1,11 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { NPC, Faction, EntityRelationship, PlayerCharacter, Campaign } from '../../types/index';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
-import { MentionInput } from '../common/MentionInput';
+import { MentionInput, resolveMentionCandidates, findMentionedIdsInText } from '../common/MentionInput';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { RegenerateButton } from '../common/RegenerateButton';
 import { EntityLink } from '../common/EntityLink';
@@ -43,13 +43,37 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
   const [activeTab, setActiveTab] = useState('identity');
   const { confirm } = useConfirmDialog();
 
+  // Tracks the last `npc` prop we've reconciled against, so incoming prop
+  // updates can be merged field-by-field instead of overwriting formData wholesale.
+  const prevNpcRef = useRef(npc);
+
   // Reset to first tab when the entity changes
   useEffect(() => {
     setActiveTab('identity');
   }, [npc.id]);
 
   useEffect(() => {
-    setFormData(npc);
+    const prevNpc = prevNpcRef.current;
+    if (prevNpc.id !== npc.id) {
+      // Switched to viewing a different NPC entirely — fully adopt it.
+      setFormData(npc);
+    } else if (prevNpc !== npc) {
+      // Same NPC, but the underlying object changed (e.g. an async AI generation
+      // or bidirectional relationship sync mutated it elsewhere). Only adopt
+      // fields the user hasn't started editing since the last sync — any field
+      // where formData still matches what we last saw from `npc`. Fields the
+      // user has locally changed (unblurred edits) are preserved.
+      setFormData(prev => {
+        const merged = { ...prev };
+        (Object.keys(npc) as (keyof NPC)[]).forEach((key) => {
+          if (prev[key] === prevNpc[key]) {
+            merged[key] = npc[key];
+          }
+        });
+        return merged;
+      });
+    }
+    prevNpcRef.current = npc;
   }, [npc]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -81,6 +105,31 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
   const handleMentionFieldChange = (field: keyof NPC) => (value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     onUpdate(npc.id, { [field]: value });
+  };
+
+  // --- @-mention tracking across all MentionInput fields ---
+  // Candidates already known to be mentioned (from a prior session), used both to
+  // hydrate MentionInput's internal map and to seed each field's initial ID set.
+  const mentionCandidates = useMemo(
+    () => resolveMentionCandidates(campaignProp, npc.mentionedEntityIds),
+    [campaignProp, npc.mentionedEntityIds],
+  );
+  const [mentionedIdsByField, setMentionedIdsByField] = useState<Record<string, string[]>>(() => ({
+    description: findMentionedIdsInText(npc.description, mentionCandidates),
+    traits: findMentionedIdsInText(npc.traits, mentionCandidates),
+    motivations: findMentionedIdsInText(npc.motivations, mentionCandidates),
+    secrets: findMentionedIdsInText(npc.secrets, mentionCandidates),
+    backstory: findMentionedIdsInText(npc.backstory, mentionCandidates),
+  }));
+  // Reports the merged set of mentioned IDs (across every mention field) whenever any field changes.
+  const handleMentionedIdsChange = (field: string) => (ids: string[]) => {
+    setMentionedIdsByField(prev => {
+      const next = { ...prev, [field]: ids };
+      const merged = Array.from(new Set(Object.values(next).flat()));
+      setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
+      onUpdate(npc.id, { mentionedEntityIds: merged });
+      return next;
+    });
   };
 
   const handleFieldRegenerate = (field: keyof Omit<NPC, 'id' | 'factionId' | 'knowsPlayerHistory' | 'relationships' | 'history'>) => (newValue: string) => {
@@ -191,6 +240,8 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                 <MentionInput
                   value={formData.description}
                   onChange={handleMentionFieldChange('description')}
+                  onMentionedIdsChange={handleMentionedIdsChange('description')}
+                  initialMentions={mentionCandidates}
                   rows={4}
                   placeholder="Physical appearance, typical attire, mannerisms... (type @ to mention entities)"
                 />
@@ -212,6 +263,8 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                 <MentionInput
                   value={formData.traits}
                   onChange={handleMentionFieldChange('traits')}
+                  onMentionedIdsChange={handleMentionedIdsChange('traits')}
+                  initialMentions={mentionCandidates}
                   rows={2}
                   placeholder="e.g., 'Taps fingers when impatient, speaks in riddles.' (type @ to mention entities)"
                 />
@@ -233,6 +286,8 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                 <MentionInput
                   value={formData.motivations}
                   onChange={handleMentionFieldChange('motivations')}
+                  onMentionedIdsChange={handleMentionedIdsChange('motivations')}
+                  initialMentions={mentionCandidates}
                   rows={2}
                   placeholder="What drives this character? (type @ to mention entities)"
                 />
@@ -254,6 +309,8 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                 <MentionInput
                   value={formData.secrets}
                   onChange={handleMentionFieldChange('secrets')}
+                  onMentionedIdsChange={handleMentionedIdsChange('secrets')}
+                  initialMentions={mentionCandidates}
                   rows={3}
                   placeholder="What are they hiding? What important information do they know? (type @ to mention entities)"
                 />
@@ -287,6 +344,8 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                 <MentionInput
                   value={formData.backstory}
                   onChange={handleMentionFieldChange('backstory')}
+                  onMentionedIdsChange={handleMentionedIdsChange('backstory')}
+                  initialMentions={mentionCandidates}
                   rows={5}
                   placeholder="The character's history and background... (type @ to mention entities)"
                 />

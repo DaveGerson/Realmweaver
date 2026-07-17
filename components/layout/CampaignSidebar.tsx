@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { Campaign, Article } from '../../types/index';
 import { Icons, SceneIcon } from '../common/Icons';
 import type { EditorView, GeneratorType } from '../../App';
@@ -46,7 +46,7 @@ interface CampaignSidebarProps {
     expandAllSections?: boolean;
 }
 
-export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
+const CampaignSidebarComponent: React.FC<CampaignSidebarProps> = ({
     campaign,
     activeView,
     onSelectView,
@@ -171,6 +171,13 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
         setDragOverSceneId(null);
     };
 
+    // Recomputed only when the specific entity array (or filter/selection) it
+    // depends on actually changes reference. Immer's produce() preserves
+    // referential identity for slices of state that weren't touched by a given
+    // update, so editing e.g. an NPC's description does not change the
+    // identity of campaign.locations/factions/items/etc. — this keeps an
+    // unrelated store update from forcing a full recompute of every filtered
+    // entity list in the sidebar.
     const entityGroups: {
         label: string,
         icon: keyof typeof Icons,
@@ -178,33 +185,57 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
         generatorType: 'npc' | 'location' | 'faction' | 'item',
         items: { id: string, name: string }[],
         selectedId: string | null
-    }[] = [
+    }[] = useMemo(() => [
         { label: "NPCs", icon: 'NPCs', view: 'npcs', generatorType: 'npc', items: campaign.npcs, selectedId: selectedIds.npc },
         { label: "Locations", icon: 'Locations', view: 'locations', generatorType: 'location', items: campaign.locations, selectedId: selectedIds.location },
         { label: "Factions", icon: 'Factions', view: 'factions', generatorType: 'faction', items: campaign.factions, selectedId: selectedIds.faction },
         { label: "Items", icon: 'Items', view: 'items', generatorType: 'item', items: campaign.items, selectedId: selectedIds.item },
-    ];
+    ], [campaign.npcs, campaign.locations, campaign.factions, campaign.items, selectedIds.npc, selectedIds.location, selectedIds.faction, selectedIds.item]);
 
-    const topLevelArticles = campaign.articles.filter(a => !a.parentArticleId);
+    const topLevelArticles = useMemo(
+        () => campaign.articles.filter(a => !a.parentArticleId),
+        [campaign.articles]
+    );
 
     // --- Filtered lists for search ---
-    const filteredSessionLogs = (campaign.sessionLogs || [])
-        .filter(s => matchesFilter(s.title))
-        .sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime());
-    const filteredPlayerCharacters = (campaign.playerCharacters || []).filter(pc => matchesFilter(pc.characterSocial.characterName));
-    const filteredPlots = (campaign.plots || []).filter(p => matchesFilter(p.title));
-    const filteredNotes = (campaign.notes || []).filter(n => matchesFilter(n.title));
-    const filteredAdventures = campaign.adventures.filter(a => {
-        if (matchesFilter(a.title)) return true;
-        return a.scenes.some(s => matchesFilter(s.title));
-    });
-    const filteredTopLevelArticles = debouncedFilter
-        ? campaign.articles.filter(a => matchesFilter(a.title))
-        : topLevelArticles;
-    const filteredEntityGroups = entityGroups.map(group => ({
-        ...group,
-        items: group.items.filter(item => matchesFilter(item.name)),
-    }));
+    const filteredSessionLogs = useMemo(
+        () => (campaign.sessionLogs || [])
+            .filter(s => matchesFilter(s.title))
+            .sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime()),
+        [campaign.sessionLogs, matchesFilter]
+    );
+    const filteredPlayerCharacters = useMemo(
+        () => (campaign.playerCharacters || []).filter(pc => matchesFilter(pc.characterSocial.characterName)),
+        [campaign.playerCharacters, matchesFilter]
+    );
+    const filteredPlots = useMemo(
+        () => (campaign.plots || []).filter(p => matchesFilter(p.title)),
+        [campaign.plots, matchesFilter]
+    );
+    const filteredNotes = useMemo(
+        () => (campaign.notes || []).filter(n => matchesFilter(n.title)),
+        [campaign.notes, matchesFilter]
+    );
+    const filteredAdventures = useMemo(
+        () => campaign.adventures.filter(a => {
+            if (matchesFilter(a.title)) return true;
+            return a.scenes.some(s => matchesFilter(s.title));
+        }),
+        [campaign.adventures, matchesFilter]
+    );
+    const filteredTopLevelArticles = useMemo(
+        () => debouncedFilter
+            ? campaign.articles.filter(a => matchesFilter(a.title))
+            : topLevelArticles,
+        [debouncedFilter, campaign.articles, topLevelArticles, matchesFilter]
+    );
+    const filteredEntityGroups = useMemo(
+        () => entityGroups.map(group => ({
+            ...group,
+            items: group.items.filter(item => matchesFilter(item.name)),
+        })),
+        [entityGroups, matchesFilter]
+    );
 
     // Determine if entire buckets should be hidden
     const hasCampaignStateItems = !debouncedFilter || filteredSessionLogs.length > 0 || filteredPlayerCharacters.length > 0 || filteredPlots.length > 0;
@@ -673,6 +704,12 @@ export const CampaignSidebar: React.FC<CampaignSidebarProps> = ({
         </aside>
     );
 };
+
+// Memoized: with stable props from App.tsx (memoized selectedIds/callbacks),
+// this avoids re-rendering the sidebar (and recomputing every filtered list)
+// on unrelated store updates elsewhere in the app.
+export const CampaignSidebar = React.memo(CampaignSidebarComponent);
+CampaignSidebar.displayName = 'CampaignSidebar';
 
 
 const NavHeader = ({ label }: { label: string }) => <h3 className="px-3 pt-4 pb-1 text-xs font-bold text-slate-500 uppercase tracking-wider">{label}</h3>;

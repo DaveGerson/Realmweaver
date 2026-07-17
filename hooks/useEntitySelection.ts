@@ -192,27 +192,24 @@ export function useEntitySelection({ activeCampaign, onSidebarClose }: UseEntity
   };
 
   const handleGoBack = () => {
-    setNavStack(prev => {
-      if (prev.length === 0) return prev;
-      const entry = prev[prev.length - 1];
-      const next = prev.slice(0, -1);
+    if (navStack.length === 0) return;
+    const entry = navStack[navStack.length - 1];
 
-      setActiveView(entry.view);
-      setSelectedNpcId(entry.view === 'npcs' ? entry.selectedId : null);
-      setSelectedLocationId(entry.view === 'locations' ? entry.selectedId : null);
-      setSelectedFactionId(entry.view === 'factions' ? entry.selectedId : null);
-      setSelectedItemId(entry.view === 'items' ? entry.selectedId : null);
-      setSelectedArticleId(entry.view === 'lorebook' ? entry.selectedId : null);
-      setSelectedSessionLogId(entry.view === 'session-logs' ? entry.selectedId : null);
-      setSelectedPlayerCharacterId(entry.view === 'player-characters' ? entry.selectedId : null);
-      setSelectedPlotId(entry.view === 'plots' ? entry.selectedId : null);
-      setSelectedNoteId(entry.view === 'notes' ? entry.selectedId : null);
-      setSelectedAdventureId(entry.adventureId ?? null);
-      setSelectedSceneId(entry.sceneId ?? null);
-      setActiveGenerator(null);
+    setActiveView(entry.view);
+    setSelectedNpcId(entry.view === 'npcs' ? entry.selectedId : null);
+    setSelectedLocationId(entry.view === 'locations' ? entry.selectedId : null);
+    setSelectedFactionId(entry.view === 'factions' ? entry.selectedId : null);
+    setSelectedItemId(entry.view === 'items' ? entry.selectedId : null);
+    setSelectedArticleId(entry.view === 'lorebook' ? entry.selectedId : null);
+    setSelectedSessionLogId(entry.view === 'session-logs' ? entry.selectedId : null);
+    setSelectedPlayerCharacterId(entry.view === 'player-characters' ? entry.selectedId : null);
+    setSelectedPlotId(entry.view === 'plots' ? entry.selectedId : null);
+    setSelectedNoteId(entry.view === 'notes' ? entry.selectedId : null);
+    setSelectedAdventureId(entry.adventureId ?? null);
+    setSelectedSceneId(entry.sceneId ?? null);
+    setActiveGenerator(null);
 
-      return next;
-    });
+    setNavStack(prev => prev.slice(0, -1));
     onSidebarClose();
   };
 

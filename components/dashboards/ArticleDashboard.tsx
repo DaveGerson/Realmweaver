@@ -43,7 +43,7 @@ interface ArticleDashboardProps {
 }
 
 export const ArticleDashboard: React.FC<ArticleDashboardProps> = ({ articles, npcs = [], locations = [], factions = [], onArticleCreated, onSelectArticle, isMockMode, isOfficialSetting, campaignContext }) => {
-  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: 3 });
+  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: { base: 1, md: 2, xl: 3 } });
 
   // Normalize: article uses `title`, hook needs `name`
   const normalizedArticles = useMemo(

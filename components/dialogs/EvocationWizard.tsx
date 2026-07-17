@@ -87,6 +87,30 @@ const initialGenerationOptions = {
     npcs: true, locations: true, factions: true, adventures: true, items: true
 };
 
+/**
+ * Await a batch of independent promises without letting one rejection discard every
+ * other successfully-settled value — unlike `Promise.all`, a single failed generation
+ * (e.g. one NPC prompt erroring) no longer throws away the rest of the batch.
+ * Exported for unit testing; rejections are logged by the caller-supplied `onReject`.
+ */
+export async function settleFulfilled<T>(
+    promises: Promise<T>[],
+    onReject: (reason: unknown) => void = (reason) => console.error(reason)
+): Promise<{ values: T[]; rejectedCount: number }> {
+    const settled = await Promise.allSettled(promises);
+    const values: T[] = [];
+    let rejectedCount = 0;
+    for (const result of settled) {
+        if (result.status === 'fulfilled') {
+            values.push(result.value);
+        } else {
+            rejectedCount++;
+            onReject(result.reason);
+        }
+    }
+    return { values, rejectedCount };
+}
+
 export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onClose, onAddToCampaign, isMockMode }) => {
     const [mode, setMode] = useState<Mode>('simple');
     const [useCampaignContext, setUseCampaignContext] = useState(true);
@@ -173,27 +197,40 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                         detailedPrompts.items.length +
                         validAdventures.length;
                     setDetailedProgress({ completed: 0, total: totalDetailed });
+                    // Count progress on settle (not just success) so a failing prompt doesn't
+                    // leave the progress bar looking stuck below the total.
                     const trackProgress = <T,>(p: Promise<T>): Promise<T> =>
-                        p.then(res => { setDetailedProgress(prev => prev ? { ...prev, completed: prev.completed + 1 } : prev); return res; });
+                        p.finally(() => setDetailedProgress(prev => prev ? { ...prev, completed: prev.completed + 1 } : prev));
 
-                    const npcPromises = detailedPrompts.npcs.map(p => trackProgress(generateNpc(p.prompt, isMockMode, campaignContext).then(res => ({ ...res, factionId: p.linkId }))));
-                    const locationPromises = detailedPrompts.locations.map(p => trackProgress(generateLocation(p.prompt, isMockMode, campaignContext).then(res => ({ ...res, parentLocationId: p.linkId }))));
-                    const factionPromises = detailedPrompts.factions.map(p => trackProgress(generateFaction(p.prompt, isMockMode, campaignContext)));
-                    const itemPromises = detailedPrompts.items.map(p => trackProgress(generateItem(p.prompt, isMockMode, campaignContext)));
-                    const adventurePromises = validAdventures.map(adv => {
+                    const npcPromises: Promise<Omit<NPC, 'id'>>[] = detailedPrompts.npcs.map(p => trackProgress(generateNpc(p.prompt, isMockMode, campaignContext).then(res => ({ ...res, factionId: p.linkId }))));
+                    const locationPromises: Promise<Omit<Location, 'id' | 'subLocationIds'>>[] = detailedPrompts.locations.map(p => trackProgress(generateLocation(p.prompt, isMockMode, campaignContext).then(res => ({ ...res, parentLocationId: p.linkId }))));
+                    const factionPromises: Promise<Omit<Faction, 'id' | 'leaderId' | 'memberIds'>>[] = detailedPrompts.factions.map(p => trackProgress(generateFaction(p.prompt, isMockMode, campaignContext)));
+                    const itemPromises: Promise<Omit<Item, 'id'>>[] = detailedPrompts.items.map(p => trackProgress(generateItem(p.prompt, isMockMode, campaignContext)));
+                    const adventurePromises: Promise<AdventureForBatchAdd>[] = validAdventures.map(adv => {
                         const scenesDescription = adv.scenes.filter(s => s.prompt.trim() !== '').map(s => `- Scene Prompt: "${s.prompt}"${s.type ? ` (Suggested Type: ${s.type})` : ''}`).join('\n');
                         const fullAdvPrompt = `Based on the following adventure concept, generate a complete adventure outline.\nAdventure Concept: "${adv.prompt}"\n\nThe adventure's structure must be built around the following user-provided scenes. Generate full, detailed scenes based on these prompts:\n${scenesDescription}`;
                         return trackProgress(generateAdventure(fullAdvPrompt, isMockMode, campaignContext));
                     });
 
-                    const [npcsResult, locationsResult, factionsResult, itemsResult, adventuresResult] = await Promise.all([Promise.all(npcPromises), Promise.all(locationPromises), Promise.all(factionPromises), Promise.all(itemPromises), Promise.all(adventurePromises)]);
+                    const [npcsResult, locationsResult, factionsResult, itemsResult, adventuresResult] = await Promise.all([
+                        settleFulfilled(npcPromises),
+                        settleFulfilled(locationPromises),
+                        settleFulfilled(factionPromises),
+                        settleFulfilled(itemPromises),
+                        settleFulfilled(adventurePromises),
+                    ]);
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    detailedData.npcs = npcsResult.map(({ knowsPlayerHistory, ...restOfNpc }: any) => restOfNpc);
-                    detailedData.locations = locationsResult;
-                    detailedData.factions = factionsResult;
-                    detailedData.items = itemsResult;
-                    detailedData.adventures = adventuresResult;
+                    detailedData.npcs = npcsResult.values.map(({ knowsPlayerHistory, ...restOfNpc }: any) => restOfNpc);
+                    detailedData.locations = locationsResult.values;
+                    detailedData.factions = factionsResult.values;
+                    detailedData.items = itemsResult.values;
+                    detailedData.adventures = adventuresResult.values;
                     data = detailedData;
+
+                    const totalFailures = npcsResult.rejectedCount + locationsResult.rejectedCount + factionsResult.rejectedCount + itemsResult.rejectedCount + adventuresResult.rejectedCount;
+                    if (totalFailures > 0) {
+                        setError(`${totalFailures} of ${totalDetailed} prompt${totalDetailed !== 1 ? 's' : ''} failed to generate. The rest are shown on the right — retry the failed ones individually.`);
+                    }
                     break;
                 }
                 

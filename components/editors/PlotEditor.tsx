@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Plot, PlotStatus, SessionLog, Campaign } from '../../types/index';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
-import { MentionInput } from '../common/MentionInput';
+import { MentionInput, resolveMentionCandidates, findMentionedIdsInText } from '../common/MentionInput';
 import { generateScene } from '../../services/aiService';
 import { RegenerateButton } from '../common/RegenerateButton';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
@@ -29,8 +29,31 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, campaign, onUpdate
   const [isGeneratingScene, setIsGeneratingScene] = useState(false);
   const { confirm } = useConfirmDialog();
 
+  // Tracks the last `plot` prop we've reconciled against, so incoming prop
+  // updates can be merged field-by-field instead of overwriting formData wholesale.
+  const prevPlotRef = useRef(plot);
+
   useEffect(() => {
-    setFormData(plot);
+    const prevPlot = prevPlotRef.current;
+    if (prevPlot.id !== plot.id) {
+      // Switched to viewing a different plot entirely — fully adopt it.
+      setFormData(plot);
+    } else if (prevPlot !== plot) {
+      // Same plot, but the underlying object changed elsewhere. Only adopt
+      // fields the user hasn't started editing since the last sync — any field
+      // where formData still matches what we last saw from `plot`. Fields the
+      // user has locally changed (unblurred edits) are preserved.
+      setFormData(prev => {
+        const merged = { ...prev };
+        (Object.keys(plot) as (keyof Plot)[]).forEach((key) => {
+          if (prev[key] === prevPlot[key]) {
+            merged[key] = plot[key];
+          }
+        });
+        return merged;
+      });
+    }
+    prevPlotRef.current = plot;
   }, [plot]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -63,6 +86,27 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, campaign, onUpdate
   const handleMentionFieldChange = (field: keyof Plot) => (value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     onUpdate(plot.id, { [field]: value } as Partial<Plot>);
+  };
+
+  // --- @-mention tracking across all MentionInput fields ---
+  // Candidates already known to be mentioned (from a prior session), used both to
+  // hydrate MentionInput's internal map and to seed each field's initial ID set.
+  const mentionCandidates = useMemo(
+    () => resolveMentionCandidates(campaign, plot.mentionedEntityIds),
+    [campaign, plot.mentionedEntityIds],
+  );
+  const [mentionedIdsByField, setMentionedIdsByField] = useState<Record<string, string[]>>(() => ({
+    description: findMentionedIdsInText(plot.description, mentionCandidates),
+  }));
+  // Reports the merged set of mentioned IDs (across every mention field) whenever any field changes.
+  const handleMentionedIdsChange = (field: string) => (ids: string[]) => {
+    setMentionedIdsByField(prev => {
+      const next = { ...prev, [field]: ids };
+      const merged = Array.from(new Set(Object.values(next).flat()));
+      setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
+      onUpdate(plot.id, { mentionedEntityIds: merged });
+      return next;
+    });
   };
 
   const handleFieldRegenerate = (field: 'description') => (newValue: string) => {
@@ -174,6 +218,8 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, campaign, onUpdate
               <MentionInput
                 value={formData.description}
                 onChange={handleMentionFieldChange('description')}
+                onMentionedIdsChange={handleMentionedIdsChange('description')}
+                initialMentions={mentionCandidates}
                 rows={8}
                 placeholder="Describe the main conflict, key beats, and current state of this plot arc. (type @ to mention entities)"
               />

@@ -34,7 +34,7 @@ interface PlayerCharacterDashboardProps {
 }
 
 export const PlayerCharacterDashboard: React.FC<PlayerCharacterDashboardProps> = ({ playerCharacters, onImport, onPlayerCharacterCreated, onSelectPlayerCharacter, isMockMode }) => {
-  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: 3 });
+  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: { base: 1, md: 2, xl: 3 } });
 
   // Normalize PlayerCharacter nested fields into flat search strings
   const normalizedPCs = useMemo(

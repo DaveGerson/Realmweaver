@@ -136,6 +136,110 @@ const validateEntityArray = (
 };
 
 // ---------------------------------------------------------------------------
+// Required-array-field normalisation
+// ---------------------------------------------------------------------------
+
+/** Ensures `entity[field]` is an array, defaulting to `[]` when missing or of
+ *  the wrong type. Mutates `entity` in place. */
+const ensureArrayField = (entity: Record<string, unknown>, field: string): void => {
+  if (!Array.isArray(entity[field])) {
+    entity[field] = [];
+  }
+};
+
+/**
+ * Backfills every array field each entity type declares as *required*
+ * (non-optional) in its `types/` definition, so the `as unknown as Campaign`
+ * cast at the end of `validateImportedCampaign` is actually safe.
+ *
+ * The entity-level validators above only guarantee `id` + `name`/`title` —
+ * hand-edited or partially-authored exports routinely omit relationship
+ * arrays like `Faction.memberIds` or `Location.subLocationIds`. Those fields
+ * are typed as required, so downstream consumers (continuityChecker.ts,
+ * FactionEditor, etc.) iterate them without an `?? []` guard and throw a
+ * TypeError the moment they encounter one.
+ */
+const normaliseRequiredArrays = (data: Record<string, unknown>): void => {
+  const npcs = data['npcs'];
+  if (Array.isArray(npcs)) {
+    for (const npc of npcs) {
+      if (!isPlainObject(npc)) continue;
+      ensureArrayField(npc, 'knowsPlayerHistory');
+      ensureArrayField(npc, 'relationships');
+      ensureArrayField(npc, 'history');
+    }
+  }
+
+  const locations = data['locations'];
+  if (Array.isArray(locations)) {
+    for (const location of locations) {
+      if (!isPlainObject(location)) continue;
+      ensureArrayField(location, 'subLocationIds');
+      ensureArrayField(location, 'history');
+    }
+  }
+
+  const factions = data['factions'];
+  if (Array.isArray(factions)) {
+    for (const faction of factions) {
+      if (!isPlainObject(faction)) continue;
+      ensureArrayField(faction, 'memberIds');
+    }
+  }
+
+  const articles = data['articles'];
+  if (Array.isArray(articles)) {
+    for (const article of articles) {
+      if (!isPlainObject(article)) continue;
+      ensureArrayField(article, 'subArticleIds');
+    }
+  }
+
+  const adventures = data['adventures'];
+  if (Array.isArray(adventures)) {
+    for (const adventure of adventures) {
+      if (!isPlainObject(adventure)) continue;
+      ensureArrayField(adventure, 'scenes');
+      const scenes = adventure['scenes'];
+      if (Array.isArray(scenes)) {
+        for (const scene of scenes) {
+          if (!isPlainObject(scene)) continue;
+          ensureArrayField(scene, 'npcIds');
+          ensureArrayField(scene, 'skillChecks');
+        }
+      }
+    }
+  }
+
+  const sessionLogs = data['sessionLogs'];
+  if (Array.isArray(sessionLogs)) {
+    for (const log of sessionLogs) {
+      if (!isPlainObject(log)) continue;
+      ensureArrayField(log, 'plannedSceneIds');
+      ensureArrayField(log, 'relatedPlotIds');
+      ensureArrayField(log, 'structuredNotes');
+      ensureArrayField(log, 'encounterLog');
+    }
+  }
+
+  const plots = data['plots'];
+  if (Array.isArray(plots)) {
+    for (const plot of plots) {
+      if (!isPlainObject(plot)) continue;
+      ensureArrayField(plot, 'relatedEntityIds');
+    }
+  }
+
+  const notes = data['notes'];
+  if (Array.isArray(notes)) {
+    for (const note of notes) {
+      if (!isPlainObject(note)) continue;
+      ensureArrayField(note, 'tags');
+    }
+  }
+};
+
+// ---------------------------------------------------------------------------
 // Version migration
 // ---------------------------------------------------------------------------
 
@@ -303,6 +407,10 @@ export const validateImportedCampaign = (
   data['settingType'] = data['settingType'] || 'custom';
   data['setting'] = data['setting'] || '';
 
+  // Backfill required array fields (memberIds, subLocationIds, npcIds, etc.)
+  // so every entity is structurally complete before being cast to Campaign.
+  normaliseRequiredArrays(data);
+
   return {
     success: true,
     campaign: data as unknown as Campaign,
@@ -340,6 +448,7 @@ export const validateExportRoundTrip = (
       'playerCharacters',
       'plots',
       'notes',
+      'secrets',
     ];
 
     for (const key of arrayKeys) {

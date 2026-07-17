@@ -45,6 +45,9 @@ export const RegenerateButton: React.FC<RegenerateButtonProps> = ({
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  // Bumped on every close/regenerate so an in-flight request can detect it was superseded
+  // (panel dismissed or a new regeneration started) and skip applying its stale result.
+  const requestIdRef = useRef(0);
 
   // Focus tweak input when panel opens
   useEffect(() => {
@@ -66,6 +69,7 @@ export const RegenerateButton: React.FC<RegenerateButtonProps> = ({
   }, [panelState]);
 
   const handleClose = () => {
+    requestIdRef.current += 1;
     setPanelState('closed');
     setTweakInstruction('');
     setPreviewValue('');
@@ -82,6 +86,7 @@ export const RegenerateButton: React.FC<RegenerateButtonProps> = ({
   };
 
   const handleRegenerate = async () => {
+    const requestId = ++requestIdRef.current;
     setPanelState('loading');
     setError(null);
 
@@ -99,9 +104,13 @@ export const RegenerateButton: React.FC<RegenerateButtonProps> = ({
         result = await generateEnhancedText(prompt, campaignContext, false);
       }
 
+      // Bail out if the panel was closed (or another regeneration started) while awaiting.
+      if (requestIdRef.current !== requestId) return;
+
       setPreviewValue(result);
       setPanelState('preview');
     } catch (err) {
+      if (requestIdRef.current !== requestId) return;
       console.error('[RegenerateButton] Generation failed:', err);
       setError('Generation failed. Please try again.');
       setPanelState('expanded');
