@@ -28,6 +28,7 @@ import { importCampaignFromJsonValidated } from './importExportService';
 import { parseCharacterSheetPdf } from './aiService';
 import { storageService } from './storageService';
 import { autoLinkScenes, autoLinkNpcFactions } from './linking/autoLinker';
+import { createDefaultPlayerCharacter } from '../utils/entityUtils';
 
 type AppStatus = 'loading' | 'welcome' | 'selecting' | 'creating' | 'editing';
 export type SaveStatus = 'idle' | 'saved' | 'saving' | 'error' | 'quota-warning';
@@ -1769,7 +1770,29 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         },
 
         createPlayerCharacter(newPcData: Omit<PlayerCharacter, 'id'>) {
-            const newPc: PlayerCharacter = { ...newPcData, id: crypto.randomUUID() };
+            // Normalize against a fully-populated default: AI-parsed PDF sheets
+            // (and hand-authored Quick Add drafts) may omit fields that
+            // CharacterStatistics/CharacterSocial declare as required — e.g. a
+            // blank Features & Traits page omits `specialActions` entirely.
+            // This MUST be a deep merge: a shallow spread of
+            // `characterStatistics` would wipe the default actions/specialActions
+            // whenever the parse includes a partial characterStatistics object.
+            const defaults = createDefaultPlayerCharacter();
+            const normalized: Omit<PlayerCharacter, 'id'> = {
+                ...defaults,
+                ...newPcData,
+                characterSocial: { ...defaults.characterSocial, ...newPcData.characterSocial },
+                characterStatistics: {
+                    ...defaults.characterStatistics,
+                    ...newPcData.characterStatistics,
+                    classes: { ...defaults.characterStatistics.classes, ...newPcData.characterStatistics?.classes },
+                    attributes: { ...defaults.characterStatistics.attributes, ...newPcData.characterStatistics?.attributes },
+                    skills: { ...defaults.characterStatistics.skills, ...newPcData.characterStatistics?.skills },
+                    actions: newPcData.characterStatistics?.actions ?? defaults.characterStatistics.actions,
+                    specialActions: newPcData.characterStatistics?.specialActions ?? defaults.characterStatistics.specialActions,
+                },
+            };
+            const newPc: PlayerCharacter = { ...normalized, id: crypto.randomUUID() };
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
                 if (campaign) {
