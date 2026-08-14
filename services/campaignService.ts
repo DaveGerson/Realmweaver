@@ -32,6 +32,61 @@ import { autoLinkScenes, autoLinkNpcFactions } from './linking/autoLinker';
 type AppStatus = 'loading' | 'welcome' | 'selecting' | 'creating' | 'editing';
 export type SaveStatus = 'idle' | 'saved' | 'saving' | 'error' | 'quota-warning';
 
+/**
+ * Migrates a raw, possibly-old-shape array of campaign objects (freshly
+ * `JSON.parse`d from localStorage or a backup slot) into the current
+ * `Campaign[]` shape: backfills required array fields older/hand-edited saves
+ * may be missing, and migrates legacy field names.
+ *
+ * Shared by every ingestion path that parses persisted campaign JSON
+ * (init()'s happy path AND its backup-recovery path) so they cannot drift
+ * apart the way init() and importExportService.normaliseRequiredArrays once
+ * did (finding #35).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function migrateCampaignsData(campaignsData: any[]): Campaign[] {
+    return campaignsData.map(c => ({
+        ...c,
+        settingType: c.settingType || 'custom',
+        plots: (c.plots || []).map((p: any) => ({
+            ...p,
+            title: p.title || p.name || 'Untitled Plot',
+            relatedEntityIds: p.relatedEntityIds || p.keyNpcIds || [],
+        })),
+        notes: c.notes || [],
+        secrets: c.secrets || [],
+        articles: (c.articles || []).map((a: any) => ({
+            ...a,
+            subArticleIds: a.subArticleIds || [],
+            relatedEntityIds: a.relatedEntityIds || [],
+        })),
+        sessionLogs: (c.sessionLogs || []).map((l: any) => ({
+            ...l,
+            structuredNotes: l.structuredNotes || [],
+            relatedPlotIds: l.relatedPlotIds || [],
+            // Backfilled in lockstep with importExportService.normaliseRequiredArrays
+            // (finding #35) — goLive()/advanceScene() dereference plannedSceneIds
+            // unconditionally once an adventureId is set.
+            plannedSceneIds: l.plannedSceneIds || [],
+            encounterLog: l.encounterLog || [],
+        })),
+        playerCharacters: c.playerCharacters || [],
+        npcs: (c.npcs || []).map((n: any) => ({ ...n, relationships: n.relationships || [], history: n.history || [] })),
+        locations: (c.locations || []).map((l: any) => ({ ...l, history: l.history || [] })),
+        // Ensure required array fields exist on factions/adventures too — older or
+        // hand-edited/imported saves can be missing these, and CRUD code
+        // (_synchronizeNpcFactionLink, deleteFaction, deleteLocation, etc.)
+        // assumes they are always present.
+        factions: (c.factions || []).map((f: any) => ({ ...f, memberIds: f.memberIds || [] })),
+        adventures: (c.adventures || []).map((a: any) => ({
+            ...a,
+            scenes: (a.scenes || []).map((s: any) => ({ ...s, npcIds: s.npcIds || [] })),
+        })),
+        // Ensure activeEncounter is initialized if missing in older saves
+        activeEncounter: c.activeEncounter || { id: crypto.randomUUID(), round: 1, turnIndex: 0, combatants: [] },
+    }));
+}
+
 type CampaignState = {
   campaigns: Campaign[];
   activeCampaignId: string | null;
@@ -50,6 +105,10 @@ type CampaignState = {
 export function createCampaignStore(config: { persist?: boolean } = {}) {
     const shouldPersist = config.persist ?? true;
     const AUTO_SAVE_DELAY_MS = 2000;
+    // Bounded max-wait (finding #8): even if edits keep re-arming the 2s
+    // debounce (e.g. continuous typing in a textarea), force a flush this
+    // often so a long uninterrupted burst is never entirely lost.
+    const AUTO_SAVE_MAX_WAIT_MS = 10000;
 
     let state: CampaignState = {
         campaigns: [],
@@ -61,6 +120,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
     };
 
     let saveTimeout: any = null;
+    let maxWaitTimeout: any = null;
 
     const CAMPAIGNS_STORAGE_KEY = 'realmweaver-campaigns';
     const ACTIVE_CAMPAIGN_ID_KEY = 'realmweaver-active-campaign-id';
@@ -78,7 +138,22 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         notify();
     };
 
-    const persistToStorage = () => {
+    /**
+     * Writes state to storage. The primary `localStorage.setItem` calls (via
+     * storageService.save) happen synchronously, before the first `await` —
+     * that's what lets `flushPendingSaveSync()` (finding #8, unload flush)
+     * guarantee data is on disk by the time a `pagehide`/`beforeunload`
+     * handler returns, even though this function is `async` overall.
+     *
+     * The `await` below (finding #9) waits for DURABLE confirmation of the
+     * write — for a plain localStorage write that's immediate, but for a
+     * quota-fallback IndexedDB write it's the real async completion. Only
+     * once that resolves do we stamp `lastSavedAt` / report a non-error
+     * status; a write that never durably lands (e.g. IndexedDB unavailable
+     * in private browsing) now surfaces `saveStatus: 'error'` instead of a
+     * false "saved"/"quota-warning".
+     */
+    const persistToStorage = async () => {
         if (!shouldPersist || state.appStatus === 'loading') {
             return;
         }
@@ -88,7 +163,8 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             JSON.stringify(state.campaigns)
         );
 
-        let activeIdResult = { success: true, quotaWarning: false };
+        let activeIdResult: { success: boolean; quotaWarning: boolean; error?: string; pending?: Promise<void> } =
+            { success: true, quotaWarning: false, pending: Promise.resolve() };
         if (state.activeCampaignId) {
             activeIdResult = storageService.save(
                 ACTIVE_CAMPAIGN_ID_KEY,
@@ -101,21 +177,35 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         const overallSuccess = campaignsResult.success && activeIdResult.success;
         const quotaWarning = campaignsResult.quotaWarning || activeIdResult.quotaWarning;
 
-        if (overallSuccess) {
-            _internalUpdate(draft => {
-                draft.saveStatus = quotaWarning ? 'quota-warning' : 'saved';
-                draft.lastSavedAt = new Date().toISOString();
-            });
-            if (quotaWarning) {
-                console.warn('[campaignService] Save succeeded via IndexedDB fallback — localStorage quota exceeded.');
-            } else {
-                console.log('Campaign auto-saved successfully.');
-            }
-        } else {
+        if (!overallSuccess) {
             console.error('[campaignService] Failed to save state:', campaignsResult.error);
             _internalUpdate(draft => {
                 draft.saveStatus = 'error';
             });
+            return;
+        }
+
+        try {
+            await Promise.all([
+                campaignsResult.pending ?? Promise.resolve(),
+                activeIdResult.pending ?? Promise.resolve(),
+            ]);
+        } catch (err) {
+            console.error('[campaignService] Save was not durably confirmed:', err);
+            _internalUpdate(draft => {
+                draft.saveStatus = 'error';
+            });
+            return;
+        }
+
+        _internalUpdate(draft => {
+            draft.saveStatus = quotaWarning ? 'quota-warning' : 'saved';
+            draft.lastSavedAt = new Date().toISOString();
+        });
+        if (quotaWarning) {
+            console.warn('[campaignService] Save succeeded via IndexedDB fallback — localStorage quota exceeded.');
+        } else {
+            console.log('Campaign auto-saved successfully.');
         }
     };
 
@@ -132,8 +222,50 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             clearTimeout(saveTimeout);
         }
         saveTimeout = setTimeout(() => {
+            saveTimeout = null;
+            if (maxWaitTimeout) {
+                clearTimeout(maxWaitTimeout);
+                maxWaitTimeout = null;
+            }
             persistToStorage();
         }, AUTO_SAVE_DELAY_MS);
+
+        // Arm the max-wait timer only for the FIRST pending change in a burst
+        // (finding #8) — re-arming it on every keystroke would defeat the
+        // point, since it needs to fire on a fixed cadence regardless of
+        // continued activity.
+        if (!maxWaitTimeout) {
+            maxWaitTimeout = setTimeout(() => {
+                maxWaitTimeout = null;
+                if (saveTimeout) {
+                    clearTimeout(saveTimeout);
+                    saveTimeout = null;
+                }
+                persistToStorage();
+            }, AUTO_SAVE_MAX_WAIT_MS);
+        }
+    };
+
+    /**
+     * Flushes any pending debounced save immediately and synchronously
+     * (finding #8). Used by the page-lifecycle handlers registered in init()
+     * so navigating away / closing the tab never discards an uncommitted
+     * burst of edits still waiting out the debounce window.
+     */
+    const flushPendingSaveSync = () => {
+        if (!shouldPersist) return;
+        if (saveTimeout) {
+            clearTimeout(saveTimeout);
+            saveTimeout = null;
+        }
+        if (maxWaitTimeout) {
+            clearTimeout(maxWaitTimeout);
+            maxWaitTimeout = null;
+        }
+        // Fire-and-forget: the synchronous localStorage write inside happens
+        // before this call returns; the rest (durability confirmation) can
+        // resolve after the page has started unloading.
+        void persistToStorage();
     };
 
     // Public update that triggers the auto-save workflow
@@ -306,14 +438,45 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
 
             // Wire cross-tab conflict detection (5.5).
             // The window `storage` event fires when ANOTHER tab writes to localStorage.
-            // We set a flag so the UI can prompt the user to reload.
+            // We set the conflict flag so the UI can prompt the user, AND (finding #13)
+            // reload this tab's in-memory campaigns from the fresh snapshot so a
+            // subsequent local edit is applied ON TOP of the other tab's newer data
+            // instead of blindly serialising this (now stale) tab's snapshot over it.
             storageService.onConflict((key) => {
                 if (key === CAMPAIGNS_STORAGE_KEY) {
                     _internalUpdate(draft => {
                         draft.conflictDetected = true;
+                        try {
+                            const fresh = storageService.loadSync(CAMPAIGNS_STORAGE_KEY);
+                            if (fresh) {
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                const parsed: any[] = JSON.parse(fresh);
+                                draft.campaigns = migrateCampaignsData(parsed);
+                            }
+                        } catch {
+                            // If the other tab's snapshot doesn't parse, keep this tab's
+                            // current in-memory campaigns rather than losing them.
+                        }
                     });
                 }
             });
+
+            // Flush any pending debounced save synchronously when the page is being
+            // hidden/unloaded (finding #8) — otherwise a GM who types for a while and
+            // then immediately closes the tab loses the entire uncommitted burst,
+            // since the 2s/10s debounce timers never get a chance to fire.
+            if (typeof window !== 'undefined') {
+                const flushOnTeardown = () => flushPendingSaveSync();
+                window.addEventListener('pagehide', flushOnTeardown);
+                window.addEventListener('beforeunload', flushOnTeardown);
+                if (typeof document !== 'undefined') {
+                    document.addEventListener('visibilitychange', () => {
+                        if (document.visibilityState === 'hidden') {
+                            flushOnTeardown();
+                        }
+                    });
+                }
+            }
 
             // Use the async, IndexedDB-aware `load()` (not `loadSync()`) so that data
             // which only made it to IndexedDB — because a previous save() hit the
@@ -334,42 +497,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         try {
                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             const campaignsData: any[] = JSON.parse(savedCampaigns);
-                            // Migrate old data: ensure arrays exists
-                            draft.campaigns = campaignsData.map(c => ({
-                                ...c,
-                                settingType: c.settingType || 'custom',
-                                plots: (c.plots || []).map((p: any) => ({
-                                    ...p,
-                                    title: p.title || p.name || 'Untitled Plot',
-                                    relatedEntityIds: p.relatedEntityIds || p.keyNpcIds || [],
-                                })),
-                                notes: c.notes || [],
-                                secrets: c.secrets || [],
-                                articles: (c.articles || []).map((a: any) => ({
-                                    ...a,
-                                    subArticleIds: a.subArticleIds || [],
-                                    relatedEntityIds: a.relatedEntityIds || [],
-                                })),
-                                sessionLogs: (c.sessionLogs || []).map((l: any) => ({
-                                    ...l,
-                                    structuredNotes: l.structuredNotes || [],
-                                    relatedPlotIds: l.relatedPlotIds || []
-                                })),
-                                playerCharacters: c.playerCharacters || [],
-                                npcs: (c.npcs || []).map((n: any) => ({...n, relationships: n.relationships || [], history: n.history || []})),
-                                locations: (c.locations || []).map((l: any) => ({...l, history: l.history || []})),
-                                // Ensure required array fields exist on factions/adventures too — older or
-                                // hand-edited/imported saves can be missing these, and CRUD code
-                                // (_synchronizeNpcFactionLink, deleteFaction, deleteLocation, etc.)
-                                // assumes they are always present.
-                                factions: (c.factions || []).map((f: any) => ({ ...f, memberIds: f.memberIds || [] })),
-                                adventures: (c.adventures || []).map((a: any) => ({
-                                    ...a,
-                                    scenes: (a.scenes || []).map((s: any) => ({ ...s, npcIds: s.npcIds || [] })),
-                                })),
-                                // Ensure activeEncounter is initialized if missing in older saves
-                                activeEncounter: c.activeEncounter || { id: crypto.randomUUID(), round: 1, turnIndex: 0, combatants: [] }
-                            }));
+                            draft.campaigns = migrateCampaignsData(campaignsData);
 
                             if (savedActiveId && draft.campaigns.some(c => c.id === savedActiveId)) {
                                 draft.activeCampaignId = savedActiveId;
@@ -380,10 +508,45 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                                 draft.appStatus = 'welcome';
                             }
                         } catch (e) {
-                            console.error("Failed to parse saved campaigns, clearing storage.", e);
-                            storageService.remove(CAMPAIGNS_STORAGE_KEY);
-                            storageService.remove(ACTIVE_CAMPAIGN_ID_KEY);
-                            draft.appStatus = 'welcome';
+                            // Finding #1: a JSON.parse failure here used to `remove()` the
+                            // primary key (which also nukes the IndexedDB copy), destroying
+                            // the user's entire campaign library with no chance of recovery.
+                            // Instead, walk the rotating backup buffer (5.6) newest-first and
+                            // recover from the first slot that parses — getBackups() is
+                            // synchronous, so this is safe to do inside the Immer recipe.
+                            console.error("Failed to parse saved campaigns — attempting backup recovery.", e);
+
+                            let recovered = false;
+                            const backups = storageService.getBackups(CAMPAIGNS_STORAGE_KEY);
+                            for (const backup of backups) {
+                                try {
+                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                    const backupData: any[] = JSON.parse(backup.data);
+                                    draft.campaigns = migrateCampaignsData(backupData);
+                                    recovered = true;
+                                    break;
+                                } catch {
+                                    // This slot is also corrupt — try the next-oldest one.
+                                }
+                            }
+
+                            if (recovered) {
+                                if (savedActiveId && draft.campaigns.some(c => c.id === savedActiveId)) {
+                                    draft.activeCampaignId = savedActiveId;
+                                    draft.appStatus = 'editing';
+                                } else if (draft.campaigns.length > 0) {
+                                    draft.appStatus = 'selecting';
+                                } else {
+                                    draft.appStatus = 'welcome';
+                                }
+                            } else {
+                                // No backup slot parsed either. Deliberately do NOT call
+                                // storageService.remove() — the corrupt-but-possibly
+                                // hand-recoverable payload is left in place (under its
+                                // original key) so the GM still has a chance at manual
+                                // recovery / export instead of silent, total data loss.
+                                draft.appStatus = 'welcome';
+                            }
                         }
                     } else {
                         // No saved campaigns — show welcome screen for fresh onboarding.
@@ -396,9 +559,12 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         },
 
         // --- Campaign Level Actions ---
-        saveCampaign() { 
+        saveCampaign() {
             // Manual save trigger (forces immediate save)
             if (saveTimeout) clearTimeout(saveTimeout);
+            if (maxWaitTimeout) clearTimeout(maxWaitTimeout);
+            saveTimeout = null;
+            maxWaitTimeout = null;
             _internalUpdate(draft => { draft.saveStatus = 'saving'; });
             setTimeout(persistToStorage, 0);
         },
