@@ -47,6 +47,11 @@ function toDateInputValue(sessionDate: string): string {
 
 export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaign, onUpdate, onDelete, isMockMode, onGoLive, onNavigate }) => {
   const [formData, setFormData] = useState(log);
+  // Latest rendered formData, for async handlers that must merge against
+  // current state without doing side effects inside a setState updater
+  // (updaters run during render and StrictMode double-invokes them).
+  const formDataRef = useRef(formData);
+  formDataRef.current = formData;
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState<'structured' | 'scratchpad'>('structured');
   const [newNoteContent, setNewNoteContent] = useState('');
@@ -349,17 +354,15 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
         });
         
         if (newEntries.length > 0) {
-            // Derive the merged list from the CURRENT structuredNotes (functional
-            // update), not the `formData` captured in this closure at click time —
-            // analysis takes seconds and the Log Entries tab stays interactive, so
-            // manual adds/removes made while this was in flight must not be
-            // silently clobbered when the AI-derived entries land (see #65's fix
-            // for handleGenerateNpcForScene, same shape).
-            setFormData(prev => {
-                const next = [...(prev.structuredNotes || []), ...newEntries];
-                onUpdate(log.id, { structuredNotes: next });
-                return { ...prev, structuredNotes: next };
-            });
+            // Merge against the LATEST structuredNotes (via formDataRef), not
+            // the closure captured at click time — analysis takes seconds and
+            // the Log Entries tab stays interactive, so manual adds/removes
+            // made while this was in flight must not be clobbered. The store
+            // write happens out here, never inside the setState updater
+            // (updaters run during render and StrictMode double-invokes them).
+            const next = [...(formDataRef.current.structuredNotes || []), ...newEntries];
+            setFormData(prev => ({ ...prev, structuredNotes: next }));
+            onUpdate(log.id, { structuredNotes: next });
             setActiveTab('structured');
         }
     } catch (e) {

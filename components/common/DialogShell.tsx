@@ -37,6 +37,12 @@ function isReachable(el: HTMLElement, layoutAware: boolean): boolean {
   if (layoutAware) {
     const rect = el.getBoundingClientRect();
     if (rect.width > 0 && rect.height > 0) {
+      // A control merely scrolled outside a scrollable ancestor's visible
+      // box is NOT covered — focusing it makes the browser scroll it into
+      // view. Without this exemption, elementFromPoint at the control's
+      // (clipped) center hits whatever paints there instead, and Tab-wrap
+      // would skip every below-the-fold control in a scrolling dialog.
+      if (isScrollClipped(el, rect)) return true;
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
       const topEl = document.elementFromPoint(cx, cy);
@@ -51,6 +57,30 @@ function isReachable(el: HTMLElement, layoutAware: boolean): boolean {
   }
 
   return true;
+}
+
+/**
+ * True when `el`'s box lies (partially) outside the visible box of a
+ * scrollable ancestor — i.e. it is clipped by overflow scrolling rather than
+ * covered by an overlay. Such an element is keyboard-reachable: focus() will
+ * scroll it into view.
+ */
+function isScrollClipped(el: HTMLElement, rect: DOMRect): boolean {
+  let parent = el.parentElement;
+  while (parent && parent !== document.body) {
+    const style = window.getComputedStyle(parent);
+    if (/(auto|scroll)/.test(style.overflowY + ' ' + style.overflowX)) {
+      const box = parent.getBoundingClientRect();
+      if (
+        rect.bottom > box.bottom || rect.top < box.top ||
+        rect.right > box.right || rect.left < box.left
+      ) {
+        return true;
+      }
+    }
+    parent = parent.parentElement;
+  }
+  return false;
 }
 
 /**

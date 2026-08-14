@@ -16,6 +16,7 @@ import type { QuickCardEntityType } from '../common/EntityQuickCard';
 import { BacklinksPanel } from '../common/BacklinksPanel';
 import { TabLayout } from '../common/TabLayout';
 import type { TabDefinition } from '../common/TabLayout';
+import { useDebouncedFieldCommit } from '../../hooks/useDebouncedFieldCommit';
 
 interface NpcEditorProps {
   npc: NPC;
@@ -86,40 +87,15 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
     }
   }
 
-  // Used by MentionInput fields (onChange receives string, not event).
-  // Local edits commit immediately for responsive typing, but the store write
-  // (onUpdate) is debounced so unblurred keystrokes coalesce into a single
-  // campaign-wide update instead of one per character — matching the
-  // blur-commit design of every other field in this editor.
-  const mentionFieldTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  // Latest not-yet-committed value per field. Flushed (not discarded) on
-  // unmount so text typed within the debounce window of e.g. switching
-  // entities in the sidebar isn't silently lost (finding #70).
-  const mentionFieldPendingRef = useRef<Record<string, string>>({});
-  useEffect(() => {
-    const timers = mentionFieldTimersRef.current;
-    const pending = mentionFieldPendingRef.current;
-    return () => {
-      Object.values(timers).forEach(clearTimeout);
-      Object.entries(pending).forEach(([field, value]) => {
-        onUpdate(npc.id, { [field]: value });
-      });
-      Object.keys(pending).forEach(field => { delete pending[field]; });
-    };
-    // Runs only on mount/unmount by design: onUpdate is campaignService's
-    // stable singleton method reference, so capturing it here is safe and
-    // guarantees the flush fires exactly once, on real unmount.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Store writes are debounced per field and keyed to the entity id by
+  // useDebouncedFieldCommit, which flushes pending edits when the edited
+  // entity changes under this same mounted editor or on unmount, so text
+  // typed inside the debounce window is committed to the entity it was
+  // typed against (finding #70).
+  const { commit: commitMentionField } = useDebouncedFieldCommit<NPC>(npc.id, onUpdate);
   const handleMentionFieldChange = (field: keyof NPC) => (value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    const timers = mentionFieldTimersRef.current;
-    mentionFieldPendingRef.current[field] = value;
-    if (timers[field]) clearTimeout(timers[field]);
-    timers[field] = setTimeout(() => {
-      delete mentionFieldPendingRef.current[field];
-      onUpdate(npc.id, { [field]: value });
-    }, 400);
+    commitMentionField(field, value);
   };
 
   // --- @-mention tracking across all MentionInput fields ---

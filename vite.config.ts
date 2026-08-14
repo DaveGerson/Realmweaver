@@ -60,6 +60,14 @@ export default defineConfig(({ mode }) => {
       define: {
         'process.env.REALMWEAVER_AI_PROVIDER': JSON.stringify(env.REALMWEAVER_AI_PROVIDER || 'claude-cli'),
         'process.env.AI_PROVIDER': JSON.stringify(env.AI_PROVIDER || 'claude-cli'),
+        // Client-tunable knobs consumed by services/ai/modelConfig.ts. Each is
+        // read through a literal `process.env.<KEY>` token so this substitution
+        // works in dev and build alike; keys omitted here (server-only:
+        // ANTHROPIC_API_KEY, CLAUDE_CLI_PATH) resolve to undefined client-side.
+        'process.env.REALMWEAVER_DEFAULT_TIER': JSON.stringify(env.REALMWEAVER_DEFAULT_TIER || ''),
+        'process.env.REALMWEAVER_MAX_RETRIES': JSON.stringify(env.REALMWEAVER_MAX_RETRIES || ''),
+        'process.env.REALMWEAVER_TIMEOUT_MS': JSON.stringify(env.REALMWEAVER_TIMEOUT_MS || ''),
+        'process.env.REALMWEAVER_API_BASE_URL': JSON.stringify(env.REALMWEAVER_API_BASE_URL || ''),
         // SECURITY: ANTHROPIC_API_KEY is intentionally NOT injected into the client bundle.
         // The claude-cli provider doesn't need it (auth handled by the CLI binary).
         // The future anthropic-api provider will consume it server-side in the Vite middleware.

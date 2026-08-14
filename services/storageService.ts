@@ -361,6 +361,15 @@ export function createStorageService() {
           .then(() => {
             try {
               _ls()?.removeItem(key);
+              // The pre-quota generation just left localStorage — capture it
+              // into the backup buffer so recovery depth isn't lost exactly
+              // on the path where saves start failing. Rotation runs AFTER
+              // removeItem so the freed primary-copy space funds the backup
+              // write; if even that overflows, _rotateBackups' own guards
+              // degrade gracefully.
+              if (!options?.skipBackup && previousValue !== null && previousValue !== value) {
+                _rotateBackups(key, previousValue);
+              }
             } catch {
               // ignore — worst case load() returns the stale localStorage copy
             }

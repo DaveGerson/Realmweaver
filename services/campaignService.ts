@@ -246,6 +246,12 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         // resolves it via resolveConflict('reload' | 'overwrite') — writing
         // now would silently clobber the other tab's newer data.
         if (state.conflictDetected) {
+            // A caller (saveCampaign) may have optimistically flipped the
+            // status to 'saving' — reset it so the header indicator doesn't
+            // spin forever while the write is deliberately withheld.
+            if (state.saveStatus === 'saving') {
+                _internalUpdate(draft => { draft.saveStatus = 'idle'; });
+            }
             return;
         }
 
