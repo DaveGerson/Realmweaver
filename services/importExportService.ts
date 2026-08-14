@@ -240,6 +240,69 @@ const normaliseRequiredArrays = (data: Record<string, unknown>): void => {
 };
 
 // ---------------------------------------------------------------------------
+// Campaign-wide id de-duplication
+// ---------------------------------------------------------------------------
+
+/** Every id-bearing entity array a Campaign export may contain, in a fixed
+ *  scan order. Order matters for "first occurrence wins" semantics. */
+const ID_BEARING_ARRAY_KEYS = [
+  'npcs',
+  'locations',
+  'factions',
+  'items',
+  'adventures',
+  'articles',
+  'sessionLogs',
+  'plots',
+  'notes',
+  'secrets',
+  'playerCharacters',
+] as const;
+
+/**
+ * Enforces campaign-wide uniqueness of entity `id`s (both within a single
+ * array and across different arrays). Every CRUD path in campaignService
+ * resolves entities by `find`/`findIndex` on `id`, so a duplicate id causes
+ * edits/deletes to silently hit the wrong entity. The FIRST occurrence
+ * (in `ID_BEARING_ARRAY_KEYS` order, then array order) keeps its id; later
+ * duplicates are dropped. Mutates `data` in place.
+ */
+const dedupeIdsAcrossCampaign = (
+  data: Record<string, unknown>,
+  warnings: string[],
+): void => {
+  const seenIds = new Set<string>();
+  let duplicateCount = 0;
+
+  for (const key of ID_BEARING_ARRAY_KEYS) {
+    const raw = data[key];
+    if (!Array.isArray(raw)) continue;
+
+    const deduped: unknown[] = [];
+    for (const entity of raw) {
+      if (!isPlainObject(entity)) {
+        deduped.push(entity);
+        continue;
+      }
+      const id = entity['id'];
+      if (typeof id === 'string' && seenIds.has(id)) {
+        duplicateCount++;
+        continue;
+      }
+      if (typeof id === 'string') seenIds.add(id);
+      deduped.push(entity);
+    }
+    data[key] = deduped;
+  }
+
+  if (duplicateCount > 0) {
+    warnings.push(
+      `${duplicateCount} entit${duplicateCount === 1 ? 'y was' : 'ies were'} removed for having a duplicate id shared with an earlier entity.`,
+    );
+  }
+};
+
+// ---------------------------------------------------------------------------
 // Version migration
 // ---------------------------------------------------------------------------
 
@@ -316,6 +379,20 @@ export const validateImportedCampaign = (
     return { success: false, errors, warnings };
   }
 
+  // Reject files from a future schema version BEFORE any mutation — a file
+  // stamped with a version newer than this build understands must not be
+  // silently downgraded and re-stamped (that would launder its provenance).
+  const declaredVersion = typeof data['version'] === 'number' ? data['version'] : 0;
+  if (declaredVersion > CURRENT_CAMPAIGN_VERSION) {
+    return {
+      success: false,
+      errors: [
+        'This file was created by a newer version of Realmweaver. Please update the app before importing it.',
+      ],
+      warnings,
+    };
+  }
+
   // Apply schema version migrations
   applyMigrations(data, warnings);
 
@@ -331,8 +408,9 @@ export const validateImportedCampaign = (
 
   for (const { key, kind } of nameArrays) {
     if (!Array.isArray(data[key])) {
+      const wasPresent = data[key] !== undefined;
       data[key] = [];
-      if (data[key] !== undefined) {
+      if (wasPresent) {
         warnings.push(`"${key}" field was not an array and has been reset to empty.`);
       }
     } else {
@@ -366,7 +444,11 @@ export const validateImportedCampaign = (
 
   for (const { key, kind } of titleArrays) {
     if (!Array.isArray(data[key])) {
+      const wasPresent = data[key] !== undefined;
       data[key] = [];
+      if (wasPresent) {
+        warnings.push(`"${key}" field was not an array and has been reset to empty.`);
+      }
     } else {
       const result = validateEntityArray(
         data[key],
@@ -388,7 +470,11 @@ export const validateImportedCampaign = (
 
   // PlayerCharacters use a different shape — only validate id presence
   if (!Array.isArray(data['playerCharacters'])) {
+    const wasPresent = data['playerCharacters'] !== undefined;
     data['playerCharacters'] = [];
+    if (wasPresent) {
+      warnings.push('"playerCharacters" field was not an array and has been reset to empty.');
+    }
   } else {
     const result = validateEntityArray(
       data['playerCharacters'],
@@ -401,6 +487,9 @@ export const validateImportedCampaign = (
       );
     }
   }
+
+  // Enforce campaign-wide id uniqueness now that every array is sanitised.
+  dedupeIdsAcrossCampaign(data, warnings);
 
   // Ensure legacy compatibility fields that campaignService also handles,
   // so the service layer gets a cleaner object.
