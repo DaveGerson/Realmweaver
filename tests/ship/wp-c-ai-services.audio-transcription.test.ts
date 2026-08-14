@@ -120,6 +120,31 @@ describe('startAudioTranscription surfaces connection failures (#41)', () => {
     expect(trackStop).toHaveBeenCalled();
     expect(audioCtxClose).toHaveBeenCalled();
   });
+
+  // The original #41 guard only wrapped `await sessionPromise` — a REJECTED
+  // connect promise. If `ai.live.connect(...)` itself throws SYNCHRONOUSLY
+  // (a malformed config object, an SDK version mismatch validating eagerly),
+  // the throw happens before `sessionPromise` is even assigned, so the
+  // already-live mic stream and AudioContext leaked exactly as described in
+  // #41, just via a different trigger.
+  it('tears down the microphone stream when connect() throws synchronously', async () => {
+    connectMock.mockImplementationOnce(() => {
+      throw new Error('Invalid live session config: unsupported speechConfig shape.');
+    });
+
+    await expect(
+      startAudioTranscription({
+        gcpApiKey: 'bad-key',
+        onTranscript: vi.fn(),
+        onConnected: vi.fn(),
+        onDisconnected: vi.fn(),
+        onError: vi.fn(),
+      })
+    ).rejects.toThrow(/unsupported speechConfig/);
+
+    expect(trackStop).toHaveBeenCalled();
+    expect(audioCtxClose).toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -155,4 +180,22 @@ describe('audio transcription goes through the aiService facade (#42)', () => {
     expect(connectMock).not.toHaveBeenCalled();
     await session.stop();
   });
+
+  // The facade existing is necessary but not sufficient — the whole point of
+  // #42 is that a real caller (SessionLogEditor's AI Scribe button) must
+  // actually route through it instead of reaching past it into
+  // services/ai/audioTranscription directly, which is the one path that
+  // ignores isMockMode entirely.
+  //
+  // components/editors/SessionLogEditor.tsx is wp-f1-owned, not this
+  // package's — wp-c's job is to make that swap trivial (the facade above
+  // now re-exports both the function AND its config/session types, see
+  // aiService.ts) and hand the swap off, not to edit the file directly. A
+  // hard assertion here that the component's source never imports
+  // `services/ai/*` would be correct once wp-f1 lands the swap, but would
+  // fail-flakily today purely on cross-package sequencing (this file is
+  // shared, actively-edited state — not something wp-c owns or controls the
+  // timing of), which would make an UNRELATED package's suite-green
+  // requirement gate this one. Left as a documented follow-up rather than a
+  // brittle cross-package assertion; see the fix-report note.
 });

@@ -13,6 +13,24 @@ import * as aiStyleMatching from './ai/styleMatching';
 import * as mockService from './ai/mockService';
 import * as aiAudioTranscription from './ai/audioTranscription';
 
+// Re-exported so components need only ever import from this facade (never
+// `services/ai/*` directly, per CLAUDE.md) — the AI Scribe types travel
+// alongside the `startAudioTranscription` facade function below (finding
+// #42; components/editors/SessionLogEditor.tsx is wp-f1-owned and still
+// imports both the function AND these types straight from
+// `services/ai/audioTranscription` — this re-export makes that swap a
+// pure import-path change with no other edits required).
+export type { AudioTranscriptionConfig, AudioTranscriptionSession };
+
+// Re-exported for the same reason: components/dialogs/WorldSimulationWizard.tsx
+// (wp-g1-owned) currently imports this validator as a VALUE straight from
+// `services/ai/worldSimulation`, which is the exact CLAUDE.md facade
+// violation this file exists to prevent. `isValidSuggestedUpdate` has no
+// mock-mode branch (it's a pure validation predicate, not an AI call), so
+// re-exporting it here — rather than adding a needless isMockMode-gated
+// wrapper — lets wp-g1 swap its import path with no behaviour change.
+export { isValidSuggestedUpdate } from './ai/worldSimulation';
+
 export const generateNpc = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<NPC, 'id' | 'factionId'>> => {
   if (isMockMode) {
     return mockService.generateNpc(prompt, false, campaignContext);

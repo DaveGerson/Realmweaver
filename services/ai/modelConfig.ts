@@ -37,6 +37,28 @@ export type ModelTier = 'lite' | 'standard' | 'quality';
 export type AIProviderType = 'claude-cli' | 'anthropic-api';
 
 // ---------------------------------------------------------------------------
+// Browser-safe environment access
+// ---------------------------------------------------------------------------
+
+/**
+ * `modelConfig.ts` is imported as a VALUE (not type-only) by
+ * `providers/registry.ts` and `providers/claude-cli.ts`, so this module's
+ * top-level code runs in the browser during `npm run dev` — the documented
+ * production runtime (see CLAUDE.md, vite.config.ts). Vite's `define` only
+ * rewrites `process.env.*` references at BUILD time (`vite build`); in dev
+ * mode (`this.environment.config.consumer === 'client' && !isBuild`) it is a
+ * no-op and nothing shims a `process` global, so a bare `process.env.FOO`
+ * read throws `ReferenceError: process is not defined` on first call.
+ *
+ * Guard every read behind this shim instead: `process` exists in Node
+ * (tests, and any future server-side usage) and is simply absent in the
+ * browser, in which case every env var below correctly resolves to its
+ * documented default rather than crashing.
+ */
+const ENV: Record<string, string | undefined> =
+  typeof process !== 'undefined' && process.env ? process.env : {};
+
+// ---------------------------------------------------------------------------
 // Tier → Model mappings
 // ---------------------------------------------------------------------------
 
@@ -104,7 +126,7 @@ export function resolveGeminiModelName(geminiName: string): ModelTier {
  * @returns The currently configured AI provider type.
  */
 export function getActiveProvider(): AIProviderType {
-    const raw = process.env.REALMWEAVER_AI_PROVIDER;
+    const raw = ENV.REALMWEAVER_AI_PROVIDER;
     if (raw === 'anthropic-api' || raw === 'claude-cli') {
         return raw;
     }
@@ -209,15 +231,15 @@ export interface ProviderConfig {
 export function getProviderConfig(): ProviderConfig {
     const type = getActiveProvider();
 
-    const rawTier = process.env.REALMWEAVER_DEFAULT_TIER ?? '';
+    const rawTier = ENV.REALMWEAVER_DEFAULT_TIER ?? '';
     const defaultTier: ModelTier = VALID_TIERS.has(rawTier)
         ? (rawTier as ModelTier)
         : 'standard';
 
-    const rawRetries = parseInt(process.env.REALMWEAVER_MAX_RETRIES ?? '', 10);
+    const rawRetries = parseInt(ENV.REALMWEAVER_MAX_RETRIES ?? '', 10);
     const maxRetries = Number.isFinite(rawRetries) && rawRetries >= 0 ? rawRetries : 3;
 
-    const rawTimeout = parseInt(process.env.REALMWEAVER_TIMEOUT_MS ?? '', 10);
+    const rawTimeout = parseInt(ENV.REALMWEAVER_TIMEOUT_MS ?? '', 10);
     const timeoutMs = Number.isFinite(rawTimeout) && rawTimeout > 0 ? rawTimeout : 120_000;
 
     const config: ProviderConfig = {
@@ -228,15 +250,15 @@ export function getProviderConfig(): ProviderConfig {
     };
 
     if (type === 'claude-cli') {
-        config.cliPath = process.env.CLAUDE_CLI_PATH ?? 'claude';
+        config.cliPath = ENV.CLAUDE_CLI_PATH ?? 'claude';
     }
 
     if (type === 'anthropic-api') {
-        const apiKey = process.env.ANTHROPIC_API_KEY;
+        const apiKey = ENV.ANTHROPIC_API_KEY;
         if (apiKey) {
             config.apiKey = apiKey;
         }
-        const baseUrl = process.env.REALMWEAVER_API_BASE_URL;
+        const baseUrl = ENV.REALMWEAVER_API_BASE_URL;
         if (baseUrl) {
             config.baseUrl = baseUrl;
         }

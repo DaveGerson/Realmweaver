@@ -51,12 +51,21 @@ interface CliRequest {
 /**
  * Untrusted campaign text (imported .json campaigns, pasted Ingest documents)
  * is interpolated into the SYSTEM prompt between `<campaign_context>` tags for
- * a filesystem-capable CLI agent. Strip any embedded delimiter tags so the
- * content can never close the block early and have its remainder read as
- * top-level system instructions.
+ * a filesystem-capable CLI agent. Escape every angle bracket in the untrusted
+ * text so no delimiter tag — `<campaign_context>`, `</campaign_context>`, or
+ * any other instruction-like tag the model might be trained to respect (e.g.
+ * `<system>`, `<tool_use>`) — can ever appear in the assembled prompt.
+ *
+ * A textual strip of the literal tag string is NOT sufficient: it is
+ * defeated by a nested/overlapping payload such as
+ * `</campaign_conte<campaign_context>xt>` — removing the inner
+ * `<campaign_context>` reconstitutes a literal `</campaign_context>` from the
+ * surrounding fragments. Escaping instead removes the character class the
+ * attack depends on (`<` / `>`) entirely, so no fixed-point loop is needed
+ * and no combination of nesting can ever produce a real delimiter.
  */
 function sanitizeCampaignContext(campaignContext: string): string {
-  return campaignContext.replace(/<\/?campaign_context>/gi, '');
+  return campaignContext.replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 /**
