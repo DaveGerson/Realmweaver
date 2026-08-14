@@ -37,10 +37,31 @@ export interface LinkedTextProps {
 interface EntityEntry {
   id: string;
   type: QuickCardEntityType;
-  /** Lowercase form used for case-insensitive matching. */
-  lowerName: string;
-  /** Original name used as the displayed label. */
+  /** Original name, used only for sort order and debugging. */
   name: string;
+  /**
+   * Case-insensitive, Unicode-aware word-boundary regex matching this
+   * entity's name directly against the ORIGINAL text (no intermediate
+   * lowercased copy — see the offset-drift note on `tokenize` below).
+   */
+  matcher: RegExp;
+}
+
+/** Escape a string for literal use inside a RegExp. */
+function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Build a case-insensitive, Unicode-aware word-boundary matcher for a name.
+ * `\p{L}\p{N}` (letters/numbers in any script) are word characters — this
+ * matches services/linking/matchingEngine.ts's definition exactly, so e.g.
+ * "Ana" never matches inside "Anaïs" (the 'ï' is a word char, not a
+ * boundary) and "_" IS a boundary (underscore is not \p{L}/\p{N}).
+ */
+function buildMatcher(name: string): RegExp {
+  const escaped = escapeRegExp(name);
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'giu');
 }
 
 // ─── Text-segment types ───────────────────────────────────────────────────────
@@ -64,49 +85,36 @@ function buildEntityEntries(campaign: NonNullable<ReturnType<typeof campaignServ
 
   for (const npc of campaign.npcs) {
     if (npc.name.length >= MIN_NAME_LENGTH)
-      entries.push({ id: npc.id, type: 'npc', name: npc.name, lowerName: npc.name.toLowerCase() });
+      entries.push({ id: npc.id, type: 'npc', name: npc.name, matcher: buildMatcher(npc.name) });
   }
   for (const loc of campaign.locations) {
     if (loc.name.length >= MIN_NAME_LENGTH)
-      entries.push({ id: loc.id, type: 'location', name: loc.name, lowerName: loc.name.toLowerCase() });
+      entries.push({ id: loc.id, type: 'location', name: loc.name, matcher: buildMatcher(loc.name) });
   }
   for (const fac of campaign.factions) {
     if (fac.name.length >= MIN_NAME_LENGTH)
-      entries.push({ id: fac.id, type: 'faction', name: fac.name, lowerName: fac.name.toLowerCase() });
+      entries.push({ id: fac.id, type: 'faction', name: fac.name, matcher: buildMatcher(fac.name) });
   }
   for (const item of campaign.items) {
     if (item.name.length >= MIN_NAME_LENGTH)
-      entries.push({ id: item.id, type: 'item', name: item.name, lowerName: item.name.toLowerCase() });
+      entries.push({ id: item.id, type: 'item', name: item.name, matcher: buildMatcher(item.name) });
   }
   for (const adv of campaign.adventures) {
     if (adv.title.length >= MIN_NAME_LENGTH)
-      entries.push({ id: adv.id, type: 'adventure', name: adv.title, lowerName: adv.title.toLowerCase() });
+      entries.push({ id: adv.id, type: 'adventure', name: adv.title, matcher: buildMatcher(adv.title) });
   }
   for (const art of campaign.articles) {
     if (art.title.length >= MIN_NAME_LENGTH)
-      entries.push({ id: art.id, type: 'article', name: art.title, lowerName: art.title.toLowerCase() });
+      entries.push({ id: art.id, type: 'article', name: art.title, matcher: buildMatcher(art.title) });
   }
   for (const plot of campaign.plots) {
     if (plot.title.length >= MIN_NAME_LENGTH)
-      entries.push({ id: plot.id, type: 'plot', name: plot.title, lowerName: plot.title.toLowerCase() });
+      entries.push({ id: plot.id, type: 'plot', name: plot.title, matcher: buildMatcher(plot.title) });
   }
 
   // Sort longest name first for greedy matching
-  entries.sort((a, b) => b.lowerName.length - a.lowerName.length);
+  entries.sort((a, b) => b.name.length - a.name.length);
   return entries;
-}
-
-/**
- * Check that the character before and after a candidate match is a word
- * boundary (non-alphanumeric or string edge) to avoid matching substrings
- * inside words like "Mira" inside "Miraculous".
- */
-function isWordBoundary(text: string, start: number, end: number): boolean {
-  const before = start === 0 ? '' : text[start - 1];
-  const after  = end   === text.length ? '' : text[end];
-  const boundaryRe = /[^a-zA-Z0-9]/;
-  return (before === '' || boundaryRe.test(before)) &&
-         (after  === '' || boundaryRe.test(after));
 }
 
 /**
@@ -114,26 +122,33 @@ function isWordBoundary(text: string, start: number, end: number): boolean {
  * the earliest position in the remaining string. When multiple entities would
  * match at the same position, the longest is selected (guaranteed by the
  * sorted order of `entries`).
+ *
+ * Matches run directly against the ORIGINAL text via each entry's
+ * Unicode-aware, case-insensitive `matcher` regex — there is no intermediate
+ * lowercased copy of `text`, so there is no possibility of an offset drifting
+ * out of sync with a character (like 'İ' U+0130) that changes length under
+ * `toLowerCase()` (finding #100).
  */
 function findNextMatch(
-  lowerText: string,
+  text: string,
   entries: EntityEntry[],
   searchStart: number
 ): { entity: EntityEntry; matchStart: number; matchEnd: number } | null {
   let best: { entity: EntityEntry; matchStart: number; matchEnd: number } | null = null;
 
   for (const entry of entries) {
-    const idx = lowerText.indexOf(entry.lowerName, searchStart);
-    if (idx === -1) continue;
+    entry.matcher.lastIndex = searchStart;
+    const m = entry.matcher.exec(text);
+    if (!m) continue;
 
-    const matchEnd = idx + entry.lowerName.length;
-    if (!isWordBoundary(lowerText, idx, matchEnd)) continue;
+    const matchStart = m.index;
+    const matchEnd = matchStart + m[0].length;
 
-    if (best === null || idx < best.matchStart) {
-      best = { entity: entry, matchStart: idx, matchEnd };
+    if (best === null || matchStart < best.matchStart) {
+      best = { entity: entry, matchStart, matchEnd };
     }
     // If same start position but longer (can't happen since entries are
-    // sorted longest-first and we only update when idx < best), skip.
+    // sorted longest-first and we only update when matchStart < best), skip.
   }
   return best;
 }
@@ -144,12 +159,11 @@ function findNextMatch(
 function tokenize(text: string, entries: EntityEntry[]): Segment[] {
   if (!text || entries.length === 0) return [{ kind: 'plain', text }];
 
-  const lowerText = text.toLowerCase();
   const segments: Segment[] = [];
   let cursor = 0;
 
   while (cursor < text.length) {
-    const match = findNextMatch(lowerText, entries, cursor);
+    const match = findNextMatch(text, entries, cursor);
     if (!match) {
       segments.push({ kind: 'plain', text: text.slice(cursor) });
       break;
