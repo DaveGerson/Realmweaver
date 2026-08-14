@@ -23,7 +23,7 @@
 
 import React from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, cleanup, screen, fireEvent } from '@testing-library/react';
+import { render, cleanup, screen, fireEvent, act } from '@testing-library/react';
 import { setupTestEnvironment } from '../helpers/testStoreFactory';
 import type { Campaign } from '../../types/index';
 
@@ -84,5 +84,70 @@ describe('DM Coach — Escape handling must be scoped to the panel (#76)', () =>
         fireEvent.keyDown(screen.getByLabelText('DM Coach prompt'), { key: 'Escape' });
 
         expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('regression: plain Escape closes the panel when opened from a toolbar button that never receives focus (verifier problem 1)', async () => {
+        const onClose = vi.fn();
+
+        // The real-world trigger: a Header toolbar button OUTSIDE the <aside>
+        // subtree. Before the fix, focus stayed here forever because nothing
+        // moved it into the panel, so Escape (fired at whatever is actually
+        // focused) never reached the panel's scoped onKeyDown handler.
+        const trigger = document.createElement('button');
+        trigger.textContent = 'Open DM Coach';
+        document.body.appendChild(trigger);
+        trigger.focus();
+        expect(document.activeElement).toBe(trigger);
+
+        render(<DmCoach campaign={campaign} onClose={onClose} isMockMode={true} />);
+
+        // Flush the rAF-guarded focus-in effect.
+        await act(async () => { await new Promise(r => setTimeout(r, 20)); });
+
+        // Focus must have moved into the panel — the trigger no longer holds it.
+        expect(document.activeElement).not.toBe(trigger);
+        const dialog = screen.getByRole('dialog', { name: 'DM Coach' });
+        expect(dialog.contains(document.activeElement)).toBe(true);
+
+        // A plain Escape fired at whatever now has focus must close the panel.
+        fireEvent.keyDown(document.activeElement as Element, { key: 'Escape' });
+        expect(onClose).toHaveBeenCalledTimes(1);
+
+        trigger.remove();
+    });
+
+    it('restores focus to the trigger element on unmount', async () => {
+        const onClose = vi.fn();
+        const trigger = document.createElement('button');
+        trigger.textContent = 'Open DM Coach';
+        document.body.appendChild(trigger);
+        trigger.focus();
+
+        const { unmount } = render(<DmCoach campaign={campaign} onClose={onClose} isMockMode={true} />);
+        await act(async () => { await new Promise(r => setTimeout(r, 20)); });
+        expect(document.activeElement).not.toBe(trigger);
+
+        unmount();
+        expect(document.activeElement).toBe(trigger);
+
+        trigger.remove();
+    });
+
+    it('does not close the panel when the Escape keydown was already marked defaultPrevented (e.g. by MentionInput\'s suggestion dropdown)', () => {
+        const onClose = vi.fn();
+        render(<DmCoach campaign={campaign} onClose={onClose} isMockMode={true} />);
+
+        const prompt = screen.getByLabelText('DM Coach prompt');
+        // A real inner consumer (MentionInput's suggestion dropdown, per
+        // finding #52) calls preventDefault() on the Escape keydown before it
+        // reaches the panel's own handler — mirrored here with a real
+        // preventDefault() on a native, cancelable KeyboardEvent so
+        // e.defaultPrevented is genuinely true by the time React's synthetic
+        // handler runs.
+        const evt = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+        evt.preventDefault();
+        act(() => { prompt.dispatchEvent(evt); });
+
+        expect(onClose).not.toHaveBeenCalled();
     });
 });

@@ -36,7 +36,14 @@ export const DmStylePanel: React.FC<DmStylePanelProps> = ({
 
   return (
     <DialogShell isOpen onClose={onClose} ariaLabel="DM Style Settings" className="relative w-full max-w-sm mx-4">
-      <div className="w-full bg-slate-900 border border-slate-700 rounded-xl shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200">
+      {/* Finding #73 residual: DialogShell centers the panel (items-center) at
+          every breakpoint, unlike the old hand-rolled wrapper's mobile bottom
+          sheet (`items-end sm:items-center`). `slide-in-from-bottom-4` was
+          written for that bottom-sheet placement and reads as a mismatched
+          entrance animation now that the panel is always centered, so it's
+          dropped in favor of a plain fade-in that suits the centered layout
+          at all viewport widths. */}
+      <div className="w-full bg-slate-900 border border-slate-700 rounded-xl shadow-2xl animate-in fade-in duration-200">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-800">
           <div className="flex items-center gap-2">

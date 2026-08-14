@@ -267,6 +267,18 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
     const canGoNext = displayIndex < activeSteps.length - 1;
 
     // ── Go Live ───────────────────────────────────────────────────────────────
+    // CROSS-PACKAGE CONTRACT (verifier problem 3 / finding #26): plannedNpcIds
+    // and plannedLocationIds below are the curated result of step 3 (extra +
+    // auto-linked NPCs/locations minus anything the DM removed) and ARE
+    // persisted correctly onto the SessionLog. But nothing reads them yet —
+    // SessionRunner.tsx (owned by wp-e-app-shell, not this package) still
+    // derives its live NPC/Location panels purely from the session's
+    // scene-linked entities, so the curation has zero effect once the DM
+    // clicks "Go Live". SessionRunner's entity panels need to prefer
+    // sessionLog.plannedNpcIds / plannedLocationIds when present (arrays,
+    // possibly empty for a deliberate all-removed curation) and fall back to
+    // the scene-derived sets only when the fields are absent (`undefined`,
+    // for session logs created before this fix) so older logs are unaffected.
     const handleGoLive = useCallback(() => {
         const sessionData: Omit<SessionLog, 'id'> = {
             title: effectiveTitle,

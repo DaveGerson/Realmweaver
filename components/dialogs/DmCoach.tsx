@@ -106,6 +106,38 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
     // itself (via onKeyDown below) rather than a document-level listener, so
     // Escape pressed elsewhere on the page (e.g. dismissing an unrelated
     // popover) doesn't tear down the panel.
+    //
+    // Regression fix: the panel is opened from a toolbar button OUTSIDE the
+    // <aside> subtree and nothing ever moved focus into the panel, so
+    // document.activeElement stayed on that trigger — a plain Escape press
+    // never bubbled through the scoped onKeyDown handler and did nothing.
+    // Move focus into the panel on mount (first focusable control, falling
+    // back to the panel itself) and restore it to whatever was focused
+    // before the panel opened when it unmounts, mirroring DialogShell's
+    // focus dance without adopting its centered-backdrop layout.
+    const asideRef = useRef<HTMLElement>(null);
+    const previousFocusRef = useRef<Element | null>(null);
+
+    useEffect(() => {
+        previousFocusRef.current = document.activeElement;
+        const frame = requestAnimationFrame(() => {
+            if (!asideRef.current) return;
+            const focusable = asideRef.current.querySelector<HTMLElement>(
+                'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            );
+            if (focusable) {
+                focusable.focus();
+            } else {
+                asideRef.current.focus();
+            }
+        });
+        return () => {
+            cancelAnimationFrame(frame);
+            if (previousFocusRef.current && 'focus' in previousFocusRef.current) {
+                (previousFocusRef.current as HTMLElement).focus();
+            }
+        };
+    }, []);
 
     useEffect(() => {
         if (activeTool === 'roleplay' && messagesEndRef.current) {
@@ -300,9 +332,11 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
 
     return (
         <aside
+            ref={asideRef}
             role="dialog"
             aria-label="DM Coach"
-            onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+            tabIndex={-1}
+            onKeyDown={(e) => { if (e.key === 'Escape' && !e.defaultPrevented) onClose(); }}
             className={[
                 // Mobile: half-height bottom sheet anchored to bottom of parent
                 "absolute bottom-0 left-0 right-0 h-[60vh]",
@@ -310,6 +344,7 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
                 "md:inset-y-0 md:left-auto md:right-0 md:w-full md:max-w-md md:h-auto",
                 "bg-slate-900/95 backdrop-blur-md border-t md:border-t-0 md:border-l border-slate-800 z-10 flex flex-col shadow-2xl",
                 "animate-in slide-in-from-bottom md:slide-in-from-right duration-300",
+                "outline-none",
             ].join(' ')}
         >
             <header className="flex items-center justify-between p-4 border-b border-slate-800 flex-shrink-0">
@@ -806,9 +841,9 @@ const RollableTableDisplay = ({ table, onSendToNotes }: { table: RollableTable; 
 
         const findResult = (r: number, entries: RollableTableEntry[]): string => {
             for (const [i, entry] of entries.entries()) {
-                // AI-generated ranges routinely use an en dash / em dash / other
-                // Unicode dash instead of the ASCII hyphen (finding #78).
-                const normalizedRange = entry.range.replace(/[‐-―]/g, '-');
+                // AI-generated ranges routinely use an en dash / em dash / minus
+                // sign / fullwidth hyphen instead of the ASCII hyphen (finding #78).
+                const normalizedRange = entry.range.replace(/[‐-―−－]/g, '-');
                 const parts = normalizedRange.split('-').map(p => parseInt(p.trim(), 10));
                 if (parts.length === 1 && !isNaN(parts[0]) && r === parts[0]) return entry.result;
                 if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1]) && r >= parts[0] && r <= parts[1]) return entry.result;

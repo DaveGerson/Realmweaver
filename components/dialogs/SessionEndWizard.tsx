@@ -7,6 +7,7 @@ import { twMerge } from 'tailwind-merge';
 import { campaignService } from '../../services/campaignService';
 import { generateSessionRecap } from '../../services/aiService';
 import { DialogShell } from '../common/DialogShell';
+import { useToast } from '@/hooks/useToast';
 
 type WizardStep = 'recap' | 'plots' | 'loose-ends' | 'player-recap' | 'confirm';
 
@@ -34,6 +35,7 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
     onComplete,
     onCancel,
 }) => {
+    const { addToast } = useToast();
     const [currentStep, setCurrentStep] = useState<WizardStep>('recap');
     const [isGenerating, setIsGenerating] = useState(false);
     const [generateError, setGenerateError] = useState<string | null>(null);
@@ -52,7 +54,10 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
     const [manualLooseEnd, setManualLooseEnd] = useState('');
 
     // Player-facing recap state
-    const [playerRecap, setPlayerRecap] = useState('');
+    // Finding #25 regression fix: seed from the previously saved value, like
+    // its `recap`/`looseEnds` siblings, so re-opening the wizard on a log that
+    // already has a saved player recap doesn't blank it on the next save.
+    const [playerRecap, setPlayerRecap] = useState(sessionLog.playerRecap || '');
     const [showCopied, setShowCopied] = useState(false);
 
     // Get related plots
@@ -140,14 +145,19 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
 
     // Copy player recap
     const handleCopyPlayerRecap = useCallback(() => {
-        if (!navigator.clipboard?.writeText) return;
+        if (!navigator.clipboard?.writeText) {
+            addToast('Copy failed — select the text and copy manually', 'error');
+            return;
+        }
         navigator.clipboard.writeText(playerRecap)
             .then(() => {
                 setShowCopied(true);
                 setTimeout(() => setShowCopied(false), 2000);
             })
-            .catch(() => { /* copy failed silently; no success state shown */ });
-    }, [playerRecap]);
+            .catch(() => {
+                addToast('Copy failed — select the text and copy manually', 'error');
+            });
+    }, [playerRecap, addToast]);
 
     // Save and complete
     const handleSaveAndEnd = useCallback(() => {

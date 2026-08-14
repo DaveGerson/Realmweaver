@@ -25,6 +25,7 @@ import React from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent, waitFor } from '@testing-library/react';
 import type { Campaign, SessionLog } from '../../types/index';
+import { ToastProvider } from '../../hooks/useToast';
 
 const h = vi.hoisted(() => ({
     updateSessionLog: vi.fn(),
@@ -69,15 +70,17 @@ const sessionLog = {
     looseEnds: '',
 } as unknown as SessionLog;
 
-const renderWizard = () =>
+const renderWizard = (log: SessionLog = sessionLog) =>
     render(
-        <SessionEndWizard
-            campaign={campaign}
-            sessionLog={sessionLog}
-            isMockMode={true}
-            onComplete={() => {}}
-            onCancel={() => {}}
-        />
+        <ToastProvider>
+            <SessionEndWizard
+                campaign={campaign}
+                sessionLog={log}
+                isMockMode={true}
+                onComplete={() => {}}
+                onCancel={() => {}}
+            />
+        </ToastProvider>
     );
 
 /** Navigate to step 4 and type a player-facing recap. */
@@ -117,6 +120,28 @@ describe('SessionEndWizard — player-facing recap persistence (#25)', () => {
         expect(payload).toHaveProperty('looseEnds');
         expect(payload).toHaveProperty('plotProgressions');
         expect(h.endSession).toHaveBeenCalled();
+    });
+
+    it('does not blank a previously saved player recap when the DM re-runs the wizard without editing it (verifier problem 2)', () => {
+        // Regression: `playerRecap` state was `useState('')`, unseeded from
+        // sessionLog.playerRecap unlike its recap/looseEnds siblings — so
+        // clicking straight through to Save & End on a log that already has a
+        // saved player recap silently overwrote it with ''.
+        const logWithSavedRecap = {
+            ...sessionLog,
+            playerRecap: 'PREVIOUSLY SAVED PLAYER RECAP',
+        } as SessionLog;
+
+        renderWizard(logWithSavedRecap);
+
+        // Click straight through to Save & End without touching the textarea.
+        fireEvent.click(screen.getByRole('button', { name: /Save & End/i }));
+        fireEvent.click(screen.getByRole('button', { name: /^End Session$/i }));
+
+        expect(h.updateSessionLog).toHaveBeenCalledWith(
+            'sess-1',
+            expect.objectContaining({ playerRecap: 'PREVIOUSLY SAVED PLAYER RECAP' })
+        );
     });
 });
 
@@ -178,5 +203,28 @@ describe('SessionEndWizard — clipboard failures must not report success (#81)'
 
         expect(uncaught).toEqual([]);
         expect(screen.queryByText(/Copied!/i)).toBeNull();
+    });
+
+    it('surfaces a failure toast when the clipboard write is rejected (verifier problem 6)', async () => {
+        const writeText = vi.fn(() => Promise.reject(new Error('permission denied')));
+        vi.stubGlobal('navigator', { ...globalThis.navigator, clipboard: { writeText } });
+
+        renderWizard();
+        typePlayerRecap('Spoiler-free recap.');
+
+        fireEvent.click(screen.getByRole('button', { name: /Copy to Clipboard/i }));
+
+        await waitFor(() => expect(screen.getByRole('alert').textContent ?? '').toMatch(/copy failed/i));
+    });
+
+    it('surfaces a failure toast when navigator.clipboard is unavailable (verifier problem 6)', async () => {
+        vi.stubGlobal('navigator', { ...globalThis.navigator, clipboard: undefined });
+
+        renderWizard();
+        typePlayerRecap('Spoiler-free recap.');
+
+        fireEvent.click(screen.getByRole('button', { name: /Copy to Clipboard/i }));
+
+        await waitFor(() => expect(screen.getByRole('alert').textContent ?? '').toMatch(/copy failed/i));
     });
 });
