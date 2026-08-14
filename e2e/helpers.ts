@@ -249,7 +249,7 @@ export async function createCampaign(
  * On mobile, the sidebar is a hidden drawer. Open it by clicking the
  * hamburger button in the header (md:hidden class means desktop doesn't show it).
  */
-async function openMobileSidebar(page: Page): Promise<void> {
+export async function openMobileSidebar(page: Page): Promise<void> {
   // The hamburger button sits before the logo in the header — it's md:hidden
   const hamburger = page.locator('header').getByRole('button').first();
   // Only click it if the sidebar is not currently visible in the viewport
@@ -347,4 +347,20 @@ export async function waitForAutoSave(page: Page, expectedTitle: string): Promis
     expectedTitle,
     { timeout: 8000, polling: 200 }
   );
+}
+
+/**
+ * In the SessionRunner on mobile, panels live behind a tab bar
+ * (Scenes / Active / Tools — md:hidden, so absent on desktop). Switch to the
+ * named tab when the bar is present; a no-op on desktop where all panels are
+ * visible side by side.
+ */
+export async function switchMobileSessionTab(
+  page: Page,
+  label: 'Scenes' | 'Active' | 'Tools'
+): Promise<void> {
+  const tab = page.getByRole('button', { name: label, exact: true }).first();
+  if (await isVisibleWithin(tab, 1000)) {
+    await tab.click();
+  }
 }

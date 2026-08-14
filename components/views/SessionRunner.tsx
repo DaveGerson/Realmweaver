@@ -317,6 +317,8 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                         variant="secondary"
                         size="sm"
                         onClick={handleEndSession}
+                        aria-label="End Session"
+                        title="End Session"
                     >
                         <Icons.Stop className="w-4 h-4" />
                         <span className="hidden sm:inline ml-1.5">End Session</span>

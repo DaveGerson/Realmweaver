@@ -243,7 +243,7 @@ export const Header: React.FC<HeaderProps> = ({
           {onOpenCommandPalette && (
             <button
               onClick={onOpenCommandPalette}
-              className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-800 border border-slate-700 text-sm text-slate-400 hover:text-white hover:border-slate-600 transition-colors"
+              className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-800 border border-slate-700 text-sm text-slate-400 hover:text-white hover:border-slate-600 transition-colors"
               title={`Search (${getModifierSymbol()}+K)`}
               aria-label={`Search (${getModifierSymbol()}+K)`}
             >

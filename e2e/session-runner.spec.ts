@@ -23,6 +23,7 @@ import {
   createCampaign,
   enableMockMode,
   navigateToView,
+  switchMobileSessionTab,
 } from './helpers';
 
 test.describe('Session Runner', () => {
@@ -136,6 +137,9 @@ test.describe('Session Runner', () => {
 
     // Wait for the SessionRunner to load
     await expect(page.getByRole('button', { name: /end session/i })).toBeVisible({ timeout: 5000 });
+
+    // On mobile, beats live in the Scenes tab.
+    await switchMobileSessionTab(page, 'Scenes');
 
     // Find the beat input by its placeholder
     const beatInput = page.getByPlaceholder(/add a beat/i);

@@ -21,6 +21,7 @@ import {
   createCampaign,
   enableMockMode,
   navigateToView,
+  switchMobileSessionTab,
 } from './helpers';
 
 // =========================================================================
@@ -182,6 +183,9 @@ test.describe('Dice Roller', () => {
 
     await expect(page.getByRole('button', { name: /end session/i })).toBeVisible({ timeout: 5000 });
 
+    // On mobile the tools panel is behind the Tools tab.
+    await switchMobileSessionTab(page, 'Tools');
+
     // The Dice Roller toggle button is in the Quick Tools panel (right column).
     // It starts collapsed — click it to expand and reveal die buttons.
     const diceRollerToggle = page.getByRole('button', { name: 'Dice Roller', exact: true });
@@ -213,6 +217,9 @@ test.describe('Dice Roller', () => {
     await goLiveBtn.click();
 
     await expect(page.getByRole('button', { name: /end session/i })).toBeVisible({ timeout: 5000 });
+
+    // On mobile the tools panel is behind the Tools tab.
+    await switchMobileSessionTab(page, 'Tools');
 
     // Expand the Dice Roller section first
     const diceRollerToggle = page.getByRole('button', { name: 'Dice Roller', exact: true });
