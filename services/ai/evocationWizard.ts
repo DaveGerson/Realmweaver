@@ -106,6 +106,9 @@ const postProcessResult = (result: BatchAddData): BatchAddData => {
                 }));
                  // FIX: Ensure scene.npcIds is an array to prevent crashes.
                 scene.npcIds = scene.npcIds || [];
+                 // FIX: Ensure scene.status has a valid default — the real-provider
+                 // sceneSchema never returns it (finding #7).
+                scene.status = scene.status || 'planned';
             });
         });
     }
