@@ -125,4 +125,161 @@ describe('Cascade deletion: reference fields the sweep currently misses (finding
         expect(serialized).not.toContain(hqId);
         expect(serialized).not.toContain(factionId);
     });
+
+    it('deleteNpc/deleteLocation clear plannedNpcIds/plannedLocationIds on prepped session logs (verifier idx1/idx2, #26)', () => {
+        const { service, campaign } = makeTestStore(createCampaignStore);
+        const npcId = service.createNpc({
+            name: 'Bob', description: '', traits: '', backstory: '', motivations: '',
+            secrets: '', stats: '', exampleQuote: '', knowsPlayerHistory: [], relationships: [], history: [],
+        });
+        const locId = service.createLocation({
+            name: 'The Docks', description: '', secrets: '', loot: [], subLocationIds: [],
+            connections: [], pointsOfInterest: [], history: [],
+        });
+        const sessionId = service.createSessionLog({
+            title: 'Prepped Session', status: 'planned', sessionDate: '', plannedSceneIds: [], prepNotes: '',
+            relatedPlotIds: [], runningNotes: '', encounterLog: [], recap: '', notableEvents: '', looseEnds: '',
+            structuredNotes: [],
+        });
+        service.updateSessionLog(sessionId, { plannedNpcIds: [npcId], plannedLocationIds: [locId] });
+
+        service.deleteNpc(npcId);
+        service.deleteLocation(locId);
+
+        const session = campaign().sessionLogs.find(l => l.id === sessionId)!;
+        expect(session.plannedNpcIds).not.toContain(npcId);
+        expect(session.plannedLocationIds).not.toContain(locId);
+    });
+});
+
+/**
+ * Verifier follow-up on #10 (problem idx1): five sibling delete paths in the
+ * same file never called `_purgeEntityReferences` at all —
+ * deleteScene/deleteSessionLog/deletePlayerCharacter/deleteNote/deleteSecret
+ * — so pinned ghost entries (and, for scenes/session-logs, other specific
+ * dangling fields) survived those deletions indefinitely.
+ */
+describe('Cascade deletion: the five delete paths the ship suite never exercised (verifier idx1)', () => {
+    it('deleteScene purges the scene id from mentionedEntityIds and pinnedEntities', () => {
+        const { service, campaign } = makeTestStore(createCampaignStore);
+        const advId = service.createFullAdventure({ title: 'The Heist', hook: '', theme: '', level: 1, scenes: [] });
+        const sceneId = service.createScene(advId, {
+            title: 'The Vault', type: 'exploration', status: 'planned', readAloudText: '', gmNotes: '',
+            skillChecks: [], rewards: '', npcIds: [],
+        });
+        const npcId = service.createNpc({
+            name: 'Fence', description: '', traits: '', backstory: '', motivations: '',
+            secrets: '', stats: '', exampleQuote: '', knowsPlayerHistory: [], relationships: [], history: [],
+            mentionedEntityIds: [sceneId],
+        });
+        service.pinEntity('scene', sceneId);
+
+        service.deleteScene(advId, sceneId);
+
+        const npc = campaign().npcs.find(n => n.id === npcId)!;
+        expect(npc.mentionedEntityIds ?? []).not.toContain(sceneId);
+        expect(campaign().pinnedEntities!.some(p => p.id === sceneId)).toBe(false);
+    });
+
+    it('deleteSessionLog purges Secret.revealedInSessionId and pinnedEntities', () => {
+        const { service, campaign } = makeTestStore(createCampaignStore);
+        const sessionId = service.createSessionLog({
+            title: 'The Reveal', status: 'planned', sessionDate: '', plannedSceneIds: [], prepNotes: '',
+            relatedPlotIds: [], runningNotes: '', encounterLog: [], recap: '', notableEvents: '', looseEnds: '',
+            structuredNotes: [],
+        });
+        const secretId = service.createSecret({
+            title: 'The Betrayal', content: '', category: 'secret', isRevealed: true, linkedEntityIds: [],
+        });
+        service.revealSecret(secretId, sessionId);
+        service.pinEntity('session-log', sessionId);
+
+        expect(campaign().secrets!.find(s => s.id === secretId)!.revealedInSessionId).toBe(sessionId);
+
+        service.deleteSessionLog(sessionId);
+
+        const secret = campaign().secrets!.find(s => s.id === secretId)!;
+        expect(secret.revealedInSessionId).toBeUndefined();
+        expect(campaign().pinnedEntities!.some(p => p.id === sessionId)).toBe(false);
+    });
+
+    it('deletePlayerCharacter purges pinnedEntities', () => {
+        const { service, campaign } = makeTestStore(createCampaignStore);
+        const pcId = service.createPlayerCharacter({
+            name: 'Aria', class: '', race: '', level: 1, background: '', alignment: '',
+            playerName: '', backstory: '', notes: '',
+        } as any);
+        service.pinEntity('player-character', pcId);
+
+        service.deletePlayerCharacter(pcId);
+
+        expect(campaign().pinnedEntities!.some(p => p.id === pcId)).toBe(false);
+    });
+
+    it('deleteNote purges pinnedEntities', () => {
+        const { service, campaign } = makeTestStore(createCampaignStore);
+        const noteId = service.createNote({ title: 'Loose thread', content: '', tags: [] });
+        service.pinEntity('note', noteId);
+
+        service.deleteNote(noteId);
+
+        expect(campaign().pinnedEntities!.some(p => p.id === noteId)).toBe(false);
+    });
+
+    it('deleteSecret purges pinnedEntities and linkedEntityIds elsewhere', () => {
+        const { service, campaign } = makeTestStore(createCampaignStore);
+        const npcId = service.createNpc({
+            name: 'Keeper', description: '', traits: '', backstory: '', motivations: '',
+            secrets: '', stats: '', exampleQuote: '', knowsPlayerHistory: [], relationships: [], history: [],
+        });
+        const secretId = service.createSecret({
+            title: 'The Vault Combo', content: '', category: 'secret', isRevealed: false, linkedEntityIds: [npcId],
+        });
+        service.pinEntity('secret', secretId);
+
+        service.deleteSecret(secretId);
+
+        expect(campaign().secrets!.some(s => s.id === secretId)).toBe(false);
+        expect(campaign().pinnedEntities!.some(p => p.id === secretId)).toBe(false);
+    });
+
+    it('leaves no trace of the deleted id anywhere in the campaign for all five paths (deep sweep)', () => {
+        const { service, campaign } = makeTestStore(createCampaignStore);
+        const advId = service.createFullAdventure({ title: 'Adv', hook: '', theme: '', level: 1, scenes: [] });
+        const sceneId = service.createScene(advId, {
+            title: 'Scene', type: 'exploration', status: 'planned', readAloudText: '', gmNotes: '',
+            skillChecks: [], rewards: '', npcIds: [],
+        });
+        const sessionId = service.createSessionLog({
+            title: 'Session', status: 'planned', sessionDate: '', plannedSceneIds: [], prepNotes: '',
+            relatedPlotIds: [], runningNotes: '', encounterLog: [], recap: '', notableEvents: '', looseEnds: '',
+            structuredNotes: [],
+        });
+        const pcId = service.createPlayerCharacter({
+            name: 'Rin', class: '', race: '', level: 1, background: '', alignment: '',
+            playerName: '', backstory: '', notes: '',
+        } as any);
+        const noteId = service.createNote({ title: 'Note', content: '', tags: [] });
+        const secretId = service.createSecret({
+            title: 'Secret', content: '', category: 'secret', isRevealed: false, linkedEntityIds: [],
+        });
+        service.pinEntity('scene', sceneId);
+        service.pinEntity('session-log', sessionId);
+        service.pinEntity('player-character', pcId);
+        service.pinEntity('note', noteId);
+        service.pinEntity('secret', secretId);
+
+        service.deleteScene(advId, sceneId);
+        service.deleteSessionLog(sessionId);
+        service.deletePlayerCharacter(pcId);
+        service.deleteNote(noteId);
+        service.deleteSecret(secretId);
+
+        const serialized = JSON.stringify(campaign());
+        expect(serialized).not.toContain(sceneId);
+        expect(serialized).not.toContain(sessionId);
+        expect(serialized).not.toContain(pcId);
+        expect(serialized).not.toContain(noteId);
+        expect(serialized).not.toContain(secretId);
+    });
 });

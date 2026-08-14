@@ -59,10 +59,14 @@ describe('campaignService.init(): corrupt payload recovery (finding #1)', () => 
     it('recovers campaigns from the rotating backup buffer instead of deleting the key', async () => {
         const goodJson = JSON.stringify(makeCampaignJson());
 
-        // Seed the primary key, then let storageService rotate that good value
-        // into backup slot 1 (this is what a normal save cycle does).
-        store[CAMPAIGNS_KEY] = goodJson;
+        // Simulate a normal save cycle: the first save writes goodJson as the
+        // primary value (nothing to back up yet — first-ever save). A SECOND
+        // save with a genuinely different value is what actually rotates
+        // goodJson into backup slot 1 (a same-value no-op save deliberately
+        // does not rotate — finding idx3 — so re-saving the identical value
+        // here would not exercise the scenario this test wants).
         storageService.save(CAMPAIGNS_KEY, goodJson);
+        storageService.save(CAMPAIGNS_KEY, goodJson + '\n');
         store[ACTIVE_ID_KEY] = 'camp-1';
 
         // Now the primary payload gets truncated / hand-mangled.

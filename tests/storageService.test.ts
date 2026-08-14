@@ -274,7 +274,7 @@ describe('storageService: auto-backup (5.6)', () => {
         svc.save('data-key', 'first value');
         svc.save('data-key', 'second value'); // should rotate first → backup_1
 
-        const backups = svc.getBackups();
+        const backups = svc.getBackups('data-key');
         expect(backups.length).toBeGreaterThanOrEqual(1);
         expect(backups[0].index).toBe(1);
         expect(backups[0].data).toBe('first value');
@@ -288,7 +288,7 @@ describe('storageService: auto-backup (5.6)', () => {
         svc.save('data-key', 'v3'); // v2 → backup_1, v1 → backup_2
         svc.save('data-key', 'v4'); // v3 → backup_1, v2 → backup_2, v1 → backup_3
 
-        const backups = svc.getBackups();
+        const backups = svc.getBackups('data-key');
         const byIndex = Object.fromEntries(backups.map(b => [b.index, b.data]));
 
         expect(byIndex[1]).toBe('v3');
@@ -301,7 +301,7 @@ describe('storageService: auto-backup (5.6)', () => {
         for (let i = 1; i <= 6; i++) {
             svc.save('data-key', `v${i}`);
         }
-        const backups = svc.getBackups();
+        const backups = svc.getBackups('data-key');
         expect(backups.length).toBe(3);
     });
 
@@ -323,7 +323,58 @@ describe('storageService: auto-backup (5.6)', () => {
 
     it('getBackups returns empty array when no backups exist', () => {
         const svc = createStorageService();
-        expect(svc.getBackups()).toEqual([]);
+        expect(svc.getBackups('data-key')).toEqual([]);
+    });
+
+    // -----------------------------------------------------------------------
+    // Finding idx3 (verifier follow-up on #0): rotation consumption points
+    // -----------------------------------------------------------------------
+
+    it('does not rotate a no-op save (value unchanged) — a redundant flush must not evict older generations', () => {
+        const svc = createStorageService();
+        svc.save('data-key', 'v1');
+        svc.save('data-key', 'v2'); // v1 -> backup_1
+        svc.save('data-key', 'v2'); // no-op: value did not change, must NOT rotate
+
+        const backups = svc.getBackups('data-key');
+        const byIndex = Object.fromEntries(backups.map(b => [b.index, b.data]));
+        expect(byIndex[1]).toBe('v1');
+        expect(byIndex[2]).toBeUndefined();
+    });
+
+    it('honors skipBackup — a scalar key opted out of the buffer never accumulates backup slots', () => {
+        const svc = createStorageService();
+        svc.save('scalar-key', 'c1', { skipBackup: true });
+        svc.save('scalar-key', 'c2', { skipBackup: true });
+        svc.save('scalar-key', 'c3', { skipBackup: true });
+
+        expect(svc.getBackups('scalar-key')).toEqual([]);
+        expect(svc.loadSync('scalar-key')).toBe('c3');
+    });
+
+    it('skipBackup on one key never disturbs another key\'s rotating buffer', () => {
+        const svc = createStorageService();
+        svc.save('data-key', 'gen1');
+        svc.save('data-key', 'gen2'); // gen1 -> backup_1
+
+        svc.save('scalar-key', 'c1', { skipBackup: true });
+        svc.save('scalar-key', 'c2', { skipBackup: true });
+
+        expect(svc.restoreFromBackup('data-key', 1)).toBe(true);
+        expect(svc.loadSync('data-key')).toBe('gen1');
+    });
+
+    it('cleans up legacy fixed-name CAMPAIGNS_BACKUP_<n> keys left by the pre-namespacing scheme', () => {
+        store['CAMPAIGNS_BACKUP_1'] = JSON.stringify({ timestamp: '2020-01-01', data: 'stale' });
+        store['CAMPAIGNS_BACKUP_2'] = JSON.stringify({ timestamp: '2020-01-01', data: 'stale' });
+        store['CAMPAIGNS_BACKUP_3'] = JSON.stringify({ timestamp: '2020-01-01', data: 'stale' });
+
+        const svc = createStorageService();
+        svc.save('data-key', 'v1'); // any save should trigger the one-time cleanup
+
+        expect(store['CAMPAIGNS_BACKUP_1']).toBeUndefined();
+        expect(store['CAMPAIGNS_BACKUP_2']).toBeUndefined();
+        expect(store['CAMPAIGNS_BACKUP_3']).toBeUndefined();
     });
 });
 

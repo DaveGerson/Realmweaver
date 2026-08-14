@@ -59,6 +59,18 @@ export interface SaveResult {
   pending?: Promise<void>;
 }
 
+export interface SaveOptions {
+  /**
+   * Skip the rotating-backup buffer for this write entirely (finding #0
+   * refinement). Intended for small scalar keys — e.g. the
+   * active-campaign-id — where a 3-slot backup history is pure overhead:
+   * it doubles up as noise in the buffer meant to hold recoverable
+   * *campaign* generations, and every no-op write to it hollows out that
+   * buffer's effective depth without protecting anything worth restoring.
+   */
+  skipBackup?: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -176,9 +188,27 @@ export function createStorageService() {
     return `${primaryKey}__backup_${index}`;
   }
 
-  // Tracks the primary key most recently rotated, so the legacy zero-arg
-  // `getBackups()` call shape (used by existing tests) keeps working.
-  let _lastRotatedKey: string | null = null;
+  // One-time migration: the pre-namespacing scheme wrote every backup under
+  // a single fixed `CAMPAIGNS_BACKUP_<n>` key regardless of which primary
+  // key was being saved (finding #0). Those keys are orphaned dead weight
+  // under the namespaced scheme — nothing reads them and they are never
+  // reused — so remove them the first time this service instance saves
+  // anything, rather than carrying an extra stale campaign copy forever for
+  // any user who saved under the old code.
+  let _legacyBackupKeysCleaned = false;
+  function _cleanupLegacyBackupKeys(): void {
+    if (_legacyBackupKeysCleaned) return;
+    _legacyBackupKeysCleaned = true;
+    const ls = _ls();
+    if (!ls) return;
+    try {
+      for (let i = 1; i <= MAX_BACKUPS; i++) {
+        ls.removeItem(`CAMPAIGNS_BACKUP_${i}`);
+      }
+    } catch {
+      // best-effort cleanup only
+    }
+  }
 
   /**
    * Before overwriting the primary key, rotate backups (namespaced per
@@ -196,7 +226,6 @@ export function createStorageService() {
     if (!ls) return;
     if (previousValue === null) return; // nothing to back up on first-ever save
     try {
-      _lastRotatedKey = primaryKey;
       // Shift existing backups down one slot (oldest first to avoid overwrite)
       for (let i = MAX_BACKUPS; i >= 2; i--) {
         const olderSlot = _backupKey(primaryKey, i);
@@ -275,7 +304,7 @@ export function createStorageService() {
    *     returned `pending` promise so callers can await durable confirmation).
    *  4. Return a SaveResult describing what happened.
    */
-  function save(key: string, value: string): SaveResult {
+  function save(key: string, value: string, options?: SaveOptions): SaveResult {
     const ls = _ls();
 
     if (!ls) {
@@ -288,6 +317,8 @@ export function createStorageService() {
       };
     }
 
+    _cleanupLegacyBackupKeys();
+
     // Capture the value about to be overwritten, for backup rotation.
     const previousValue = ls.getItem(key);
 
@@ -295,7 +326,17 @@ export function createStorageService() {
       ls.setItem(key, value);
       _usingIdbFallback = false;
       _quotaWarning = false;
-      _rotateBackups(key, previousValue);
+      // Finding #0 refinement: don't rotate a fresh copy through the buffer
+      // for a no-op save (previousValue === value — e.g. a page navigation
+      // that flushes with nothing actually changed), and let callers opt
+      // small scalar keys (e.g. the active-campaign-id) out of the backup
+      // buffer entirely, since a rotating history of a bare id string
+      // protects nothing while still consuming a slot buffer and evicting
+      // older, actually-useful generations of other keys is never at risk
+      // here — but every no-op/scalar rotation is still wasted writes.
+      if (!options?.skipBackup && previousValue !== value) {
+        _rotateBackups(key, previousValue);
+      }
       return { success: true, backend: 'localStorage', quotaWarning: false, pending: Promise.resolve() };
     } catch (e) {
       const isQuota =
@@ -421,14 +462,17 @@ export function createStorageService() {
    * Returns available backup entries (5.6) for `primaryKey`.
    * Slot 1 = most recent, slot 3 = oldest.
    *
-   * `primaryKey` is optional for backward compatibility with pre-existing
-   * zero-arg callers — it defaults to whichever key was most recently
-   * rotated via `save()`. Prefer passing it explicitly.
+   * `primaryKey` is required (finding idx5): backups are namespaced per
+   * primary key, so a caller that omits it has no principled key to default
+   * to — a "last rotated key" fallback silently returns whichever key
+   * happened to save most recently (in the real app, almost always the
+   * scalar active-campaign-id, not the campaigns JSON callers actually want),
+   * which is the exact class of cross-key confusion finding #0 was about.
    */
-  function getBackups(primaryKey?: string): BackupEntry[] {
+  function getBackups(primaryKey: string): BackupEntry[] {
     const ls = _ls();
     if (!ls) return [];
-    const key = primaryKey ?? _lastRotatedKey;
+    const key = primaryKey;
     if (!key) return [];
     const results: BackupEntry[] = [];
     for (let i = 1; i <= MAX_BACKUPS; i++) {

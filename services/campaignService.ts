@@ -28,7 +28,7 @@ import { importCampaignFromJsonValidated } from './importExportService';
 import { parseCharacterSheetPdf } from './aiService';
 import { storageService } from './storageService';
 import { autoLinkScenes, autoLinkNpcFactions } from './linking/autoLinker';
-import { createDefaultPlayerCharacter } from '../utils/entityUtils';
+import { createDefaultPlayerCharacter, createDefaultScene } from '../utils/entityUtils';
 
 type AppStatus = 'loading' | 'welcome' | 'selecting' | 'creating' | 'editing';
 export type SaveStatus = 'idle' | 'saved' | 'saving' | 'error' | 'quota-warning';
@@ -158,6 +158,15 @@ type CampaignState = {
   lastSavedAt: string | null;
   /** True when another browser tab has modified campaign data since this tab last saved. */
   conflictDetected: boolean;
+  /**
+   * True when init() had to recover the campaign library from a rotating
+   * backup slot because the primary saved payload failed to parse (finding
+   * #1 / idx7). The GM is silently continuing from a slightly older
+   * snapshot unless this is surfaced — a dismissible banner (owned by
+   * wp-e-app-shell) should read this and call
+   * `campaignService.dismissBackupRecoveryNotice()`.
+   */
+  recoveredFromBackup: boolean;
 };
 
 /**
@@ -180,10 +189,20 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         saveStatus: 'idle',
         lastSavedAt: null,
         conflictDetected: false,
+        recoveredFromBackup: false,
     };
 
     let saveTimeout: any = null;
     let maxWaitTimeout: any = null;
+    // Finding idx7: monotonic token guarding against a stale in-flight
+    // persistToStorage() call clobbering saveStatus/lastSavedAt after a
+    // newer save has already completed.
+    let saveSequenceToken = 0;
+    // Finding idx6: disposer for init()'s window/document listeners + the
+    // storageService conflict subscription, so a re-`init()` call (or a
+    // caller that wants to tear a store down) doesn't leave a prior
+    // registration's closures still firing alongside a new one.
+    let _disposeInit: (() => void) | null = null;
 
     const CAMPAIGNS_STORAGE_KEY = 'realmweaver-campaigns';
     const ACTIVE_CAMPAIGN_ID_KEY = 'realmweaver-active-campaign-id';
@@ -221,6 +240,27 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             return;
         }
 
+        // Finding #13 (blocker): while a cross-tab conflict is flagged and
+        // unresolved, this tab's in-memory snapshot may be stale relative to
+        // what the other tab already wrote. Refuse to save until the user
+        // resolves it via resolveConflict('reload' | 'overwrite') — writing
+        // now would silently clobber the other tab's newer data.
+        if (state.conflictDetected) {
+            return;
+        }
+
+        // Finding idx7 (verifier follow-up on #9): persistToStorage is async
+        // and fire-and-forget from several call sites (scheduleSave's
+        // setTimeout, the max-wait timer, flushPendingSaveSync,
+        // saveCampaign). If a slow write is still awaiting durability
+        // confirmation when a LATER save already completed, the slow one's
+        // `_internalUpdate` could stamp `saveStatus`/`lastSavedAt` after the
+        // newer, more-current result — reporting stale information. A
+        // monotonically increasing token lets only the newest in-flight
+        // write's completion actually update state.
+        const myToken = ++saveSequenceToken;
+        const isStillCurrent = () => myToken === saveSequenceToken;
+
         const campaignsResult = storageService.save(
             CAMPAIGNS_STORAGE_KEY,
             JSON.stringify(state.campaigns)
@@ -229,9 +269,14 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         let activeIdResult: { success: boolean; quotaWarning: boolean; error?: string; pending?: Promise<void> } =
             { success: true, quotaWarning: false, pending: Promise.resolve() };
         if (state.activeCampaignId) {
+            // Finding #0 refinement: the active-campaign-id is a tiny scalar —
+            // rotating a 3-slot backup history for it is pure overhead (and
+            // used to corrupt the campaigns key's OWN backup buffer before
+            // slots were namespaced per-key). Opt it out of backups entirely.
             activeIdResult = storageService.save(
                 ACTIVE_CAMPAIGN_ID_KEY,
-                state.activeCampaignId
+                state.activeCampaignId,
+                { skipBackup: true }
             );
         } else {
             storageService.remove(ACTIVE_CAMPAIGN_ID_KEY);
@@ -242,9 +287,11 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
 
         if (!overallSuccess) {
             console.error('[campaignService] Failed to save state:', campaignsResult.error);
-            _internalUpdate(draft => {
-                draft.saveStatus = 'error';
-            });
+            if (isStillCurrent()) {
+                _internalUpdate(draft => {
+                    draft.saveStatus = 'error';
+                });
+            }
             return;
         }
 
@@ -255,16 +302,20 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             ]);
         } catch (err) {
             console.error('[campaignService] Save was not durably confirmed:', err);
-            _internalUpdate(draft => {
-                draft.saveStatus = 'error';
-            });
+            if (isStillCurrent()) {
+                _internalUpdate(draft => {
+                    draft.saveStatus = 'error';
+                });
+            }
             return;
         }
 
-        _internalUpdate(draft => {
-            draft.saveStatus = quotaWarning ? 'quota-warning' : 'saved';
-            draft.lastSavedAt = new Date().toISOString();
-        });
+        if (isStillCurrent()) {
+            _internalUpdate(draft => {
+                draft.saveStatus = quotaWarning ? 'quota-warning' : 'saved';
+                draft.lastSavedAt = new Date().toISOString();
+            });
+        }
         if (quotaWarning) {
             console.warn('[campaignService] Save succeeded via IndexedDB fallback — localStorage quota exceeded.');
         } else {
@@ -317,6 +368,13 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
      */
     const flushPendingSaveSync = () => {
         if (!shouldPersist) return;
+        // Finding #0 refinement: only actually persist when a save was
+        // genuinely pending. A real unload fires `visibilitychange`,
+        // `pagehide` AND `beforeunload` in quick succession — without this
+        // guard the first flush does the real work and the next two fire a
+        // redundant save each, rotating fresh (identical) copies through the
+        // backup buffer and evicting older, actually-useful generations.
+        const hadPendingSave = saveTimeout !== null || maxWaitTimeout !== null;
         if (saveTimeout) {
             clearTimeout(saveTimeout);
             saveTimeout = null;
@@ -325,6 +383,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             clearTimeout(maxWaitTimeout);
             maxWaitTimeout = null;
         }
+        if (!hadPendingSave) return;
         // Fire-and-forget: the synchronous localStorage write inside happens
         // before this call returns; the rest (durability confirmation) can
         // resolve after the page has started unloading.
@@ -423,8 +482,17 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
      * relatedEntityIds + mentionedEntityIds, SessionLog relatedPlotIds +
      * plotProgressions (for when the deleted entity is a Plot), Faction
      * leaderId/headquartersLocationId, Location.connections, Secret
-     * linkedEntityIds, SessionLog.structuredNotes[].taggedEntityIds, and
-     * Campaign.pinnedEntities (finding #10).
+     * linkedEntityIds + revealedInSessionId, SessionLog
+     * structuredNotes[].taggedEntityIds + plannedNpcIds + plannedLocationIds,
+     * and Campaign.pinnedEntities (finding #10).
+     *
+     * Called from every entity delete method — including
+     * deleteScene/deleteSessionLog/deletePlayerCharacter/deleteNote/
+     * deleteSecret, not just NPC/Location/Faction/Plot/Article (verifier
+     * follow-up on #10: those five were wired to the individual-array splice
+     * but never called this sweep, so e.g. a deleted scene's id survived in
+     * every mentionedEntityIds array and a deleted note/secret/session-log/PC
+     * id survived in pinnedEntities forever).
      */
     const _purgeEntityReferences = (draftCampaign: Campaign, entityId: string) => {
         draftCampaign.npcs.forEach(npc => {
@@ -497,11 +565,26 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     }
                 });
             }
+            // Finding idx1/idx2 (verifier follow-up on #10/#26): session-prep
+            // planned rosters are id-bearing arrays too — an NPC/Location
+            // deleted after a session is prepped otherwise stays listed as
+            // "planned" forever.
+            if (log.plannedNpcIds) {
+                log.plannedNpcIds = log.plannedNpcIds.filter(id => id !== entityId);
+            }
+            if (log.plannedLocationIds) {
+                log.plannedLocationIds = log.plannedLocationIds.filter(id => id !== entityId);
+            }
         });
 
         (draftCampaign.secrets || []).forEach(secret => {
             if (secret.linkedEntityIds) {
                 secret.linkedEntityIds = secret.linkedEntityIds.filter(id => id !== entityId);
+            }
+            // Finding idx1 (verifier follow-up on #10): deleting the session
+            // log a secret was revealed in must not leave a dangling pointer.
+            if (secret.revealedInSessionId === entityId) {
+                secret.revealedInSessionId = undefined;
             }
         });
 
@@ -523,6 +606,17 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
 
         // --- Initialization ---
         init() {
+            // Finding idx6: an idempotence guard — re-calling init() on a
+            // store that already registered listeners (or a caller that
+            // wants a clean re-init) must not accumulate a second set of
+            // window/document listeners alongside the first, still-active
+            // set (each firing its own persistToStorage against the same
+            // localStorage keys on every teardown event).
+            if (_disposeInit) {
+                _disposeInit();
+                _disposeInit = null;
+            }
+
             if (!shouldPersist) {
                 _internalUpdate(draft => { draft.appStatus = 'welcome'; });
                 return;
@@ -530,25 +624,21 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
 
             // Wire cross-tab conflict detection (5.5).
             // The window `storage` event fires when ANOTHER tab writes to localStorage.
-            // We set the conflict flag so the UI can prompt the user, AND (finding #13)
-            // reload this tab's in-memory campaigns from the fresh snapshot so a
-            // subsequent local edit is applied ON TOP of the other tab's newer data
-            // instead of blindly serialising this (now stale) tab's snapshot over it.
-            storageService.onConflict((key) => {
+            //
+            // Finding #13 (blocker): an earlier version of this handler reloaded
+            // this tab's `draft.campaigns` from the other tab's snapshot right
+            // here — which silently threw away whatever THIS tab had edited
+            // in-memory but not yet saved (a tab mid-edit could lose everything
+            // it typed on every conflicting autosave). Policy (b): merely raise
+            // the flag. `persistToStorage` refuses to write while it is set, so
+            // the stale tab can no longer clobber the other tab's newer data,
+            // and nothing is discarded until the user explicitly picks a side
+            // via `resolveConflict('reload' | 'overwrite')` — wp-e's Header
+            // banner is expected to read `state.conflictDetected` and call it.
+            const unsubscribeConflict = storageService.onConflict((key) => {
                 if (key === CAMPAIGNS_STORAGE_KEY) {
                     _internalUpdate(draft => {
                         draft.conflictDetected = true;
-                        try {
-                            const fresh = storageService.loadSync(CAMPAIGNS_STORAGE_KEY);
-                            if (fresh) {
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                const parsed: any[] = JSON.parse(fresh);
-                                draft.campaigns = migrateCampaignsData(parsed);
-                            }
-                        } catch {
-                            // If the other tab's snapshot doesn't parse, keep this tab's
-                            // current in-memory campaigns rather than losing them.
-                        }
                     });
                 }
             });
@@ -557,18 +647,32 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             // hidden/unloaded (finding #8) — otherwise a GM who types for a while and
             // then immediately closes the tab loses the entire uncommitted burst,
             // since the 2s/10s debounce timers never get a chance to fire.
+            let removeWindowListeners: (() => void) | null = null;
             if (typeof window !== 'undefined') {
                 const flushOnTeardown = () => flushPendingSaveSync();
+                const onVisibilityChange = () => {
+                    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+                        flushOnTeardown();
+                    }
+                };
                 window.addEventListener('pagehide', flushOnTeardown);
                 window.addEventListener('beforeunload', flushOnTeardown);
                 if (typeof document !== 'undefined') {
-                    document.addEventListener('visibilitychange', () => {
-                        if (document.visibilityState === 'hidden') {
-                            flushOnTeardown();
-                        }
-                    });
+                    document.addEventListener('visibilitychange', onVisibilityChange);
                 }
+                removeWindowListeners = () => {
+                    window.removeEventListener('pagehide', flushOnTeardown);
+                    window.removeEventListener('beforeunload', flushOnTeardown);
+                    if (typeof document !== 'undefined') {
+                        document.removeEventListener('visibilitychange', onVisibilityChange);
+                    }
+                };
             }
+
+            _disposeInit = () => {
+                unsubscribeConflict();
+                removeWindowListeners?.();
+            };
 
             // Use the async, IndexedDB-aware `load()` (not `loadSync()`) so that data
             // which only made it to IndexedDB — because a previous save() hit the
@@ -640,6 +744,12 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                             }
 
                             if (recovered) {
+                                // Finding idx7: surface the recovery rather than
+                                // continuing silently on a possibly-older
+                                // snapshot — a GM who doesn't know can overwrite
+                                // the corrupt-but-newer payload without ever
+                                // finding out data was rolled back.
+                                draft.recoveredFromBackup = true;
                                 if (savedActiveId && draft.campaigns.some(c => c.id === savedActiveId)) {
                                     draft.activeCampaignId = savedActiveId;
                                     draft.appStatus = 'editing';
@@ -667,6 +777,20 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             })();
         },
 
+        /**
+         * Tears down the listeners `init()` registered (finding idx6):
+         * the storageService conflict subscription and the
+         * pagehide/beforeunload/visibilitychange handlers. Safe to call
+         * even if init() was never called or was already disposed. Tests
+         * that construct multiple `persist: true` stores in the same jsdom
+         * environment should call this in `afterEach` so an old store's
+         * handlers don't keep firing (and writing) alongside a new one.
+         */
+        destroy() {
+            _disposeInit?.();
+            _disposeInit = null;
+        },
+
         // --- Campaign Level Actions ---
         saveCampaign() {
             // Manual save trigger (forces immediate save)
@@ -676,6 +800,52 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             maxWaitTimeout = null;
             _internalUpdate(draft => { draft.saveStatus = 'saving'; });
             setTimeout(persistToStorage, 0);
+        },
+
+        /**
+         * Resolves a cross-tab conflict raised by init()'s `storage`-event
+         * listener (finding #13). `persistToStorage` refuses to write while
+         * `conflictDetected` is true, so the GM must explicitly choose:
+         *   - 'reload': discard this tab's in-memory campaigns and adopt
+         *     whatever is currently persisted (the other tab's write).
+         *   - 'overwrite': keep this tab's in-memory campaigns exactly as
+         *     they are and force-save them now, superseding the other tab.
+         * Either way `conflictDetected` is cleared afterward so autosave
+         * resumes. Intended to be called from a banner (owned by
+         * wp-e-app-shell) that reads `getState().conflictDetected`.
+         */
+        resolveConflict(choice: 'reload' | 'overwrite') {
+            if (choice === 'reload') {
+                _internalUpdate(draft => {
+                    draft.conflictDetected = false;
+                    try {
+                        const fresh = storageService.loadSync(CAMPAIGNS_STORAGE_KEY);
+                        if (fresh) {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            const parsed: any[] = JSON.parse(fresh);
+                            draft.campaigns = migrateCampaignsData(parsed);
+                            if (draft.activeCampaignId && !draft.campaigns.some(c => c.id === draft.activeCampaignId)) {
+                                draft.activeCampaignId = null;
+                                draft.appStatus = 'selecting';
+                            }
+                        }
+                    } catch {
+                        // The other tab's on-disk snapshot doesn't parse — keep
+                        // this tab's current in-memory campaigns rather than
+                        // losing them to a corrupt reload.
+                    }
+                });
+            } else {
+                _internalUpdate(draft => { draft.conflictDetected = false; });
+                // Force-save now that the block has been explicitly lifted —
+                // don't wait out the debounce, the user just made a decision.
+                void persistToStorage();
+            }
+        },
+
+        /** Dismisses the "recovered from backup" notice (finding idx7). */
+        dismissBackupRecoveryNotice() {
+            _internalUpdate(draft => { draft.recoveredFromBackup = false; });
         },
         createCampaign(title: string, setting: string, settingType: SettingType = 'custom', officialSetting?: string, dmStyle: DmStyle = 'standard') {
             updateState(draft => {
@@ -777,12 +947,21 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 return idMap.get(oldId)!;
             };
             const remapRequired = (oldId: string): string => remap(oldId) as string;
-            // For ids that may legitimately point outside the campaign (or are
-            // simply optional/best-effort references), fall back to the original
-            // id rather than minting a fresh, dangling UUID when it isn't in the
-            // remap table.
+            // Finding idx4 (verifier follow-up on #11): `remap()` MINTS a
+            // fresh id for any id not already in the table, so it never
+            // actually returns undefined for a defined input — the
+            // `remap(x) ?? x` form previously used here (and in the
+            // connections/relationships/plotProgressions mappers below) was
+            // dead code that silently converted an unknown/dangling id into
+            // a brand-new random UUID rather than genuinely preserving it as
+            // the comment claimed. `idMap` is pre-populated with every id
+            // actually owned by an entity in this campaign (see the
+            // pre-registration pass below), so a TRUE pure lookup — one that
+            // can really fall through to `?? id` — is what makes the
+            // "preserve, don't mint a fresh dangling ref" promise real for
+            // optional/outbound reference fields.
             const remapIds = (ids: string[] | undefined): string[] =>
-                (ids ?? []).map(id => remap(id) ?? id);
+                (ids ?? []).map(id => idMap.get(id) ?? id);
 
             const newCampaignId = crypto.randomUUID();
 
@@ -817,10 +996,16 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     ...n,
                     id: remapRequired(n.id),
                     factionId: remap(n.factionId),
-                    history: n.history ?? [],
+                    // Finding idx2 (verifier follow-up on #11): a history
+                    // entry's referenceId points at a sessionLog or article id
+                    // (see HistoryEntry.referenceType) — without remapping it,
+                    // EntityHistoryManager resolves it against the SOURCE
+                    // campaign's ids, which don't exist in the copy.
+                    history: (n.history ?? []).map(h => ({ ...h, referenceId: remap(h.referenceId) })),
                     relationships: (n.relationships ?? []).map(r => ({
                         ...r,
-                        targetId: remap(r.targetId) ?? r.targetId,
+                        // Finding idx4: pure lookup, not the dead `remap(x) ?? x` form.
+                        targetId: idMap.get(r.targetId) ?? r.targetId,
                     })),
                     mentionedEntityIds: remapIds(n.mentionedEntityIds),
                 })),
@@ -830,11 +1015,12 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     id: remapRequired(l.id),
                     parentLocationId: remap(l.parentLocationId),
                     subLocationIds: (l.subLocationIds ?? []).map(remapRequired),
-                    history: l.history ?? [],
+                    history: (l.history ?? []).map(h => ({ ...h, referenceId: remap(h.referenceId) })),
                     controllingFactionId: remap(l.controllingFactionId),
                     connections: (l.connections ?? []).map(c => ({
                         ...c,
-                        targetLocationId: remap(c.targetLocationId) ?? c.targetLocationId,
+                        // Finding idx4: pure lookup, not the dead `remap(x) ?? x` form.
+                        targetLocationId: idMap.get(c.targetLocationId) ?? c.targetLocationId,
                     })),
                     mentionedEntityIds: remapIds(l.mentionedEntityIds),
                 })),
@@ -878,10 +1064,17 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     status: (l.status === 'active' ? 'planned' : l.status) as typeof l.status,
                     adventureId: remap(l.adventureId),
                     plannedSceneIds: (l.plannedSceneIds ?? []).map(remapRequired),
+                    // Finding idx2 (verifier follow-up on #11/#26): these were
+                    // riding through the `...l` spread untouched, so a
+                    // duplicated campaign's session logs pointed at the
+                    // SOURCE campaign's NPC/Location ids.
+                    plannedNpcIds: remapIds(l.plannedNpcIds),
+                    plannedLocationIds: remapIds(l.plannedLocationIds),
                     relatedPlotIds: (l.relatedPlotIds ?? []).map(remapRequired),
                     plotProgressions: l.plotProgressions
                         ? Object.fromEntries(
-                              Object.entries(l.plotProgressions).map(([plotId, status]) => [remap(plotId) ?? plotId, status])
+                              // Finding idx4: pure lookup, not the dead `remap(x) ?? x` form.
+                              Object.entries(l.plotProgressions).map(([plotId, status]) => [idMap.get(plotId) ?? plotId, status])
                           )
                         : l.plotProgressions,
                     structuredNotes: (l.structuredNotes ?? []).map(entry => ({
@@ -1019,7 +1212,16 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
 
                 rawNpcs.forEach(n => registerId(n.id));
                 rawFactions.forEach(f => registerId(f.id));
-                rawLocations.forEach(l => registerId(l.id));
+                rawLocations.forEach(l => {
+                    registerId(l.id);
+                    // Finding #93's verifier follow-up: PointOfInterest ids must
+                    // be pre-registered too — LootItem.pointOfInterestId is a
+                    // cross-reference to one, and without registering it here
+                    // the PoI gets re-minted with a bare, unregistered
+                    // crypto.randomUUID() below while the preserved loot item
+                    // keeps pointing at the TEMPLATE's old (now dangling) id.
+                    (l.pointsOfInterest || []).forEach((poi: any) => registerId(poi.id));
+                });
                 rawItems.forEach(i => registerId(i.id));
                 rawArticles.forEach(a => registerId(a.id));
                 rawAdventures.forEach(a => {
@@ -1061,7 +1263,13 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         stats: n.stats || '',
                         exampleQuote: n.exampleQuote || '',
                         factionId: remap(n.factionId),
-                        knowsPlayerHistory: [],
+                        // Finding #93's verifier follow-up: this was the last
+                        // remaining silently-blanked NPC array — playerId
+                        // references are remappable now that playerCharacters
+                        // are imported and registered too.
+                        knowsPlayerHistory: (n.knowsPlayerHistory || [])
+                            .map((h: any) => ({ ...h, playerId: remap(h.playerId) }))
+                            .filter((h: any) => !!h.playerId),
                         relationships: (n.relationships || [])
                             .map((r: any) => ({ ...r, id: r.id || crypto.randomUUID(), targetId: remap(r.targetId) }))
                             .filter((r: any) => !!r.targetId),
@@ -1110,9 +1318,15 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         name: l.name || 'Unnamed Location',
                         description: l.description || '',
                         secrets: l.secrets || '',
+                        // Finding #93's verifier follow-up: loot.pointOfInterestId
+                        // is a cross-reference to a PointOfInterest — remap it
+                        // (dropping it, not leaving it dangling, if unresolved)
+                        // now that PoI ids are pre-registered above and minted
+                        // via remapRequired below instead of a bare fresh UUID.
                         loot: (l.loot || []).map((item: any) => ({
                             ...item,
                             id: item.id || crypto.randomUUID(),
+                            pointOfInterestId: remap(item.pointOfInterestId),
                         })),
                         parentLocationId: remap(l.parentLocationId),
                         subLocationIds: remapIds(l.subLocationIds),
@@ -1121,7 +1335,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                             .filter((c: any) => !!c.targetLocationId),
                         pointsOfInterest: (l.pointsOfInterest || []).map((poi: any) => ({
                             ...poi,
-                            id: crypto.randomUUID(),
+                            id: remapRequired(poi.id),
                             investigationChecks: poi.investigationChecks || [],
                             interactions: poi.interactions || [],
                         })),
@@ -1236,6 +1450,8 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         sessionDate: l.sessionDate || '',
                         adventureId: remap(l.adventureId),
                         plannedSceneIds: remapIds(l.plannedSceneIds),
+                        plannedNpcIds: remapIds(l.plannedNpcIds),
+                        plannedLocationIds: remapIds(l.plannedLocationIds),
                         prepNotes: l.prepNotes || '',
                         relatedPlotIds: remapIds(l.relatedPlotIds),
                         plotProgressions: l.plotProgressions
@@ -1627,14 +1843,21 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 hook: adventureData.hook,
                 theme: adventureData.theme,
                 level: adventureData.level,
+                // The real provider's sceneSchema (and the RealmChat
+                // draft-adventure path, which has no postProcess step at all)
+                // omit npcIds/status/skillChecks (finding #7 and its verifier
+                // follow-up — the earlier fix only defaulted npcIds/status,
+                // leaving skillChecks undefined for ActiveScenePanel/SceneEditor
+                // to crash on). Build from createDefaultScene() and spread the
+                // AI data over it so every Scene field is normalised in one
+                // move, including any future field this type gains.
                 scenes: (adventureData.scenes || []).map(sceneData => ({
+                    ...createDefaultScene(),
                     ...sceneData,
                     id: crypto.randomUUID(),
-                    // The real provider's sceneSchema omits npcIds/status
-                    // (finding #7) — normalise so downstream .filter/.status
-                    // reads never hit undefined.
                     npcIds: sceneData.npcIds ?? [],
                     status: sceneData.status ?? 'planned',
+                    skillChecks: sceneData.skillChecks ?? [],
                 }))
             };
             updateState(draft => {
@@ -1705,6 +1928,12 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
                 if (!campaign) return;
+
+                // Cleanup all cross-entity references (e.g. @-mentions of this
+                // scene, pinnedEntities) before removing it — verifier follow-up
+                // on #10: this delete path never called the sweep at all.
+                _purgeEntityReferences(campaign, sceneId);
+
                 const adventure = campaign.adventures.find(a => a.id === adventureId);
                 if (adventure) adventure.scenes = adventure.scenes.filter(s => s.id !== sceneId);
 
@@ -1770,6 +1999,11 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     campaign.activeSceneId = undefined;
                 }
 
+                // Cleanup all cross-entity references — most notably
+                // Secret.revealedInSessionId, which otherwise keeps pointing at
+                // a session log that no longer exists (verifier follow-up on #10).
+                _purgeEntityReferences(campaign, id);
+
                 campaign.sessionLogs = (campaign.sessionLogs || []).filter(l => l.id !== id);
             });
         },
@@ -1823,9 +2057,11 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         deletePlayerCharacter(id: string) {
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
-                if (campaign) {
-                    campaign.playerCharacters = (campaign.playerCharacters || []).filter(p => p.id !== id);
-                }
+                if (!campaign) return;
+                // Cleanup all cross-entity references (pinnedEntities, etc.)
+                // before removing it (verifier follow-up on #10).
+                _purgeEntityReferences(campaign, id);
+                campaign.playerCharacters = (campaign.playerCharacters || []).filter(p => p.id !== id);
             });
         },
 
@@ -1886,9 +2122,11 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         deleteNote(id: string) {
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
-                if (campaign) {
-                    campaign.notes = (campaign.notes || []).filter(n => n.id !== id);
-                }
+                if (!campaign) return;
+                // Cleanup all cross-entity references (pinnedEntities, etc.)
+                // before removing it (verifier follow-up on #10).
+                _purgeEntityReferences(campaign, id);
+                campaign.notes = (campaign.notes || []).filter(n => n.id !== id);
             });
         },
 
@@ -1919,9 +2157,11 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         deleteSecret(id: string) {
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
-                if (campaign) {
-                    campaign.secrets = (campaign.secrets || []).filter(s => s.id !== id);
-                }
+                if (!campaign) return;
+                // Cleanup all cross-entity references (pinnedEntities, etc.)
+                // before removing it (verifier follow-up on #10).
+                _purgeEntityReferences(campaign, id);
+                campaign.secrets = (campaign.secrets || []).filter(s => s.id !== id);
             });
         },
         revealSecret(id: string, sessionId?: string) {
@@ -2335,7 +2575,23 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 newNpcs.forEach(n => npcNameMap.set(n.name.toLowerCase(), n.id));
                 
                 const newItems = data.items.map(itemData => ({ ...itemData, id: crypto.randomUUID() }));
-                const newAdventures = data.adventures.map(advData => ({ ...advData, id: crypto.randomUUID(), scenes: (advData.scenes || []).map(s => ({ ...s, id: crypto.randomUUID() }))}));
+                // Finding #7's verifier follow-up: this path has no
+                // normalization of its own either, relying entirely on the
+                // caller having already run evocationWizard.postProcessResult
+                // — build from createDefaultScene() so npcIds/status/
+                // skillChecks are always populated regardless of caller.
+                const newAdventures = data.adventures.map(advData => ({
+                    ...advData,
+                    id: crypto.randomUUID(),
+                    scenes: (advData.scenes || []).map(s => ({
+                        ...createDefaultScene(),
+                        ...s,
+                        id: crypto.randomUUID(),
+                        npcIds: s.npcIds ?? [],
+                        status: s.status ?? 'planned',
+                        skillChecks: s.skillChecks ?? [],
+                    })),
+                }));
         
                 campaign.factions.push(...newFactions);
                 campaign.locations.push(...newLocations);

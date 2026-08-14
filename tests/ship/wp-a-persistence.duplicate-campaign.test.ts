@@ -104,9 +104,66 @@ describe('duplicateCampaign: reference remapping gaps (finding #11)', () => {
         expect(copySession.structuredNotes[0].taggedEntityIds).toEqual([copyNpcId, copyKeepId]);
     });
 
+    it('remaps npc/location history[].referenceId into the copy (verifier idx2)', () => {
+        const { service } = makeTestStore(createCampaignStore);
+        const ids = seedSource(service);
+        const sourceId = service.getState().campaigns[0].id;
+
+        service.updateNpc(ids.npcId, {
+            history: [{ id: 'h1', summary: 'Met the party', referenceType: 'session', referenceId: ids.sessionId }],
+        });
+        service.updateLocation(ids.keepId, {
+            history: [{ id: 'h2', summary: 'Founded', referenceType: 'session', referenceId: ids.sessionId }],
+        });
+
+        const copyId = service.duplicateCampaign(sourceId);
+        const copy = service.getState().campaigns.find(c => c.id === copyId)!;
+
+        const copySessionId = copy.sessionLogs[0].id;
+        const copyNpc = copy.npcs.find(n => n.name === 'Alice')!;
+        const copyKeep = copy.locations.find(l => l.name === 'The Keep')!;
+
+        expect(copyNpc.history[0].referenceId).toBe(copySessionId);
+        expect(copyNpc.history[0].referenceId).not.toBe(ids.sessionId);
+        expect(copyKeep.history[0].referenceId).toBe(copySessionId);
+    });
+
+    it('remaps sessionLog plannedNpcIds/plannedLocationIds into the copy (verifier idx2, #26)', () => {
+        const { service } = makeTestStore(createCampaignStore);
+        const ids = seedSource(service);
+        const sourceId = service.getState().campaigns[0].id;
+
+        service.updateSessionLog(ids.sessionId, {
+            plannedNpcIds: [ids.npcId],
+            plannedLocationIds: [ids.keepId],
+        });
+
+        const copyId = service.duplicateCampaign(sourceId);
+        const copy = service.getState().campaigns.find(c => c.id === copyId)!;
+
+        const copyNpcId = copy.npcs[0].id;
+        const copyKeepId = copy.locations.find(l => l.name === 'The Keep')!.id;
+        const copySession = copy.sessionLogs[0];
+
+        expect(copySession.plannedNpcIds).toEqual([copyNpcId]);
+        expect(copySession.plannedLocationIds).toEqual([copyKeepId]);
+        expect(copySession.plannedNpcIds).not.toContain(ids.npcId);
+        expect(copySession.plannedLocationIds).not.toContain(ids.keepId);
+    });
+
     it('contains no id belonging to the source campaign anywhere in the copy', () => {
         const { service } = makeTestStore(createCampaignStore);
-        seedSource(service);
+        const ids = seedSource(service);
+        // Also populate the fields the verifier's idx2 problem flagged (history
+        // referenceId + planned rosters) so this deep sweep genuinely exercises
+        // them too, not just the fields the original finding #11 covered.
+        service.updateNpc(ids.npcId, {
+            history: [{ id: 'h1', summary: 'Met the party', referenceType: 'session', referenceId: ids.sessionId }],
+        });
+        service.updateSessionLog(ids.sessionId, {
+            plannedNpcIds: [ids.npcId],
+            plannedLocationIds: [ids.keepId],
+        });
         const source = service.getState().campaigns[0];
         const sourceId = source.id;
 
