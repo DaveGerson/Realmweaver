@@ -5,6 +5,7 @@
 import React, { useState } from 'react';
 import { Icons } from './Icons';
 import { Button } from './Button';
+import { DialogShell } from './DialogShell';
 import type { DmStyle } from '../../types/index';
 import { isFeatureVisible, OVERRIDEABLE_FEATURES, FEATURE_LABELS } from '../../utils/dmStyleUtils';
 
@@ -34,11 +35,8 @@ export const DmStylePanel: React.FC<DmStylePanelProps> = ({
   const [showOverrides, setShowOverrides] = useState(false);
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="DM Style Settings">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-
-      <div className="relative w-full max-w-sm bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-10 animate-in fade-in slide-in-from-bottom-4 duration-200">
+    <DialogShell isOpen onClose={onClose} ariaLabel="DM Style Settings" className="relative w-full max-w-sm mx-4">
+      <div className="w-full bg-slate-900 border border-slate-700 rounded-xl shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-800">
           <div className="flex items-center gap-2">
@@ -181,6 +179,6 @@ export const DmStylePanel: React.FC<DmStylePanelProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </DialogShell>
   );
 };
