@@ -35,10 +35,11 @@ setup does one `fetch(baseURL)` and asserts the body contains `<title>RealmWeave
 failing with an actionable message otherwise. It is a no-op safety net on CI (which always launches fresh) — it exists
 for the local dev path.
 
-`mobile-chrome` is currently **excluded from CI** (`.github/workflows/ci.yml`): `Header.tsx` renders `relative z-[60]`
-while `DialogShell`'s overlay and the mobile sidebar sit at `z-50` / `z-40`, so on narrow viewports the header paints
-above modals and intercepts the clicks the helpers make. Re-enable the project there once the stacking order is fixed
-(content < header < sidebar < modal).
+CI runs **both projects**. The stacking order that once forced a chromium-only run is fixed and is now a contract:
+content < header `z-[60]` < mobile drawer `z-[70]` (backdrop `z-[65]`) < `DialogShell`/quick-card sheet `z-[80]` <
+toasts `z-[90]`. Related invariant: nothing in the header may be wider than the viewport — the action cluster is
+`min-w-0 overflow-x-auto` because content overflow on mobile permanently expands the layout viewport and shifts every
+fixed overlay partly off-screen (this was the root cause of all 8 original mobile.spec failures).
 
 ## Specs
 
