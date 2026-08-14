@@ -22,7 +22,7 @@ export const ENTITY_TYPE_CONFIG: Record<string, { icon: string; color: string; l
   'player-character': { icon: 'PlayerCharacters', color: 'teal', label: 'Player Characters' },
   plot:            { icon: 'Plot',            color: 'yellow',  label: 'Plots' },
   note:            { icon: 'FileText',        color: 'slate',   label: 'Notes' },
-  scene:           { icon: 'Scenes',          color: 'red',     label: 'Scenes' },
+  scene:           { icon: 'Scenes',          color: 'blue',    label: 'Scenes' },
 };
 
 /**

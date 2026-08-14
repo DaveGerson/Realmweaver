@@ -1630,6 +1630,11 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 scenes: (adventureData.scenes || []).map(sceneData => ({
                     ...sceneData,
                     id: crypto.randomUUID(),
+                    // The real provider's sceneSchema omits npcIds/status
+                    // (finding #7) — normalise so downstream .filter/.status
+                    // reads never hit undefined.
+                    npcIds: sceneData.npcIds ?? [],
+                    status: sceneData.status ?? 'planned',
                 }))
             };
             updateState(draft => {

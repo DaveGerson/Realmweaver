@@ -105,6 +105,10 @@ export const DialogShell: React.FC<DialogShellProps> = ({
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (e.key === 'Escape') {
+        // A child that already consumed this Escape (e.g. MentionInput
+        // closing its suggestion dropdown) marks it defaultPrevented —
+        // the dialog must stay open in that case (finding #52).
+        if (e.defaultPrevented) return;
         e.stopPropagation();
         onClose();
         return;
