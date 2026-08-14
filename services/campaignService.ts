@@ -357,8 +357,11 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
      *
      * Covers: NPC relationships + mentionedEntityIds, Location/Faction/Scene
      * mentionedEntityIds, Plot relatedEntityIds + mentionedEntityIds, Article
-     * relatedEntityIds + mentionedEntityIds, and SessionLog relatedPlotIds +
-     * plotProgressions (for when the deleted entity is a Plot).
+     * relatedEntityIds + mentionedEntityIds, SessionLog relatedPlotIds +
+     * plotProgressions (for when the deleted entity is a Plot), Faction
+     * leaderId/headquartersLocationId, Location.connections, Secret
+     * linkedEntityIds, SessionLog.structuredNotes[].taggedEntityIds, and
+     * Campaign.pinnedEntities (finding #10).
      */
     const _purgeEntityReferences = (draftCampaign: Campaign, entityId: string) => {
         draftCampaign.npcs.forEach(npc => {
@@ -374,11 +377,20 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             if (loc.mentionedEntityIds) {
                 loc.mentionedEntityIds = loc.mentionedEntityIds.filter(id => id !== entityId);
             }
+            if (loc.connections) {
+                loc.connections = loc.connections.filter(c => c.targetLocationId !== entityId);
+            }
         });
 
         draftCampaign.factions.forEach(faction => {
             if (faction.mentionedEntityIds) {
                 faction.mentionedEntityIds = faction.mentionedEntityIds.filter(id => id !== entityId);
+            }
+            if (faction.leaderId === entityId) {
+                faction.leaderId = undefined;
+            }
+            if (faction.headquartersLocationId === entityId) {
+                faction.headquartersLocationId = undefined;
             }
         });
 
@@ -415,7 +427,24 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             if (log.plotProgressions && entityId in log.plotProgressions) {
                 delete log.plotProgressions[entityId];
             }
+            if (log.structuredNotes) {
+                log.structuredNotes.forEach(entry => {
+                    if (entry.taggedEntityIds) {
+                        entry.taggedEntityIds = entry.taggedEntityIds.filter(id => id !== entityId);
+                    }
+                });
+            }
         });
+
+        (draftCampaign.secrets || []).forEach(secret => {
+            if (secret.linkedEntityIds) {
+                secret.linkedEntityIds = secret.linkedEntityIds.filter(id => id !== entityId);
+            }
+        });
+
+        if (draftCampaign.pinnedEntities) {
+            draftCampaign.pinnedEntities = draftCampaign.pinnedEntities.filter(p => p.id !== entityId);
+        }
     };
 
 
@@ -668,6 +697,12 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 return idMap.get(oldId)!;
             };
             const remapRequired = (oldId: string): string => remap(oldId) as string;
+            // For ids that may legitimately point outside the campaign (or are
+            // simply optional/best-effort references), fall back to the original
+            // id rather than minting a fresh, dangling UUID when it isn't in the
+            // remap table.
+            const remapIds = (ids: string[] | undefined): string[] =>
+                (ids ?? []).map(id => remap(id) ?? id);
 
             const newCampaignId = crypto.randomUUID();
 
@@ -707,6 +742,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         ...r,
                         targetId: remap(r.targetId) ?? r.targetId,
                     })),
+                    mentionedEntityIds: remapIds(n.mentionedEntityIds),
                 })),
 
                 locations: source.locations.map(l => ({
@@ -715,6 +751,12 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     parentLocationId: remap(l.parentLocationId),
                     subLocationIds: (l.subLocationIds ?? []).map(remapRequired),
                     history: l.history ?? [],
+                    controllingFactionId: remap(l.controllingFactionId),
+                    connections: (l.connections ?? []).map(c => ({
+                        ...c,
+                        targetLocationId: remap(c.targetLocationId) ?? c.targetLocationId,
+                    })),
+                    mentionedEntityIds: remapIds(l.mentionedEntityIds),
                 })),
 
                 factions: source.factions.map(f => ({
@@ -723,6 +765,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     leaderId: remap(f.leaderId),
                     memberIds: (f.memberIds ?? []).map(remapRequired),
                     headquartersLocationId: remap(f.headquartersLocationId),
+                    mentionedEntityIds: remapIds(f.mentionedEntityIds),
                 })),
 
                 items: source.items.map(i => ({ ...i, id: remapRequired(i.id) })),
@@ -732,7 +775,8 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     id: remapRequired(a.id),
                     parentArticleId: remap(a.parentArticleId),
                     subArticleIds: (a.subArticleIds ?? []).map(remapRequired),
-                    relatedEntityIds: (a.relatedEntityIds ?? []).map(remapRequired),
+                    relatedEntityIds: remapIds(a.relatedEntityIds),
+                    mentionedEntityIds: remapIds(a.mentionedEntityIds),
                 })),
 
                 adventures: source.adventures.map(adv => ({
@@ -743,6 +787,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         id: remapRequired(s.id),
                         locationId: remap(s.locationId),
                         npcIds: (s.npcIds ?? []).map(remapRequired),
+                        mentionedEntityIds: remapIds(s.mentionedEntityIds),
                     })),
                 })),
 
@@ -759,6 +804,10 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                               Object.entries(l.plotProgressions).map(([plotId, status]) => [remap(plotId) ?? plotId, status])
                           )
                         : l.plotProgressions,
+                    structuredNotes: (l.structuredNotes ?? []).map(entry => ({
+                        ...entry,
+                        taggedEntityIds: remapIds(entry.taggedEntityIds),
+                    })),
                 })),
 
                 playerCharacters: (source.playerCharacters ?? []).map(pc => ({
@@ -769,12 +818,18 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 plots: (source.plots ?? []).map(p => ({
                     ...p,
                     id: remapRequired(p.id),
-                    relatedEntityIds: (p.relatedEntityIds ?? []).map(remapRequired),
+                    relatedEntityIds: remapIds(p.relatedEntityIds),
+                    mentionedEntityIds: remapIds(p.mentionedEntityIds),
                 })),
 
                 notes: (source.notes ?? []).map(n => ({ ...n, id: remapRequired(n.id) })),
 
-                secrets: (source.secrets ?? []).map(s => ({ ...s, id: remapRequired(s.id) })),
+                secrets: (source.secrets ?? []).map(s => ({
+                    ...s,
+                    id: remapRequired(s.id),
+                    linkedEntityIds: remapIds(s.linkedEntityIds),
+                    revealedInSessionId: remap(s.revealedInSessionId),
+                })),
             };
 
             updateState(draft => {
