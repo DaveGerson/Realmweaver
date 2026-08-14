@@ -9,6 +9,39 @@ import { ENTITY_TYPE_CONFIG } from '../../utils/entityUtils';
 
 const PC_COLOR = ENTITY_TYPE_CONFIG['playerCharacter'].color;
 
+/**
+ * Static Tailwind class lookup for the PC card accent, keyed by the same
+ * Tailwind color name ENTITY_TYPE_CONFIG uses for `playerCharacter`.
+ *
+ * This project compiles Tailwind at build time via `@tailwindcss/vite`
+ * (index.css does `@import "tailwindcss"`), not the old CDN JIT — so a
+ * dynamic `border-l-${color}-500` template literal is invisible to the
+ * build-time class scanner and never makes it into the compiled stylesheet.
+ * Every class variant that can actually render must exist as a literal
+ * string somewhere in source. Extend this map if
+ * ENTITY_TYPE_CONFIG['playerCharacter'].color ever changes to something
+ * other than 'teal'.
+ */
+const PC_ACCENT_CLASSES: Record<string, {
+  border: string;
+  borderHover: string;
+  name: string;
+  chipBg: string;
+  chipText: string;
+  chipBorder: string;
+}> = {
+  teal: {
+    border: 'border-l-teal-500',
+    borderHover: 'hover:border-l-teal-400',
+    name: 'text-teal-400',
+    chipBg: 'bg-teal-900/40',
+    chipText: 'text-teal-300',
+    chipBorder: 'border-teal-500/30',
+  },
+};
+
+const PC_ACCENT = PC_ACCENT_CLASSES[PC_COLOR] ?? PC_ACCENT_CLASSES.teal;
+
 /** Returns a Tailwind color class for a completeness dot given a percentage 0-100. */
 function completenessColor(pct: number): string {
   if (pct >= 67) return 'bg-green-500';
@@ -97,14 +130,14 @@ export const PlayerCharacterDashboard: React.FC<PlayerCharacterDashboardProps> =
                 <button
                   key={pc.id}
                   onClick={() => onSelectPlayerCharacter(pc.id)}
-                  className={`relative bg-slate-900/50 p-4 rounded-lg border border-slate-800 border-l-4 border-l-${PC_COLOR}-500 text-left hover:bg-slate-800 hover:border-slate-700 hover:border-l-${PC_COLOR}-400 transition-all space-y-2`}
+                  className={`relative bg-slate-900/50 p-4 rounded-lg border border-slate-800 border-l-4 ${PC_ACCENT.border} text-left hover:bg-slate-800 hover:border-slate-700 ${PC_ACCENT.borderHover} transition-all space-y-2`}
                   {...getRovingProps(index)}
                 >
                   <span className={`absolute top-2 right-2 w-1.5 h-1.5 rounded-full ${completenessColor(pct)}`} title={`${pct}% complete`} />
-                  <h3 className={`font-semibold text-${PC_COLOR}-400 leading-tight pr-4`}>{characterName}</h3>
+                  <h3 className={`font-semibold ${PC_ACCENT.name} leading-tight pr-4`}>{characterName}</h3>
                   <div className="flex flex-wrap items-center gap-1.5">
                     {species && (
-                      <span className={`text-[10px] bg-${PC_COLOR}-900/40 text-${PC_COLOR}-300 border border-${PC_COLOR}-500/30 rounded-full px-2 py-0.5`}>
+                      <span className={`text-[10px] ${PC_ACCENT.chipBg} ${PC_ACCENT.chipText} border ${PC_ACCENT.chipBorder} rounded-full px-2 py-0.5`}>
                         {species}
                       </span>
                     )}

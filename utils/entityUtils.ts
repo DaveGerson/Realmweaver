@@ -298,3 +298,31 @@ export const createDefaultPlayerCharacter = (): Omit<PlayerCharacter, 'id'> => (
         specialActions: [],
     },
 });
+
+/**
+ * Deep-merges a possibly-incomplete PlayerCharacter (AI-parsed sheet data, or
+ * a PC persisted before defensive normalization existed) onto
+ * createDefaultPlayerCharacter() so every field `CharacterStatistics` /
+ * `CharacterSocial` declare as required is always present. A shallow spread
+ * alone is NOT enough — see createDefaultPlayerCharacter's docstring for why.
+ * `id` and any parsed values are preserved verbatim; only missing fields are
+ * backfilled.
+ */
+export function normalizePlayerCharacter(pc: PlayerCharacter): PlayerCharacter {
+    const defaults = createDefaultPlayerCharacter();
+    return {
+        ...defaults,
+        ...pc,
+        id: pc.id,
+        characterSocial: { ...defaults.characterSocial, ...pc.characterSocial },
+        characterStatistics: {
+            ...defaults.characterStatistics,
+            ...pc.characterStatistics,
+            classes: { ...defaults.characterStatistics.classes, ...pc.characterStatistics?.classes },
+            attributes: { ...defaults.characterStatistics.attributes, ...pc.characterStatistics?.attributes },
+            skills: { ...defaults.characterStatistics.skills, ...pc.characterStatistics?.skills },
+            actions: pc.characterStatistics?.actions ?? defaults.characterStatistics.actions,
+            specialActions: pc.characterStatistics?.specialActions ?? defaults.characterStatistics.specialActions,
+        },
+    };
+}

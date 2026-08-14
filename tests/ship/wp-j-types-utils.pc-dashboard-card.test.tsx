@@ -22,6 +22,8 @@
 import React from 'react';
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup, screen } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { PlayerCharacter } from '../../types/index';
 import { PlayerCharacterDashboard } from '../../components/dashboards/PlayerCharacterDashboard';
 import { ENTITY_TYPE_CONFIG } from '../../utils/entityUtils';
@@ -90,5 +92,42 @@ describe('#106 — PC cards use the ENTITY_TYPE_CONFIG teal accent, not hardcode
     // is expected anywhere inside this card.
     expect(screen.getByText('Kaelen').className).toContain(`text-${color}-`);
     expect(card.outerHTML).not.toMatch(/amber/);
+  });
+
+  it('never re-introduces dynamic border-l-${PC_COLOR}-* template literals in source', () => {
+    // The prior #106 fix used fully dynamic template literals
+    // (`border-l-${PC_COLOR}-500` etc.). This project compiles Tailwind at
+    // build time via @tailwindcss/vite (index.css does `@import
+    // "tailwindcss"`), not the old CDN JIT scanner, so a class name that
+    // only ever exists as `${...}-500` in source is never emitted into the
+    // compiled stylesheet — jsdom className checks above cannot catch this
+    // because jsdom doesn't run the Tailwind build. Assert directly against
+    // the source text instead: every accent class must appear as a literal
+    // string, and no dynamic `${PC_COLOR}`-style interpolation may appear
+    // inside a Tailwind class position.
+    const rawSource = readFileSync(
+      resolve(__dirname, '../../components/dashboards/PlayerCharacterDashboard.tsx'),
+      'utf-8',
+    );
+    // Strip comments before scanning so a doc comment that *explains* the
+    // dynamic-interpolation pitfall (and necessarily quotes the pattern) is
+    // not itself flagged as the regression it's warning about.
+    const source = rawSource.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    const color = ENTITY_TYPE_CONFIG['playerCharacter'].color; // 'teal'
+
+    // No dynamic color interpolation left in a Tailwind class literal.
+    expect(source).not.toMatch(/border-l-\$\{/);
+    expect(source).not.toMatch(/text-\$\{/);
+    expect(source).not.toMatch(/bg-\$\{/);
+
+    // The literal classes the Tailwind scanner needs to see must be present
+    // verbatim in source, for whatever color ENTITY_TYPE_CONFIG currently
+    // assigns to playerCharacter.
+    expect(source).toContain(`border-l-${color}-500`);
+    expect(source).toContain(`hover:border-l-${color}-400`);
+    expect(source).toContain(`text-${color}-400`);
+    expect(source).toContain(`bg-${color}-900/40`);
+    expect(source).toContain(`text-${color}-300`);
+    expect(source).toContain(`border-${color}-500/30`);
   });
 });

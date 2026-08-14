@@ -25,7 +25,7 @@ const GUIDED_HIDDEN = new Set([
  * These are available but not surfaced prominently.
  */
 const STANDARD_HIDDEN = new Set<string>([
-  // plot-timeline is available but collapsed in standard — currently nothing fully hidden
+  // nothing is fully hidden in standard mode today
 ]);
 
 /**

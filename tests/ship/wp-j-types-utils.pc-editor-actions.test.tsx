@@ -18,7 +18,7 @@
  */
 import React from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, cleanup, screen } from '@testing-library/react';
+import { render, cleanup, screen, fireEvent, waitFor } from '@testing-library/react';
 import type { PlayerCharacter } from '../../types/index';
 
 const storeState = { campaigns: [], activeCampaignId: null, saveStatus: 'idle', lastSavedAt: null, appStatus: 'editing' };
@@ -63,5 +63,61 @@ describe('#34 — PlayerCharacterEditor survives a PC with no actions/specialAct
 
     expect(screen.getByText('Kaelen')).toBeTruthy();
     expect(screen.getByText('Actions & Features')).toBeTruthy();
+  });
+});
+
+/**
+ * wp-j-types-utils — finding #63 (editor half)
+ *
+ * PlayerCharacterEditor is the PC's only delete affordance (handleDelete),
+ * so it must survive a PC that is missing `characterStatistics` entirely —
+ * not just a partial one. Verifier probe that proved the crash (deleted,
+ * repo left clean): rendering `{ id, playerName, characterSocial: {
+ * characterName: 'Ghost' } }` threw `TypeError: Cannot read properties of
+ * undefined (reading 'classes')` at line 131
+ * (`formData.characterStatistics.classes.charClass`), and every other
+ * unguarded read (attributes, skills, characterSocial.*) was equally
+ * reachable. Already-persisted malformed PCs cannot be fixed by create-time
+ * normalization alone, so the editor itself must normalize what it renders.
+ */
+const pcMissingEverything = {
+  id: 'pc-ghost',
+  playerName: 'Riley',
+  characterSocial: { characterName: 'Ghost' },
+  // characterStatistics omitted entirely — the worst case the dashboard
+  // fix (#106/#63) already defends against; the editor must too.
+} as unknown as PlayerCharacter;
+
+describe('#63 — PlayerCharacterEditor survives a PC missing characterStatistics entirely', () => {
+  it('renders header, stats, skills and social sections without throwing', () => {
+    expect(() =>
+      render(
+        <ConfirmDialogProvider>
+          <PlayerCharacterEditor pc={pcMissingEverything} onUpdate={() => {}} onDelete={() => {}} />
+        </ConfirmDialogProvider>,
+      ),
+    ).not.toThrow();
+
+    expect(screen.getByText('Ghost')).toBeTruthy();
+    expect(screen.getByText('Ability Scores')).toBeTruthy();
+    expect(screen.getByText('Skills')).toBeTruthy();
+    expect(screen.getByText('Social Traits')).toBeTruthy();
+  });
+
+  it('the delete confirmation still works and reaches onDelete (the entity remains deletable)', async () => {
+    const onDelete = vi.fn();
+    render(
+      <ConfirmDialogProvider>
+        <PlayerCharacterEditor pc={pcMissingEverything} onUpdate={() => {}} onDelete={onDelete} />
+      </ConfirmDialogProvider>,
+    );
+
+    fireEvent.click(screen.getByText('Delete Character'));
+    // The confirm dialog's message must not have crashed building the
+    // fallback name (formData.characterSocial.characterName || pc.playerName).
+    expect(await screen.findByText('Are you sure you want to delete Ghost?')).toBeTruthy();
+
+    fireEvent.click(screen.getByText('Confirm'));
+    await waitFor(() => expect(onDelete).toHaveBeenCalledWith('pc-ghost'));
   });
 });

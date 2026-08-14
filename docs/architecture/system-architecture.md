@@ -561,9 +561,9 @@ rather than a shared type (see §12).
 
 **Mock mode.** Every `aiService` function accepts `isMockMode: boolean`. `ai/mockService.ts`
 provides a full deterministic implementation of every function — this is what lets the
-entire app (including the dev-only `smokeTest.ts` that runs on every app load in `DEV`) be
-exercised with zero AI backend, and is the same code path the 516 Vitest unit tests assert
-against.
+entire app (including the dev-only, opt-in `smokeTest.ts` — runs only when
+`VITE_RUN_SMOKE_TESTS=true` is set alongside `DEV`) be exercised with zero AI backend, and
+is the same code path the 516 Vitest unit tests assert against.
 
 **Retry/timeout semantics.** `providers/retry.ts#withRetry()` retries once
 (`maxAttempts: 2`, fixed `delayMs: 1500` — no exponential backoff, reasoned as unnecessary
@@ -751,7 +751,7 @@ erDiagram
 | Unit | Vitest (`tests/`, Node environment) | **516 tests / 34 files**, all passing | Covers `campaignService` (CRUD, cascade deletion, migration/backfill), `contextBuilder`, `continuityChecker`, `importExportService`, `storageService`, linking engine + `autoLinker`, `entityUtils`, `entityFieldSave`, `entityDetailExtractors`, `formReconciliation`, dice/keyboard/popover utils, AI service adapters + retry + Claude CLI provider, `MentionInput`, and five persona-driven "archetype" scenario tests (`archetype.new-dm`, `.lazy-dm`, `.forever-dm`, `.tactical-dm`, `.worldbuilder`) |
 | Component (render) | — | **None** | No `@testing-library/react` dependency; `tests/components/*.test.ts` test pure exported functions (`findUnlinkedEntities`, timeline sort, combatant-removal logic) extracted *from* components, not rendered component behavior |
 | E2E | Playwright (`e2e/`) | **118 tests across 13 spec files**, 6 `test.skip()` | Covers campaign CRUD/persistence, navigation, entity CRUD (core + extended), generators, dialogs, DM tools, session runner, visualizers, mobile responsiveness, RealmChat. Uses `waitForTimeout` hard waits in places (flake risk). The 2 skipped Notes tests in `entity-crud-extended.spec.ts` carry a **stale comment** ("NoteDashboard exists but is not routed") — Notes *is* now wired into `EditorView`/`ViewRouter`/`CampaignSidebar` as of this session's fixes; the tests were never re-enabled to match |
-| Smoke | `smokeTest.ts`, dev-only | ~20 checks | Runs on every app load when `import.meta.env.DEV`, guarded to never run against real API calls; exercises AI service function availability and basic entity CRUD against a real `createCampaignStore` instance |
+| Smoke | `smokeTest.ts`, dev-only, opt-in | ~20 checks | Runs on app load only when `import.meta.env.DEV` AND `VITE_RUN_SMOKE_TESTS=true` are both set (off by default — see `.env.local.example`); with Mock Mode off it exercises real AI service calls, so it is not guarded against hitting the live provider; exercises AI service function availability and basic entity CRUD against a real `createCampaignStore` instance |
 | Type check | `tsc --noEmit` via `npm run typecheck` | 0 errors | **Added this session** as a standalone script/quality gate. Adding `@types/react`/`@types/react-dom` in the same pass surfaced ~20 previously-invisible type errors, including a pre-existing `SessionPrepWizard` bug referencing `npc.race` (not a real `NPC` field) and a `DraftEntity` union missing `'scene'` |
 | Manual | Mock mode | — | The entire app is usable end-to-end with `isMockMode: true` and zero AI backend — this is also what CI-less local verification and the smoke test rely on |
 

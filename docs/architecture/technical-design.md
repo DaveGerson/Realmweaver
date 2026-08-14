@@ -631,7 +631,7 @@ Covers: campaign creation lifecycle, entity CRUD, navigation (EntityLink, back s
 
 ### 10.3 Smoke Tests (`smokeTest.ts`)
 
-Runs automatically on app startup in development mode. Tests service function availability and a full entity CRUD session. Console reports pass/fail.
+Opt-in only: runs on app startup in development mode when `VITE_RUN_SMOKE_TESTS=true` is set (see `.env.local.example`) — it no longer runs automatically, since the suite wipes the `realmweaver-campaigns` / `realmweaver-active-campaign-id` storage keys and, with Mock Mode off, fires live AI calls against the real provider. Tests service function availability and a full entity CRUD session. Console reports pass/fail.
 
 ### 10.4 Manual Testing
 
