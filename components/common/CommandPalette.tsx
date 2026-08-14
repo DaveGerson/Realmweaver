@@ -407,18 +407,18 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       // No query: show recents + quick actions
       const recentResults: PaletteResult[] = recentItems
         .slice(0, 8)
-        .map(r => {
+        .map((r): PaletteResult | null => {
           // Find the full entity to get its CURRENT name/subtitle — the
           // snapshot in `r` was captured at visit time and goes stale on
           // rename, and stays around forever on delete (finding #49).
           const found = allEntities.find(e => e.type === r.type && e.id === r.id);
           if (!found) return null;
           return {
-            kind: 'entity' as const,
+            kind: 'entity',
             data: { type: r.type, id: r.id, name: found.name, subtitle: found.subtitle },
           };
         })
-        .filter((r): r is PaletteResult & { kind: 'entity' } => r !== null); // drop deleted entities
+        .filter((r): r is PaletteResult => r !== null); // drop deleted entities
 
       const actionResults: PaletteResult[] = actions.map(a => ({ kind: 'action' as const, data: a }));
       return { recentResults, entityResults: [], actionResults };
