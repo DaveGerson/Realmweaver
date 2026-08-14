@@ -2,6 +2,7 @@
 import React, { useMemo } from 'react';
 import type { Note } from '../../types/index';
 import { useEntitySearch } from '@/hooks/useEntitySearch';
+import { useRovingTabIndex } from '@/hooks/useRovingTabIndex';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 
@@ -82,6 +83,8 @@ export const NoteDashboard: React.FC<NoteDashboardProps> = ({ notes, onNoteCreat
     return normalizedNotes.filter(n => ids.has(n.id));
   }, [filteredNormalized, normalizedNotes]);
 
+  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: { base: 1, sm: 2 } });
+
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -103,12 +106,13 @@ export const NoteDashboard: React.FC<NoteDashboardProps> = ({ notes, onNoteCreat
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {filteredNotes.map(note => {
+            {filteredNotes.map((note, index) => {
               const pct = noteCompleteness(note);
               return (
                 <button
                   key={note.id}
                   onClick={() => onSelectNote(note.id)}
+                  {...getRovingProps(index)}
                   className="bg-slate-800/60 border-l-4 border-slate-600 p-4 rounded-r-lg hover:bg-slate-800 transition-all text-left flex flex-col h-40 relative group"
                 >
                   {/* Completeness dot */}

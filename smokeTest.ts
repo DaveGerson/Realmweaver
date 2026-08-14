@@ -20,6 +20,7 @@ import {
     chatWithRealmWeaver,
 } from './services/aiService';
 import { createCampaignStore } from './services/campaignService';
+import { storageService } from './services/storageService';
 
 // --- Helper for logging test results ---
 const testLog = (condition: boolean, successMsg: string, failureMsg: string, data?: unknown) => {
@@ -359,16 +360,26 @@ const testImportExport = async () => {
 };
 
 export const runSmokeTests = async (isMockMode: boolean) => {
-  // Dev-only safety net: this suite wipes real localStorage save keys and fires
-  // live AI calls, so it must never execute in a production build regardless of
-  // how/where it gets invoked from.
+  // Dev-only safety net: this suite wipes real localStorage/IndexedDB save keys
+  // and fires live AI calls, so it must never execute in a production build
+  // regardless of how/where it gets invoked from.
   if (!import.meta.env.DEV) {
     console.warn('[SmokeTest] Skipped: smoke tests only run in development builds.');
     return;
   }
+  // Second, explicit opt-in: DEV alone is not enough, since every `npm run dev`
+  // session is DEV=true. Without this flag, running the app locally with real
+  // campaign data would wipe it (and re-fire ~21 live AI calls) on every mount.
+  if (!import.meta.env.VITE_RUN_SMOKE_TESTS) {
+    console.warn('[SmokeTest] Skipped: set VITE_RUN_SMOKE_TESTS=true to opt in.');
+    return;
+  }
   // Clear any saved campaign from a previous session to ensure a clean test run.
-  localStorage.removeItem('realmweaver-campaigns');
-  localStorage.removeItem('realmweaver-active-campaign-id');
+  // Use storageService.remove() (not raw localStorage.removeItem) so the
+  // IndexedDB fallback copy is cleared too — otherwise a machine that fell
+  // back to IDB on a quota error resurrects the campaigns via load().
+  storageService.remove('realmweaver-campaigns');
+  storageService.remove('realmweaver-active-campaign-id');
   console.log(`%c🚀 Running application smoke tests... (Mock Mode: ${isMockMode})`, 'color: #7c3aed; font-size: 1.2em; font-weight: bold;');
   const servicesOk = await testServiceFunctions(isMockMode);
   const realmChatOk = await testRealmChat(isMockMode);

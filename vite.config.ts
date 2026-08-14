@@ -1,6 +1,7 @@
 import path from 'path';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { aiProxyPlugin } from './vite-plugin-ai-proxy';
 
 export default defineConfig(({ mode }) => {
@@ -16,20 +17,43 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 4200,
         host,
-        strictPort: false,
+        // A taken port must fail loudly rather than silently drifting to 4201 —
+        // e2e/playwright.config.ts hardcodes 4200 and would otherwise validate
+        // a stale or unrelated server.
+        strictPort: true,
       },
       plugins: [
         react(),
+        tailwindcss(),
         aiProxyPlugin(),
       ],
+      build: {
+        rollupOptions: {
+          output: {
+            // Split out vendor code so the entry chunk isn't a single 900KB+
+            // blob users download before first paint. The per-view
+            // dashboards/editors themselves are further split via
+            // React.lazy in components/layout/ViewRouter.tsx.
+            manualChunks: {
+              react: ['react', 'react-dom'],
+              'lucide-react': ['lucide-react'],
+            },
+          },
+        },
+      },
       define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.REALMWEAVER_AI_PROVIDER': JSON.stringify(env.REALMWEAVER_AI_PROVIDER || 'claude-cli'),
         'process.env.AI_PROVIDER': JSON.stringify(env.AI_PROVIDER || 'claude-cli'),
         // SECURITY: ANTHROPIC_API_KEY is intentionally NOT injected into the client bundle.
         // The claude-cli provider doesn't need it (auth handled by the CLI binary).
         // The future anthropic-api provider will consume it server-side in the Vite middleware.
+        //
+        // SECURITY: GEMINI_API_KEY / API_KEY are intentionally NOT injected here either.
+        // Nothing in the app reads process.env.GEMINI_API_KEY — the Gemini key is sourced
+        // per-campaign from campaign.gcpApiKey instead. `loadEnv(mode, '.', '')` uses an
+        // empty prefix, so it merges in every key already present in process.env (not just
+        // .env* files); wiring it into `define` would silently bake that secret as a literal
+        // into dist/assets/*.js the moment any source file referenced the token.
       },
       resolve: {
         alias: {

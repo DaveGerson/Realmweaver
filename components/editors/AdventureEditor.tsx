@@ -37,6 +37,7 @@ export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, cam
   const [formData, setFormData] = useState(adventure);
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [isGeneratingScene, setIsGeneratingScene] = useState(false);
+  const [sceneGenerationError, setSceneGenerationError] = useState<string | null>(null);
   const { confirm } = useConfirmDialog();
 
   // Tracks the last `adventure` prop we've reconciled against, so incoming prop
@@ -96,6 +97,7 @@ export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, cam
 
   const handleGenerateNextScene = async (prompt: string) => {
     setIsGeneratingScene(true);
+    setSceneGenerationError(null);
     try {
       const sceneData = await generateScene(prompt, isMockMode, campaignContext);
       campaignService.createScene(adventure.id, {
@@ -105,6 +107,7 @@ export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, cam
       });
     } catch (error) {
       console.error('Failed to generate scene for adventure:', error);
+      setSceneGenerationError('Failed to generate the next scene. Please try again.');
     } finally {
       setIsGeneratingScene(false);
     }
@@ -221,6 +224,9 @@ export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, cam
                   onGenerate={handleGenerateNextScene}
                 />
               </div>
+              {sceneGenerationError && (
+                <p role="alert" className="text-xs text-red-400">{sceneGenerationError}</p>
+              )}
 
               {adventure.scenes.length === 0 ? (
                 <p className="text-sm text-slate-500 italic">No scenes yet. Generate one above, or add scenes from the adventure dashboard.</p>

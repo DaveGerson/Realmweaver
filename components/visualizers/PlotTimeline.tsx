@@ -75,17 +75,19 @@ interface TooltipState {
 interface StatusDotProps {
   status: PlotSessionStatus | 'resolved' | null;
   color: string;
+  label: string;
   onMouseEnter: (e: React.MouseEvent) => void;
   onMouseLeave: () => void;
 }
 
-const StatusDot: React.FC<StatusDotProps> = ({ status, color, onMouseEnter, onMouseLeave }) => {
+const StatusDot: React.FC<StatusDotProps> = ({ status, color, label, onMouseEnter, onMouseLeave }) => {
   if (status === null) {
     // Hollow dim circle: plot not mentioned this session
     return (
       <span
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
+        aria-label={label}
         className="w-3 h-3 rounded-full border border-slate-600 bg-transparent flex-shrink-0 cursor-default"
         style={{ display: 'inline-block' }}
       />
@@ -97,6 +99,7 @@ const StatusDot: React.FC<StatusDotProps> = ({ status, color, onMouseEnter, onMo
       <span
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
+        aria-label={label}
         className="w-3.5 h-3.5 rounded-full flex-shrink-0 cursor-default"
         style={{ backgroundColor: '#22c55e', display: 'inline-block' }}
       />
@@ -108,6 +111,7 @@ const StatusDot: React.FC<StatusDotProps> = ({ status, color, onMouseEnter, onMo
       <span
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
+        aria-label={label}
         className="w-3.5 h-3.5 rounded-full flex-shrink-0 cursor-default"
         style={{ backgroundColor: '#f59e0b', display: 'inline-block' }}
       />
@@ -119,6 +123,7 @@ const StatusDot: React.FC<StatusDotProps> = ({ status, color, onMouseEnter, onMo
       <span
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
+        aria-label={label}
         className="w-3.5 h-3.5 rounded-full border-2 bg-transparent flex-shrink-0 cursor-default"
         style={{ borderColor: '#6b7280', display: 'inline-block' }}
       />
@@ -130,6 +135,7 @@ const StatusDot: React.FC<StatusDotProps> = ({ status, color, onMouseEnter, onMo
       <span
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
+        aria-label={label}
         className="flex-shrink-0 cursor-default"
         style={{ display: 'inline-flex', alignItems: 'center' }}
       >
@@ -343,9 +349,10 @@ export const PlotTimeline: React.FC<PlotTimelineProps> = ({
           {plots.map((plot, i) => {
             const color = PLOT_COLORS[i % PLOT_COLORS.length];
             return (
-              <div
+              <button
+                type="button"
                 key={plot.id}
-                className="flex items-center pr-3 cursor-pointer group"
+                className="w-full flex items-center pr-3 cursor-pointer group text-left"
                 style={{ height: ROW_HEIGHT, borderBottom: '1px solid #292524' }}
                 onClick={() => onSelectPlot?.(plot.id)}
                 title={plot.title}
@@ -358,7 +365,7 @@ export const PlotTimeline: React.FC<PlotTimelineProps> = ({
                 <span className="text-xs text-slate-300 group-hover:text-amber-300 transition-colors truncate leading-tight">
                   {plot.title}
                 </span>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -380,7 +387,8 @@ export const PlotTimeline: React.FC<PlotTimelineProps> = ({
                 {/* Session header row */}
                 <div className="flex border-b border-slate-700 sticky top-0 z-10 bg-slate-900 shadow-sm" style={{ height: ROW_HEIGHT }}>
                   {sessions.map((session, si) => (
-                    <div
+                    <button
+                      type="button"
                       key={session.id}
                       className="flex-shrink-0 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-700/40 transition-colors group px-1"
                       style={{ width: COL_WIDTH, borderRight: si < sessions.length - 1 ? '1px solid #292524' : undefined }}
@@ -403,7 +411,7 @@ export const PlotTimeline: React.FC<PlotTimelineProps> = ({
                           </span>
                         </>
                       )}
-                    </div>
+                    </button>
                   ))}
                 </div>
 
@@ -414,9 +422,18 @@ export const PlotTimeline: React.FC<PlotTimelineProps> = ({
                   return (
                     <div
                       key={plot.id}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={plot.title}
                       className="flex relative cursor-pointer hover:bg-slate-800/40 transition-colors"
                       style={{ height: ROW_HEIGHT, borderBottom: '1px solid #292524' }}
                       onClick={() => onSelectPlot?.(plot.id)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onSelectPlot?.(plot.id);
+                        }
+                      }}
                     >
                       {/* Horizontal line spanning all columns */}
                       <div
@@ -441,12 +458,22 @@ export const PlotTimeline: React.FC<PlotTimelineProps> = ({
                         return (
                           <div
                             key={session.id}
+                            role="button"
+                            tabIndex={0}
+                            aria-label={tooltipContent}
                             className="flex-shrink-0 flex items-center justify-center relative"
                             style={{
                               width: COL_WIDTH,
                               borderRight: si < sessions.length - 1 ? '1px solid #292524' : undefined,
                             }}
                             onClick={e => { e.stopPropagation(); onSelectSession?.(session.id); }}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onSelectSession?.(session.id);
+                              }
+                            }}
                           >
                             {/* Solid segment of the line when plot is active in this session */}
                             {active && (
@@ -461,6 +488,7 @@ export const PlotTimeline: React.FC<PlotTimelineProps> = ({
                               <StatusDot
                                 status={status}
                                 color={color.line}
+                                label={statusLabel}
                                 onMouseEnter={e => showTooltip(e, tooltipContent)}
                                 onMouseLeave={hideTooltip}
                               />
@@ -509,12 +537,21 @@ export const PlotTimeline: React.FC<PlotTimelineProps> = ({
           {warnings.map((w, idx) => (
             <div
               key={`${w.plotId}-${w.type}-${idx}`}
+              role="button"
+              tabIndex={0}
+              aria-label={`${w.plotTitle}: ${w.type === 'dormant' ? 'stalled or unchanged for 3+ sessions' : 'active with no linked entities'}`}
               className={`flex items-center gap-2 px-3 py-2 rounded-md text-xs border cursor-pointer hover:opacity-80 transition-opacity ${
                 w.type === 'dormant'
                   ? 'bg-amber-900/20 border-amber-700/40 text-amber-300'
                   : 'bg-sky-900/20 border-sky-700/40 text-sky-300'
               }`}
               onClick={() => onSelectPlot?.(w.plotId)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onSelectPlot?.(w.plotId);
+                }
+              }}
             >
               <Icons.AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
               {w.type === 'dormant' ? (

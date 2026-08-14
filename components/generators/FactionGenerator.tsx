@@ -68,6 +68,7 @@ export const FactionGenerator: React.FC<FactionGeneratorProps> = ({
       onFactionCreated(newFaction);
       setPrompt('');
     } catch (err) {
+      console.error('[FactionGenerator] generation failed', err);
       if (isMountedRef.current) {
         setError('Failed to generate faction. Please check your API key and try again.');
       }

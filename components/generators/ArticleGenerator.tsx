@@ -72,6 +72,7 @@ export const ArticleGenerator: React.FC<ArticleGeneratorProps> = ({
       onArticleCreated(newArticle);
       setPrompt('');
     } catch (err) {
+      console.error('[ArticleGenerator] generation failed', err);
       if (isMountedRef.current) {
         setError('Failed to generate article. Please check your API key and try again.');
       }

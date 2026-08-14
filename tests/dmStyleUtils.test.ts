@@ -30,15 +30,17 @@ describe('OVERRIDEABLE_FEATURES', () => {
     });
 
     it('includes all guided-hidden features', () => {
+        // wp-j-types-utils finding #91: 'plot-timeline', 'backlinks-panel' and
+        // 'advanced-context' were dropped from FEATURE_LABELS/GUIDED_HIDDEN
+        // because no isFeatureVisible(...) call site ever consulted them —
+        // they were inert switches in the settings panel. See
+        // tests/ship/wp-j-types-utils.dm-style-feature-gates.test.ts.
         const expected = [
             'continuity-checker',
             'relationship-graph',
-            'plot-timeline',
-            'backlinks-panel',
             'secrets-tracker',
             'combat-tracker',
             'keyboard-shortcuts',
-            'advanced-context',
         ];
         for (const feature of expected) {
             expect(OVERRIDEABLE_FEATURES).toContain(feature);
@@ -51,15 +53,14 @@ describe('OVERRIDEABLE_FEATURES', () => {
 // ---------------------------------------------------------------------------
 
 describe('isFeatureVisible — guided mode', () => {
+    // wp-j-types-utils finding #91: 'plot-timeline', 'backlinks-panel' and
+    // 'advanced-context' were dropped — see note above.
     const GUIDED_HIDDEN = [
         'continuity-checker',
         'relationship-graph',
-        'plot-timeline',
-        'backlinks-panel',
         'secrets-tracker',
         'combat-tracker',
         'keyboard-shortcuts',
-        'advanced-context',
     ];
 
     it('hides all advanced features', () => {

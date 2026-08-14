@@ -47,13 +47,23 @@ describe('wp-i2 — index.html third-party CDN payload (finding #29)', () => {
   });
 
   it('declares a Content-Security-Policy that does not whitelist remote script hosts', () => {
+    // NOTE (wp-i2, test defect fix): the original extraction regex used
+    // `content=["']([^"']+)["']` — a *fixed* pair of independent `["']`
+    // alternations with no backreference. Since a real CSP value must itself
+    // contain single-quoted keyword sources (`'self'`, `'unsafe-inline'`,
+    // etc. — required by the CSP spec, not optional styling), the capture
+    // group always truncated at the first embedded apostrophe, making this
+    // assertion impossible to satisfy for ANY spec-valid policy — including
+    // ones the test itself demands contain `'self'` below. Fixed by
+    // backreferencing the actual opening quote character so embedded quotes
+    // of the same kind used for CSP keywords don't terminate the match early.
     const cspMatch = indexHtml.match(
-      /<meta[^>]+http-equiv=["']Content-Security-Policy["'][^>]*content=["']([^"']+)["']/i
+      /<meta[^>]+http-equiv=["']Content-Security-Policy["'][^>]*content=(["'])((?:(?!\1)[\s\S])*)\1/i
     );
 
     expect(cspMatch, 'index.html must declare a CSP <meta> tag').not.toBeNull();
 
-    const policy = cspMatch![1];
+    const policy = cspMatch![2];
     expect(policy).toMatch(/script-src[^;]*'self'/);
     // No remote origin may be allowed to execute script in a page that holds
     // campaign data and API keys in localStorage.

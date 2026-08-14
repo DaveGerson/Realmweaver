@@ -94,6 +94,7 @@ export const NpcGenerator: React.FC<NpcGeneratorProps> = ({
       setCr('');
       setAlignment('');
     } catch (err) {
+      console.error('[NpcGenerator] generation failed', err);
       if (isMountedRef.current) {
         setError('Failed to generate NPC. Please check your API key and try again.');
       }

@@ -75,6 +75,7 @@ export const AdventureGenerator: React.FC<AdventureGeneratorProps> = ({
       setLevelRange('');
       setPartySize(4);
     } catch (err) {
+      console.error('[AdventureGenerator] generation failed', err);
       if (isMountedRef.current) {
         setError('Failed to generate adventure. Please check your API key and try again.');
       }
@@ -133,6 +134,8 @@ export const AdventureGenerator: React.FC<AdventureGeneratorProps> = ({
                     adventure={{ ...data, id: 'preview' }}
                     campaign={mockCampaign}
                     onUpdate={(_, updates) => onUpdate(updates)}
+                    isMockMode={isMockMode}
+                    campaignContext={campaignContext}
                   />
                 );
               }}

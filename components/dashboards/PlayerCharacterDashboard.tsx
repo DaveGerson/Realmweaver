@@ -5,6 +5,9 @@ import { useEntitySearch } from '@/hooks/useEntitySearch';
 import { PlayerCharacterImporter } from '../generators/PlayerCharacterImporter';
 import { Icons } from '../common/Icons';
 import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
+import { ENTITY_TYPE_CONFIG } from '../../utils/entityUtils';
+
+const PC_COLOR = ENTITY_TYPE_CONFIG['playerCharacter'].color;
 
 /** Returns a Tailwind color class for a completeness dot given a percentage 0-100. */
 function completenessColor(pct: number): string {
@@ -83,28 +86,33 @@ export const PlayerCharacterDashboard: React.FC<PlayerCharacterDashboardProps> =
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filteredPCs.map((pc, index) => {
-              const charClass = pc.characterStatistics.classes.charClass;
-              const subclass = pc.characterStatistics.classes.subclass;
-              const level = pc.characterStatistics.classes.level;
-              const species = pc.characterSocial.species;
-              const background = pc.characterSocial.background;
+              const charClass = pc.characterStatistics?.classes?.charClass;
+              const subclass = pc.characterStatistics?.classes?.subclass;
+              const level = pc.characterStatistics?.classes?.level;
+              const species = pc.characterSocial?.species;
+              const background = pc.characterSocial?.background;
+              const characterName = pc.characterSocial?.characterName;
               const pct = pcCompleteness(pc);
               return (
                 <button
                   key={pc.id}
                   onClick={() => onSelectPlayerCharacter(pc.id)}
-                  className="relative bg-slate-900/50 p-4 rounded-lg border border-slate-800 border-l-4 border-l-amber-500 text-left hover:bg-slate-800 hover:border-slate-700 hover:border-l-amber-400 transition-all space-y-2"
+                  className={`relative bg-slate-900/50 p-4 rounded-lg border border-slate-800 border-l-4 border-l-${PC_COLOR}-500 text-left hover:bg-slate-800 hover:border-slate-700 hover:border-l-${PC_COLOR}-400 transition-all space-y-2`}
                   {...getRovingProps(index)}
                 >
                   <span className={`absolute top-2 right-2 w-1.5 h-1.5 rounded-full ${completenessColor(pct)}`} title={`${pct}% complete`} />
-                  <h3 className="font-semibold text-amber-400 leading-tight pr-4">{pc.characterSocial.characterName}</h3>
+                  <h3 className={`font-semibold text-${PC_COLOR}-400 leading-tight pr-4`}>{characterName}</h3>
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-[10px] bg-amber-900/40 text-amber-300 border border-amber-500/30 rounded-full px-2 py-0.5">
-                      {species}
-                    </span>
-                    <span className="text-[10px] bg-slate-700/60 text-slate-300 border border-slate-600/30 rounded-full px-2 py-0.5">
-                      {subclass ? `${subclass} ` : ''}{charClass} {level}
-                    </span>
+                    {species && (
+                      <span className={`text-[10px] bg-${PC_COLOR}-900/40 text-${PC_COLOR}-300 border border-${PC_COLOR}-500/30 rounded-full px-2 py-0.5`}>
+                        {species}
+                      </span>
+                    )}
+                    {charClass && (
+                      <span className="text-[10px] bg-slate-700/60 text-slate-300 border border-slate-600/30 rounded-full px-2 py-0.5">
+                        {subclass ? `${subclass} ` : ''}{charClass} {level}
+                      </span>
+                    )}
                   </div>
                   {background && (
                     <p className="text-xs text-slate-500 italic line-clamp-1">{background}</p>

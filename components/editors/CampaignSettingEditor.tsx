@@ -80,16 +80,18 @@ export const CampaignSettingEditor: React.FC<CampaignSettingEditorProps> = ({
       formData.title !== campaign.title ||
       formData.setting !== campaign.setting ||
       formData.settingType !== campaign.settingType ||
-      formData.officialSetting !== campaign.officialSetting ||
+      formData.officialSetting !== (campaign.officialSetting || OFFICIAL_SETTINGS[0]) ||
       formData.gcpApiKey !== (campaign.gcpApiKey || '')
     ) {
-      onUpdate(formData);
+      const { officialSetting, ...rest } = formData;
+      onUpdate(formData.settingType === 'official' ? formData : rest);
     }
   };
 
   const toggleSettingType = (type: SettingType) => {
     setFormData(prev => ({ ...prev, settingType: type }));
-    onUpdate({ ...formData, settingType: type });
+    const { officialSetting, ...rest } = formData;
+    onUpdate(type === 'official' ? { ...formData, settingType: type } : { ...rest, settingType: type });
   };
 
   const totalEntities =

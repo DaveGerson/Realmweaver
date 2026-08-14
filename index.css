@@ -1,0 +1,10 @@
+/**
+ * index.css — Tailwind CSS build-time entry point.
+ *
+ * Replaces the old `<script src="https://cdn.tailwindcss.com">` runtime JIT
+ * compiler (see index.html) with a real compiled stylesheet: the
+ * `@tailwindcss/vite` plugin (registered in vite.config.ts) scans the project
+ * for utility classes and generates a local CSS file instead of shipping a
+ * compiler to the browser.
+ */
+@import "tailwindcss";

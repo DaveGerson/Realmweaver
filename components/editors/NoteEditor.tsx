@@ -85,10 +85,15 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete
   };
 
   const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    // For tags, compare joined string
+    // For tags, clean up on commit (trim, drop empties from a trailing comma,
+    // dedupe) so the user can still type a trailing comma while editing —
+    // the raw split happens on every keystroke in handleTagsChange, but only
+    // the cleaned list is ever persisted.
     if (e.target.name === 'tags') {
-      if (formData.tags.join(',') !== note.tags.join(',')) {
-        onUpdate(note.id, { tags: formData.tags });
+      const cleanedTags = Array.from(new Set(formData.tags.map(t => t.trim()).filter(Boolean)));
+      if (cleanedTags.join(',') !== note.tags.join(',')) {
+        setFormData(prev => ({ ...prev, tags: cleanedTags }));
+        onUpdate(note.id, { tags: cleanedTags });
       }
     } else {
       if (formData[e.target.name as keyof Note] !== note[e.target.name as keyof Note]) {

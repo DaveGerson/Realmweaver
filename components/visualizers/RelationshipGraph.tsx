@@ -39,7 +39,7 @@ const ENTITY_TYPE_TO_CONFIG_KEY: Record<string, string> = {
   [EntityType.FACTION]:   'faction',
   [EntityType.ITEM]:      'item',
   [EntityType.ADVENTURE]: 'adventure',
-  [EntityType.SCENE]:     'adventure', // Scene uses adventure color family
+  [EntityType.SCENE]:     'scene',
   [EntityType.ARTICLE]:   'article',
 };
 
@@ -51,9 +51,6 @@ const TYPE_COLORS: Record<string, string> = Object.fromEntries(
     return [entityTypeKey, hex];
   })
 );
-
-// Override SCENE to be slightly distinct from ADVENTURE
-TYPE_COLORS[EntityType.SCENE] = '#ef4444'; // red-500
 
 export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, onNodeSelect }) => {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -183,6 +180,8 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
 
     const svg = d3.select(svgRef.current)
       .attr("viewBox", [0, 0, width, height])
+      .attr("role", "application")
+      .attr("aria-label", "Entity relationship graph")
       .style("max-width", "100%")
       .style("height", "100%")
       .style("background-color", "#020617"); // slate-950
@@ -254,10 +253,18 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
       .selectAll<SVGGElement, GraphNode>("g")
       .data(simulationNodes)
       .join("g")
+      .attr("tabindex", 0)
+      .attr("role", "button")
+      .style("outline", "none")
+      .on("keydown", handleNodeKeyDown)
       .call(d3.drag<SVGGElement, GraphNode>()
         .on("start", dragstarted)
         .on("drag", dragged)
         .on("end", dragended));
+
+    // Accessible name for keyboard/AT users — mirrors the link groups' <title>.
+    nodeGroup.append("title")
+      .text((d: GraphNode) => d.name);
 
     // Invisible large hit area for touch-friendly interaction (44px diameter = r:22).
     // This circle captures click/touch events; the visible circle below provides the visual.
@@ -287,7 +294,7 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
       .style("pointer-events", "none")
       .style("text-shadow", "2px 2px 4px #000");
 
-    function handleNodeClick(event: MouseEvent, d: GraphNode) {
+    function handleNodeClick(event: MouseEvent | KeyboardEvent, d: GraphNode) {
       event.stopPropagation();
       const typeMap: Record<string, string> = {
           [EntityType.NPC]: 'npc',
@@ -302,6 +309,12 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
       if (mappedType) {
           onNodeSelect(mappedType, d.id);
       }
+    }
+
+    function handleNodeKeyDown(event: KeyboardEvent, d: GraphNode) {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      handleNodeClick(event, d);
     }
 
     simulation.on("tick", () => {

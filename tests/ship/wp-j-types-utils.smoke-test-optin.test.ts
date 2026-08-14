@@ -27,10 +27,19 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Every aiService export smokeTest.ts uses, stubbed inert — and counted, so we
 // can assert the suite fired no generation calls when not opted in.
+//
+// NOTE: `get` must special-case `then` — a Proxy that answers every property
+// access with a function makes the mocked module look "thenable" to the
+// module loader's own Promise-resolution machinery, which then calls
+// `mod.then(resolve, reject)` once while awaiting the dynamic `import(...)`
+// below. Without this guard that phantom call is indistinguishable from a
+// real (bad) AI call and fails the "does nothing" assertion regardless of
+// runSmokeTests' own logic — this is a mock-setup artifact, not a change in
+// contract under test.
 const aiCalls = vi.fn();
 vi.mock('../../services/aiService', () => {
     const inert = async (...args: unknown[]) => { aiCalls(...args); return {}; };
-    return new Proxy({}, { get: () => inert });
+    return new Proxy({}, { get: (_t, prop) => (prop === 'then' ? undefined : inert) });
 });
 
 vi.mock('../../services/campaignService', () => {

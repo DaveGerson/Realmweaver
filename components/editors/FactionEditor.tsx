@@ -29,6 +29,14 @@ interface FactionEditorProps {
   isMockMode: boolean;
   campaignContext?: string;
   onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
+  /**
+   * True when this editor is rendering an unsaved chat-generator draft (e.g.
+   * FactionDashboard's live preview), not a real, saved faction. The
+   * synthetic `faction.id === 'preview'` id used by those previews is also
+   * treated as this signal, so either one disables "generate here" affordances
+   * that would otherwise write a real NPC pointing at a faction that doesn't exist yet.
+   */
+  isPreview?: boolean;
 }
 
 const FACTION_TABS: TabDefinition[] = [
@@ -37,11 +45,13 @@ const FACTION_TABS: TabDefinition[] = [
   { id: 'connections',  label: 'Connections',  icon: Icons.Link },
 ];
 
-export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, allLocations = [], campaign, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
+export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, allLocations = [], campaign, onUpdate, onDelete, isMockMode, campaignContext, onNavigate, isPreview = false }) => {
   const [formData, setFormData] = useState(faction);
   const [isGeneratingMember, setIsGeneratingMember] = useState(false);
+  const [memberGenerationError, setMemberGenerationError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const { confirm } = useConfirmDialog();
+  const isDraftPreview = isPreview || faction.id === 'preview';
 
   // Tracks the last `faction` prop we've reconciled against, so incoming prop
   // updates can be merged field-by-field instead of overwriting formData wholesale.
@@ -85,10 +95,22 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
     }
   }
 
-  // Used by MentionInput fields (onChange receives string, not event)
+  // Used by MentionInput fields (onChange receives string, not event).
+  // Local edits commit immediately for responsive typing, but the store write
+  // (onUpdate) is debounced so unblurred keystrokes coalesce into a single
+  // campaign-wide update instead of one per character.
+  const mentionFieldTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  useEffect(() => {
+    const timers = mentionFieldTimersRef.current;
+    return () => { Object.values(timers).forEach(clearTimeout); };
+  }, []);
   const handleMentionFieldChange = (field: keyof Faction) => (value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    onUpdate(faction.id, { [field]: value });
+    const timers = mentionFieldTimersRef.current;
+    if (timers[field]) clearTimeout(timers[field]);
+    timers[field] = setTimeout(() => {
+      onUpdate(faction.id, { [field]: value });
+    }, 400);
   };
 
   // --- @-mention tracking across all MentionInput fields ---
@@ -102,15 +124,19 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
     description: findMentionedIdsInText(faction.description, mentionCandidates),
     goals: findMentionedIdsInText(faction.goals, mentionCandidates),
   }));
+  // Kept in sync with `mentionedIdsByField` so the merged set can be computed
+  // and reported without writing to the store from inside a setState updater
+  // (React invokes functional updaters during the render phase, and StrictMode
+  // intentionally double-invokes them — doing the store write there fired it twice).
+  const mentionedIdsByFieldRef = useRef(mentionedIdsByField);
   // Reports the merged set of mentioned IDs (across every mention field) whenever any field changes.
   const handleMentionedIdsChange = (field: string) => (ids: string[]) => {
-    setMentionedIdsByField(prev => {
-      const next = { ...prev, [field]: ids };
-      const merged = Array.from(new Set(Object.values(next).flat()));
-      setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
-      onUpdate(faction.id, { mentionedEntityIds: merged });
-      return next;
-    });
+    const next = { ...mentionedIdsByFieldRef.current, [field]: ids };
+    mentionedIdsByFieldRef.current = next;
+    setMentionedIdsByField(next);
+    const merged = Array.from(new Set(Object.values(next).flat()));
+    setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
+    onUpdate(faction.id, { mentionedEntityIds: merged });
   };
 
   const handleFieldRegenerate = (field: keyof Omit<Faction, 'id' | 'leaderId' | 'memberIds' | 'headquartersLocationId' | 'alignment'>) => (newValue: string) => {
@@ -125,18 +151,20 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
 
   const handleGenerateMemberNpc = async (prompt: string) => {
     setIsGeneratingMember(true);
+    setMemberGenerationError(null);
     const contextWithFaction = `${campaignContext || ''}\nFaction: ${faction.name}${faction.description ? ` — ${faction.description}` : ''}${faction.goals ? `\nFaction Goals: ${faction.goals}` : ''}`.trim();
     try {
       const npcData = await generateNpc(prompt, isMockMode, contextWithFaction);
       campaignService.createNpc({ ...npcData, factionId: faction.id, relationships: [], history: [] });
     } catch (error) {
       console.error('Failed to generate member NPC:', error);
+      setMemberGenerationError('Failed to generate member NPC. Please try again.');
     } finally {
       setIsGeneratingMember(false);
     }
   };
 
-  const memberNpcs = allNpcs.filter(npc => faction.memberIds.includes(npc.id));
+  const memberNpcs = allNpcs.filter(npc => (faction.memberIds || []).includes(npc.id));
 
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar animate-fade-in">
@@ -295,8 +323,13 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
                     defaultPrompt={memberGenerationDefaultPrompt}
                     isGenerating={isGeneratingMember}
                     onGenerate={handleGenerateMemberNpc}
+                    disabled={isDraftPreview}
+                    disabledReason={isDraftPreview ? 'Save this faction before generating members.' : undefined}
                   />
                 </div>
+                {memberGenerationError && (
+                  <p role="alert" className="text-xs text-red-400 mb-1.5">{memberGenerationError}</p>
+                )}
                 {memberNpcs.length > 0 ? (
                    <div className="bg-slate-950 border border-slate-800 rounded-md p-3 space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
                        {memberNpcs.map(npc => (

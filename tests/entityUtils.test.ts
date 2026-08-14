@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
     ENTITY_TYPE_CONFIG,
-    buildCampaignContext,
     buildEntityContext,
     estimatePcHp,
     createDefaultNpc,
@@ -126,120 +125,10 @@ describe('ENTITY_TYPE_CONFIG', () => {
 });
 
 // ---------------------------------------------------------------------------
-// buildCampaignContext
+// buildCampaignContext — REMOVED (finding #121): entityUtils no longer
+// exports a buildCampaignContext. The single implementation now lives in
+// services/contextBuilder.ts (see tests/ship/wp-j-types-utils.dead-context-builder.test.ts).
 // ---------------------------------------------------------------------------
-
-describe('buildCampaignContext', () => {
-    it('includes campaign title and setting', () => {
-        const campaign = makeMinimalCampaign();
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).toContain('Campaign: Test Campaign');
-        expect(ctx).toContain('Setting: A dark fantasy realm');
-    });
-
-    it('includes official setting when settingType is official', () => {
-        const campaign = makeMinimalCampaign({
-            settingType: 'official',
-            officialSetting: 'Forgotten Realms',
-        });
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).toContain('Official Setting: Forgotten Realms');
-    });
-
-    it('omits official setting line for custom campaigns', () => {
-        const campaign = makeMinimalCampaign({ settingType: 'custom' });
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).not.toContain('Official Setting');
-    });
-
-    it('lists NPC names when present', () => {
-        const campaign = makeMinimalCampaign({
-            npcs: [
-                { id: 'n1', name: 'Gandalf', description: '', traits: '', backstory: '', motivations: '', secrets: '', stats: '', exampleQuote: '', knowsPlayerHistory: [], relationships: [], history: [] },
-                { id: 'n2', name: 'Sauron', description: '', traits: '', backstory: '', motivations: '', secrets: '', stats: '', exampleQuote: '', knowsPlayerHistory: [], relationships: [], history: [] },
-            ],
-        });
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).toContain('Existing NPCs: Gandalf, Sauron');
-    });
-
-    it('lists location names when present', () => {
-        const campaign = makeMinimalCampaign({
-            locations: [
-                { id: 'l1', name: 'Rivendell', description: '', secrets: '', subLocationIds: [], history: [] },
-            ],
-        });
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).toContain('Existing Locations: Rivendell');
-    });
-
-    it('lists faction names when present', () => {
-        const campaign = makeMinimalCampaign({
-            factions: [
-                { id: 'f1', name: 'The Fellowship', description: '', goals: '', memberIds: [] },
-            ],
-        });
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).toContain('Existing Factions: The Fellowship');
-    });
-
-    it('lists item names when present', () => {
-        const campaign = makeMinimalCampaign({
-            items: [
-                { id: 'i1', name: 'Sting', description: '', rarity: 'rare', properties: '' },
-            ],
-        });
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).toContain('Existing Items: Sting');
-    });
-
-    it('lists adventure titles when present', () => {
-        const campaign = makeMinimalCampaign({
-            adventures: [
-                { id: 'a1', title: 'The Quest', level: 1, hook: '', theme: '', scenes: [] },
-            ],
-        });
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).toContain('Existing Adventures: The Quest');
-    });
-
-    it('lists article titles when present', () => {
-        const campaign = makeMinimalCampaign({
-            articles: [
-                { id: 'ar1', title: 'Creation Myth', category: 'lore', content: '', subArticleIds: [] },
-            ],
-        });
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).toContain('Lore Articles: Creation Myth');
-    });
-
-    it('lists only active plots', () => {
-        const campaign = makeMinimalCampaign({
-            plots: [
-                { id: 'p1', title: 'Save the World', description: '', status: 'active', relatedEntityIds: [] },
-                { id: 'p2', title: 'Old News', description: '', status: 'resolved', relatedEntityIds: [] },
-            ],
-        });
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).toContain('Active Plots: Save the World');
-        expect(ctx).not.toContain('Old News');
-    });
-
-    it('lists player character names', () => {
-        const pc = makePlayerCharacter();
-        const campaign = makeMinimalCampaign({ playerCharacters: [pc] });
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).toContain('Player Characters: Thorn');
-    });
-
-    it('omits empty categories', () => {
-        const campaign = makeMinimalCampaign();
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).not.toContain('Existing NPCs');
-        expect(ctx).not.toContain('Existing Locations');
-        expect(ctx).not.toContain('Active Plots');
-    });
-});
 
 // ---------------------------------------------------------------------------
 // buildEntityContext

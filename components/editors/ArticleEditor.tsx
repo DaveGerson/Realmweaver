@@ -31,13 +31,13 @@ interface ArticleEditorProps {
 
 const categoryOptions: ArticleCategory[] = ['lore', 'history', 'cosmology'];
 
-export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticles, campaign, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
+export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticles, allNpcs: propAllNpcs, allLocations: propAllLocations, allFactions: propAllFactions, campaign, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(article);
   const { confirm } = useConfirmDialog();
 
-  const allNpcs = campaign?.npcs ?? [];
-  const allLocations = campaign?.locations ?? [];
-  const allFactions = campaign?.factions ?? [];
+  const allNpcs = propAllNpcs ?? campaign?.npcs ?? [];
+  const allLocations = propAllLocations ?? campaign?.locations ?? [];
+  const allFactions = propAllFactions ?? campaign?.factions ?? [];
 
   // Tracks the last `article` prop we've reconciled against, so incoming prop
   // updates can be merged field-by-field instead of overwriting formData wholesale.
@@ -86,10 +86,22 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
     }
   }
 
-  // Used by MentionInput fields (onChange receives string, not event)
+  // Used by MentionInput fields (onChange receives string, not event).
+  // Local edits commit immediately for responsive typing, but the store write
+  // (onUpdate) is debounced so unblurred keystrokes coalesce into a single
+  // campaign-wide update instead of one per character.
+  const mentionFieldTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  useEffect(() => {
+    const timers = mentionFieldTimersRef.current;
+    return () => { Object.values(timers).forEach(clearTimeout); };
+  }, []);
   const handleMentionFieldChange = (field: keyof Article) => (value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    onUpdate(article.id, { [field]: value });
+    const timers = mentionFieldTimersRef.current;
+    if (timers[field]) clearTimeout(timers[field]);
+    timers[field] = setTimeout(() => {
+      onUpdate(article.id, { [field]: value });
+    }, 400);
   };
 
   // --- @-mention tracking across all MentionInput fields ---
@@ -102,15 +114,19 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
   const [mentionedIdsByField, setMentionedIdsByField] = useState<Record<string, string[]>>(() => ({
     content: findMentionedIdsInText(article.content, mentionCandidates),
   }));
+  // Kept in sync with `mentionedIdsByField` so the merged set can be computed
+  // and reported without writing to the store from inside a setState updater
+  // (React invokes functional updaters during the render phase, and StrictMode
+  // intentionally double-invokes them — doing the store write there fired it twice).
+  const mentionedIdsByFieldRef = useRef(mentionedIdsByField);
   // Reports the merged set of mentioned IDs (across every mention field) whenever any field changes.
   const handleMentionedIdsChange = (field: string) => (ids: string[]) => {
-    setMentionedIdsByField(prev => {
-      const next = { ...prev, [field]: ids };
-      const merged = Array.from(new Set(Object.values(next).flat()));
-      setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
-      onUpdate(article.id, { mentionedEntityIds: merged });
-      return next;
-    });
+    const next = { ...mentionedIdsByFieldRef.current, [field]: ids };
+    mentionedIdsByFieldRef.current = next;
+    setMentionedIdsByField(next);
+    const merged = Array.from(new Set(Object.values(next).flat()));
+    setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
+    onUpdate(article.id, { mentionedEntityIds: merged });
   };
 
   const handleFieldRegenerate = (field: 'content') => (newValue: string) => {

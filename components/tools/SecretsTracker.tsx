@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import type { Campaign, Secret } from '@/types/index';
 import { Icons } from '@/components/common/Icons';
 import { Button } from '@/components/common/Button';
@@ -86,14 +86,6 @@ function buildPickableEntities(campaign: Campaign): PickableEntity[] {
   return results;
 }
 
-/** Returns color classes for a chip based on entity type, derived from ENTITY_TYPE_CONFIG. */
-function entityChipClasses(type: string): string {
-  const config = ENTITY_TYPE_CONFIG[type];
-  if (!config) return 'bg-slate-700 text-slate-300';
-  const color = config.color;
-  return `bg-${color}-900/50 text-${color}-300 border border-${color}-700/50`;
-}
-
 // --- Entity chip sub-component ---
 
 interface EntityChipProps {
@@ -133,6 +125,8 @@ interface EntityPickerProps {
   allEntities: PickableEntity[];
   onToggle: (id: string) => void;
   onClose: () => void;
+  /** Ref to the trigger button that opened this picker, so outside-click detection doesn't fight the trigger's own toggle handler. */
+  triggerRef: React.RefObject<HTMLElement>;
 }
 
 const EntityPicker: React.FC<EntityPickerProps> = ({
@@ -140,8 +134,29 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   allEntities,
   onToggle,
   onClose,
+  triggerRef,
 }) => {
   const [search, setSearch] = useState('');
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Dismiss on Escape (anywhere) or on a mousedown outside the popover/trigger.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    const handleMouseDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (popoverRef.current?.contains(target)) return;
+      if (triggerRef.current?.contains(target)) return;
+      onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleMouseDown);
+    };
+  }, [onClose, triggerRef]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -163,7 +178,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
 
   if (allEntities.length === 0) {
     return (
-      <div className="absolute z-50 left-0 mt-1 w-56 bg-slate-900 border border-slate-700 rounded-lg shadow-xl p-3 text-xs text-slate-500 italic">
+      <div ref={popoverRef} className="absolute z-50 left-0 mt-1 w-56 bg-slate-900 border border-slate-700 rounded-lg shadow-xl p-3 text-xs text-slate-500 italic">
         No entities in campaign yet.
         <button onClick={onClose} className="block mt-2 text-amber-400 hover:text-amber-300">Close</button>
       </div>
@@ -171,7 +186,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   }
 
   return (
-    <div className="absolute z-50 left-0 mt-1 w-64 bg-slate-900 border border-slate-700 rounded-lg shadow-xl flex flex-col max-h-64">
+    <div ref={popoverRef} className="absolute z-50 left-0 mt-1 w-64 bg-slate-900 border border-slate-700 rounded-lg shadow-xl flex flex-col max-h-64">
       {/* Search */}
       <div className="p-2 border-b border-slate-700 flex-shrink-0">
         <input
@@ -263,6 +278,7 @@ const SecretCard: React.FC<SecretCardProps> = ({
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const linkTriggerRef = useRef<HTMLButtonElement>(null);
   const { confirm } = useConfirmDialog();
 
   const config = CATEGORY_CONFIG[secret.category];
@@ -298,6 +314,11 @@ const SecretCard: React.FC<SecretCardProps> = ({
       onLinkEntity(secret.id, entityId);
     }
   };
+
+  const closePicker = useCallback(() => {
+    setShowPicker(false);
+    linkTriggerRef.current?.focus();
+  }, []);
 
   return (
     <div
@@ -419,6 +440,7 @@ const SecretCard: React.FC<SecretCardProps> = ({
               <p className="text-xs text-slate-500 uppercase tracking-wide">Linked Entities</p>
               <div className="relative">
                 <button
+                  ref={linkTriggerRef}
                   onClick={() => setShowPicker(prev => !prev)}
                   className="flex items-center gap-1 text-[10px] text-amber-500 hover:text-amber-400 transition-colors px-1.5 py-0.5 rounded hover:bg-slate-700"
                 >
@@ -430,7 +452,8 @@ const SecretCard: React.FC<SecretCardProps> = ({
                     linkedEntityIds={linkedIds}
                     allEntities={allEntities}
                     onToggle={handlePickerToggle}
-                    onClose={() => setShowPicker(false)}
+                    onClose={closePicker}
+                    triggerRef={linkTriggerRef}
                   />
                 )}
               </div>
@@ -483,6 +506,7 @@ const AddSecretForm: React.FC<AddSecretFormProps> = ({ campaign, onAdd, onCancel
   const [notes, setNotes] = useState('');
   const [linkedEntityIds, setLinkedEntityIds] = useState<string[]>([]);
   const [showPicker, setShowPicker] = useState(false);
+  const linkTriggerRef = useRef<HTMLButtonElement>(null);
 
   const allEntities = useMemo(() => buildPickableEntities(campaign), [campaign]);
 
@@ -503,6 +527,11 @@ const AddSecretForm: React.FC<AddSecretFormProps> = ({ campaign, onAdd, onCancel
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     );
   };
+
+  const closePicker = useCallback(() => {
+    setShowPicker(false);
+    linkTriggerRef.current?.focus();
+  }, []);
 
   const linkedEntities = useMemo(
     () => linkedEntityIds.map(id => allEntities.find(e => e.id === id)).filter(Boolean) as PickableEntity[],
@@ -558,6 +587,7 @@ const AddSecretForm: React.FC<AddSecretFormProps> = ({ campaign, onAdd, onCancel
             <p className="text-xs text-slate-500 uppercase tracking-wide">Link Entities (optional)</p>
             <div className="relative">
               <button
+                ref={linkTriggerRef}
                 onClick={() => setShowPicker(prev => !prev)}
                 className="flex items-center gap-1 text-[10px] text-amber-500 hover:text-amber-400 transition-colors px-1.5 py-0.5 rounded hover:bg-slate-800"
               >
@@ -569,7 +599,8 @@ const AddSecretForm: React.FC<AddSecretFormProps> = ({ campaign, onAdd, onCancel
                   linkedEntityIds={linkedEntityIds}
                   allEntities={allEntities}
                   onToggle={toggleEntity}
-                  onClose={() => setShowPicker(false)}
+                  onClose={closePicker}
+                  triggerRef={linkTriggerRef}
                 />
               )}
             </div>

@@ -43,7 +43,9 @@ const LOCATION_TABS: TabDefinition[] = [
 export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLocations, allFactions = [], campaign, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(location);
   const [generatingPoiFor, setGeneratingPoiFor] = useState<string | null>(null);
+  const [poiGenerationError, setPoiGenerationError] = useState<string | null>(null);
   const [isGeneratingNpc, setIsGeneratingNpc] = useState(false);
+  const [npcGenerationError, setNpcGenerationError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const { confirm } = useConfirmDialog();
 
@@ -89,10 +91,22 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     onUpdate(location.id, { controllingFactionId: newFactionId });
   };
 
-  // Used by MentionInput fields (onChange receives string, not event)
+  // Used by MentionInput fields (onChange receives string, not event).
+  // Local edits commit immediately for responsive typing, but the store write
+  // (onUpdate) is debounced so unblurred keystrokes coalesce into a single
+  // campaign-wide update instead of one per character.
+  const mentionFieldTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  useEffect(() => {
+    const timers = mentionFieldTimersRef.current;
+    return () => { Object.values(timers).forEach(clearTimeout); };
+  }, []);
   const handleMentionFieldChange = (field: keyof Location) => (value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    onUpdate(location.id, { [field]: value });
+    const timers = mentionFieldTimersRef.current;
+    if (timers[field]) clearTimeout(timers[field]);
+    timers[field] = setTimeout(() => {
+      onUpdate(location.id, { [field]: value });
+    }, 400);
   };
 
   // --- @-mention tracking across all MentionInput fields ---
@@ -106,15 +120,19 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     description: findMentionedIdsInText(location.description, mentionCandidates),
     secrets: findMentionedIdsInText(location.secrets, mentionCandidates),
   }));
+  // Kept in sync with `mentionedIdsByField` so the merged set can be computed
+  // and reported without writing to the store from inside a setState updater
+  // (React invokes functional updaters during the render phase, and StrictMode
+  // intentionally double-invokes them — doing the store write there fired it twice).
+  const mentionedIdsByFieldRef = useRef(mentionedIdsByField);
   // Reports the merged set of mentioned IDs (across every mention field) whenever any field changes.
   const handleMentionedIdsChange = (field: string) => (ids: string[]) => {
-    setMentionedIdsByField(prev => {
-      const next = { ...prev, [field]: ids };
-      const merged = Array.from(new Set(Object.values(next).flat()));
-      setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
-      onUpdate(location.id, { mentionedEntityIds: merged });
-      return next;
-    });
+    const next = { ...mentionedIdsByFieldRef.current, [field]: ids };
+    mentionedIdsByFieldRef.current = next;
+    setMentionedIdsByField(next);
+    const merged = Array.from(new Set(Object.values(next).flat()));
+    setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
+    onUpdate(location.id, { mentionedEntityIds: merged });
   };
 
   const handleFieldRegenerate = (field: 'description' | 'secrets') => (newValue: string) => {
@@ -241,6 +259,7 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
   const handleGeneratePoi = async (lootItem: LootItem) => {
     if (!lootItem.description) return;
     setGeneratingPoiFor(lootItem.id);
+    setPoiGenerationError(null);
     try {
         const poiData = await generatePoiFromLoot(lootItem.description, undefined, isMockMode);
         const newPoi: PointOfInterest = { ...poiData, id: crypto.randomUUID() };
@@ -256,6 +275,7 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
 
     } catch (err) {
         console.error("Failed to generate Point of Interest from loot", err);
+        setPoiGenerationError('Failed to generate Point of Interest. Please try again.');
     } finally {
         setGeneratingPoiFor(null);
     }
@@ -266,12 +286,14 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
 
   const handleGenerateNpcAtLocation = async (prompt: string) => {
     setIsGeneratingNpc(true);
+    setNpcGenerationError(null);
     const contextWithLocation = `${campaignContext || ''}\nCurrent Location: ${location.name}${location.description ? ` — ${location.description}` : ''}`.trim();
     try {
       const npcData = await generateNpc(prompt, isMockMode, contextWithLocation);
       campaignService.createNpc({ ...npcData, factionId: undefined, relationships: [], history: [] });
     } catch (error) {
       console.error('Failed to generate NPC at location:', error);
+      setNpcGenerationError('Failed to generate NPC. Please try again.');
     } finally {
       setIsGeneratingNpc(false);
     }
@@ -290,7 +312,7 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     return true;
   });
 
-  const subLocations = allLocations.filter(l => location.subLocationIds.includes(l.id));
+  const subLocations = allLocations.filter(l => (location.subLocationIds || []).includes(l.id));
   const possibleConnectionTargets = allLocations.filter(l => l.id !== location.id);
   const inboundConnections = allLocations.filter(l => l.connections?.some(c => c.targetLocationId === location.id));
 
@@ -334,6 +356,9 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                     isGenerating={isGeneratingNpc}
                     onGenerate={handleGenerateNpcAtLocation}
                   />
+                  {npcGenerationError && (
+                    <p role="alert" className="text-xs text-red-400 mt-1.5">{npcGenerationError}</p>
+                  )}
                 </div>
               </div>
 
@@ -394,6 +419,9 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                     <Icons.Plus className="w-3 h-3 mr-1.5" /> Add Loot
                   </Button>
                 </div>
+                {poiGenerationError && (
+                  <p role="alert" className="text-xs text-red-400 mb-1.5">{poiGenerationError}</p>
+                )}
                 <div className="space-y-2">
                   {(formData.loot || []).map(item => (
                     <div key={item.id} className="flex items-center gap-2 bg-slate-950/50 p-2 rounded-md border border-slate-800/50">

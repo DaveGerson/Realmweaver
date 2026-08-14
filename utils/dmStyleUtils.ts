@@ -5,16 +5,19 @@ import type { DmStyle } from '@/types/index';
 /**
  * Features that are hidden in guided mode (new DMs).
  * These are the advanced tools that can overwhelm beginners.
+ *
+ * Only features that are actually consulted via `isFeatureVisible(...)`
+ * somewhere in the app belong here — an entry for a feature nothing checks
+ * is an inert switch: it moves in the settings panel, persists an override,
+ * and changes nothing on screen. 'plot-timeline', 'backlinks-panel' and
+ * 'advanced-context' were removed for this reason (see FEATURE_LABELS).
  */
 const GUIDED_HIDDEN = new Set([
   'continuity-checker',
   'relationship-graph',
-  'plot-timeline',
-  'backlinks-panel',
   'secrets-tracker',
   'combat-tracker',
   'keyboard-shortcuts',
-  'advanced-context',
 ]);
 
 /**
@@ -28,16 +31,16 @@ const STANDARD_HIDDEN = new Set<string>([
 /**
  * Human-readable label for each hideable feature.
  * Used in the feature override settings panel.
+ *
+ * Only features with a real `isFeatureVisible('<key>', ...)` call site are
+ * listed here — otherwise the toggle in DmStylePanel is a no-op (finding #91).
  */
 export const FEATURE_LABELS: Record<string, string> = {
   'continuity-checker': 'Continuity Checker',
   'relationship-graph': 'World Graph',
-  'plot-timeline': 'Plot Timeline',
-  'backlinks-panel': 'Backlinks Panel',
   'secrets-tracker': 'Secrets & Clues',
   'combat-tracker': 'Combat Tracker',
   'keyboard-shortcuts': 'Keyboard Shortcuts Help',
-  'advanced-context': 'Advanced Context Options',
 };
 
 /**

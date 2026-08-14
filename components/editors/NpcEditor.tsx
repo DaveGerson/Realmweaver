@@ -86,10 +86,23 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
     }
   }
 
-  // Used by MentionInput fields (onChange receives string, not event)
+  // Used by MentionInput fields (onChange receives string, not event).
+  // Local edits commit immediately for responsive typing, but the store write
+  // (onUpdate) is debounced so unblurred keystrokes coalesce into a single
+  // campaign-wide update instead of one per character — matching the
+  // blur-commit design of every other field in this editor.
+  const mentionFieldTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  useEffect(() => {
+    const timers = mentionFieldTimersRef.current;
+    return () => { Object.values(timers).forEach(clearTimeout); };
+  }, []);
   const handleMentionFieldChange = (field: keyof NPC) => (value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    onUpdate(npc.id, { [field]: value });
+    const timers = mentionFieldTimersRef.current;
+    if (timers[field]) clearTimeout(timers[field]);
+    timers[field] = setTimeout(() => {
+      onUpdate(npc.id, { [field]: value });
+    }, 400);
   };
 
   // --- @-mention tracking across all MentionInput fields ---
@@ -106,15 +119,19 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
     secrets: findMentionedIdsInText(npc.secrets, mentionCandidates),
     backstory: findMentionedIdsInText(npc.backstory, mentionCandidates),
   }));
+  // Kept in sync with `mentionedIdsByField` so the merged set can be computed
+  // and reported without writing to the store from inside a setState updater
+  // (React invokes functional updaters during the render phase, and StrictMode
+  // intentionally double-invokes them — doing the store write there fired it twice).
+  const mentionedIdsByFieldRef = useRef(mentionedIdsByField);
   // Reports the merged set of mentioned IDs (across every mention field) whenever any field changes.
   const handleMentionedIdsChange = (field: string) => (ids: string[]) => {
-    setMentionedIdsByField(prev => {
-      const next = { ...prev, [field]: ids };
-      const merged = Array.from(new Set(Object.values(next).flat()));
-      setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
-      onUpdate(npc.id, { mentionedEntityIds: merged });
-      return next;
-    });
+    const next = { ...mentionedIdsByFieldRef.current, [field]: ids };
+    mentionedIdsByFieldRef.current = next;
+    setMentionedIdsByField(next);
+    const merged = Array.from(new Set(Object.values(next).flat()));
+    setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
+    onUpdate(npc.id, { mentionedEntityIds: merged });
   };
 
   const handleFieldRegenerate = (field: keyof Omit<NPC, 'id' | 'factionId' | 'knowsPlayerHistory' | 'relationships' | 'history'>) => (newValue: string) => {

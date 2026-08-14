@@ -22,45 +22,7 @@ export const ENTITY_TYPE_CONFIG: Record<string, { icon: string; color: string; l
   'player-character': { icon: 'PlayerCharacters', color: 'teal', label: 'Player Characters' },
   plot:            { icon: 'Plot',            color: 'yellow',  label: 'Plots' },
   note:            { icon: 'FileText',        color: 'slate',   label: 'Notes' },
-};
-
-/**
- * Builds a campaign context string for AI generation functions.
- * Keeps it concise (entity names only) to avoid token bloat while
- * giving the AI enough awareness to maintain consistency.
- */
-export const buildCampaignContext = (campaign: Campaign): string => {
-    const lines: string[] = [];
-    lines.push(`Campaign: ${campaign.title}`);
-    lines.push(`Setting: ${campaign.setting}`);
-    if (campaign.settingType === 'official' && campaign.officialSetting) {
-        lines.push(`Official Setting: ${campaign.officialSetting}`);
-    }
-    if (campaign.npcs.length > 0) {
-        lines.push(`Existing NPCs: ${campaign.npcs.map(n => n.name).join(', ')}`);
-    }
-    if (campaign.locations.length > 0) {
-        lines.push(`Existing Locations: ${campaign.locations.map(l => l.name).join(', ')}`);
-    }
-    if (campaign.factions.length > 0) {
-        lines.push(`Existing Factions: ${campaign.factions.map(f => f.name).join(', ')}`);
-    }
-    if (campaign.items.length > 0) {
-        lines.push(`Existing Items: ${campaign.items.map(i => i.name).join(', ')}`);
-    }
-    if (campaign.adventures.length > 0) {
-        lines.push(`Existing Adventures: ${campaign.adventures.map(a => a.title).join(', ')}`);
-    }
-    if (campaign.articles.length > 0) {
-        lines.push(`Lore Articles: ${campaign.articles.map(a => a.title).join(', ')}`);
-    }
-    if (campaign.plots && campaign.plots.length > 0) {
-        lines.push(`Active Plots: ${campaign.plots.filter(p => p.status === 'active').map(p => p.title).join(', ')}`);
-    }
-    if (campaign.playerCharacters && campaign.playerCharacters.length > 0) {
-        lines.push(`Player Characters: ${campaign.playerCharacters.map(pc => pc.characterSocial.characterName).join(', ')}`);
-    }
-    return lines.join('\n');
+  scene:           { icon: 'Scenes',          color: 'red',     label: 'Scenes' },
 };
 
 /**
@@ -269,4 +231,70 @@ export const createDefaultPlot = (): Plot => ({
     description: '',
     status: 'active',
     relatedEntityIds: []
+});
+
+/**
+ * Fully-populated default PlayerCharacter, used to normalize AI-parsed
+ * character sheets (which may omit fields the model deemed empty) before
+ * they enter the store. Deep-merge parsed data onto this so every field
+ * `CharacterStatistics`/`CharacterSocial` declare as required is always
+ * present, e.g.:
+ *   { ...createDefaultPlayerCharacter(), ...parsed,
+ *     characterSocial: { ...createDefaultPlayerCharacter().characterSocial, ...parsed.characterSocial },
+ *     characterStatistics: {
+ *       ...createDefaultPlayerCharacter().characterStatistics, ...parsed.characterStatistics,
+ *       classes: { ...defaultClasses, ...parsed.characterStatistics?.classes },
+ *       attributes: { ...defaultAttributes, ...parsed.characterStatistics?.attributes },
+ *       skills: { ...defaultSkills, ...parsed.characterStatistics?.skills },
+ *     } }
+ * A shallow spread of `characterStatistics` alone is NOT enough — it would
+ * wipe the default `actions`/`specialActions` whenever the parse includes
+ * a partial `characterStatistics` object.
+ */
+export const createDefaultPlayerCharacter = (): Omit<PlayerCharacter, 'id'> => ({
+    playerName: '',
+    characterSocial: {
+        characterName: '',
+        background: '',
+        species: '',
+        personality: '',
+        appearance: '',
+        backstory: '',
+        ideals: '',
+        bonds: '',
+        flaws: '',
+    },
+    characterStatistics: {
+        classes: { charClass: '', level: 1 },
+        attributes: {
+            strength: 0,
+            dexterity: 0,
+            constitution: 0,
+            intelligence: 0,
+            wisdom: 0,
+            charisma: 0,
+        },
+        skills: {
+            acrobatics: 'none',
+            animal_handling: 'none',
+            arcana: 'none',
+            athletics: 'none',
+            deception: 'none',
+            history: 'none',
+            insight: 'none',
+            intimidation: 'none',
+            investigation: 'none',
+            medicine: 'none',
+            nature: 'none',
+            perception: 'none',
+            performance: 'none',
+            persuasion: 'none',
+            religion: 'none',
+            sleight_of_hand: 'none',
+            stealth: 'none',
+            survival: 'none',
+        },
+        actions: [],
+        specialActions: [],
+    },
 });

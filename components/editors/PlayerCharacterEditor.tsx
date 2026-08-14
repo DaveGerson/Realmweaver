@@ -238,8 +238,8 @@ export const PlayerCharacterEditor: React.FC<PlayerCharacterEditorProps> = ({ pc
           <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800/50">
             <h3 className="font-semibold text-slate-200 mb-2">Actions & Features</h3>
             <div className="text-sm text-slate-300 space-y-1 list-disc list-inside">
-              {formData.characterStatistics.actions.map((action, i) => <li key={i}>{action}</li>)}
-              {formData.characterStatistics.specialActions.map((action, i) => <li key={i}>{action}</li>)}
+              {(formData.characterStatistics.actions ?? []).map((action, i) => <li key={i}>{action}</li>)}
+              {(formData.characterStatistics.specialActions ?? []).map((action, i) => <li key={i}>{action}</li>)}
             </div>
           </div>
         </div>
