@@ -161,4 +161,23 @@ describe('wp-e-app-shell #56 — the Combat Tracker slide-out is a real dialog',
         fireEvent.keyDown(document, { key: 'Escape' });
         expect(screen.queryByRole('dialog')).toBeNull();
     });
+
+    it('does not close when a stacked dialog on top already consumed the Escape (verifier idx 56 residual)', async () => {
+        renderRunner();
+        await openFabMenu();
+
+        fireEvent.click(screen.getByRole('menuitem', { name: /combat tracker/i }));
+        expect(screen.getByRole('dialog')).toBeTruthy();
+
+        // Simulate a modal opened ON TOP of the combat panel (e.g.
+        // SessionEndWizard) consuming Escape for itself, the same way
+        // DialogShell's own guard expects — the underlying document-level
+        // listener must respect defaultPrevented and leave the combat panel
+        // open.
+        const evt = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+        evt.preventDefault();
+        act(() => { document.dispatchEvent(evt); });
+
+        expect(screen.getByRole('dialog')).toBeTruthy();
+    });
 });

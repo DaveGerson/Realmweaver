@@ -8,6 +8,15 @@ interface ErrorBoundaryProps {
     children: React.ReactNode;
     /** Optional custom fallback UI. Receives the error and a reset callback. */
     fallback?: (error: Error, reset: () => void) => React.ReactNode;
+    /**
+     * Finding #19 (verifier follow-up): this same component is now used both
+     * as the ViewRouter-subtree boundary ('view', the default — a throw there
+     * really is isolated to the current view) and as the app-root boundary in
+     * index.tsx ('root' — a throw there means the WHOLE app is down, so the
+     * "isolated to the current view" claim would be false). Defaults to
+     * 'view' so every pre-existing call site keeps its current, accurate copy.
+     */
+    scope?: 'root' | 'view';
 }
 
 interface ErrorBoundaryState {
@@ -73,7 +82,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
     render(): React.ReactNode {
         const { hasError, error } = this.state;
-        const { children, fallback } = this.props;
+        const { children, fallback, scope = 'view' } = this.props;
 
         if (!hasError || !error) {
             return children;
@@ -114,8 +123,18 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
                             Something went wrong
                         </h2>
                         <p className="text-slate-400 text-sm leading-relaxed">
-                            An unexpected error occurred in this part of the app.
-                            Your campaign data is safe — this error is isolated to the current view.
+                            {scope === 'root' ? (
+                                <>
+                                    An unexpected error crashed the whole app, not just one view.
+                                    Your saved campaign data is safe on disk, but nothing here is isolated —
+                                    reload to recover.
+                                </>
+                            ) : (
+                                <>
+                                    An unexpected error occurred in this part of the app.
+                                    Your campaign data is safe — this error is isolated to the current view.
+                                </>
+                            )}
                         </p>
                     </div>
 

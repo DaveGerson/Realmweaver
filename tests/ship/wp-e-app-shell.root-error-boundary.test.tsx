@@ -14,6 +14,11 @@
  *
  * Contract: the root render is wrapped in an ErrorBoundary, so a throw from
  * anywhere in the app — App itself included — still paints the recovery screen.
+ *
+ * Verifier follow-up (idx 19 residual): the fallback copy must not claim
+ * "isolated to the current view" when it is painted by the ROOT boundary —
+ * that claim is only true for the ViewRouter-subtree boundary. index.tsx must
+ * pass a distinguishing scope so the root fallback's copy is honest.
  */
 
 import React from 'react';
@@ -32,6 +37,11 @@ describe('wp-e-app-shell #19 — the app root is wrapped in an ErrorBoundary', (
         // createRoot().render is concurrent — let React commit.
         await new Promise(r => setTimeout(r, 50));
 
-        expect(document.body.textContent ?? '').toMatch(/something went wrong/i);
+        const text = document.body.textContent ?? '';
+        expect(text).toMatch(/something went wrong/i);
+
+        // The root boundary's copy must not claim "isolated to the current
+        // view" — a throw here means the WHOLE app is down, not one view.
+        expect(text).not.toMatch(/isolated to the current view/i);
     });
 });

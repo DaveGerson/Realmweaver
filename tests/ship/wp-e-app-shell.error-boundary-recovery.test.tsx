@@ -68,6 +68,13 @@ describe('wp-e-app-shell #61 — the recovery screen must not discard the pendin
         expect(screen.queryByRole('button', { name: /return home/i })).toBeNull();
     });
 
+    it('keeps the "isolated to the current view" copy for the default (view-scoped) boundary', () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        render(<ErrorBoundary><Boom /></ErrorBoundary>);
+
+        expect(document.body.textContent ?? '').toMatch(/isolated to the current view/i);
+    });
+
     it('flushes the pending save before reloading the page', () => {
         vi.spyOn(console, 'error').mockImplementation(() => {});
         render(<ErrorBoundary><Boom /></ErrorBoundary>);

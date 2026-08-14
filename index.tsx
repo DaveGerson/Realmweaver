@@ -14,7 +14,7 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <ErrorBoundary>
+    <ErrorBoundary scope="root">
       <ToastProvider>
         <ConfirmDialogProvider>
           <App />

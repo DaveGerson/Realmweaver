@@ -1,11 +1,12 @@
 
-import React, { FC, useState, useEffect, useMemo, useCallback, useSyncExternalStore, Suspense } from 'react';
+import React, { FC, useState, useEffect, useMemo, useCallback, useRef, useSyncExternalStore, Suspense } from 'react';
 import { WelcomeScreen } from './components/views/WelcomeScreen';
 import { CampaignCreator } from './components/views/CampaignCreator';
 import { FirstCampaignWizard } from './components/views/FirstCampaignWizard';
 import { CrossCampaignDashboard } from './components/views/CrossCampaignDashboard';
 import { Header } from './components/layout/Header';
 import { CampaignSidebar } from './components/layout/CampaignSidebar';
+import { ConflictBanner, BackupRecoveryBanner } from './components/layout/StatusBanners';
 import { ViewRouter } from './components/layout/ViewRouter';
 import type { ExportEntityCounts } from './components/dialogs/ExportModal';
 import type { CommandPaletteEntityType } from './components/common/CommandPalette';
@@ -44,7 +45,7 @@ export interface NavStackEntry {
 }
 
 const App: FC = () => {
-  const { campaigns, activeCampaignId, appStatus, saveStatus, lastSavedAt } = useSyncExternalStore(
+  const { campaigns, activeCampaignId, appStatus, saveStatus, lastSavedAt, conflictDetected, recoveredFromBackup } = useSyncExternalStore(
     campaignService.subscribe,
     campaignService.getState
   );
@@ -97,11 +98,35 @@ const App: FC = () => {
 
   // --- Effects ---
 
+  // wp-j finding #94 (verifier follow-up, App.tsx owned by wp-e this round):
+  // runSmokeTests is dev-only and now gated behind an explicit
+  // VITE_RUN_SMOKE_TESTS opt-in inside smokeTest.ts itself (so a plain
+  // `npm run dev` never runs it), but this effect's dependency array still
+  // included `isMockMode` — so a developer who HAS opted in and then flips
+  // the Mock Mode switch mid-session re-runs the whole suite against the
+  // real provider (~21 live generation/chat calls) and re-wipes the campaign
+  // save keys. Hold isMockMode in a ref and run the effect once on mount.
+  const isMockModeRef = useRef(isMockMode);
+  isMockModeRef.current = isMockMode;
   useEffect(() => {
     // Dev-only: never let this run against a real user's saved campaigns/API calls.
     if (!import.meta.env.DEV) return;
-    runSmokeTests(isMockMode).catch(err => console.error('Smoke tests failed:', err));
-  }, [isMockMode]);
+    runSmokeTests(isMockModeRef.current).catch(err => console.error('Smoke tests failed:', err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Finding #3 (verifier follow-up): appStatus can be 'editing' with an
+  // activeCampaignId that no longer resolves to a campaign — e.g. a cross-tab
+  // storage-conflict reload replaces `campaigns` with a snapshot that no
+  // longer contains the campaign this tab was editing, or an id survives a
+  // deletion race. Recover instead of leaving the 'editing' case with nothing
+  // to render: bounce back to the campaign selector as soon as that state is
+  // observed.
+  useEffect(() => {
+    if (appStatus === 'editing' && !activeCampaign) {
+      campaignService.switchToCampaignSelector();
+    }
+  }, [appStatus, activeCampaign]);
 
   // When campaign transitions to 'editing' with pending template data, bulk-import the entities
   useEffect(() => {
@@ -112,17 +137,36 @@ const App: FC = () => {
   }, [appStatus, pendingTemplateData]);
 
   // Auto-show First Campaign Wizard for new empty campaigns.
-  // Gated on pendingTemplateData === null and keyed on the entity counts (not
-  // just activeCampaign?.id) so that when a template import lands in the
-  // commit right after campaign creation, this effect re-evaluates and closes
-  // the wizard instead of leaving it open over an already-populated campaign.
+  //
+  // Gated on pendingTemplateData === null so that when a template import
+  // lands in the commit right after campaign creation, this effect waits for
+  // the import to land instead of judging emptiness against the pre-import
+  // snapshot.
+  //
+  // Finding #55 (verifier follow-up): watching the entity counts to catch
+  // the just-imported case also meant the effect kept re-evaluating for the
+  // rest of the campaign's life — a GM emptying out a template campaign's
+  // starter cast later would make the wizard pop open again. `autoWizardRef`
+  // records that this campaign has already had its one auto-open decision
+  // made, so the check below only ever fires once per campaign id (right
+  // after creation / template import lands), never again afterwards.
+  const autoWizardRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (pendingTemplateData !== null) {
       setIsFirstCampaignWizardOpen(false);
       return;
     }
+    if (!activeCampaign) {
+      setIsFirstCampaignWizardOpen(false);
+      return;
+    }
+    if (autoWizardRef.current.has(activeCampaign.id)) {
+      // Already made the one auto-open decision for this campaign — do not
+      // reopen just because its entity counts changed afterward.
+      return;
+    }
+    autoWizardRef.current.add(activeCampaign.id);
     if (
-      activeCampaign &&
       !activeCampaign.wizardDismissed &&
       activeCampaign.npcs.length === 0 &&
       activeCampaign.adventures.length === 0 &&
@@ -132,13 +176,7 @@ const App: FC = () => {
     } else {
       setIsFirstCampaignWizardOpen(false);
     }
-  }, [
-    activeCampaign?.id,
-    pendingTemplateData,
-    activeCampaign?.npcs.length,
-    activeCampaign?.adventures.length,
-    activeCampaign?.locations.length,
-  ]);
+  }, [activeCampaign, pendingTemplateData]);
 
   // Global keyboard shortcut handler
   useEffect(() => {
@@ -252,13 +290,20 @@ const App: FC = () => {
   const handleImportCampaign = async (file: File) => {
     try {
       const { title, warnings } = await campaignService.importCampaign(file);
-      for (const warning of warnings) {
-        addToast(warning, 'info');
-      }
       if (warnings.length === 0) {
         addToast(`Campaign "${title}" imported successfully!`, 'success');
       } else {
-        addToast(`Campaign "${title}" imported with ${warnings.length} warning${warnings.length === 1 ? '' : 's'} — some data may have been dropped.`, 'info');
+        // Finding #12 (verifier follow-up, wp-b idx 3): firing one addToast
+        // per warning plus a summary toast raced hooks/useToast.ts's
+        // MAX_TOASTS = 3 cap (oldest evicted first), silently dropping the
+        // earliest — often most important — warnings (e.g. "N NPC(s) were
+        // removed…") from the DOM. Aggregate into a single toast that always
+        // carries the full warning text, so the 3-toast cap can never evict
+        // one.
+        addToast(
+          `Campaign "${title}" imported with ${warnings.length} warning${warnings.length === 1 ? '' : 's'}: ${warnings.join(' ')}`,
+          'info'
+        );
       }
     } catch (error) {
       console.error('Import failed:', error);
@@ -422,6 +467,14 @@ const App: FC = () => {
                 onOpenCommandPalette={toggleCommandPalette}
                 saveStatus={saveStatus}
                 lastSavedAt={lastSavedAt}
+              />
+              <ConflictBanner
+                isOpen={conflictDetected}
+                onResolve={(choice) => campaignService.resolveConflict(choice)}
+              />
+              <BackupRecoveryBanner
+                isOpen={recoveredFromBackup}
+                onDismiss={() => campaignService.dismissBackupRecoveryNotice()}
               />
               <div className="flex-1 flex overflow-hidden relative">
                 {/* Mobile Sidebar Overlay */}
@@ -666,7 +719,16 @@ const App: FC = () => {
             </>
           );
         }
-        return null;
+        // activeCampaignId no longer resolves to a campaign (e.g. it vanished
+        // from a cross-tab conflict snapshot). The effect above redirects to
+        // the campaign selector; render a visible recovery state in the
+        // meantime instead of a blank/black screen (finding #3).
+        return (
+          <div className="h-screen w-full flex flex-col items-center justify-center gap-4 text-slate-300" role="status" aria-live="polite">
+            <div className="h-10 w-10 border-4 border-slate-700 border-t-amber-400 rounded-full animate-spin" aria-hidden="true" />
+            <p className="text-lg font-serif">Campaign not found — returning to your campaigns&hellip;</p>
+          </div>
+        );
       default:
         return <div>Unhandled App Status</div>;
     }

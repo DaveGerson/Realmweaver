@@ -95,4 +95,36 @@ describe('wp-e-app-shell #20 — abandoning a template must not leak its data in
 
         expect(wasRetracted(emitted, cleared)).toBe(true);
     });
+
+    it('resets the template-prefilled title/setting form fields, not just the pending import (verifier idx 20 residual)', async () => {
+        const submitted: unknown[] = [];
+        render(
+            <CampaignCreator
+                onCreateCampaign={(...args: unknown[]) => { submitted.push(args); }}
+                onTemplateSelected={() => {}}
+            />
+        );
+
+        await pickTemplate();
+
+        // Landed on the campaign-form step, pre-filled from the template.
+        expect((screen.getByPlaceholderText(/the sundered crown/i) as HTMLInputElement).value)
+            .toBe(templateData.title);
+
+        fireEvent.click(screen.getByRole('button', { name: /back to templates/i }));
+        fireEvent.click(screen.getByRole('button', { name: /start from scratch/i }));
+
+        // Back on the campaign-form step (skip goes straight there) — the
+        // template's title and world-setting prose must be gone.
+        const titleInput = screen.getByPlaceholderText(/the sundered crown/i) as HTMLInputElement;
+        expect(titleInput.value).toBe('');
+
+        fireEvent.change(titleInput, { target: { value: 'My Own World' } });
+        fireEvent.click(screen.getByRole('button', { name: /weave campaign/i }));
+
+        expect(submitted).toHaveLength(1);
+        const [submittedTitle, submittedSetting] = submitted[0] as [string, string, ...unknown[]];
+        expect(submittedTitle).toBe('My Own World');
+        expect(submittedSetting).toBe('');
+    });
 });

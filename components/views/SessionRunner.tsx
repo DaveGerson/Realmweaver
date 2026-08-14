@@ -109,10 +109,20 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
     // event bubbles up through its own subtree; a document-level listener
     // (mirroring DmCoach's pattern) also catches an Escape dispatched
     // directly at `document`.
+    //
+    // Verifier follow-up: this listener fired for ANY Escape while
+    // showCombatPanel was true, with no defaultPrevented check — bypassing
+    // DialogShell's own cross-package guard (a child that already consumed
+    // Escape marks it defaultPrevented, and the dialog must stay open) and
+    // closing the combat panel out from under a modal opened on top of it
+    // (e.g. Escape dismissing the SessionEndWizard would also close the
+    // combat tracker underneath). Guard it the same way DialogShell does.
     useEffect(() => {
         if (!showCombatPanel) return;
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') setShowCombatPanel(false);
+            if (e.key !== 'Escape') return;
+            if (e.defaultPrevented) return;
+            setShowCombatPanel(false);
         };
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);

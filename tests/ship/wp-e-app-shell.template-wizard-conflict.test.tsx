@@ -21,7 +21,7 @@
  */
 
 import React from 'react';
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent, act } from '@testing-library/react';
 
 const templateData = {
@@ -66,6 +66,16 @@ import { ConfirmDialogProvider } from '../../hooks/useConfirmDialog';
 
 afterEach(cleanup);
 
+// The campaignService mock above shares ONE store instance across every test
+// in this file (module-cached), so a campaign created in one test would
+// otherwise still be active — and the app already past the welcome screen —
+// for the next. Reset back to a clean, campaign-less 'welcome' state first.
+beforeEach(() => {
+    for (const c of [...campaignService.getState().campaigns]) {
+        act(() => { campaignService.deleteCampaign(c.id); });
+    }
+});
+
 const tick = () => act(async () => { await new Promise(r => setTimeout(r, 0)); });
 
 describe('wp-e-app-shell #55 — the onboarding wizard must stay shut for template campaigns', () => {
@@ -90,6 +100,48 @@ describe('wp-e-app-shell #55 — the onboarding wizard must stay shut for templa
         expect(campaign.npcs.map(n => n.name)).toEqual(['Xiximanter', 'Sir Chyde']);
 
         // …so the "your world is empty, let's generate a cast" wizard must not be up.
+        expect(screen.queryByText(/tell me about your world/i)).toBeNull();
+        expect(screen.queryByLabelText(/campaign setup wizard/i)).toBeNull();
+    });
+
+    it('does not re-open once the imported cast is later cleaned out (verifier idx 55 residual)', async () => {
+        render(
+            <ToastProvider>
+                <ConfirmDialogProvider>
+                    <App />
+                </ConfirmDialogProvider>
+            </ToastProvider>
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: /create a campaign/i }));
+        fireEvent.click(await screen.findByRole('button', { name: /use this template/i }));
+        await tick();
+
+        fireEvent.click(screen.getByRole('button', { name: /weave campaign/i }));
+        await tick();
+
+        const campaignId = campaignService.getState().campaigns[0].id;
+        expect(campaignService.getState().campaigns[0].npcs).toHaveLength(2);
+        expect(campaignService.getState().campaigns[0].wizardDismissed).toBeFalsy();
+
+        // GM deletes every NPC/location the template seeded — the campaign's
+        // npcs/adventures/locations counts all go back to zero, exactly the
+        // condition the auto-open check looks for.
+        for (const npc of [...campaignService.getState().campaigns[0].npcs]) {
+            act(() => { campaignService.deleteNpc(npc.id); });
+        }
+        for (const loc of [...campaignService.getState().campaigns[0].locations]) {
+            act(() => { campaignService.deleteLocation(loc.id); });
+        }
+        await tick();
+
+        const cleaned = campaignService.getState().campaigns.find(c => c.id === campaignId)!;
+        expect(cleaned.npcs).toHaveLength(0);
+        expect(cleaned.locations).toHaveLength(0);
+
+        // Wizard must stay shut — it already made its one auto-open decision
+        // for this campaign (to stay closed, because the template had
+        // content) and must not reopen just because the GM emptied it out.
         expect(screen.queryByText(/tell me about your world/i)).toBeNull();
         expect(screen.queryByLabelText(/campaign setup wizard/i)).toBeNull();
     });

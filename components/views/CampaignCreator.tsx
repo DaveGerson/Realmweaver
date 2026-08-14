@@ -252,10 +252,23 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampai
     }
   };
 
+  // Finding #20 (verifier follow-up): onTemplateSelected(null) stops the
+  // bulk-import, but it does not undo the form pre-fill handleTemplateChosen
+  // performed (title/settingDescription/settingType/officialSetting). Without
+  // this, a GM who backs out of a template and picks "Start From Scratch"
+  // still submits with the template's title and world description attached.
+  const resetTemplatePrefill = () => {
+    setTitle('');
+    setSettingDescription('');
+    setSettingType('official');
+    setOfficialSetting(OFFICIAL_SETTINGS[0]);
+  };
+
   const handleSkipTemplate = () => {
     if (onTemplateSelected) {
       onTemplateSelected(null);
     }
+    resetTemplatePrefill();
     setStep('campaign-form');
   };
 
@@ -263,6 +276,7 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampai
     if (onTemplateSelected) {
       onTemplateSelected(null);
     }
+    resetTemplatePrefill();
     setStep('template-select');
   };
 
