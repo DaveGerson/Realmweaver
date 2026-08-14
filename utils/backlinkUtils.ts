@@ -94,6 +94,14 @@ function scanAllMentionSources(
  * themselves: session logs, player characters and notes (finding #46).
  * Covers articles and plots, the two entity types whose relatedEntityIds is
  * used as a general-purpose "related to" pointer.
+ *
+ * Also scans NPC relationships (finding #46 follow-up): NpcEditor lets a GM
+ * point an NPC relationship at a PlayerCharacter (NpcEditor.tsx builds its
+ * relationship-target list from `playerCharacters`), so `npc.relationships[].
+ * targetId` routinely holds a PC's id. Without this, opening that PC's editor
+ * shows the affirmative-false "No other entities reference this one" even
+ * though an NPC visibly has a relationship pointing at them. This is a no-op
+ * for session-log/note since nothing ever targets those via relationships.
  */
 function computeGenericRelatedEntitySweep(entityId: string, campaign: Campaign): GroupedBacklinks {
   const acc = new Map<string, BacklinkEntry[]>();
@@ -116,6 +124,17 @@ function computeGenericRelatedEntitySweep(entityId: string, campaign: Campaign):
         name: plot.title,
         entityType: 'plot',
         relationshipLabel: 'Referenced by',
+      });
+    }
+  }
+
+  for (const npc of campaign.npcs) {
+    if (npc.relationships.some(rel => rel.targetId === entityId)) {
+      addEntry(acc, 'npc', {
+        id: npc.id,
+        name: npc.name,
+        entityType: 'npc',
+        relationshipLabel: 'Relationship with',
       });
     }
   }

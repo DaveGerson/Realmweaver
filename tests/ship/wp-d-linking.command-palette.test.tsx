@@ -177,4 +177,51 @@ describe('wp-d-linking #99 — scene colour comes from ENTITY_TYPE_CONFIG', () =
         expect(badge.className).not.toMatch(/red/);
         expect(badge.className).toMatch(/blue/);
     });
+
+    // Pins the actual contract: the badge must be DERIVED from
+    // ENTITY_TYPE_CONFIG.scene at render time (via makePaletteConfig), not a
+    // second hand-synced literal that merely happens to also say "blue"
+    // today. If CommandPalette still hardcoded its own colour, changing the
+    // config here would have no effect on the rendered badge.
+    it('re-colours the badge when ENTITY_TYPE_CONFIG.scene changes, proving no hardcoded literal remains', async () => {
+        vi.resetModules();
+        vi.doMock('../../utils/entityUtils', async () => {
+            const actual = await vi.importActual<typeof import('../../utils/entityUtils')>('../../utils/entityUtils');
+            return {
+                ...actual,
+                ENTITY_TYPE_CONFIG: {
+                    ...actual.ENTITY_TYPE_CONFIG,
+                    scene: { ...actual.ENTITY_TYPE_CONFIG.scene, color: 'pink' },
+                },
+            };
+        });
+
+        try {
+            const { CommandPalette: PatchedPalette } = await import('../../components/common/CommandPalette');
+            render(
+                <PatchedPalette
+                    isOpen
+                    npcs={[]}
+                    locations={[]}
+                    factions={[]}
+                    items={[]}
+                    adventures={[adventure] as any}
+                    articles={[]}
+                    sessionLogs={[]}
+                    plots={[]}
+                    playerCharacters={[]}
+                    recentItems={[]}
+                    {...(makeHandlers() as any)}
+                />,
+            );
+            fireEvent.change(searchInput(), { target: { value: 'Gatehouse' } });
+
+            const badge = screen.getByText('Scene');
+            expect(badge.className).toMatch(/pink/);
+            expect(badge.className).not.toMatch(/blue/);
+        } finally {
+            vi.doUnmock('../../utils/entityUtils');
+            vi.resetModules();
+        }
+    });
 });

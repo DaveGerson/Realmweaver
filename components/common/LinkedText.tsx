@@ -195,11 +195,19 @@ export const LinkedText: React.FC<LinkedTextProps> = ({ text, onNavigate, classN
   const state = useSyncExternalStore(campaignService.subscribe, campaignService.getState);
   const campaign = state.campaigns.find(c => c.id === state.activeCampaignId);
 
+  // Entries (and their compiled matchers) only depend on the CAMPAIGN, not on
+  // the text being scanned — keying this memo on `[text, campaign]` meant
+  // every one of the ~7 entity arrays was walked and a fresh RegExp compiled
+  // per entity on every keystroke, in every mounted LinkedText instance
+  // (finding #45). Recompute only when `campaign` itself changes; sharing the
+  // matchers across tokenize() calls is safe because findNextMatch resets
+  // `lastIndex` before every `exec`.
+  const entries = useMemo(() => buildEntityEntries(campaign), [campaign]);
+
   const segments = useMemo(() => {
     if (!text) return [];
-    const entries = buildEntityEntries(campaign);
     return tokenize(text, entries);
-  }, [text, campaign]);
+  }, [text, entries]);
 
   if (!text) return null;
 

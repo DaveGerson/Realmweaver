@@ -242,6 +242,28 @@ export const MentionInput: React.FC<MentionInputProps> = ({
     new Set(initialMentions?.map(c => c.id) ?? []),
   );
 
+  // Editors are NOT keyed by entity id (e.g. ViewRouter renders <NpcEditor
+  // npc={selectedNpc}/> at a fixed position, and useEntitySelection batches
+  // resetSelections()+setSelectedNpcId into one commit), so MentionInput
+  // never unmounts when the GM navigates from entity A's editor to entity
+  // B's via an EntityLink/@-mention click. Seeding `mentionMapRef` /
+  // `seededIdsRef` only once via `useRef(...)` initialisers means every
+  // field of B's editor keeps reporting A's seeded IDs on the next
+  // keystroke, silently clobbering B's real mentionedEntityIds (blocker).
+  // Resync both refs whenever the actual SET of seeded ids changes — keyed
+  // on the joined, sorted ids rather than `initialMentions` array identity,
+  // because callers commonly recompute that array on every unrelated store
+  // update (e.g. NpcEditor's mentionCandidates useMemo depends on the whole
+  // campaign object) and a fresh array with the SAME ids must not reset an
+  // in-progress session's tracked mentions.
+  const seedKey = (initialMentions ?? []).map(c => c.id).sort().join('\u0000');
+  useEffect(() => {
+    mentionMapRef.current = new Map(initialMentions?.map(c => [c.name, c.id]));
+    seededIdsRef.current = new Set(initialMentions?.map(c => c.id) ?? []);
+    // Only the joined id set should trigger a resync — see comment above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seedKey]);
+
   /** Reports the union of freshly-parsed mention IDs and the seeded set. */
   const reportMentionedIds = useCallback((text: string) => {
     if (!onMentionedIdsChange) return;
@@ -415,7 +437,14 @@ export const MentionInput: React.FC<MentionInputProps> = ({
     active?.scrollIntoView?.({ block: 'nearest' });
   }, [activeIndex, isOpen]);
 
-  const activeOptionId = isOpen && filtered[activeIndex]
+  // Only the true dropdown-with-options render (see the JSX condition below)
+  // counts as "expanded" for AT purposes — the empty-state message is not a
+  // listbox, so claiming aria-expanded/aria-controls against a non-existent
+  // listbox id is a dangling IDREF some screen readers report as an error
+  // (finding #51).
+  const dropdownVisible = isOpen && filtered.length > 0;
+
+  const activeOptionId = dropdownVisible && filtered[activeIndex]
     ? getOptionId(filtered[activeIndex].id)
     : undefined;
 
@@ -429,9 +458,9 @@ export const MentionInput: React.FC<MentionInputProps> = ({
     'aria-label': ariaLabel,
     role: 'combobox' as const,
     'aria-autocomplete': 'list' as const,
-    'aria-expanded': isOpen,
+    'aria-expanded': dropdownVisible,
     'aria-haspopup': 'listbox' as const,
-    'aria-controls': isOpen ? listboxId : undefined,
+    'aria-controls': dropdownVisible ? listboxId : undefined,
     'aria-activedescendant': activeOptionId,
     className: twMerge(
       'w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm',

@@ -165,6 +165,43 @@ describe('wp-d-linking #46 — backlinks must work for session-log / player-char
         const result = computeBacklinks('note-1', 'note', campaign);
         expect(flatten(result)).toContain('art-1');
     });
+
+    // Verifier follow-up: NpcEditor lets a GM point an NPC relationship at a
+    // PlayerCharacter (its relationship-target list is built from
+    // `playerCharacters`), so `npc.relationships[].targetId` routinely holds
+    // a PC id — but computeGenericRelatedEntitySweep only scanned articles
+    // and plots, so opening that PC's editor still showed the affirmative-
+    // false "No other entities reference this one".
+    it('finds an NPC whose relationship targets a player character', () => {
+        const pc = { id: 'pc-vex', characterSocial: { characterName: 'Vex' } } as any;
+        const npc = makeNpc({
+            id: 'npc-sera', name: 'Sera',
+            relationships: [{ targetId: 'pc-vex', label: 'Rival' } as any],
+        });
+        const campaign = makeCampaign({
+            playerCharacters: [pc],
+            npcs: [npc],
+        });
+
+        const result = computeBacklinks('pc-vex', 'player-character', campaign);
+        expect(flatten(result)).toContain('npc-sera');
+        expect(result.npc?.[0].relationshipLabel).toBe('Relationship with');
+    });
+
+    it('does not report an NPC relationship for an unrelated player character', () => {
+        const pc = { id: 'pc-other', characterSocial: { characterName: 'Other' } } as any;
+        const npc = makeNpc({
+            id: 'npc-sera', name: 'Sera',
+            relationships: [{ targetId: 'pc-vex', label: 'Rival' } as any],
+        });
+        const campaign = makeCampaign({
+            playerCharacters: [pc],
+            npcs: [npc],
+        });
+
+        const result = computeBacklinks('pc-other', 'player-character', campaign);
+        expect(flatten(result)).not.toContain('npc-sera');
+    });
 });
 
 // ── #47 — adventures are mention targets but have no mention sweep ──────────

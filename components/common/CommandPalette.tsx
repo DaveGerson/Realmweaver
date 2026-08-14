@@ -115,13 +115,9 @@ const ENTITY_CONFIG: Record<CommandPaletteEntityType, { label: string; colorClas
   'session-log':    { ...makePaletteConfig('session-log'), label: 'Session' },
   plot:             makePaletteConfig('plot'),
   'player-character': { ...makePaletteConfig('player-character'), label: 'Character' },
-  // Scenes are blue everywhere else in the app (EntityLink, EntityQuickCard,
-  // BacklinksPanel) — red reads as the app's GM-secret/danger colour. Ideally
-  // this comes from `makePaletteConfig('scene')` once ENTITY_TYPE_CONFIG gets
-  // a 'scene' entry with color:'blue' (utils/entityUtils.ts, owned outside
-  // this work package); hardcoded here in the meantime so the badge is
-  // correct today (finding #99).
-  scene: { label: 'Scene', colorClass: 'bg-blue-500/10 border-blue-500/30', textClass: 'text-blue-400', icon: 'Scenes' },
+  // Derived from ENTITY_TYPE_CONFIG.scene (color: 'blue') like every other
+  // entry — no more hardcoded literal here (finding #99).
+  scene:            makePaletteConfig('scene'),
   note:             makePaletteConfig('note'),
 };
 
@@ -606,13 +602,13 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         {/* Results */}
         <div id={listboxId} role="listbox" aria-label="Command palette results" className="overflow-y-auto flex-1">
           {isEmpty && (
-            <div className="px-4 py-8 text-center text-slate-500 text-sm">
+            <div role="presentation" className="px-4 py-8 text-center text-slate-500 text-sm">
               {hasQuery ? `No results for "${query}"` : 'No recent items. Start typing to search.'}
             </div>
           )}
 
           {!isEmpty && showNoRecentItems && (
-            <div className="px-4 py-3 text-center text-slate-500 text-sm">
+            <div role="presentation" className="px-4 py-3 text-center text-slate-500 text-sm">
               No recent items. Start typing to search.
             </div>
           )}

@@ -86,4 +86,37 @@ describe('TextMatchingEngine', () => {
     expect(names).toContain('Anaïs');
     expect(names).not.toContain('Ana');
   });
+
+  it('does not abandon a candidate whose FIRST substring occurrence fails the boundary test (wp-d-linking #45)', () => {
+    // "Mira" occurs first inside "Miraculous" (fails the boundary test) and
+    // again later as a genuine standalone word. The old implementation did
+    // `lowerText.indexOf(name, cursor)` ONCE per candidate per scan position
+    // and `continue`d past the whole candidate the moment that one occurrence
+    // failed isWordBoundary, so it never found the later, valid occurrence —
+    // yielding NO match at all. A per-candidate regex scan (like
+    // LinkedText.tsx's buildMatcher/findNextMatch) keeps advancing internally
+    // until it finds a position where the boundary assertions hold.
+    const miraCandidates: EntityCandidate[] = [
+      { id: '8', name: 'Mira', type: 'npc' },
+    ];
+    const matches = engine.findMatches('Miraculous events unfolded before Mira arrives.', miraCandidates);
+    expect(matches).toHaveLength(1);
+    expect(matches[0].entityName).toBe('Mira');
+    const text = 'Miraculous events unfolded before Mira arrives.';
+    const [start, end] = matches[0].matchSpan;
+    expect(text.slice(start, end)).toBe('Mira');
+  });
+
+  it('does not drift matchSpan offsets for a character that lowercases to two code points (İ, U+0130)', () => {
+    // Regression guard mirroring LinkedText's #100 fix: the engine must not
+    // derive spans from a parallel `text.toLowerCase()` copy, because 'İ'
+    // (U+0130) lowercases to two code points and would shift every later
+    // offset by one.
+    const sera: EntityCandidate[] = [{ id: '9', name: 'Sera', type: 'npc' }];
+    const text = 'İzmir Gate is where Sera waits';
+    const matches = engine.findMatches(text, sera);
+    expect(matches).toHaveLength(1);
+    const [start, end] = matches[0].matchSpan;
+    expect(text.slice(start, end)).toBe('Sera');
+  });
 });

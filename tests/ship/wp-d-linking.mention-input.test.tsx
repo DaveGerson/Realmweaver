@@ -114,6 +114,87 @@ describe('wp-d-linking #18 — editing a field must not drop mentions of renamed
         const reported = onMentionedIdsChange.mock.calls.at(-1)![0] as string[];
         expect(reported).toContain('npc-1');
     });
+
+    // BLOCKER regression guard: editors are not keyed by entity id (ViewRouter
+    // renders <NpcEditor npc={selectedNpc}/> at a fixed position and
+    // useEntitySelection batches the swap into one commit), so MentionInput
+    // never unmounts when the GM navigates from entity A's editor to entity
+    // B's. Seeding the internal ref maps only once (via useRef initialisers)
+    // meant every field of B's editor kept reporting A's seeded IDs on the
+    // next keystroke, silently clobbering B's real mentionedEntityIds.
+    it('does NOT leak entity A\'s seeded mention IDs into entity B after a re-render with different initialMentions (no unmount)', () => {
+        seedCampaign({ npcs: [{ id: 'npc-a', name: 'Alpha' }, { id: 'npc-b', name: 'Beta' }] });
+        const onMentionedIdsChange = vi.fn();
+
+        const { rerender } = render(
+            <MentionInput
+                value="@Gate Guard watches"
+                onChange={() => {}}
+                onMentionedIdsChange={onMentionedIdsChange}
+                initialMentions={[{ id: 'ext-1', name: 'Gate Guard', type: 'npc' }]}
+                aria-label="Description"
+            />,
+        );
+
+        // Simulate the SAME component instance being reused for a different
+        // entity (B), whose text has no mentions and whose initialMentions is
+        // empty — this is exactly what happens when NpcEditor swaps `npc` prop
+        // without the component tree unmounting.
+        rerender(
+            <MentionInput
+                value=""
+                onChange={() => {}}
+                onMentionedIdsChange={onMentionedIdsChange}
+                initialMentions={[]}
+                aria-label="Description"
+            />,
+        );
+
+        onMentionedIdsChange.mockClear();
+        const el = screen.getByLabelText('Description') as HTMLTextAreaElement;
+        typeInto(el, 'B');
+
+        expect(onMentionedIdsChange).toHaveBeenCalled();
+        const reported = onMentionedIdsChange.mock.calls.at(-1)![0] as string[];
+        expect(reported).not.toContain('ext-1');
+        expect(reported).toEqual([]);
+    });
+
+    it('still applies the #18 union correctly for entity B once B is re-seeded with its own mentions', () => {
+        seedCampaign({ npcs: [{ id: 'npc-a', name: 'Alpha' }, { id: 'npc-b', name: 'Beta' }] });
+        const onMentionedIdsChange = vi.fn();
+
+        const { rerender } = render(
+            <MentionInput
+                value="@Alpha visits"
+                onChange={() => {}}
+                onMentionedIdsChange={onMentionedIdsChange}
+                initialMentions={[{ id: 'npc-a', name: 'Alpha', type: 'npc' }]}
+                aria-label="Description"
+            />,
+        );
+
+        // Swap to entity B, seeded with B's OWN previously-persisted mention.
+        rerender(
+            <MentionInput
+                value="@Old-Beta-Name text"
+                onChange={() => {}}
+                onMentionedIdsChange={onMentionedIdsChange}
+                initialMentions={[{ id: 'npc-renamed', name: 'Beta', type: 'npc' }]}
+                aria-label="Description"
+            />,
+        );
+
+        onMentionedIdsChange.mockClear();
+        const el = screen.getByLabelText('Description') as HTMLTextAreaElement;
+        typeInto(el, '@Old-Beta-Name text.');
+
+        const reported = onMentionedIdsChange.mock.calls.at(-1)![0] as string[];
+        // B's own seeded id survives (the #18 union still works)...
+        expect(reported).toContain('npc-renamed');
+        // ...but A's stale id must not leak in.
+        expect(reported).not.toContain('npc-a');
+    });
 });
 
 // ── #51 — combobox ARIA ──────────────────────────────────────────────────────
@@ -176,6 +257,23 @@ describe('wp-d-linking #51 — the mention dropdown must be exposed to assistive
             }
             expect(node).toBe(listbox);
         }
+    });
+
+    // The dropdown only RENDERS when `isOpen && filtered.length > 0`, but
+    // aria-expanded/aria-controls were previously gated on `isOpen` alone —
+    // so an "@zzz" query with zero matches claimed to be expanded and
+    // pointed aria-controls at a listbox id that does not exist in the DOM
+    // (a dangling IDREF some screen readers report as an error).
+    it('does not claim to be expanded (or point aria-controls at a non-existent listbox) when there are no matches', () => {
+        seedCampaign({ npcs: [{ id: 'npc-1', name: 'Salvia Dane' }] });
+
+        render(<MentionInput value="" onChange={() => {}} aria-label="Notes" />);
+        const el = screen.getByLabelText('Notes') as HTMLTextAreaElement;
+        typeInto(el, '@zzz');
+
+        expect(screen.queryByRole('listbox')).toBeNull();
+        expect(el.getAttribute('aria-expanded')).toBe('false');
+        expect(el.getAttribute('aria-controls')).toBeNull();
     });
 });
 

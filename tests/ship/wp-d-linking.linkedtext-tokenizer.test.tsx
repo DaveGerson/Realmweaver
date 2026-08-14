@@ -38,6 +38,8 @@ vi.mock('../../services/campaignService', () => ({
 }));
 
 import { LinkedText } from '../../components/common/LinkedText';
+import { TextMatchingEngine } from '../../services/linking/matchingEngine';
+import type { EntityCandidate } from '../../services/linking/matchingEngine';
 
 function seedCampaign(partial: Record<string, any[]>) {
     h.state.campaigns = [{
@@ -114,6 +116,59 @@ describe('wp-d-linking #100 — offsets must not drift when toLowerCase changes 
         const { container } = render(<LinkedText text={text} onNavigate={() => {}} />);
 
         expect(container.textContent).toBe(text);
+    });
+});
+
+describe('wp-d-linking #45 — LinkedText must agree with services/linking/matchingEngine.ts', () => {
+    // LinkedText renders prose; LinkSuggestionsPanel/SceneSmartLinkBar suggest
+    // links via getMatchingEngine(). If the two matchers disagree, the same
+    // text can be suggested for linking by one system and silently skipped by
+    // the other. Both must reach the same verdict on the same edge cases.
+    const engine = new TextMatchingEngine();
+
+    it('agrees with the engine on the "first occurrence fails the boundary" case ("Miraculous ... Mira arrives")', () => {
+        const text = 'Miraculous events unfolded before Mira arrives.';
+        seedCampaign({ npcs: [{ id: 'npc-mira', name: 'Mira' }] });
+
+        const engineCandidates: EntityCandidate[] = [{ id: 'npc-mira', name: 'Mira', type: 'npc' }];
+        const engineMatches = engine.findMatches(text, engineCandidates);
+
+        render(<LinkedText text={text} onNavigate={() => {}} />);
+
+        expect(linkLabels()).toEqual(engineMatches.map(m => m.entityName));
+        expect(linkLabels()).toEqual(['Mira']);
+    });
+
+    it('agrees with the engine on matchSpan offsets for a length-changing lowercase character (İ, U+0130)', () => {
+        const text = 'İzmir Gate is where Sera waits';
+        seedCampaign({ npcs: [{ id: 'npc-sera', name: 'Sera' }] });
+
+        const engineCandidates: EntityCandidate[] = [{ id: 'npc-sera', name: 'Sera', type: 'npc' }];
+        const engineMatches = engine.findMatches(text, engineCandidates);
+        const [engStart, engEnd] = engineMatches[0].matchSpan;
+
+        render(<LinkedText text={text} onNavigate={() => {}} />);
+
+        expect(linkLabels()).toEqual([text.slice(engStart, engEnd)]);
+        expect(linkLabels()).toEqual(['Sera']);
+    });
+});
+
+describe('wp-d-linking #45 — entity matchers must not be rebuilt when only the text changes', () => {
+    it('produces identical, correct links across re-renders that change only `text` (campaign stays the same object)', () => {
+        seedCampaign({ npcs: [{ id: 'npc-1', name: 'Kalli Alran' }] });
+
+        const { rerender } = render(<LinkedText text="Kalli Alran waits." onNavigate={() => {}} />);
+        expect(linkLabels()).toEqual(['Kalli Alran']);
+
+        // Re-render several times with different text but the SAME campaign
+        // object identity (buildEntityEntries must be memoized on `campaign`
+        // alone, not recomputed per keystroke — finding #45).
+        rerender(<LinkedText text="Nothing relevant here." onNavigate={() => {}} />);
+        expect(linkLabels()).toHaveLength(0);
+
+        rerender(<LinkedText text="Kalli Alran returns once more." onNavigate={() => {}} />);
+        expect(linkLabels()).toEqual(['Kalli Alran']);
     });
 });
 
