@@ -889,7 +889,12 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
          * Bulk-imports template data into the active campaign.
          * Remaps template IDs to fresh UUIDs and creates all entities in a single
          * state update so that the campaign is populated immediately after creation.
-         * Template JSON may contain: npcs, locations, factions, adventures, plots, items.
+         *
+         * Template JSON is documented as accepting the same shape produced by
+         * "Export Campaign" — so every entity array a full export can contain
+         * (npcs, locations, factions, adventures, items, articles, notes,
+         * secrets, session logs, player characters, plots) is carried through
+         * here (finding #93); nothing is silently dropped on the floor.
          */
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         importTemplateData(templateData: any) {
@@ -897,13 +902,56 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 const campaign = getActiveCampaignFromState(draft);
                 if (!campaign) return;
 
-                // Build an ID-remap table so cross-references stay consistent
+                // --- Build an ID-remap table -----------------------------------
+                // Pre-register every id actually OWNED by an entity in the
+                // template (two-pass, like duplicateCampaign) so `remap()` is a
+                // pure lookup rather than a minter. A reference to an id that no
+                // entity in the template owns (a typo, a dangling pointer left
+                // over from a hand-edited export, `undefined`) resolves to
+                // `undefined` and is dropped — NOT turned into a fresh UUID that
+                // points at nothing (finding #93).
                 const idMap = new Map<string, string>();
-                const remap = (oldId: string | undefined | null): string | undefined => {
-                    if (!oldId) return undefined;
-                    if (!idMap.has(oldId)) idMap.set(oldId, crypto.randomUUID());
-                    return idMap.get(oldId);
+                const registerId = (id: unknown) => {
+                    if (typeof id === 'string' && id && !idMap.has(id)) {
+                        idMap.set(id, crypto.randomUUID());
+                    }
                 };
+                const rawNpcs: any[] = templateData.npcs || [];
+                const rawFactions: any[] = templateData.factions || [];
+                const rawLocations: any[] = templateData.locations || [];
+                const rawItems: any[] = templateData.items || [];
+                const rawArticles: any[] = templateData.articles || [];
+                const rawAdventures: any[] = templateData.adventures || [];
+                const rawPlots: any[] = templateData.plots || [];
+                const rawNotes: any[] = templateData.notes || [];
+                const rawSecrets: any[] = templateData.secrets || [];
+                const rawSessionLogs: any[] = templateData.sessionLogs || [];
+                const rawPlayerCharacters: any[] = templateData.playerCharacters || [];
+
+                rawNpcs.forEach(n => registerId(n.id));
+                rawFactions.forEach(f => registerId(f.id));
+                rawLocations.forEach(l => registerId(l.id));
+                rawItems.forEach(i => registerId(i.id));
+                rawArticles.forEach(a => registerId(a.id));
+                rawAdventures.forEach(a => {
+                    registerId(a.id);
+                    (a.scenes || []).forEach((s: any) => registerId(s.id));
+                });
+                rawPlots.forEach(p => registerId(p.id));
+                rawNotes.forEach(n => registerId(n.id));
+                rawSecrets.forEach(s => registerId(s.id));
+                rawSessionLogs.forEach(l => registerId(l.id));
+                rawPlayerCharacters.forEach(pc => registerId(pc.id));
+
+                const remap = (oldId: unknown): string | undefined =>
+                    typeof oldId === 'string' && oldId ? idMap.get(oldId) : undefined;
+                // Every entity we are about to CREATE has already been
+                // pre-registered above, so this always resolves — the `??`
+                // fallback only covers the pathological case of an entity
+                // with no `id` field at all in the source template.
+                const remapRequired = (oldId: unknown): string => remap(oldId) ?? crypto.randomUUID();
+                const remapIds = (ids: unknown): string[] =>
+                    Array.isArray(ids) ? (ids.map(id => remap(id)).filter((id): id is string => !!id)) : [];
 
                 // Override title/setting from template
                 if (templateData.title) campaign.title = templateData.title;
@@ -911,9 +959,8 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 if (templateData.settingType) campaign.settingType = templateData.settingType;
 
                 // --- NPCs ---
-                const rawNpcs: any[] = templateData.npcs || [];
                 rawNpcs.forEach((n: any) => {
-                    const newId = remap(n.id)!;
+                    const newId = remapRequired(n.id);
                     const npc: NPC = {
                         id: newId,
                         name: n.name || 'Unnamed NPC',
@@ -924,18 +971,24 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         secrets: n.secrets || '',
                         stats: n.stats || '',
                         exampleQuote: n.exampleQuote || '',
-                        factionId: n.factionId ? remap(n.factionId) : undefined,
+                        factionId: remap(n.factionId),
                         knowsPlayerHistory: [],
-                        relationships: [],
-                        history: [],
+                        relationships: (n.relationships || [])
+                            .map((r: any) => ({ ...r, id: r.id || crypto.randomUUID(), targetId: remap(r.targetId) }))
+                            .filter((r: any) => !!r.targetId),
+                        history: (n.history || []).map((h: any) => ({
+                            ...h,
+                            id: h.id || crypto.randomUUID(),
+                            referenceId: remap(h.referenceId),
+                        })),
+                        mentionedEntityIds: remapIds(n.mentionedEntityIds),
                     };
                     campaign.npcs.push(npc);
                 });
 
                 // --- Factions ---
-                const rawFactions: any[] = templateData.factions || [];
                 rawFactions.forEach((f: any) => {
-                    const newId = remap(f.id)!;
+                    const newId = remapRequired(f.id);
                     const faction: Faction = {
                         id: newId,
                         name: f.name || 'Unnamed Faction',
@@ -944,9 +997,10 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         alignment: f.alignment,
                         resources: f.resources,
                         influence: f.influence,
-                        memberIds: (f.memberIds || []).map((mid: string) => remap(mid)).filter(Boolean) as string[],
-                        headquartersLocationId: f.headquartersLocationId ? remap(f.headquartersLocationId) : undefined,
-                        leaderId: f.leaderId ? remap(f.leaderId) : undefined,
+                        memberIds: remapIds(f.memberIds),
+                        headquartersLocationId: remap(f.headquartersLocationId),
+                        leaderId: remap(f.leaderId),
+                        mentionedEntityIds: remapIds(f.mentionedEntityIds),
                     };
                     campaign.factions.push(faction);
                 });
@@ -960,34 +1014,42 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 });
 
                 // --- Locations ---
-                const rawLocations: any[] = templateData.locations || [];
                 rawLocations.forEach((l: any) => {
-                    const newId = remap(l.id)!;
+                    const newId = remapRequired(l.id);
                     const location: Location = {
                         id: newId,
                         name: l.name || 'Unnamed Location',
                         description: l.description || '',
                         secrets: l.secrets || '',
-                        loot: [],
-                        parentLocationId: l.parentLocationId ? remap(l.parentLocationId) : undefined,
-                        subLocationIds: (l.subLocationIds || []).map((sid: string) => remap(sid)).filter(Boolean) as string[],
-                        connections: [],
+                        loot: (l.loot || []).map((item: any) => ({
+                            ...item,
+                            id: item.id || crypto.randomUUID(),
+                        })),
+                        parentLocationId: remap(l.parentLocationId),
+                        subLocationIds: remapIds(l.subLocationIds),
+                        connections: (l.connections || [])
+                            .map((c: any) => ({ ...c, id: c.id || crypto.randomUUID(), targetLocationId: remap(c.targetLocationId) }))
+                            .filter((c: any) => !!c.targetLocationId),
                         pointsOfInterest: (l.pointsOfInterest || []).map((poi: any) => ({
                             ...poi,
                             id: crypto.randomUUID(),
                             investigationChecks: poi.investigationChecks || [],
                             interactions: poi.interactions || [],
                         })),
-                        controllingFactionId: l.controllingFactionId ? remap(l.controllingFactionId) : undefined,
-                        history: [],
+                        controllingFactionId: remap(l.controllingFactionId),
+                        history: (l.history || []).map((h: any) => ({
+                            ...h,
+                            id: h.id || crypto.randomUUID(),
+                            referenceId: remap(h.referenceId),
+                        })),
+                        mentionedEntityIds: remapIds(l.mentionedEntityIds),
                     };
                     campaign.locations.push(location);
                 });
 
                 // --- Adventures (with Scenes) ---
-                const rawAdventures: any[] = templateData.adventures || [];
                 rawAdventures.forEach((a: any) => {
-                    const advId = crypto.randomUUID();
+                    const advId = remapRequired(a.id);
                     const adventure: Adventure = {
                         id: advId,
                         title: a.title || 'Untitled Adventure',
@@ -995,7 +1057,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         hook: a.hook || '',
                         theme: a.theme || '',
                         scenes: (a.scenes || []).map((s: any) => ({
-                            id: crypto.randomUUID(),
+                            id: remapRequired(s.id),
                             title: s.title || 'Untitled Scene',
                             type: s.type || 'exploration',
                             status: 'planned' as const,
@@ -1006,18 +1068,18 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                                 id: crypto.randomUUID(),
                             })),
                             rewards: s.rewards || '',
-                            locationId: s.locationId ? remap(s.locationId) : undefined,
-                            npcIds: (s.npcIds || []).map((nid: string) => remap(nid)).filter(Boolean) as string[],
+                            locationId: remap(s.locationId),
+                            npcIds: remapIds(s.npcIds),
+                            mentionedEntityIds: remapIds(s.mentionedEntityIds),
                         })),
                     };
                     campaign.adventures.push(adventure);
                 });
 
                 // --- Items ---
-                const rawItems: any[] = templateData.items || [];
                 rawItems.forEach((i: any) => {
                     const item: Item = {
-                        id: crypto.randomUUID(),
+                        id: remapRequired(i.id),
                         name: i.name || 'Unnamed Item',
                         description: i.description || '',
                         rarity: i.rarity || 'common',
@@ -1030,15 +1092,105 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     campaign.items.push(item);
                 });
 
+                // --- Articles ---
+                rawArticles.forEach((a: any) => {
+                    const article: Article = {
+                        id: remapRequired(a.id),
+                        title: a.title || 'Untitled Article',
+                        category: a.category || 'lore',
+                        content: a.content || '',
+                        parentArticleId: remap(a.parentArticleId),
+                        subArticleIds: remapIds(a.subArticleIds),
+                        relatedEntityIds: remapIds(a.relatedEntityIds),
+                        mentionedEntityIds: remapIds(a.mentionedEntityIds),
+                    };
+                    campaign.articles.push(article);
+                });
+
+                // --- Notes ---
+                rawNotes.forEach((n: any) => {
+                    const note: Note = {
+                        id: remapRequired(n.id),
+                        title: n.title || 'Untitled Note',
+                        content: n.content || '',
+                        tags: n.tags || [],
+                        createdAt: n.createdAt || new Date().toISOString(),
+                        lastModified: n.lastModified || new Date().toISOString(),
+                    };
+                    campaign.notes.push(note);
+                });
+
+                // --- Secrets ---
+                rawSecrets.forEach((s: any) => {
+                    const secret: Secret = {
+                        id: remapRequired(s.id),
+                        title: s.title || 'Untitled Secret',
+                        content: s.content || '',
+                        category: s.category || 'secret',
+                        isRevealed: s.isRevealed ?? false,
+                        revealedInSessionId: remap(s.revealedInSessionId),
+                        linkedEntityIds: remapIds(s.linkedEntityIds),
+                        createdAt: s.createdAt || new Date().toISOString(),
+                        notes: s.notes,
+                    };
+                    if (!campaign.secrets) campaign.secrets = [];
+                    campaign.secrets.push(secret);
+                });
+
+                // --- Session Logs ---
+                rawSessionLogs.forEach((l: any) => {
+                    const log: SessionLog = {
+                        id: remapRequired(l.id),
+                        title: l.title || 'Untitled Session',
+                        // An imported template shouldn't claim to have a live session.
+                        status: l.status === 'active' ? 'planned' : (l.status || 'planned'),
+                        sessionDate: l.sessionDate || '',
+                        adventureId: remap(l.adventureId),
+                        plannedSceneIds: remapIds(l.plannedSceneIds),
+                        prepNotes: l.prepNotes || '',
+                        relatedPlotIds: remapIds(l.relatedPlotIds),
+                        plotProgressions: l.plotProgressions
+                            ? Object.fromEntries(
+                                  Object.entries(l.plotProgressions)
+                                      .map(([plotId, status]) => [remap(plotId), status])
+                                      .filter(([plotId]) => !!plotId)
+                              )
+                            : undefined,
+                        runningNotes: l.runningNotes || '',
+                        structuredNotes: (l.structuredNotes || []).map((entry: any) => ({
+                            ...entry,
+                            id: entry.id || crypto.randomUUID(),
+                            taggedEntityIds: remapIds(entry.taggedEntityIds),
+                        })),
+                        encounterLog: l.encounterLog || [],
+                        diceRolls: l.diceRolls,
+                        beats: l.beats,
+                        recap: l.recap || '',
+                        notableEvents: l.notableEvents || '',
+                        looseEnds: l.looseEnds || '',
+                    };
+                    if (!campaign.sessionLogs) campaign.sessionLogs = [];
+                    campaign.sessionLogs.push(log);
+                });
+
+                // --- Player Characters ---
+                rawPlayerCharacters.forEach((pc: any) => {
+                    if (!campaign.playerCharacters) campaign.playerCharacters = [];
+                    campaign.playerCharacters.push({
+                        ...pc,
+                        id: remapRequired(pc.id),
+                    });
+                });
+
                 // --- Plots ---
-                const rawPlots: any[] = templateData.plots || [];
                 rawPlots.forEach((p: any) => {
                     const plot: Plot = {
-                        id: crypto.randomUUID(),
+                        id: remapRequired(p.id),
                         title: p.title || 'Untitled Plot',
                         description: p.description || '',
                         status: p.status || 'active',
-                        relatedEntityIds: (p.relatedEntityIds || []).map((eid: string) => remap(eid)).filter(Boolean) as string[],
+                        relatedEntityIds: remapIds(p.relatedEntityIds),
+                        mentionedEntityIds: remapIds(p.mentionedEntityIds),
                     };
                     campaign.plots.push(plot);
                 });
