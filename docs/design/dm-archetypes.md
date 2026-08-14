@@ -1,8 +1,18 @@
 # Realmweaver DM Archetype Personas
 
 > **Purpose:** Product design reference defining 7 Dungeon Master archetypes grounded in real-world TTRPG community research.
-> **Date:** 2026-03-22 (v2 — added Digital-First DM, Published Module Runner, and Design Philosophy)
+> **Date:** 2026-08-14 (v3 — reconciled the five test-backed archetypes against the shipped feature set after the ship-readiness hardening pass; v2, 2026-03-22, added Digital-First DM, Published Module Runner, and Design Philosophy)
 > **Audience:** Realmweaver product and engineering teams
+
+---
+
+## How These Personas Stay Honest
+
+Five of the seven archetypes are backed by executable end-to-end store tests in `tests/archetype.*.test.ts` — `forever-dm`, `lazy-dm`, `new-dm`, `tactical-dm`, `worldbuilder`. Each drives a real `campaignService` store (created with `{ persist: false }`) through that persona's actual session lifecycle, from campaign creation to post-session recap, asserting on the data the persona would care about rather than on UI details. They are the closest thing the product has to a "would this DM's evening actually work?" check, and a persona claim that no longer survives its archetype test is a claim to delete, not to defend.
+
+The archetypes carry a **Reconciliation** block below their needs list recording what the product does for them today and what it still does not. Those blocks are read off the source tree, not off the roadmap.
+
+The **Digital-First DM** and **Published Module Runner** have no archetype test. They are composites — a Digital-First DM's flows are the union of the other five plus search and export, and a Module Runner's are a Worldbuilder's entity decomposition driving a New DM's session loop. Both remain useful for prioritization; neither is independently pinned by a regression suite.
 
 ---
 
@@ -122,6 +132,14 @@ This archetype maps directly to the "worldbuilder's disease" phenomenon well-doc
 - Relationship and continuity tracking (who met whom, who knows what)
 - Rich entity detail with fast-access summary view
 
+### Reconciliation with the Shipped Product
+
+**Regression coverage** — `tests/archetype.worldbuilder.test.ts` ("Marcus the Worldbuilder") builds a four-level location hierarchy (continent → city → district → landmark) with bidirectional parent/child links, proves the hierarchy rejects a circular parent chain, assigns NPCs to factions and moves one between factions with `memberIds` staying in sync on both sides, nests lore articles under a parent, then deletes an NPC and a location and asserts every dangling reference is swept — faction `memberIds`, scene `npcIds`, article `relatedEntityIds`, child locations un-parented.
+
+**What the product does for this archetype today.** The referential machinery this persona depends on is the most thoroughly pinned part of the store. Beyond that: the relationship graph is now reachable by keyboard (Tab through nodes, Enter/Space to open, an amber focus ring on the focused node, each node carrying its entity name as its accessible label), and its node colors are derived from `ENTITY_TYPE_CONFIG` rather than hand-picked, so the graph, dashboard cards, and search badges finally agree. Backlinks now sweep `@`-mentions across every entity type that can hold them and additionally resolve session logs, player characters, and notes as reference targets — a Worldbuilder opening a minor NPC sees the articles, plots, scenes, and NPC relationships that point at them. Inline entity links use Unicode-aware word boundaries, so fantasy names with diacritics link the same way the "Detected" suggestion panel matches them. Editing an article's body inline from a quick card no longer truncates it at 500 characters, which was silent lore destruction.
+
+**What it still does not do.** `LinkedText` matches with its own (now-correct) regex rather than routing through the shared linking engine, so the two matchers can drift again. Nothing virtualizes dashboard grids or palette results, which is the failure mode a deep world reaches first. `buildEntityContext` — the single source of truth for AI-regeneration context — still has no editor call sites, so regeneration quality varies per editor. The prep-to-session pipeline this persona asks for does not exist: there is no "session-ready" marker anywhere in the entity model.
+
 ---
 
 ## Archetype 2: The Lazy DM / Improvisational Storyteller
@@ -168,6 +186,14 @@ Directly modeled on the community around Mike Shea's *Return of the Lazy Dungeon
 - Secrets and clues tracker with revealed/unrevealed status
 - Lightweight session history — quick "what happened last session"
 - AI-powered gap filling — flesh out improvised NPCs after the session
+
+### Reconciliation with the Shipped Product
+
+**Regression coverage** — `tests/archetype.lazy-dm.test.ts` ("Diana the Lazy DM") pre-creates one adventure and one plot, writes prep notes in the eight-step format (secrets, clues, key NPCs, strong start, treasure), goes live, creates an NPC mid-session, captures structured notes across the session, sets a per-session plot status, and ends with a recap and loose ends. It is deliberately the shortest of the five: the persona's whole claim is that the lifecycle should be short.
+
+**What the product does for this archetype today.** The single biggest change for this persona is that improvised notes now survive the tab. Autosave still coalesces bursts of typing, but no write is delayed more than ten seconds, and any pending write is flushed when the tab is hidden, closed, or reloaded — the "closed the laptop, lost the last twenty minutes" failure mode is gone. If the saved payload is ever unreadable at startup, the app recovers from one of three rotating backups and says so instead of silently continuing from an older snapshot; if localStorage fills up, saves fall through to IndexedDB and the header says "Saved (fallback storage)" rather than lying. The Session End wizard no longer auto-generates a recap from a handful of notes — below five logged notes it tells the DM how many it found and waits, because sparse notes produce recaps this persona has to rewrite anyway.
+
+**What it still does not do.** There is no streaming AI output — every generate is a buffered wait with a spinner, which is the worst fit of any persona for a DM who wanted an answer thirty seconds ago. Session Prep step 3's curated NPC/location roster is persisted onto the session log but nothing reads it back: the Session Runner still derives its live panels from scene links alone, so removing an NPC during prep has no effect once the session starts. DM Coach still clears the prompt box on every tool-tab switch, which punishes exactly the exploratory poking this persona does mid-session. Audio transcription now sits behind the `aiService` facade with a mock available, but the Session Log editor's AI Scribe button does not pass the mock-mode flag, so it remains the one feature this persona cannot exercise offline.
 
 ---
 
@@ -218,6 +244,14 @@ The fastest-growing DM segment. D&D's mainstream cultural moment (Stranger Thing
 - "What would a good DM do here?" AI assist for when they're stuck
 - Post-session learning prompts ("Things that went well", "Things to try differently")
 
+### Reconciliation with the Shipped Product
+
+**Regression coverage** — `tests/archetype.new-dm.test.ts` ("Nadia the New DM") creates an *official*-setting campaign (Forgotten Realms), imports two player characters, preps a module-shaped adventure with per-scene skill checks and DCs and explicit NPC references, then runs the full lifecycle: go live, set up an encounter, roll dice, update HP, advance turns, end the session with the encounter archived. It is the only archetype test that exercises the official-setting path and the by-the-book combat loop together.
+
+**What the product does for this archetype today.** Guided mode is now honest. Its feature gates previously listed toggles — Plot Timeline, Backlinks Panel, Advanced Context Options — that no code consulted, so flipping them moved a switch and changed nothing on screen. The list is now exactly the five features that respond: Continuity Checker, World Graph, Secrets & Clues, Combat Tracker, and the keyboard shortcuts help. The First Campaign Wizard no longer discards hand-edited NPC, location, and adventure drafts without asking — Escape, the backdrop, the ✕, and Skip all route through a confirmation once there is unsaved draft content, which previously was gated on the *smaller* action of regenerating a step.
+
+**What it still does not do.** The onboarding surface itself is unchanged: the Welcome Screen is still a logo, a tagline, and a button; the campaign creator still offers a bare textarea with no seed questions or worked example. There is no encounter-difficulty signal anywhere in the app, so "am I about to TPK my party" remains unanswerable. DM Coach — the "what would a good DM do here" surface this persona leans on hardest — still wipes the prompt box whenever the tool tab changes. There are no post-session learning prompts.
+
 ---
 
 ## Archetype 4: The Tactical Combat DM
@@ -265,6 +299,14 @@ Traces lineage to D&D's wargaming roots. Robin Laws' "Tactician" player type —
 - Monster quick-reference — stat blocks accessible with one click during combat
 - Combat pacing tools — turn timer, "on deck" notification, condition reference
 - Post-combat encounter review — damage dealt, rounds lasted, players downed
+
+### Reconciliation with the Shipped Product
+
+**Regression coverage** — `tests/archetype.tactical-dm.test.ts` ("Viktor the Tactical DM") is the longest of the five. It builds an arena location with points of interest, runs a multi-round wolf encounter tracking HP and dice rolls, adds a dire wolf mid-fight as reinforcements, records status effects in the combatant `notes` field, advances the scene and overwrites the active encounter with a second fight, then ends the session and asserts that *only* the active encounter is archived — pinning, rather than papering over, the fact that intermediate encounters are lost.
+
+**What the product does for this archetype today.** The tracker's turn bookkeeping is now correct rather than merely present. Sorting by initiative mid-combat preserves whose turn it is by combatant identity instead of snapping back to the top of the order — previously a sort silently rewound the fight. Advancing past the last combatant increments the round and wraps; rewinding past the first decrements it, floored at round 1. HP is no longer clamped to max, so temporary hit points above max and negative values for a dying PC both survive the input, and the tracker stops arguing with the DM's arithmetic. Dice rolls logged into the session record the dice that actually counted — a `4d6kh3` entry logs the three kept dice — and each log entry gets its own id, so logging the same roll twice produces two entries instead of one overwriting the other. The combat slide-out closes on Escape, and it correctly declines to close when a dialog stacked above it consumed the Escape first.
+
+**What it still does not do.** `Combatant.ac` is still declared in the type and rendered nowhere. HP moves in ±1 steps or by typing a value; there is no "apply 14 damage" delta input. Conditions remain a freeform `notes` string with no chips, no durations, and no 5e condition list — which the archetype test acknowledges by asserting on `notes` content. Ending combat mid-session still clears the board and writes only a one-line summary event, so the first of two fights in a session leaves no combatant detail behind. This archetype's fit ceiling has not moved: Realmweaver's tracker is Theatre-of-the-Mind bookkeeping done correctly, not an encounter engine.
 
 ---
 
@@ -315,6 +357,14 @@ The "Forever DM" is one of the most-discussed identities in the TTRPG community.
 - Continuity safety net — automatic tracking of unresolved hooks, NPC appearances, promises made
 - Prep templates optimized for speed — one-page sheets pre-filled with campaign context
 - Migration and import — bring existing campaign data from Notion, Obsidian, Google Docs
+
+### Reconciliation with the Shipped Product
+
+**Regression coverage** — `tests/archetype.forever-dm.test.ts` ("Evelyn the Forever DM") creates two campaigns, confirms the most recently created one becomes active, then populates both and asserts zero cross-contamination between them — no NPC, plot, or session log leaking across the boundary. It also walks a plot through the full `active → dormant → active → resolved` lifecycle and writes a session recap "offline," setting a log to `completed` via `updateSessionLog` without ever going live, because that is how a veteran who ran the night on paper actually enters their notes.
+
+**What the product does for this archetype today.** Almost the entire durability agenda in the hardening pass lands on this persona. Saves rotate three backups and recover from them at startup with a visible notice; a full localStorage falls through to IndexedDB with the header reporting "Saved (fallback storage)" instead of a false "Saved"; pending writes flush on tab hide, close, and reload; and a second tab writing the same campaign no longer silently wins — this tab pauses autosave and asks the DM to choose **Reload other tab's version** or **Keep mine**. For a DM whose campaign is the accumulated artifact of three years, "the store never silently drops or corrupts data" *is* the feature. Duplicating a campaign remaps every id in the copy, including session logs' planned NPC and location rosters, so a branched what-if campaign does not point at the original's entities. Importing a campaign reports what it had to repair rather than repairing it quietly, and refuses files stamped by a newer schema version instead of half-importing them.
+
+**What it still does not do.** There is no cross-campaign entity reuse — a recurring NPC in three concurrent campaigns is three hand-typed NPCs. Nothing virtualizes dashboards or palette results, so the app degrades exactly as a campaign gets long enough to matter. CRUD remains hand-duplicated per entity type in `campaignService`, which is why integrity rules have to be remembered rather than enforced. And there is still no import path from Notion, Obsidian, or Google Docs: export goes out to markdown, nothing comes back in.
 
 ---
 
@@ -478,13 +528,13 @@ How well Realmweaver's current architecture and design philosophy serve each arc
 
 | Archetype | Fit | Rationale |
 |-----------|:---:|-----------|
-| **Digital-First DM** | ★★★★★ | Realmweaver's ideal user. Unified workspace, AI-assisted generation, structured entities, keyboard-driven — everything this archetype wants. |
+| **Digital-First DM** | ★★★★★ | Realmweaver's ideal user. Unified workspace, AI-assisted generation, structured entities, keyboard-driven — everything this archetype wants. Global search reaches scenes directly, not just their parent adventure, and the shortcut set (⌘K, /, ⌘N, ⌘S, ?) is discoverable in-app. |
 | **Published Module Runner** | ★★★★☆ | Entity system maps perfectly to module decomposition. AI expansion within module context is a killer feature. Needs better import and guided setup workflows. |
-| **Prep-Heavy Worldbuilder** | ★★★★☆ | Deep entity model with history tracking. Needs richer cross-references and wiki-style navigation to fully satisfy. |
-| **Forever DM / Burnout-Risk** | ★★★★☆ | Multi-campaign support exists. AI recap generation and continuity tracking directly address burnout. Needs cross-campaign content reuse. |
-| **Lazy DM / Improviser** | ★★★☆☆ | AI improv tools exist (DM Coach, RealmChat). But the interface adds ceremony — needs a bullet-point-first quick-capture mode. |
-| **New/Nervous DM** | ★★☆☆☆ | No onboarding, no guidance, no guardrails. Powerful tools but intimidating without scaffolding. High priority for guided workflows. |
-| **Tactical Combat DM** | ★★☆☆☆ | Theatre of the Mind combat tracker serves basic initiative/HP. By design, Realmweaver will never match dedicated combat tools (Improved Initiative, Shieldmaiden). This archetype is best served indirectly — prep NPCs and encounters in Realmweaver, run combat in a dedicated tracker. |
+| **Prep-Heavy Worldbuilder** | ★★★★☆ | Deep entity model with cycle-checked hierarchies and swept cascade deletes. Backlinks now cover `@`-mentions and non-source entity types, and the relationship graph is keyboard-reachable. Still needs wiki-style navigation and list virtualization at scale. |
+| **Forever DM / Burnout-Risk** | ★★★★☆ | Multi-campaign isolation is pinned by tests, and the persistence layer now has backups, recovery, quota fallback, unload flush, and explicit multi-tab conflict resolution — the durability this archetype's decade of data depends on. Still needs cross-campaign content reuse. |
+| **Lazy DM / Improviser** | ★★★☆☆ | AI improv tools exist (DM Coach, RealmChat) and live notes now survive a closed laptop. But the interface still adds ceremony, generation has no streaming feedback, and prep-step curation does not reach the runner. |
+| **New/Nervous DM** | ★★☆☆☆ | Guided mode's feature gates are now real rather than inert, and the first-run wizard confirms before discarding drafts — but the onboarding surface itself is unchanged, and there are still no encounter-confidence guardrails. High priority for guided workflows. |
+| **Tactical Combat DM** | ★★☆☆☆ | The Theatre of the Mind tracker's turn order, round wrapping, HP handling, and dice logging are now correct, but AC, damage deltas, and structured conditions remain absent. By design, Realmweaver will never match dedicated combat tools (Improved Initiative, Shieldmaiden). This archetype is best served indirectly — prep NPCs and encounters in Realmweaver, run combat in a dedicated tracker. |
 
 ### Archetype Migration Paths
 
