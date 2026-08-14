@@ -476,10 +476,11 @@ export const EvocationWizard: React.FC<EvocationWizardProps> = ({ campaign, onCl
                                     />
                                 )}
                                 {editingEntity.type === 'adventures' && (
-                                    <AdventureEditor 
-                                        adventure={generatedData.adventures[editingEntity.index]} 
+                                    <AdventureEditor
+                                        adventure={generatedData.adventures[editingEntity.index]}
                                         campaign={campaign}
-                                        onUpdate={(id, data) => handleUpdateEntity('adventures', editingEntity.index, data)} 
+                                        onUpdate={(id, data) => handleUpdateEntity('adventures', editingEntity.index, data)}
+                                        isMockMode={isMockMode}
                                     />
                                 )}
                             </div>

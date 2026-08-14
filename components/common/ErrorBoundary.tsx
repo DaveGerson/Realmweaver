@@ -73,7 +73,9 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     // the throw are not discarded by the reload.
     handleReload = (): void => {
         try {
-            campaignService.saveCampaign();
+            // Synchronous flush — saveCampaign() defers its write via
+            // setTimeout(0), which window.location.reload() would cancel.
+            campaignService.flushPendingSave();
         } catch (e) {
             console.error('[ErrorBoundary] Failed to flush pending save before reload:', e);
         }

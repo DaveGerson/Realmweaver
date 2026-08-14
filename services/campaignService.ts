@@ -791,6 +791,16 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             _disposeInit = null;
         },
 
+        /**
+         * Synchronously flushes any pending debounced save (no-op when
+         * nothing is pending). Unlike saveCampaign(), the localStorage
+         * write happens before this returns, so callers about to tear the
+         * page down (ErrorBoundary reload, tests) can rely on it.
+         */
+        flushPendingSave() {
+            flushPendingSaveSync();
+        },
+
         // --- Campaign Level Actions ---
         saveCampaign() {
             // Manual save trigger (forces immediate save)

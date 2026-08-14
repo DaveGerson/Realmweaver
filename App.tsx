@@ -313,6 +313,13 @@ const App: FC = () => {
 
   const handleImportPC = (file: File): Promise<string> => {
     return new Promise<string>((resolve, reject) => {
+      // The AI proxy rejects bodies over ~4MB; base64 inflates by ~33%, so
+      // refuse early with a clear message instead of a server-side failure.
+      const MAX_PDF_BYTES = 3 * 1024 * 1024;
+      if (file.size > MAX_PDF_BYTES) {
+        reject(new Error(`PDF is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum supported size is 3MB.`));
+        return;
+      }
       const reader = new FileReader();
       reader.onload = async (event) => {
         if (event.target?.result) {
