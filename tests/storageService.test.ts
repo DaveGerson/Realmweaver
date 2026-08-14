@@ -253,8 +253,12 @@ describe('storageService: conflict detection (5.5)', () => {
         const callback = vi.fn();
         svc.onConflict(callback);
 
-        // Backup keys should be ignored by the filter
-        capturedListener?.({ key: 'CAMPAIGNS_BACKUP_1' });
+        // Backup keys should be ignored by the filter. Finding #0 renamed
+        // backup keys to be namespaced per primary key
+        // (`${primaryKey}__backup_${index}`) instead of the old fixed
+        // `CAMPAIGNS_BACKUP_<n>`; the conflict-detection filter was updated
+        // in lockstep, so this exercises the new naming scheme.
+        capturedListener?.({ key: 'realmweaver-campaigns__backup_1' });
 
         expect(callback).not.toHaveBeenCalled();
     });
