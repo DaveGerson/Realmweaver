@@ -15,6 +15,7 @@
  */
 
 import type { ModelTier } from '@/services/ai/modelConfig';
+import { getProviderConfig } from '@/services/ai/modelConfig';
 import type {
   AIProvider,
   GenerateWithSchemaOptions,
@@ -96,7 +97,7 @@ export class ClaudeCliProvider implements AIProvider {
         });
         return this.parseJsonResponse<T>(raw);
       },
-      { maxAttempts: 2, delayMs: 1500, label: `${TIER_TO_CLI_MODEL[model]} json` }
+      { maxAttempts: getProviderConfig().maxRetries, delayMs: 1500, label: `${TIER_TO_CLI_MODEL[model]} json` }
     );
   }
 
@@ -161,7 +162,7 @@ export class ClaudeCliProvider implements AIProvider {
   private async callApi(request: CliRequest): Promise<string> {
     return withRetry(
       () => this.rawCallApi(request),
-      { maxAttempts: 2, delayMs: 1500, label: `${request.model} ${request.outputFormat}` }
+      { maxAttempts: getProviderConfig().maxRetries, delayMs: 1500, label: `${request.model} ${request.outputFormat}` }
     );
   }
 
