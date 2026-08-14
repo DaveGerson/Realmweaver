@@ -233,7 +233,12 @@ export const Header: React.FC<HeaderProps> = ({
               )}
           </div>
         </div>
-        <div className="flex items-center gap-2 sm:gap-6">
+        {/* min-w-0 + overflow-x-auto: on narrow (mobile) viewports the action
+            cluster must scroll inside the header rather than overflow the
+            page — content wider than the screen makes mobile browsers expand
+            the layout viewport permanently, which shifts every fixed overlay
+            (dialogs, drawers) partly off-screen. */}
+        <div className="flex items-center gap-2 sm:gap-6 min-w-0 overflow-x-auto">
           {/* Command Palette Search Button */}
           {onOpenCommandPalette && (
             <button

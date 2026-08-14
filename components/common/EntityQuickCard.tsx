@@ -140,7 +140,7 @@ export const EntityQuickCard: React.FC<EntityQuickCardProps> = React.memo(({
   if (isMobile) {
     return ReactDOM.createPortal(
       <div
-        className="fixed inset-0 z-50 flex flex-col justify-end"
+        className="fixed inset-0 z-[80] flex flex-col justify-end"
         style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
         onPointerDown={(e) => {
           // Close when tapping the backdrop (not the card itself)

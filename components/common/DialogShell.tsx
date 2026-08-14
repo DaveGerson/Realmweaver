@@ -266,7 +266,7 @@ export const DialogShell: React.FC<DialogShellProps> = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center"
+      className="fixed inset-0 bg-black/60 z-[80] flex items-center justify-center"
       onMouseDown={handleBackdropMouseDown}
       onMouseUp={handleBackdropMouseUp}
       onClick={handleBackdropClick}
