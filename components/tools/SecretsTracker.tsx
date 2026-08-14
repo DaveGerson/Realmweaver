@@ -124,7 +124,13 @@ interface EntityPickerProps {
   linkedEntityIds: string[];
   allEntities: PickableEntity[];
   onToggle: (id: string) => void;
-  onClose: () => void;
+  /**
+   * Called on every dismissal. `restoreFocus` is true for keyboard dismissal
+   * (Escape / Done) and false for a pointer dismissal (outside mousedown), so
+   * the caller can avoid stealing focus — and scrolling a panel back into
+   * view — out from under an in-flight click elsewhere on the page.
+   */
+  onClose: (restoreFocus: boolean) => void;
   /** Ref to the trigger button that opened this picker, so outside-click detection doesn't fight the trigger's own toggle handler. */
   triggerRef: React.RefObject<HTMLElement>;
 }
@@ -142,13 +148,14 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   // Dismiss on Escape (anywhere) or on a mousedown outside the popover/trigger.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onClose(true);
     };
     const handleMouseDown = (e: MouseEvent) => {
       const target = e.target as Node;
       if (popoverRef.current?.contains(target)) return;
       if (triggerRef.current?.contains(target)) return;
-      onClose();
+      // Pointer dismissal: don't steal focus from wherever the user clicked.
+      onClose(false);
     };
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('mousedown', handleMouseDown);
@@ -180,7 +187,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
     return (
       <div ref={popoverRef} className="absolute z-50 left-0 mt-1 w-56 bg-slate-900 border border-slate-700 rounded-lg shadow-xl p-3 text-xs text-slate-500 italic">
         No entities in campaign yet.
-        <button onClick={onClose} className="block mt-2 text-amber-400 hover:text-amber-300">Close</button>
+        <button onClick={() => onClose(true)} className="block mt-2 text-amber-400 hover:text-amber-300">Close</button>
       </div>
     );
   }
@@ -241,7 +248,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
       {/* Footer */}
       <div className="border-t border-slate-700 p-1.5 flex justify-end flex-shrink-0">
         <button
-          onClick={onClose}
+          onClick={() => onClose(true)}
           className="text-[10px] text-slate-500 hover:text-slate-300 px-2 py-0.5 rounded transition-colors"
         >
           Done
@@ -315,9 +322,12 @@ const SecretCard: React.FC<SecretCardProps> = ({
     }
   };
 
-  const closePicker = useCallback(() => {
+  const closePicker = useCallback((restoreFocus: boolean = true) => {
     setShowPicker(false);
-    linkTriggerRef.current?.focus();
+    // Only steal focus back to the trigger for keyboard dismissal (Escape /
+    // Done); a pointer dismissal (e.g. mousedown on a different card) must
+    // not yank focus away from wherever the user just clicked.
+    if (restoreFocus) linkTriggerRef.current?.focus();
   }, []);
 
   return (
@@ -528,9 +538,11 @@ const AddSecretForm: React.FC<AddSecretFormProps> = ({ campaign, onAdd, onCancel
     );
   };
 
-  const closePicker = useCallback(() => {
+  const closePicker = useCallback((restoreFocus: boolean = true) => {
     setShowPicker(false);
-    linkTriggerRef.current?.focus();
+    // Only steal focus back to the trigger for keyboard dismissal (Escape /
+    // Done); a pointer dismissal must not yank focus away from the click.
+    if (restoreFocus) linkTriggerRef.current?.focus();
   }, []);
 
   const linkedEntities = useMemo(

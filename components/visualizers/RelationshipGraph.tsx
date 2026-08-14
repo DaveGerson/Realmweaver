@@ -255,8 +255,9 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
       .join("g")
       .attr("tabindex", 0)
       .attr("role", "button")
-      .style("outline", "none")
       .on("keydown", handleNodeKeyDown)
+      .on("focus", handleNodeFocus)
+      .on("blur", handleNodeBlur)
       .call(d3.drag<SVGGElement, GraphNode>()
         .on("start", dragstarted)
         .on("drag", dragged)
@@ -276,6 +277,7 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
 
     // Visible node circle (r:8 = 16px visual diameter)
     nodeGroup.append("circle")
+      .attr("class", "node-ring")
       .attr("r", 8)
       .attr("fill", (d: GraphNode) => TYPE_COLORS[d.group] || '#94a3b8')
       .attr("stroke", "#fff")
@@ -315,6 +317,21 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
       if (event.key !== 'Enter' && event.key !== ' ') return;
       event.preventDefault();
       handleNodeClick(event, d);
+    }
+
+    // Explicit focus indicator for keyboard users — the node group itself has
+    // no visible chrome, so relying on the browser's default outline on an
+    // SVG <g> is unreliable. Highlight the visible node circle instead.
+    function handleNodeFocus(event: FocusEvent) {
+      d3.select(event.currentTarget as SVGGElement).select<SVGCircleElement>("circle.node-ring")
+        .attr("stroke", "#f59e0b") // amber-400
+        .attr("stroke-width", 3);
+    }
+
+    function handleNodeBlur(event: FocusEvent) {
+      d3.select(event.currentTarget as SVGGElement).select<SVGCircleElement>("circle.node-ring")
+        .attr("stroke", "#fff")
+        .attr("stroke-width", 1.5);
     }
 
     simulation.on("tick", () => {

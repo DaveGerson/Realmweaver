@@ -114,6 +114,48 @@ describe('#82 PlotTimeline keyboard access', () => {
       () => onSelectSession.mockClear()
     );
   });
+
+  it('does not nest an interactive session cell inside an interactive plot row', () => {
+    render(<PlotTimeline plots={plots} sessionLogs={sessions} onSelectPlot={vi.fn()} />);
+
+    // The session-status cell (name includes "Salt and Silence: ...") is the
+    // one interactive control per row; its ancestor row must not itself carry
+    // an interactive role/tabIndex, or ARIA's presentational-children rule
+    // makes the cell unreachable in screen-reader browse mode and roving
+    // focus creates far more tab stops than plots + sessions.
+    const cell = screen.getByRole('button', { name: /Salt and Silence:/i });
+    let ancestor: HTMLElement | null = cell.parentElement;
+    while (ancestor && ancestor !== document.body) {
+      expect(
+        ancestor.getAttribute('role'),
+        'no ancestor of an interactive cell may itself be role="button"'
+      ).not.toBe('button');
+      expect(
+        ancestor.hasAttribute('tabindex'),
+        'no ancestor of an interactive cell may itself carry a tabindex'
+      ).toBe(false);
+      ancestor = ancestor.parentElement;
+    }
+
+    // The plot itself must still be reachable/operable — via the always-present
+    // left-column label button, not a second interactive layer in the grid.
+    // (Exact-name match to exclude the unrelated "no linked entities" warning
+    // banner, which also mentions the plot title in its longer aria-label.)
+    const plotButtons = screen.queryAllByRole('button', { name: /^The Drowned Heir$/ });
+    expect(plotButtons.length).toBe(1);
+  });
+
+  it('exposes each status dot via a valid, non-redundant accessible name', () => {
+    render(<PlotTimeline plots={plots} sessionLogs={sessions} onSelectPlot={vi.fn()} />);
+
+    // A bare <span> has the implicit role "generic", on which aria-label is
+    // ARIA-prohibited and unreliably exposed by assistive tech. The dot must
+    // carry an explicit role (e.g. "img") for its aria-label to be valid.
+    const cell = screen.getByRole('button', { name: /Salt and Silence:/i });
+    const dot = cell.querySelector('[aria-label]') as HTMLElement | null;
+    expect(dot, 'status dot must be present').toBeTruthy();
+    expect(dot!.getAttribute('role'), 'a labelled <span> needs an explicit role for the name to be valid').toBeTruthy();
+  });
 });
 
 describe('#82 DiceRoller history keyboard access', () => {

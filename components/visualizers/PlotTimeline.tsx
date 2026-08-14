@@ -88,6 +88,7 @@ const StatusDot: React.FC<StatusDotProps> = ({ status, color, label, onMouseEnte
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
         aria-label={label}
+        role="img"
         className="w-3 h-3 rounded-full border border-slate-600 bg-transparent flex-shrink-0 cursor-default"
         style={{ display: 'inline-block' }}
       />
@@ -100,6 +101,7 @@ const StatusDot: React.FC<StatusDotProps> = ({ status, color, label, onMouseEnte
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
         aria-label={label}
+        role="img"
         className="w-3.5 h-3.5 rounded-full flex-shrink-0 cursor-default"
         style={{ backgroundColor: '#22c55e', display: 'inline-block' }}
       />
@@ -112,6 +114,7 @@ const StatusDot: React.FC<StatusDotProps> = ({ status, color, label, onMouseEnte
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
         aria-label={label}
+        role="img"
         className="w-3.5 h-3.5 rounded-full flex-shrink-0 cursor-default"
         style={{ backgroundColor: '#f59e0b', display: 'inline-block' }}
       />
@@ -124,6 +127,7 @@ const StatusDot: React.FC<StatusDotProps> = ({ status, color, label, onMouseEnte
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
         aria-label={label}
+        role="img"
         className="w-3.5 h-3.5 rounded-full border-2 bg-transparent flex-shrink-0 cursor-default"
         style={{ borderColor: '#6b7280', display: 'inline-block' }}
       />
@@ -136,6 +140,7 @@ const StatusDot: React.FC<StatusDotProps> = ({ status, color, label, onMouseEnte
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
         aria-label={label}
+        role="img"
         className="flex-shrink-0 cursor-default"
         style={{ display: 'inline-flex', alignItems: 'center' }}
       >
@@ -422,18 +427,9 @@ export const PlotTimeline: React.FC<PlotTimelineProps> = ({
                   return (
                     <div
                       key={plot.id}
-                      role="button"
-                      tabIndex={0}
-                      aria-label={plot.title}
-                      className="flex relative cursor-pointer hover:bg-slate-800/40 transition-colors"
+                      role="presentation"
+                      className="flex relative hover:bg-slate-800/40 transition-colors"
                       style={{ height: ROW_HEIGHT, borderBottom: '1px solid #292524' }}
-                      onClick={() => onSelectPlot?.(plot.id)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          onSelectPlot?.(plot.id);
-                        }
-                      }}
                     >
                       {/* Horizontal line spanning all columns */}
                       <div

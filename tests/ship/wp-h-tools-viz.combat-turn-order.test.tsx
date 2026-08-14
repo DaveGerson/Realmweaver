@@ -130,4 +130,24 @@ describe('#80 Increase HP must not drop a combatant to 0 when Max HP is blank', 
     // The bug: Math.min(0, 13) === 0 — the combatant reads as downed.
     expect(next.combatants[0].hp).toBe(13);
   });
+
+  it('lets HP go above maxHp, matching the unclamped decrease direction', () => {
+    // Residue of #80: with maxHp > 0, a clamp on the increase button (but not
+    // the decrease button) made the two directions asymmetric and blocked
+    // recording temporary/over-max HP that the Current field can already
+    // accept directly.
+    const encounter: Encounter = {
+      id: 'enc-4',
+      round: 1,
+      turnIndex: 0,
+      combatants: [makeCombatant('Knight', 10, { hp: 40, maxHp: 40 })],
+    };
+    const onUpdate = renderTracker(encounter);
+
+    fireEvent.click(screen.getByRole('button', { name: /increase hp/i }));
+
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    const next: Encounter = onUpdate.mock.calls[0][0];
+    expect(next.combatants[0].hp).toBe(41);
+  });
 });

@@ -101,4 +101,27 @@ describe('#83 RelationshipGraph keyboard/AT access', () => {
     fireEvent.keyDown(named!, { key: 'Enter', code: 'Enter' });
     expect(onNodeSelect).toHaveBeenCalledWith('npc', 'npc-1');
   });
+
+  it('does not suppress focus without providing a replacement indicator, and shows one on focus', () => {
+    const { container } = render(<RelationshipGraph campaign={campaign} onNodeSelect={vi.fn()} />);
+    const nodeGroups = Array.from(container.querySelectorAll('g')).filter(
+      g => g.querySelector(':scope > circle') !== null
+    );
+    const target = nodeGroups.find(g => g.querySelector('title')?.textContent?.includes('Marla Tidebinder'));
+    expect(target).toBeTruthy();
+
+    // The fix must not merely hide the browser's default focus ring without
+    // replacing it with something visible.
+    expect(target!.getAttribute('style') ?? '').not.toMatch(/outline:\s*none/);
+
+    const ring = target!.querySelector('circle.node-ring') as SVGCircleElement | null;
+    expect(ring, 'visible node circle must be identifiable for a focus indicator').toBeTruthy();
+
+    fireEvent.focus(target!);
+    expect(ring!.getAttribute('stroke')).toBe('#f59e0b');
+    expect(Number(ring!.getAttribute('stroke-width'))).toBeGreaterThan(1.5);
+
+    fireEvent.blur(target!);
+    expect(ring!.getAttribute('stroke')).toBe('#fff');
+  });
 });

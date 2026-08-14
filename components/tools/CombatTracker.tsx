@@ -251,7 +251,7 @@ export const CombatTracker: React.FC<CombatTrackerProps> = ({ encounter, onUpdat
                                 />
                                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] text-slate-500 bg-slate-900 px-1">Max</span>
                             </div>
-                            <Button variant="icon" onClick={() => updateCombatant(combatant.id, { hp: combatant.maxHp > 0 ? Math.min(combatant.maxHp, combatant.hp + 1) : combatant.hp + 1 })} className="text-green-400 hover:bg-green-500/20" aria-label="Increase HP">
+                            <Button variant="icon" onClick={() => updateCombatant(combatant.id, { hp: combatant.hp + 1 })} className="text-green-400 hover:bg-green-500/20" aria-label="Increase HP">
                                 <Icons.ChevronUp className="w-4 h-4" />
                             </Button>
                         </div>

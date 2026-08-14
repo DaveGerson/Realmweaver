@@ -47,6 +47,15 @@ const campaign = {
       linkedEntityIds: [],
       createdAt: '2026-05-01T00:00:00.000Z',
     },
+    {
+      id: 'secret-2',
+      title: 'The lighthouse hides a portal',
+      content: 'Beneath the lamp room.',
+      category: 'secret',
+      isRevealed: false,
+      linkedEntityIds: [],
+      createdAt: '2026-05-02T00:00:00.000Z',
+    },
   ],
 } as unknown as Campaign;
 
@@ -92,5 +101,30 @@ describe('#115 SecretsTracker entity picker dismissal', () => {
     fireEvent.keyDown(document, { key: 'Escape', code: 'Escape' });
 
     expect(document.activeElement).toBe(trigger);
+  });
+
+  it('does not steal focus when dismissed by mousedowning a different card', () => {
+    // Regression for the #115 refinement: opening the picker on secret A and
+    // then mousedown-ing on secret B's card must NOT leave focus (and thus
+    // panel scroll position) pinned on secret A's "Link entity" trigger.
+    render(
+      <ConfirmDialogProvider>
+        <SecretsTracker campaign={campaign} />
+      </ConfirmDialogProvider>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /The regent is a changeling/i }));
+    const triggerA = screen.getByRole('button', { name: /link entity/i });
+    fireEvent.click(triggerA);
+    expect(screen.getByPlaceholderText(/search entities/i)).toBeTruthy();
+
+    const cardB = screen.getByRole('button', { name: /The lighthouse hides a portal/i });
+    fireEvent.mouseDown(cardB);
+
+    // Picker A closed...
+    expect(screen.queryByPlaceholderText(/search entities/i)).toBeNull();
+    // ...but focus was NOT yanked back onto triggerA — it stayed with the
+    // click (or at least off the dismissed trigger).
+    expect(document.activeElement).not.toBe(triggerA);
   });
 });
