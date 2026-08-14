@@ -140,9 +140,13 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
 
     // Copy player recap
     const handleCopyPlayerRecap = useCallback(() => {
-        navigator.clipboard.writeText(playerRecap);
-        setShowCopied(true);
-        setTimeout(() => setShowCopied(false), 2000);
+        if (!navigator.clipboard?.writeText) return;
+        navigator.clipboard.writeText(playerRecap)
+            .then(() => {
+                setShowCopied(true);
+                setTimeout(() => setShowCopied(false), 2000);
+            })
+            .catch(() => { /* copy failed silently; no success state shown */ });
     }, [playerRecap]);
 
     // Save and complete
@@ -153,13 +157,14 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
             recap,
             looseEnds,
             plotProgressions: plotStatuses,
+            playerRecap,
         });
 
         // End the session (archives encounter, marks completed, clears active state)
         campaignService.endSession();
 
         onComplete();
-    }, [recap, looseEnds, plotStatuses, sessionLog.id, onComplete]);
+    }, [recap, looseEnds, plotStatuses, playerRecap, sessionLog.id, onComplete]);
 
     // Navigation
     const currentIndex = STEP_ORDER.indexOf(currentStep);

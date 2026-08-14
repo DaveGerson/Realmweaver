@@ -35,9 +35,11 @@ export interface SessionLog {
   sessionDate: string; 
   
   // Planning Context
-  adventureId?: string; 
-  plannedSceneIds: string[]; 
-  prepNotes: string; 
+  adventureId?: string;
+  plannedSceneIds: string[];
+  prepNotes: string;
+  plannedNpcIds?: string[];
+  plannedLocationIds?: string[];
   
   // Plot Tracking
   relatedPlotIds: string[]; // IDs of plots advanced in this session

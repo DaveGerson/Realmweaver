@@ -525,7 +525,7 @@ const DetailedModeView = ({ campaign, prompts, onPromptsChange }) => {
             if (item) {
                 item.prompt = prompt;
                 if (linkId !== undefined) {
-                    item.linkId = linkId || undefined;
+                    item.linkId = (linkId && linkId !== 'none') ? linkId : undefined;
                 }
             }
         }));
@@ -661,8 +661,8 @@ const SimpleDetailedSection: React.FC<SimpleDetailedSectionProps> = ({ title, it
                             {linkOptions && linkNoun && (
                                 <div className="flex items-center gap-2">
                                     <Icons.Link className="w-3 h-3 text-slate-400" />
-                                    <select value={p.linkId || 'none'} onChange={(e) => onChange(p.id, p.prompt, e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-amber-500">
-                                        <option value="none">-- Link to {linkNoun} (Optional) --</option>
+                                    <select value={p.linkId || ''} onChange={(e) => onChange(p.id, p.prompt, e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-amber-500">
+                                        <option value="">-- Link to {linkNoun} (Optional) --</option>
                                         {linkOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                     </select>
                                 </div>

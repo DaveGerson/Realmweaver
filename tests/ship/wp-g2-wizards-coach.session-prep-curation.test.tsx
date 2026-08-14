@@ -25,10 +25,10 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent, within } from '@testing-library/react';
-import type { Campaign } from '../../types/index';
+import type { Campaign, SessionLog } from '../../types/index';
 
 const h = vi.hoisted(() => ({
-    createSessionLog: vi.fn(() => 'sess-new'),
+    createSessionLog: vi.fn((_newLogData: Omit<SessionLog, 'id'>) => 'sess-new'),
     goLive: vi.fn(),
 }));
 

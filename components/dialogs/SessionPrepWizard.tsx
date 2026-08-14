@@ -275,6 +275,8 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
             adventureId: selectedAdventureId ?? undefined,
             plannedSceneIds: Array.from(selectedSceneIds),
             prepNotes: prepNotes.trim(),
+            plannedNpcIds: Array.from(activeNpcIds),
+            plannedLocationIds: Array.from(activeLocationIds),
             runningNotes: '',
             structuredNotes: [],
             relatedPlotIds: Array.from(selectedPlotIds),
@@ -287,7 +289,7 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
         const newId = campaignService.createSessionLog(sessionData);
         campaignService.goLive(newId);
         onComplete(newId);
-    }, [effectiveTitle, selectedAdventureId, selectedSceneIds, selectedPlotIds, prepNotes, onComplete]);
+    }, [effectiveTitle, selectedAdventureId, selectedSceneIds, selectedPlotIds, prepNotes, activeNpcIds, activeLocationIds, onComplete]);
 
     // ── Status badge colour ───────────────────────────────────────────────────
     const sceneStatusBadge = (status: Scene['status']) => {
