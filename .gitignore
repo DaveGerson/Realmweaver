@@ -47,3 +47,6 @@ e2e/screenshots/
 docs/superpowers/
 docs/ux-audit/screenshots/
 /reference_files/
+
+# Local Playwright config overrides (e.g. pinning a machine-specific browser executable)
+pw.local.config.ts
