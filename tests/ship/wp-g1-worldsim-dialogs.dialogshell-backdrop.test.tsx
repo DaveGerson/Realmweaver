@@ -73,4 +73,36 @@ describe('DialogShell backdrop dismissal', () => {
         fireEvent.click(backdrop, { bubbles: true });
         expect(onClose).toHaveBeenCalledTimes(1);
     });
+
+    it('does not close when a drag starts on the backdrop and releases inside the panel (mirror gesture)', () => {
+        const { onClose, backdrop } = setup();
+        const textarea = screen.getByTestId('ingest');
+
+        // Press on the backdrop, drag into the panel, release inside it. The
+        // click's target is still computed as the common ancestor (the
+        // backdrop, since it contains the panel) — a press-origin check
+        // alone is not enough to reject this gesture.
+        fireEvent.mouseDown(backdrop, { bubbles: true });
+        fireEvent.mouseUp(textarea, { bubbles: true });
+        fireEvent.click(backdrop, { bubbles: true });
+
+        expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('still closes a subsequent genuine backdrop press-and-release after a rejected mirror-gesture drag', () => {
+        const { onClose, backdrop } = setup();
+        const textarea = screen.getByTestId('ingest');
+
+        // Rejected mirror-gesture drag first — must leave no armed state behind.
+        fireEvent.mouseDown(backdrop, { bubbles: true });
+        fireEvent.mouseUp(textarea, { bubbles: true });
+        fireEvent.click(backdrop, { bubbles: true });
+        expect(onClose).not.toHaveBeenCalled();
+
+        // A genuine backdrop press-and-release must still work afterwards.
+        fireEvent.mouseDown(backdrop, { bubbles: true });
+        fireEvent.mouseUp(backdrop, { bubbles: true });
+        fireEvent.click(backdrop, { bubbles: true });
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
 });

@@ -125,6 +125,28 @@ describe('generateWorldEvents validates model-supplied suggestedUpdates', () => 
         ]);
     });
 
+    it('drops updates whose currentValue is not a string', async () => {
+        // A model that returns an object/array for currentValue would crash
+        // the review pane's raw render (before the DM can ever reach Apply)
+        // if it survived filtering — verified separately at the render layer
+        // in wp-g1-worldsim-dialogs.apply-guard.test.tsx.
+        h.result = {
+            events: [
+                eventWith([
+                    { entityId: 'npc-1', entityType: 'npc', field: 'motivations', currentValue: { text: 'old' } as any, proposedValue: 'Protect the pass, and hunt the informant.' },
+                    { entityId: 'loc-1', entityType: 'location', field: 'description', currentValue: 'A cold gap.', proposedValue: 'A cold gap, now garrisoned.' },
+                ]),
+            ],
+        };
+
+        const events = await generateWorldEvents(campaign, 14);
+
+        expect(events).toHaveLength(1);
+        expect(events[0].suggestedUpdates).toEqual([
+            expect.objectContaining({ entityId: 'loc-1', entityType: 'location', field: 'description' }),
+        ]);
+    });
+
     it('keeps the event even when every one of its suggested updates is rejected', async () => {
         h.result = {
             events: [eventWith([{ entityId: 'npc-1', entityType: 'npc', field: 'id', currentValue: 'npc-1', proposedValue: 'renamed' }])],

@@ -2,8 +2,10 @@
 import React, { useState, useCallback } from 'react';
 import type { Campaign } from '../../types/index';
 import type { WorldEvent } from '../../services/ai/worldSimulation';
-import { isValidSuggestedUpdate } from '../../services/ai/worldSimulation';
-import { generateWorldEvents } from '../../services/aiService';
+// AI facade rule (CLAUDE.md): components import ONLY from aiService.ts, never
+// from services/ai/* directly. isValidSuggestedUpdate is a pure validation
+// predicate (no mock-mode branch), so aiService.ts re-exports it as-is.
+import { generateWorldEvents, isValidSuggestedUpdate } from '../../services/aiService';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { campaignService } from '../../services/campaignService';
@@ -67,7 +69,12 @@ function resolveEntityName(campaign: Campaign, entityId: string, entityType: str
 // suggestedUpdates against the writable-field allowlist, re-validate here
 // at the write site so a model-chosen structural field (id, relationships,
 // factionId, ...) can never be written via Object.assign-based updaters.
-function applyWorldEventsToCampaign(campaign: Campaign, events: WorldEvent[]): void {
+// Returns the number of individual field updates actually written, so the
+// caller can report what really happened rather than assuming every
+// approved event resulted in a write (an event whose updates were all
+// dropped by the allowlist writes nothing).
+function applyWorldEventsToCampaign(campaign: Campaign, events: WorldEvent[]): number {
+  let updatesWritten = 0;
   for (const event of events) {
     for (const update of event.suggestedUpdates) {
       if (!isValidSuggestedUpdate(campaign, update)) {
@@ -92,9 +99,12 @@ function applyWorldEventsToCampaign(campaign: Campaign, events: WorldEvent[]): v
           break;
         default:
           console.warn(`[WorldSim] Unknown entityType for update: ${update.entityType}`);
+          continue;
       }
+      updatesWritten++;
     }
   }
+  return updatesWritten;
 }
 
 export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
@@ -109,6 +119,10 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
   const [approvedIds, setApprovedIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [appliedCount, setAppliedCount] = useState(0);
+  // Count of individual entity field writes actually performed — distinct
+  // from appliedCount (events), since an approved event whose updates were
+  // all dropped by the allowlist writes nothing (finding #24b).
+  const [appliedUpdateCount, setAppliedUpdateCount] = useState(0);
   // The events that were approved and applied, handed to the parent once the
   // DM acknowledges the 'applied' confirmation via the Done button.
   const [approvedEvents, setApprovedEvents] = useState<WorldEvent[]>([]);
@@ -117,6 +131,11 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
   // Monotonic run id — identifies the current in-flight simulation request so
   // a cancelled-then-superseded run can never populate the review list.
   const runIdRef = React.useRef(0);
+  // Guards onApplyEvents so it fires at most once per apply, regardless of
+  // whether the DM acknowledges via "Done" or dismisses the 'applied' step
+  // through the header close button, Escape, or a backdrop click (#24a) —
+  // the parent must always learn that the campaign was mutated.
+  const acknowledgedRef = React.useRef(false);
 
   const selectedLabel =
     DAYS_LABELS.reduce((best, opt) => {
@@ -176,9 +195,11 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
 
   const handleApply = () => {
     const approved = events.filter(e => approvedIds.has(e.id));
-    applyWorldEventsToCampaign(campaign, approved);
+    const updatesWritten = applyWorldEventsToCampaign(campaign, approved);
     setAppliedCount(approved.length);
+    setAppliedUpdateCount(updatesWritten);
     setApprovedEvents(approved);
+    acknowledgedRef.current = false;
     // Show the 'applied' confirmation first — onApplyEvents (which the
     // parent uses to close the wizard) is deferred until the DM
     // acknowledges via the Done button, so a destructive apply always
@@ -186,14 +207,34 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
     setStep('applied');
   };
 
-  const handleDone = () => {
+  // Notifies the parent that the campaign was mutated. Called from the Done
+  // button in the normal flow, and also from handleClose below if the DM
+  // dismisses the 'applied' confirmation some other way (header X, Escape,
+  // backdrop click) — guarded so the parent is never told twice.
+  const acknowledgeApplied = useCallback(() => {
+    if (acknowledgedRef.current) return;
+    acknowledgedRef.current = true;
     onApplyEvents(approvedEvents);
+  }, [approvedEvents, onApplyEvents]);
+
+  const handleDone = () => {
+    acknowledgeApplied();
   };
+
+  // Wraps onClose so that dismissing the 'applied' step by any means still
+  // notifies the parent the campaign was mutated (#24a) before delegating to
+  // the real close handler.
+  const handleClose = useCallback(() => {
+    if (step === 'applied') {
+      acknowledgeApplied();
+    }
+    onClose();
+  }, [step, acknowledgeApplied, onClose]);
 
   const approvedCount = events.filter(e => approvedIds.has(e.id)).length;
 
   return (
-    <DialogShell isOpen={true} onClose={onClose} ariaLabel="World Simulation Wizard" className="w-full max-w-2xl mx-2 sm:mx-4">
+    <DialogShell isOpen={true} onClose={handleClose} ariaLabel="World Simulation Wizard" className="w-full max-w-2xl mx-2 sm:mx-4">
       <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-700 flex-shrink-0">
@@ -208,7 +249,7 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
           </div>
           <Button
             variant="icon"
-            onClick={onClose}
+            onClick={handleClose}
             className="text-slate-400 hover:text-slate-100"
             aria-label="Close"
           >
@@ -378,7 +419,7 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
                                   <div className="flex-1 bg-red-950/30 border border-red-800/30 rounded p-2">
                                     <p className="text-red-400 text-[10px] font-semibold mb-0.5 uppercase tracking-wide">Before</p>
                                     <p className={twMerge('text-slate-400 leading-relaxed', !isExpanded && 'line-clamp-3')}>
-                                      {upd.currentValue || '(empty)'}
+                                      {String(upd.currentValue ?? '') || '(empty)'}
                                     </p>
                                   </div>
                                   <div className="flex items-center flex-shrink-0 text-slate-500">
@@ -423,7 +464,11 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
                 <p className="text-slate-400 text-sm mt-1">
                   {appliedCount === 0
                     ? 'No events were applied.'
-                    : `${appliedCount} event${appliedCount !== 1 ? 's' : ''} applied to your campaign.`}
+                    : `${appliedCount} event${appliedCount !== 1 ? 's' : ''} applied to your campaign. `}
+                  {appliedCount > 0 &&
+                    (appliedUpdateCount === 0
+                      ? 'No entity fields were changed.'
+                      : `${appliedUpdateCount} field${appliedUpdateCount !== 1 ? 's' : ''} updated.`)}
                 </p>
               </div>
               <p className="text-slate-500 text-xs max-w-xs">
@@ -437,7 +482,7 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
         <div className="flex items-center justify-between gap-3 p-4 border-t border-slate-700 flex-shrink-0">
           {step === 'setup' && (
             <>
-              <Button variant="ghost" onClick={onClose}>Cancel</Button>
+              <Button variant="ghost" onClick={handleClose}>Cancel</Button>
               <Button variant="primary" onClick={handleSimulate} disabled={false}>
                 <Icons.WorldSim className="w-4 h-4 mr-1.5" />
                 Simulate World

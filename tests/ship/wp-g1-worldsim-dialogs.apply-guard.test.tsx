@@ -33,9 +33,13 @@ const h = vi.hoisted(() => ({
     updateAdventure: vi.fn(),
 }));
 
-vi.mock('../../services/aiService', () => ({
-    generateWorldEvents: vi.fn(async () => h.events),
-}));
+vi.mock('../../services/aiService', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../../services/aiService')>();
+    return {
+        ...actual,
+        generateWorldEvents: vi.fn(async () => h.events),
+    };
+});
 
 vi.mock('../../services/campaignService', () => ({
     campaignService: {
@@ -142,5 +146,32 @@ describe('WorldSimulationWizard apply guards model-chosen field names', () => {
         const descWrites = h.updateNpc.mock.calls.filter(([, patch]) => patch && 'description' in patch);
         expect(descWrites).toHaveLength(0);
         expect(h.updateFaction).toHaveBeenCalledWith('fac-1', { goals: 'Control trade and the eastern road.' });
+    });
+
+    it('renders a non-string currentValue without crashing and never writes it (finding #5 important)', async () => {
+        // A model that returns an object for `currentValue` — generateWorldEvents'
+        // own filter would normally drop this before the wizard ever sees it, but
+        // this test mocks aiService.generateWorldEvents directly (as EvocationWizard's
+        // review pane render does not depend on that upstream filter), so the
+        // wizard's own render layer must not crash on a raw object child.
+        h.events = [
+            makeEvent([
+                { entityId: 'npc-1', entityType: 'npc', field: 'description', currentValue: { text: 'A weathered veteran.' } as any, proposedValue: 'A hunted veteran.' },
+            ]),
+        ];
+
+        render(
+            <WorldSimulationWizard
+                campaign={campaign}
+                isMockMode={true}
+                onClose={() => {}}
+                onApplyEvents={() => {}}
+            />
+        );
+        fireEvent.click(screen.getByRole('button', { name: /Simulate World/i }));
+
+        // Must not throw "Objects are not valid as a React child" — the review
+        // step must render normally.
+        expect(await screen.findByText(/The Circle Moves/i)).toBeTruthy();
     });
 });

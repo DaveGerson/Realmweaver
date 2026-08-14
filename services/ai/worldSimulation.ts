@@ -195,17 +195,24 @@ function entityExists(campaign: Campaign, entityType: string, entityId: string):
 /**
  * Validates a single model-supplied suggested update against the writable
  * field allowlist and the actual campaign data. Returns false for unknown
- * entity types, non-allowlisted (structural) fields, non-string proposed
- * values, or entity ids that don't exist in the campaign.
+ * entity types, non-allowlisted (structural) fields, non-string proposed OR
+ * current values, or entity ids that don't exist in the campaign.
+ *
+ * `currentValue` is checked alongside `proposedValue` (not just for the
+ * write) because the review pane renders both sides of the before/after
+ * diff — a model that returns an object/array for `currentValue` would
+ * otherwise survive filtering and crash the render before the DM can ever
+ * reach Apply (wp-g1-worldsim-dialogs finding #5).
  */
 export function isValidSuggestedUpdate(
   campaign: Campaign,
-  update: { entityId: string; entityType: string; field: string; proposedValue: unknown }
+  update: { entityId: string; entityType: string; field: string; currentValue?: unknown; proposedValue: unknown }
 ): boolean {
   const allowedFields = WORLD_SIM_WRITABLE_FIELDS[update.entityType];
   if (!allowedFields) return false;
   if (!allowedFields.includes(update.field)) return false;
   if (typeof update.proposedValue !== 'string') return false;
+  if ('currentValue' in update && typeof update.currentValue !== 'string') return false;
   if (!entityExists(campaign, update.entityType, update.entityId)) return false;
   return true;
 }
