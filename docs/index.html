@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Realmweaver — Forge Worlds. Run Legendary Sessions.</title>
+<meta name="description" content="Realmweaver is an AI-assisted campaign workshop for tabletop RPG Game Masters — build worlds, prep adventures, and run sessions from one dark, fast cockpit.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b1120;          /* deep slate */
+    --bg-2: #0f172a;        /* slate-900 */
+    --card: #1e293b;        /* slate-800 */
+    --card-2: #16203a;
+    --border: #334155;      /* slate-700 */
+    --text: #f1f5f9;        /* slate-100 */
+    --muted: #94a3b8;       /* slate-400 */
+    --amber: #fbbf24;       /* amber-400 */
+    --amber-deep: #d97706;  /* amber-600 */
+    --emerald: #34d399;
+    --violet: #a78bfa;
+    --sky: #38bdf8;
+    --rose: #fb7185;
+    --display: 'Cinzel', serif;
+    --body: 'Inter', system-ui, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+  ::selection { background: rgba(251,191,36,.35); }
+
+  /* ---- Star field ---- */
+  .stars {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(1px 1px at 12% 22%, rgba(255,255,255,.7) 50%, transparent 51%),
+      radial-gradient(1px 1px at 34% 8%,  rgba(255,255,255,.5) 50%, transparent 51%),
+      radial-gradient(2px 2px at 58% 31%, rgba(251,191,36,.55) 50%, transparent 51%),
+      radial-gradient(1px 1px at 71% 12%, rgba(255,255,255,.6) 50%, transparent 51%),
+      radial-gradient(1px 1px at 86% 26%, rgba(255,255,255,.45) 50%, transparent 51%),
+      radial-gradient(2px 2px at 22% 44%, rgba(167,139,250,.5) 50%, transparent 51%),
+      radial-gradient(1px 1px at 44% 57%, rgba(255,255,255,.5) 50%, transparent 51%),
+      radial-gradient(1px 1px at 66% 49%, rgba(255,255,255,.4) 50%, transparent 51%),
+      radial-gradient(2px 2px at 91% 62%, rgba(56,189,248,.5) 50%, transparent 51%),
+      radial-gradient(1px 1px at 8% 76%,  rgba(255,255,255,.5) 50%, transparent 51%),
+      radial-gradient(1px 1px at 39% 88%, rgba(255,255,255,.45) 50%, transparent 51%),
+      radial-gradient(2px 2px at 77% 84%, rgba(251,191,36,.4) 50%, transparent 51%);
+    animation: twinkle 7s ease-in-out infinite alternate;
+  }
+  @keyframes twinkle { from { opacity: .55; } to { opacity: 1; } }
+
+  .wrap { position: relative; z-index: 1; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+  /* ---- Hero ---- */
+  header {
+    min-height: 92vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; position: relative;
+    background:
+      radial-gradient(ellipse 80% 55% at 50% -10%, rgba(217,119,6,.22), transparent 65%),
+      radial-gradient(ellipse 60% 45% at 80% 110%, rgba(124,58,237,.14), transparent 60%);
+    padding: 96px 24px 72px;
+  }
+  .rune {
+    font-family: var(--display); font-weight: 700; letter-spacing: .35em;
+    color: var(--amber); text-transform: uppercase; font-size: .8rem;
+    border: 1px solid rgba(251,191,36,.35); border-radius: 999px;
+    padding: 8px 22px 8px 26px; margin-bottom: 32px;
+    background: rgba(251,191,36,.06);
+  }
+  h1 {
+    font-family: var(--display); font-weight: 900;
+    font-size: clamp(2.6rem, 7vw, 5rem); line-height: 1.08;
+    background: linear-gradient(180deg, #fff7e6 15%, var(--amber) 55%, var(--amber-deep) 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 0 60px rgba(251,191,36,.18);
+    margin-bottom: 22px;
+  }
+  .tagline {
+    font-size: clamp(1.05rem, 2.2vw, 1.35rem); color: var(--muted);
+    max-width: 620px; margin: 0 auto 40px;
+  }
+  .tagline strong { color: var(--text); font-weight: 600; }
+  .cta-row { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+  .btn {
+    display: inline-block; padding: 14px 32px; border-radius: 10px;
+    font-weight: 700; font-size: 1rem; text-decoration: none;
+    transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+  }
+  .btn-amber {
+    background: linear-gradient(180deg, var(--amber), var(--amber-deep));
+    color: #1c1204; box-shadow: 0 8px 30px rgba(217,119,6,.35);
+  }
+  .btn-amber:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(217,119,6,.5); }
+  .btn-ghost {
+    border: 1px solid var(--border); color: var(--text); background: rgba(30,41,59,.5);
+  }
+  .btn-ghost:hover { border-color: var(--amber); color: var(--amber); transform: translateY(-2px); }
+  .scroll-hint { position: absolute; bottom: 26px; color: var(--muted); font-size: 1.4rem; animation: bob 2s ease-in-out infinite; }
+  @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(8px); } }
+
+  /* ---- Sections ---- */
+  section { padding: 88px 0; }
+  .kicker {
+    font-family: var(--display); color: var(--amber); letter-spacing: .3em;
+    text-transform: uppercase; font-size: .78rem; font-weight: 700; text-align: center;
+    margin-bottom: 14px;
+  }
+  h2 {
+    font-family: var(--display); font-weight: 700; text-align: center;
+    font-size: clamp(1.7rem, 4vw, 2.5rem); margin-bottom: 18px;
+  }
+  .lede { text-align: center; color: var(--muted); max-width: 640px; margin: 0 auto 56px; }
+
+  /* ---- Feature grid ---- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+  .card {
+    background: linear-gradient(180deg, var(--card), var(--card-2));
+    border: 1px solid var(--border); border-radius: 14px; padding: 28px;
+    transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+  }
+  .card:hover { transform: translateY(-4px); border-color: rgba(251,191,36,.55); box-shadow: 0 14px 44px rgba(0,0,0,.45); }
+  .card .glyph {
+    width: 46px; height: 46px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    font-size: 1.35rem; margin-bottom: 18px; border: 1px solid;
+  }
+  .g-amber   { color: var(--amber);   border-color: rgba(251,191,36,.4);  background: rgba(251,191,36,.08); }
+  .g-emerald { color: var(--emerald); border-color: rgba(52,211,153,.4);  background: rgba(52,211,153,.08); }
+  .g-violet  { color: var(--violet);  border-color: rgba(167,139,250,.4); background: rgba(167,139,250,.08); }
+  .g-sky     { color: var(--sky);     border-color: rgba(56,189,248,.4);  background: rgba(56,189,248,.08); }
+  .g-rose    { color: var(--rose);    border-color: rgba(251,113,133,.4); background: rgba(251,113,133,.08); }
+  .card h3 { font-size: 1.12rem; margin-bottom: 8px; font-weight: 700; }
+  .card p { color: var(--muted); font-size: .95rem; }
+
+  /* ---- Stats band ---- */
+  .band {
+    background: linear-gradient(90deg, rgba(217,119,6,.12), rgba(124,58,237,.10));
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 24px; text-align: center; }
+  .stat b {
+    display: block; font-family: var(--display); font-size: clamp(2rem, 5vw, 2.9rem);
+    color: var(--amber); font-weight: 900; line-height: 1.1;
+  }
+  .stat span { color: var(--muted); font-size: .92rem; }
+
+  /* ---- Cockpit strip ---- */
+  .cockpit {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;
+  }
+  .tool {
+    border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px;
+    background: rgba(15,23,42,.8); display: flex; gap: 14px; align-items: flex-start;
+  }
+  .tool .dot { margin-top: 7px; width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .tool h4 { font-size: 1rem; margin-bottom: 4px; }
+  .tool p { color: var(--muted); font-size: .88rem; line-height: 1.5; }
+
+  /* ---- Durability ---- */
+  .vault { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+  .vault .card { padding: 24px; }
+  .vault h3 { font-size: 1rem; }
+  .vault h3::before { content: "⛨ "; color: var(--emerald); }
+
+  /* ---- Quickstart ---- */
+  pre {
+    background: #0a0f1e; border: 1px solid var(--border); border-radius: 12px;
+    padding: 24px 28px; overflow-x: auto; font-size: .92rem; line-height: 1.7;
+    max-width: 640px; margin: 0 auto;
+  }
+  code { font-family: 'SFMono-Regular', Consolas, monospace; color: #e2e8f0; }
+  .cmt { color: #64748b; } .amb { color: var(--amber); } .grn { color: var(--emerald); }
+
+  /* ---- Footer ---- */
+  footer {
+    border-top: 1px solid var(--border); padding: 44px 24px; text-align: center; color: var(--muted); font-size: .9rem;
+  }
+  footer a { color: var(--amber); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  .sig { font-family: var(--display); letter-spacing: .2em; color: var(--amber); margin-bottom: 10px; }
+
+  /* ---- Reveal on scroll ---- */
+  .reveal { opacity: 0; transform: translateY(24px); transition: opacity .6s ease, transform .6s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; transition: none; }
+    .stars, .scroll-hint { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="stars" aria-hidden="true"></div>
+<div class="wrap">
+
+  <header>
+    <div class="rune">The GM's Forge</div>
+    <h1>Realmweaver</h1>
+    <p class="tagline">Forge worlds. Prep adventures. Run <strong>legendary sessions</strong> — with an AI co-conspirator that knows your whole campaign.</p>
+    <div class="cta-row">
+      <a class="btn btn-amber" href="https://github.com/DaveGerson/Realmweaver">Enter the Forge ↗</a>
+      <a class="btn btn-ghost" href="#features">Explore the Craft</a>
+    </div>
+    <div class="scroll-hint" aria-hidden="true">▾</div>
+  </header>
+
+  <section id="features">
+    <div class="container">
+      <div class="kicker reveal">Worldbuilding</div>
+      <h2 class="reveal">Everything your realm remembers</h2>
+      <p class="lede reveal">Twelve interlinked entity types — NPCs, locations, factions, items, adventures, lore, plots, secrets and more — woven together by smart linking, backlinks and @-mentions.</p>
+      <div class="grid">
+        <div class="card reveal">
+          <div class="glyph g-amber">✦</div>
+          <h3>AI-Forged Entities</h3>
+          <p>Describe an NPC, a faction, a cursed blade — Realmweaver generates it in full, grounded in your campaign's own context so nothing contradicts your canon.</p>
+        </div>
+        <div class="card reveal">
+          <div class="glyph g-emerald">🗺</div>
+          <h3>Living Locations</h3>
+          <p>Nested location hierarchies with connections, points of interest and loot — plus cycle detection so your dungeon can't contain itself.</p>
+        </div>
+        <div class="card reveal">
+          <div class="glyph g-violet">⚔</div>
+          <h3>Factions &amp; Intrigue</h3>
+          <p>Bidirectional membership, leaders, headquarters and goals. The relationship graph renders the whole web of alliances and grudges.</p>
+        </div>
+        <div class="card reveal">
+          <div class="glyph g-sky">🔗</div>
+          <h3>Smart Linking</h3>
+          <p>@-mention any entity from any text field. Backlinks, quick cards and a command palette keep every thread of your world one keystroke away.</p>
+        </div>
+        <div class="card reveal">
+          <div class="glyph g-rose">📜</div>
+          <h3>Plots &amp; Timelines</h3>
+          <p>Track arcs across sessions with the plot timeline, session logs with AI scribe, and a continuity checker that flags contradictions before your players do.</p>
+        </div>
+        <div class="card reveal">
+          <div class="glyph g-amber">🜂</div>
+          <h3>World Simulation</h3>
+          <p>Advance the world between sessions: the simulation wizard proposes off-screen events — every change reviewed and approved by you before it touches canon.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="band">
+    <section>
+      <div class="container stats">
+        <div class="stat reveal"><b>990</b><span>unit &amp; component tests</span></div>
+        <div class="stat reveal"><b>124</b><span>hardening fixes shipped</span></div>
+        <div class="stat reveal"><b>15</b><span>end-to-end suites</span></div>
+        <div class="stat reveal"><b>12</b><span>interlinked entity types</span></div>
+      </div>
+    </section>
+  </div>
+
+  <section>
+    <div class="container">
+      <div class="kicker reveal">Session Night</div>
+      <h2 class="reveal">A cockpit built for the table</h2>
+      <p class="lede reveal">When the party sits down, Realmweaver switches from workshop to war room.</p>
+      <div class="cockpit">
+        <div class="tool reveal"><span class="dot" style="background:var(--amber)"></span><div><h4>Session Runner</h4><p>Planned scenes, NPC &amp; location rosters from your prep wizard, running log and scratchpad — all one screen.</p></div></div>
+        <div class="tool reveal"><span class="dot" style="background:var(--rose)"></span><div><h4>Combat Tracker</h4><p>Initiative, HP, conditions and round math that survives mid-fight sorting. Fully keyboard-accessible.</p></div></div>
+        <div class="tool reveal"><span class="dot" style="background:var(--sky)"></span><div><h4>Dice &amp; Tables</h4><p>A full dice roller and AI-generated rollable tables, logged straight into the session record.</p></div></div>
+        <div class="tool reveal"><span class="dot" style="background:var(--violet)"></span><div><h4>Secrets Tracker</h4><p>Who knows what — and when they learned it. Reveal secrets on cue and let the log remember for you.</p></div></div>
+        <div class="tool reveal"><span class="dot" style="background:var(--emerald)"></span><div><h4>DM Coach</h4><p>Instant improv help: names, read-alouds, complications and rulings, styled to how <em>you</em> run the table.</p></div></div>
+        <div class="tool reveal"><span class="dot" style="background:var(--amber)"></span><div><h4>Session End Wizard</h4><p>Wrap the night with an AI-drafted recap, loose ends and a player-facing summary — saved, not lost.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="container">
+      <div class="kicker reveal">Built Like a Vault</div>
+      <h2 class="reveal">Your world doesn't get lost</h2>
+      <p class="lede reveal">A year of worldbuilding deserves paranoid engineering. The persistence layer was hardened end-to-end and is guarded by hundreds of regression tests.</p>
+      <div class="vault">
+        <div class="card reveal"><h3>Rotating backups</h3><p>Every save rotates a three-deep, per-key backup buffer. Corrupted data triggers automatic recovery — never deletion.</p></div>
+        <div class="card reveal"><h3>Crash-proof autosave</h3><p>Debounced saves with a hard max-wait, flushed synchronously on tab close — a browser crash costs you seconds, not sessions.</p></div>
+        <div class="card reveal"><h3>Multi-tab safety</h3><p>Editing in two tabs? Realmweaver detects the conflict, blocks silent clobbering and lets you choose which reality wins.</p></div>
+        <div class="card reveal"><h3>Honest save status</h3><p>Storage full? Saves fall back to IndexedDB and the indicator only reports success once the write is durably confirmed.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="container">
+      <div class="kicker reveal">Begin</div>
+      <h2 class="reveal">Summon your first realm</h2>
+      <p class="lede reveal">React 19 · TypeScript · Vite · Claude — running locally, your world stays yours.</p>
+      <pre class="reveal"><code><span class="cmt"># clone the forge</span>
+git clone https://github.com/DaveGerson/Realmweaver.git
+cd Realmweaver
+
+<span class="cmt"># light the fires</span>
+npm install
+npm run dev          <span class="cmt"># → http://localhost:4200</span>
+
+<span class="cmt"># prove the wards hold</span>
+npm test             <span class="grn"># 990 passing</span>
+npm run test:e2e     <span class="cmt"># Playwright</span></code></pre>
+    </div>
+  </section>
+
+  <footer>
+    <div class="sig">✦ REALMWEAVER ✦</div>
+    <p>An AI-assisted campaign workshop for Game Masters.<br>
+    <a href="https://github.com/DaveGerson/Realmweaver">Source on GitHub</a> · Built with React 19, TypeScript &amp; Claude.</p>
+  </footer>
+</div>
+
+<script>
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+</script>
+</body>
+</html>
