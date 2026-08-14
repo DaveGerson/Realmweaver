@@ -85,7 +85,7 @@ describe('AI proxy stdin error handling — finding #31', () => {
     expect(res.json().error).toMatch(/EPIPE|pipe|stdin|write/i);
   });
 
-  it('does not write to a stdin pipe that is already destroyed', async () => {
+  it('does not write to a stdin pipe that is already destroyed, and settles the request immediately instead of hanging', async () => {
     const child = new FakeChild();
     child.stdin.destroyed = true;
     h.state.child = child;
@@ -101,5 +101,14 @@ describe('AI proxy stdin error handling — finding #31', () => {
     await waitFor(() => child.stdin.write.mock.calls.length > 0, 100);
 
     expect(child.stdin.write).not.toHaveBeenCalled();
+
+    // Previously this branch never settled the promise, leaving the client
+    // hanging until 'close' / child 'error' / the 120s spawn timeout fired.
+    // It must now reject right away with a clear error, independent of any
+    // other event source on `child`.
+    await waitFor(() => res.ended, 200);
+    expect(res.ended).toBe(true);
+    expect(res.statusCode).toBeGreaterThanOrEqual(500);
+    expect(res.json().error).toMatch(/stdin/i);
   });
 });

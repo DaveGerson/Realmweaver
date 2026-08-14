@@ -12,20 +12,25 @@
 
 - **Frontend:** React 19.2.0 + TypeScript 5.8.2, Vite 6.2.0
 - **AI:** Claude Code CLI (via `vite-plugin-ai-proxy.ts`) / Anthropic REST API (future)
-- **Styling:** Tailwind CSS (CDN via index.html), tailwind-merge
+- **Styling:** Tailwind CSS (build-time, via `@tailwindcss/vite` — `index.css`), tailwind-merge
 - **State:** Custom store with Immer (`services/campaignService.ts`)
 - **Icons:** Lucide React via `components/common/Icons.tsx`
-- **Visualization:** React Flow 11.10.1, Dagre 0.8.5, D3 7.8.5
+- **Visualization:** D3 7.8.5
 - **Testing:** Vitest (unit) + Playwright (E2E)
 
 ### Quick Start
 
 ```bash
-npm install && npm run dev    # http://localhost:3000
-npm run build                 # Production build
+npm install && npm run dev    # http://localhost:4200
+npm run build                 # Typecheck + production bundle
 npm test                      # Vitest unit tests
 npm run test:e2e              # Playwright E2E
 ```
+
+**Runtime / deploy story:** `npm run dev` (or `npm run preview` after `npm run build`) IS the
+runtime — `vite-plugin-ai-proxy.ts` adds `/api/ai/*` as Vite dev/preview server middleware, so a
+live Vite process is required for AI generation to work. A statically hosted `dist/` (no Vite
+process behind it) has no AI backend at all; every `/api/ai/*` call 404s.
 
 Create `.env.local`:
 ```env

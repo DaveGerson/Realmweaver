@@ -242,7 +242,7 @@ describe('AI proxy — error mapping', () => {
 });
 
 describe('AI proxy — health endpoint', () => {
-  it('reports the configured provider and CLI path', () => {
+  it('reports the configured provider for a legitimate local request', () => {
     const handler = routeFor(mountDevServer(aiProxyPlugin()), '/api/ai/health');
     const req = new FakeReq({ method: 'GET', url: '/api/ai/health' });
     const res = new FakeRes();
@@ -250,5 +250,30 @@ describe('AI proxy — health endpoint', () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ status: 'ok', provider: 'claude-cli' });
+  });
+
+  it('does not disclose CLAUDE_CLI_PATH in the response body', () => {
+    const handler = routeFor(mountDevServer(aiProxyPlugin()), '/api/ai/health');
+    const req = new FakeReq({ method: 'GET', url: '/api/ai/health' });
+    const res = new FakeRes();
+    handler(req, res);
+
+    expect(res.json()).not.toHaveProperty('cli');
+  });
+
+  it('gates the health endpoint the same way as /api/ai/generate — finding #30 minor', () => {
+    const handler = routeFor(mountDevServer(aiProxyPlugin()), '/api/ai/health');
+
+    // Forged Origin/Host from a real LAN peer, mirroring the #30 repro.
+    const req = new FakeReq({
+      method: 'GET',
+      url: '/api/ai/health',
+      headers: authorizedHeaders(),
+      socket: { remoteAddress: '192.0.2.2' },
+    });
+    const res = new FakeRes();
+    handler(req, res);
+
+    expect(res.statusCode).toBe(403);
   });
 });

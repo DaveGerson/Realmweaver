@@ -20,10 +20,12 @@ import {
   FakeReq,
   FakeRes,
   authorizedHeaders,
+  extractProxyToken,
   mountDevServer,
   routeFor,
   waitFor,
 } from './wp-i1-ai-proxy.harness';
+import { PROXY_TOKEN_HEADER } from '../../vite-plugin-ai-proxy';
 
 const h = vi.hoisted(() => {
   const state = {
@@ -136,5 +138,126 @@ describe('AI proxy origin guard — finding #30', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json().result).toBe('pwned');
     expect(h.state.execFileCalls).toHaveLength(1);
+  });
+
+  it('rejects a request forging BOTH Origin and Host from a real LAN peer — the exact #30 reproduction', async () => {
+    const handler = generateRoute();
+    // This is the verifier's live repro: server bound to 0.0.0.0
+    // (REALMWEAVER_DEV_HOST=0.0.0.0), attacker on the LAN forges Origin AND
+    // Host to read as localhost. Headers are fully attacker-controlled, but
+    // `req.socket.remoteAddress` is the real TCP peer and is NOT — it's set
+    // by the kernel from the actual connection, not by anything the client
+    // sends.
+    const req = new FakeReq({
+      headers: authorizedHeaders(), // forged Origin: localhost, Host: localhost
+      socket: { remoteAddress: '192.0.2.2' }, // real LAN peer address
+    });
+    const res = new FakeRes();
+
+    handler(req, res);
+    req.sendJson(BODY);
+    await waitFor(() => res.ended);
+
+    expect(res.statusCode).toBe(403);
+    expect(h.state.execFileCalls).toHaveLength(0);
+    expect(h.state.spawnCalls).toHaveLength(0);
+  });
+
+  it('rejects a request whose Host is a bracketed non-localhost IPv6 address even with forged Origin', async () => {
+    const handler = generateRoute();
+    const req = new FakeReq({
+      headers: { ...authorizedHeaders(), host: '[2001:db8::1]:4200' },
+    });
+    const res = new FakeRes();
+
+    handler(req, res);
+    req.sendJson(BODY);
+    await waitFor(() => res.ended);
+
+    expect(res.statusCode).toBe(403);
+    expect(h.state.execFileCalls).toHaveLength(0);
+  });
+
+  it('accepts a bracketed IPv6 loopback Host ([::1]:port)', async () => {
+    const handler = generateRoute();
+    const req = new FakeReq({
+      headers: { origin: 'http://localhost:4200', host: '[::1]:4200' },
+    });
+    const res = new FakeRes();
+
+    handler(req, res);
+    req.sendJson({ prompt: 'Describe a tavern', outputFormat: 'json' });
+    await waitFor(() => res.ended);
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('accepts a bare (bracket-less) IPv6 loopback Host (::1) without mangling the port strip', async () => {
+    const handler = generateRoute();
+    const req = new FakeReq({
+      headers: { origin: 'http://localhost:4200', host: '::1' },
+    });
+    const res = new FakeRes();
+
+    handler(req, res);
+    req.sendJson({ prompt: 'Describe a tavern', outputFormat: 'json' });
+    await waitFor(() => res.ended);
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('rejects the historically-loose ALLOWED_HOST_RE forms: unbalanced brackets', async () => {
+    const handler = generateRoute();
+    for (const host of ['[::1', '::1]']) {
+      const req = new FakeReq({ headers: { ...authorizedHeaders(), host } });
+      const res = new FakeRes();
+      handler(req, res);
+      req.sendJson(BODY);
+      await waitFor(() => res.ended);
+      expect(res.statusCode).toBe(403);
+    }
+  });
+
+  describe('per-session proxy token (X-Realmweaver-Token)', () => {
+    it('exposes a stable token via transformIndexHtml for the page to read', () => {
+      const plugin = aiProxyPlugin();
+      const token = extractProxyToken(plugin);
+      expect(typeof token).toBe('string');
+      expect(token.length).toBeGreaterThanOrEqual(32);
+      // Same plugin instance -> same token on repeated reads.
+      expect(extractProxyToken(plugin)).toBe(token);
+    });
+
+    it('rejects a request carrying the WRONG token even though Origin/Host/peer are all valid', async () => {
+      const handler = generateRoute();
+      const req = new FakeReq({
+        headers: { ...authorizedHeaders(), [PROXY_TOKEN_HEADER]: 'not-the-real-token' },
+      });
+      const res = new FakeRes();
+
+      handler(req, res);
+      req.sendJson(BODY);
+      await waitFor(() => res.ended);
+
+      expect(res.statusCode).toBe(403);
+      expect(h.state.execFileCalls).toHaveLength(0);
+    });
+
+    it('serves a request carrying the CORRECT token', async () => {
+      const plugin = aiProxyPlugin();
+      const token = extractProxyToken(plugin);
+      const routes = mountDevServer(plugin);
+      const handler = routeFor(routes, '/api/ai/generate');
+      const req = new FakeReq({
+        headers: { ...authorizedHeaders(), [PROXY_TOKEN_HEADER]: token },
+      });
+      const res = new FakeRes();
+
+      handler(req, res);
+      req.sendJson({ prompt: 'Describe a tavern', outputFormat: 'json' });
+      await waitFor(() => res.ended);
+
+      expect(res.statusCode).toBe(200);
+    });
   });
 });

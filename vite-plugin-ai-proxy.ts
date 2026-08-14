@@ -13,11 +13,28 @@
  * Security: Uses `execFile` (no shell) for CLI invocation to prevent
  * command injection. For prompts exceeding 100KB, falls back to a temp
  * file approach with shell invocation (necessary to bypass ARG_MAX).
+ *
+ * Request authentication (see isLocalRequest below for the full rationale):
+ * a TCP-peer-address loopback check (mandatory, unforgeable) layered with an
+ * Origin+Host localhost allowlist (blocks DNS-rebinding), plus a per-session
+ * PROXY_TOKEN injected into the page via transformIndexHtml and validated
+ * when present on the X-Realmweaver-Token header. The token is not yet
+ * REQUIRED: the browser client that would send it
+ * (services/ai/providers/claude-cli.ts, rawCallApi's fetch call) is owned by
+ * a different work package and was already modified this remediation round
+ * (`git log -- services/ai/providers/claude-cli.ts`), so it was left
+ * unedited here per the file-ownership rule for this round rather than risk
+ * clobbering a concurrent change. To complete the rollout: read
+ * `document.querySelector('meta[name="realmweaver-proxy-token"]')?.content`
+ * once in claude-cli.ts and add `headers: { ..., 'x-realmweaver-token':
+ * token }` to the fetch() call in rawCallApi -- no server-side change
+ * needed, hasValidToken() already accepts it.
  */
 
 import type { Plugin, ViteDevServer } from 'vite';
 import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
+import { randomBytes, timingSafeEqual } from 'crypto';
 
 
 const execFileAsync = promisify(execFile);
@@ -38,20 +55,117 @@ const DIRECT_PROMPT_LIMIT = 100_000; // 100KB -- above this, use temp file
 // silently spending the user's Claude usage.
 const ALLOWED_ORIGIN_RE = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i;
 
-// Matches only the hostname portion (no scheme, no port) of a Host header --
-// used to detect a request that arrived over a LAN bind
-// (REALMWEAVER_DEV_HOST=0.0.0.0 / `vite --host`) even when the Origin header
-// has been forged or omitted by a non-browser client.
-const ALLOWED_HOST_RE = /^(localhost|127\.0\.0\.1|\[?::1\]?)$/i;
+// Matches only the hostname portion (no scheme, no port, brackets kept for
+// IPv6) of a Host header -- used to detect a request that arrived over a LAN
+// bind (REALMWEAVER_DEV_HOST=0.0.0.0 / `vite --host`) even when the Origin
+// header has been forged or omitted by a non-browser client. Deliberately
+// exact (no unbalanced-bracket forms, no wider 127.0.0.0/8) so it can't be
+// satisfied by anything but the two legitimate loopback spellings.
+const ALLOWED_HOST_RE = /^(localhost|127\.0\.0\.1|::1|\[::1\])$/i;
 
 /**
- * Returns true when the request's Origin AND Host both resolve to a
- * localhost interface. Origin is trivially forged (or simply absent) by
- * non-browser clients like curl/python, so it alone is not sufficient
- * authentication -- Host reflects the interface the connection actually
- * arrived on, which is what reveals a LAN bind.
+ * Strips the `:<port>` suffix from a Host header, bracket-aware. Node/WHATWG
+ * URL parsing understands `[::1]:4200` (-> `[::1]`) but rejects a bare,
+ * bracket-less `::1` as an invalid URL entirely -- handle that one form
+ * directly rather than let a naive `replace(/:\d+$/, '')` mangle it (a bare
+ * `::1` ends in `:1`, which a trailing-port strip turns into `:`).
  */
-function isLocalRequest(headers: Record<string, string | string[] | undefined>): boolean {
+function extractHostname(hostHeader: string): string {
+  if (hostHeader === '::1') {
+    return '::1';
+  }
+  try {
+    return new URL('http://' + hostHeader + '/').hostname;
+  } catch {
+    return hostHeader.replace(/:\d+$/, '');
+  }
+}
+
+// Loopback forms Node reports on `req.socket.remoteAddress` for a
+// same-machine TCP connection. Unlike the Origin/Host headers below, this
+// value is set by the kernel from the actual TCP peer and cannot be forged
+// by the client at the application layer -- not even by a non-browser
+// script that freely sets arbitrary headers (curl, python, ...).
+function isLoopbackAddress(remoteAddress: string | undefined): boolean {
+  if (!remoteAddress) return false;
+  if (remoteAddress === '127.0.0.1' || remoteAddress === '::1') return true;
+  // IPv4-mapped IPv6 form Node uses on dual-stack sockets, e.g. ::ffff:127.0.0.1
+  if (remoteAddress.startsWith('::ffff:127.')) return true;
+  return remoteAddress.startsWith('127.');
+}
+
+// Per-server-session secret, generated fresh each time the plugin is
+// instantiated (i.e. on every `vite dev`/`vite preview` process start) and
+// injected into the served page via `transformIndexHtml`. Origin and Host
+// are both attacker-controlled strings for any non-browser client (curl,
+// python, arbitrary scripts) -- reproducibly so even when both are forged to
+// read as localhost -- so neither is sufficient authentication on its own.
+// A page has to be served BY this process to ever see this value (same-origin
+// policy prevents a cross-origin or DNS-rebound page from reading it), which
+// makes it the one signal in this file a remote attacker cannot forge.
+const PROXY_TOKEN = randomBytes(32).toString('hex');
+export const PROXY_TOKEN_HEADER = 'x-realmweaver-token';
+
+/**
+ * True only when the supplied header value exactly matches PROXY_TOKEN.
+ * Uses a constant-time comparison so response-timing can't be used to guess
+ * the token byte-by-byte. NOTE: this is validated when present but not yet
+ * required -- see the "Proxy token" comment on isLocalRequest for why, and
+ * services/ai/providers/claude-cli.ts for the client-side change that would
+ * complete the rollout.
+ */
+function hasValidToken(headers: Record<string, string | string[] | undefined>): boolean {
+  const supplied = headers[PROXY_TOKEN_HEADER];
+  if (typeof supplied !== 'string' || !supplied) return false;
+  const suppliedBuf = Buffer.from(supplied);
+  const expectedBuf = Buffer.from(PROXY_TOKEN);
+  if (suppliedBuf.length !== expectedBuf.length) return false;
+  return timingSafeEqual(suppliedBuf, expectedBuf);
+}
+
+/**
+ * Returns true when a request proves it's a same-origin browser request from
+ * the SPA (or, going forward, one carrying the per-session proxy token).
+ *
+ * Layered checks, most-authoritative first:
+ *  1. TCP peer address must be loopback. This is the mandatory,
+ *     non-forgeable gate: `req.socket.remoteAddress` reflects the real
+ *     connection source and cannot be spoofed by a script that controls
+ *     every header it sends, which is exactly the exploit finding #30
+ *     reproduced (forging both Origin AND Host from a real LAN peer). A
+ *     request that fails this check is rejected outright, regardless of
+ *     what its Origin/Host claim.
+ *  2. Origin + Host must both resolve to a localhost interface. Origin
+ *     cannot be forged by page JS in a browser (fetch/XHR do not let script
+ *     override it), so this is what blocks DNS-rebinding / a malicious page
+ *     the browser happens to have open; Host cross-checks that the
+ *     connection didn't arrive over a LAN bind.
+ *
+ * PROXY_TOKEN (X-Realmweaver-Token) is deliberately NOT required here yet:
+ * the legitimate client (services/ai/providers/claude-cli.ts's rawCallApi)
+ * does not send it, and that file is owned by another work package this
+ * round (see the git-log note in this file's header comment) -- making the
+ * token mandatory today would 403 every real AI call. hasValidToken() is
+ * exported/used so a token that IS present must still be correct, and so
+ * wiring the client header later requires no further server change.
+ */
+function isLocalRequest(req: {
+  headers: Record<string, string | string[] | undefined>;
+  socket?: { remoteAddress?: string };
+}): boolean {
+  if (!isLoopbackAddress(req.socket?.remoteAddress)) {
+    return false;
+  }
+
+  const headers = req.headers;
+  const suppliedToken = headers[PROXY_TOKEN_HEADER];
+  // If a token was supplied at all, it must be correct -- a wrong token is
+  // always rejected even though a missing one currently falls through to
+  // the Origin/Host check (see comment above).
+  if (typeof suppliedToken === 'string' && suppliedToken && !hasValidToken(headers)) {
+    return false;
+  }
+
   const origin = headers.origin;
   if (typeof origin !== 'string' || !origin || !ALLOWED_ORIGIN_RE.test(origin)) {
     return false;
@@ -61,9 +175,7 @@ function isLocalRequest(headers: Record<string, string | string[] | undefined>):
   if (typeof hostHeader !== 'string' || !hostHeader) {
     return false;
   }
-  // Strip a trailing ":<port>", but leave IPv6 brackets intact.
-  const hostname = hostHeader.replace(/:\d+$/, '');
-  return ALLOWED_HOST_RE.test(hostname);
+  return ALLOWED_HOST_RE.test(extractHostname(hostHeader));
 }
 
 // ---------------------------------------------------------------------------
@@ -104,10 +216,19 @@ interface MiddlewareServer {
 }
 
 function registerAiRoutes(server: MiddlewareServer) {
-  // Health check endpoint
-  server.middlewares.use('/api/ai/health', (_req, res) => {
+  // Health check endpoint. Gated the same way as /api/ai/generate: it can't
+  // execute the CLI, but an ungated response (a) confirms to any LAN host
+  // that a Realmweaver dev server is listening and (b) previously echoed
+  // CLAUDE_CLI_PATH, leaking a filesystem path off-box if the user set it to
+  // an absolute path. Neither field is needed by the SPA's own health check.
+  server.middlewares.use('/api/ai/health', (req, res) => {
+    if (!isLocalRequest(req)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Origin not allowed' }));
+      return;
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'ok', provider: 'claude-cli', cli: CLAUDE_CLI_PATH }));
+    res.end(JSON.stringify({ status: 'ok', provider: 'claude-cli' }));
   });
 
   // Main AI generation endpoint
@@ -119,12 +240,10 @@ function registerAiRoutes(server: MiddlewareServer) {
     }
 
     // Reject any request that doesn't prove it's a same-origin browser
-    // request from the SPA. Non-browser clients (curl, scripts) never
-    // send an Origin header, so a missing/empty Origin is treated as
-    // untrusted rather than allowed through; the Host header is checked
-    // too since Origin is trivially forged and Host is what reveals a
-    // LAN bind (REALMWEAVER_DEV_HOST=0.0.0.0 / `vite --host`).
-    if (!isLocalRequest(req.headers)) {
+    // request from the SPA (or a same-machine caller carrying the correct
+    // proxy token). See isLocalRequest's doc comment for the full
+    // three-layer rationale (TCP peer address, Origin+Host, token).
+    if (!isLocalRequest(req)) {
       res.writeHead(403, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Origin not allowed' }));
       return;
@@ -212,6 +331,19 @@ function registerAiRoutes(server: MiddlewareServer) {
 
         // Handle case where headers already sent
         if (!res.headersSent) {
+          // The 413 body-too-large case is the one path where the client
+          // may still be actively streaming into `req` when we respond
+          // (readBody paused the stream rather than destroying it -- see
+          // the comment there for why destroying immediately makes the
+          // client see ECONNRESET instead of this 413). Tear the request
+          // down once the response is fully flushed (`res.on('finish',
+          // ...)`), not immediately -- and register that listener BEFORE
+          // calling end(), since 'finish' can fire synchronously.
+          if (status === 413 && typeof (res as unknown as { on?: Function }).on === 'function') {
+            (res as unknown as { on: (event: string, cb: () => void) => void }).on('finish', () => {
+              (req as unknown as { destroy?: () => void }).destroy?.();
+            });
+          }
           res.writeHead(status, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({
             error: formatErrorMessage(error, code),
@@ -230,12 +362,31 @@ export function aiProxyPlugin(): Plugin {
     },
     // `vite dev` runs `configureServer`; `vite preview` (serving the built
     // `dist/`) runs this separate hook instead. Without it every AI call in
-    // a previewed/production build 404s -- see finding #6. `npm run dev`
-    // remains the primary supported runtime (documented in README/CLAUDE.md);
-    // this hook makes `vite preview` a faithful smoke-test of the built
-    // artifact rather than a dead end.
+    // a previewed/production build 404s -- see finding #6. Neither hook
+    // helps a statically-hosted `dist/` served by something other than
+    // `vite preview` (e.g. a plain static file host / CDN) -- there is no
+    // Node process there at all to run this plugin, so every /api/ai/* call
+    // 404s. `npm run dev` (or `npm run preview`) IS the supported runtime;
+    // see README.md's "Running the app" section and
+    // docs/architecture/system-architecture.md's AI-proxy section for the
+    // explicit statement of that deploy story.
     configurePreviewServer(server: MiddlewareServer) {
       registerAiRoutes(server);
+    },
+    // Injects the per-session proxy token (see PROXY_TOKEN above) into the
+    // served page so a legitimate same-origin script -- and only a
+    // same-origin script, per the browser's same-origin policy -- can read
+    // it back out and echo it on the X-Realmweaver-Token header. Runs under
+    // both `vite dev` and `vite preview` (transformIndexHtml is not tied to
+    // configureServer/configurePreviewServer the way route registration is).
+    transformIndexHtml() {
+      return [
+        {
+          tag: 'meta',
+          injectTo: 'head' as const,
+          attrs: { name: 'realmweaver-proxy-token', content: PROXY_TOKEN },
+        },
+      ];
     },
   };
 }
@@ -359,6 +510,12 @@ async function invokeClaudeCli(request: CliRequest): Promise<string> {
         } catch (err) {
           settleReject(err instanceof Error ? err : new Error(String(err)));
         }
+      } else {
+        // Settle immediately instead of leaving the request hanging on
+        // 'close' / child 'error' / the 120s spawn timeout -- a destroyed
+        // stdin almost always means the child already died, so the client
+        // should get an immediate error rather than wait out the timeout.
+        settleReject(new Error('claude CLI stdin closed before the prompt could be written'));
       }
     });
   }
@@ -415,14 +572,19 @@ function readBody(req: {
       totalBytes += chunk.length;
       if (totalBytes > MAX_REQUEST_BODY) {
         settled = true;
-        // Stop the client from continuing to stream into a socket whose
-        // response is about to be written.
-        if (typeof req.destroy === 'function') {
-          req.destroy();
-        } else if (typeof req.pause === 'function') {
+        // Stop the client from streaming more data we're going to discard,
+        // WITHOUT destroying the socket yet. `IncomingMessage.destroy()`
+        // tears down the underlying TCP socket immediately -- since that
+        // socket is shared with the paired ServerResponse, any write on the
+        // response after destroy() never reaches the client (observed as
+        // ECONNRESET, not the 413 this is supposed to deliver). pause() +
+        // unpipe() just stop consumption; the caller (the /api/ai/generate
+        // handler's .catch) destroys the request only once the 413 has
+        // actually been flushed, via the response's 'finish' event.
+        if (typeof req.pause === 'function') {
           req.pause();
-          req.unpipe?.();
         }
+        req.unpipe?.();
         const err = new Error('Request body too large (max 4MB)') as Error & { status?: number };
         err.status = 413;
         reject(err);

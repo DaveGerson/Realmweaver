@@ -29,7 +29,7 @@ export function authorizedHeaders(): Record<string, string> {
   };
 }
 
-export class FakeRes {
+export class FakeRes extends EventEmitter {
   statusCode = 0;
   headers: Record<string, string> = {};
   body = '';
@@ -38,7 +38,30 @@ export class FakeRes {
   endCount = 0;
   writeHeadCount = 0;
 
+  /**
+   * Request whose `destroyed` flag this response respects. Mirrors real
+   * Node: `IncomingMessage.destroy()` tears down the shared underlying
+   * socket, so any subsequent write on the *paired* `ServerResponse` never
+   * reaches the client. Link right after constructing both fakes via
+   * `res.attach(req)` so a fix that destroys the request before flushing
+   * the response fails this fake exactly like it fails a real socket
+   * (finding #89).
+   */
+  private linkedReq: { destroyed: boolean } | null = null;
+
+  attach(req: { destroyed: boolean }) {
+    this.linkedReq = req;
+    return this;
+  }
+
+  private assertSocketAlive() {
+    if (this.linkedReq?.destroyed) {
+      throw new Error('ECONNRESET: write after underlying request socket was destroyed');
+    }
+  }
+
   writeHead(status: number, headers?: Record<string, string>) {
+    this.assertSocketAlive();
     this.writeHeadCount += 1;
     if (this.headersSent) {
       // Mirrors node: writing headers twice is a hard error.
@@ -55,14 +78,20 @@ export class FakeRes {
   }
 
   write(chunk: string) {
+    this.assertSocketAlive();
     this.body += chunk;
     return true;
   }
 
   end(chunk?: string) {
+    this.assertSocketAlive();
     if (chunk) this.body += chunk;
     this.ended = true;
     this.endCount += 1;
+    // Real http.ServerResponse emits 'finish' once the response has been
+    // fully flushed to the client -- a correct fix defers any request-side
+    // teardown (e.g. req.destroy()) until after this event.
+    this.emit('finish');
   }
 
   json(): any {
@@ -74,6 +103,14 @@ export class FakeReq extends EventEmitter {
   method: string;
   url: string;
   headers: Record<string, string | undefined>;
+  /**
+   * Mirrors Node's `IncomingMessage.socket`. Defaults to a loopback peer
+   * address so every existing suite (which represents a legitimate
+   * same-machine request) keeps passing the TCP-peer-address gate added
+   * for finding #30; tests exercising the LAN/forged-header exploit pass
+   * an explicit non-loopback `socket.remoteAddress`.
+   */
+  socket: { remoteAddress?: string };
   destroyed = false;
   paused = false;
   destroy = vi.fn(() => {
@@ -88,11 +125,13 @@ export class FakeReq extends EventEmitter {
     method?: string;
     url?: string;
     headers?: Record<string, string | undefined>;
+    socket?: { remoteAddress?: string };
   } = {}) {
     super();
     this.method = opts.method ?? 'POST';
     this.url = opts.url ?? '/api/ai/generate';
     this.headers = opts.headers ?? authorizedHeaders();
+    this.socket = opts.socket ?? { remoteAddress: '127.0.0.1' };
   }
 
   /** Streams a JSON body and closes the stream. */
@@ -193,6 +232,30 @@ export class FakeStdin extends EventEmitter {
     }
     return true;
   });
+}
+
+/**
+ * Extracts the per-server-session token the plugin injects via
+ * `transformIndexHtml` (finding #30's non-forgeable-third-factor mitigation).
+ * Real Vite invokes this hook with `(html, ctx)`; tests only care about the
+ * returned tag list, so both call shapes (bare array, or `{ html, tags }`)
+ * are handled.
+ */
+export function extractProxyToken(plugin: any): string {
+  const hook = plugin.transformIndexHtml;
+  const fn = typeof hook === 'function' ? hook : hook?.handler ?? hook?.transform;
+  if (typeof fn !== 'function') {
+    throw new Error('plugin has no transformIndexHtml hook');
+  }
+  const result = fn('<html></html>', {} as any);
+  const tags = Array.isArray(result) ? result : result?.tags;
+  const metaTag = (tags || []).find(
+    (t: any) => t?.tag === 'meta' && t?.attrs?.name === 'realmweaver-proxy-token'
+  );
+  if (!metaTag) {
+    throw new Error('proxy token meta tag not found in transformIndexHtml output');
+  }
+  return metaTag.attrs.content;
 }
 
 /** A fake ChildProcess good enough for the spawn() path of invokeClaudeCli. */

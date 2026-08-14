@@ -37,7 +37,7 @@ RealmWeaver is a single-page application for tabletop RPG Game Masters who want 
 git clone <repository-url>
 cd Realmweaver
 npm install
-npm run dev      # http://localhost:3000
+npm run dev      # http://localhost:4200
 ```
 
 The app works immediately in **Mock Mode** (toggle in the header) — no API key or AI setup required. For real AI generation, ensure the Claude Code CLI is installed and on your `$PATH`:
@@ -46,6 +46,14 @@ The app works immediately in **Mock Mode** (toggle in the header) — no API key
 # .env.local (optional)
 REALMWEAVER_AI_PROVIDER=claude-cli   # default; requires `claude` binary on $PATH
 ```
+
+**Runtime / deploy story:** `npm run dev` (or `npm run preview` after `npm run build`) *is* the
+runtime, not just a dev convenience — `vite-plugin-ai-proxy.ts` registers the `/api/ai/*` routes
+as Vite dev/preview server middleware, so a real Node process (`vite dev` or `vite preview`) must
+stay running for AI generation to work. There is no separate backend server, and a statically
+hosted `dist/` (e.g. served from a plain CDN/static file host with no Vite process behind it) has
+**no AI backend at all** — every `/api/ai/*` call 404s and every AI feature falls back to failing
+requests. `npm run build` alone is a typecheck/bundle step, not a deployable artifact on its own.
 
 ---
 
@@ -57,9 +65,9 @@ REALMWEAVER_AI_PROVIDER=claude-cli   # default; requires `claude` binary on $PAT
 | **Build** | Vite 6.2 + custom AI proxy middleware |
 | **AI** | Claude Code CLI (primary, local dev) / Anthropic API (future production) |
 | **State** | Custom store + Immer + `useSyncExternalStore` |
-| **Styling** | Tailwind CSS (CDN) — dark theme (slate + amber) |
+| **Styling** | Tailwind CSS (build-time, via `@tailwindcss/vite`) — dark theme (slate + amber) |
 | **Icons** | Lucide React (centralized via `Icons.tsx`) |
-| **Graphs** | React Flow + Dagre + D3 |
+| **Graphs** | D3 |
 | **Testing** | Vitest (unit) + Playwright (E2E) |
 
 ---
@@ -112,8 +120,8 @@ All code at **project root** (no `src/` directory). Import alias `@/` maps to ro
 ### Commands
 
 ```bash
-npm run dev              # Dev server on localhost:3000
-npm run build            # Production build (verify zero TS errors)
+npm run dev              # Dev server on localhost:4200 -- the AI proxy runs here (see "Runtime / deploy story" above)
+npm run build            # Typecheck + production bundle (dist/ has no AI backend by itself -- use `npm run preview`)
 npm test                 # Vitest unit tests
 npm run test:watch       # Vitest watch mode
 npm run test:e2e         # Playwright E2E tests (headless)

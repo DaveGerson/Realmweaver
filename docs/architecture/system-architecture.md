@@ -99,18 +99,38 @@ flowchart LR
 
 - **Localhost bind.** `vite.config.ts` binds the dev server to `127.0.0.1` by default
   (`REALMWEAVER_DEV_HOST` env var can opt into a wider bind). This keeps `/api/ai/generate`
-  unreachable from other devices on the LAN.
-- **Origin validation.** Every POST to `/api/ai/generate` checks the `Origin` header (when
-  present) against `ALLOWED_ORIGIN_RE` (`localhost` / `127.0.0.1` / `[::1]`, any port) and
-  returns `403` otherwise. This blocks DNS-rebinding attacks and any other page the browser
-  happens to have open from silently spending the user's Claude usage.
+  unreachable from other devices on the LAN by default.
+- **TCP peer address gate (mandatory).** Every request to `/api/ai/generate` and
+  `/api/ai/health` is first checked against `req.socket.remoteAddress` — it must be a loopback
+  address. Unlike every header below, this value is set by the kernel from the real TCP
+  connection and cannot be forged by a client that controls its own request headers (curl,
+  python, arbitrary scripts), which is what closes the LAN-bind exploit: forging `Origin` *and*
+  `Host` to read as `localhost` from a real LAN peer is rejected outright, because the peer
+  address itself isn't loopback.
+- **Origin + Host validation.** Both headers must resolve to a localhost interface
+  (`ALLOWED_ORIGIN_RE` / `ALLOWED_HOST_RE`) — a missing/empty Origin is rejected, not allowed
+  through. Origin cannot be forged by page JS in a browser (`fetch`/`XHR` don't let script
+  override it), so this is what blocks DNS-rebinding / any other page the browser happens to
+  have open; Host cross-checks that the connection didn't arrive over a LAN bind.
+- **Per-session proxy token (defense in depth, not yet enforced).** The plugin generates a
+  random token at process start and injects it into the served page via `transformIndexHtml`;
+  `X-Realmweaver-Token`, when present, is validated with a constant-time comparison and a
+  mismatch is always rejected. It is not yet *required* on every request — the browser client
+  doesn't send it yet (see the header comment in `vite-plugin-ai-proxy.ts` for the exact wiring
+  still needed) — so today it hardens the design without yet closing the "other local process on
+  the same machine" case (see §12).
 - **No shell.** CLI invocation uses `execFile`/`spawn` (never a shell string), so
   arbitrary prompt content cannot achieve command injection. Prompts over 100 KB switch
   from an argv-based invocation to writing to the child process's stdin, avoiding OS
   `ARG_MAX` limits without introducing a shell.
-- **Bounded resources.** Request bodies are capped at 4 MB; CLI invocation has a 120 s
-  timeout and a 1 MB stdout buffer cap (`MAX_BUFFER`) — output beyond that is **silently
-  truncated**, a known gap (see §12).
+- **Bounded resources.** Request bodies are capped at 4 MB — a request that exceeds it gets a
+  `413` (the request stream is paused, not immediately destroyed, so the response actually
+  reaches the client before the socket is torn down). CLI invocation has a 120 s timeout and a
+  1 MB stdout buffer cap (`MAX_BUFFER`); output beyond that now **kills the child and rejects
+  with `ENOBUFS`** (both the `execFile` and stdin-piped `spawn` paths) rather than silently
+  truncating — the previous "silently truncated" gap is fixed, not merely documented.
+  `outputFormat: 'json'` requests whose CLI output doesn't parse as the expected result envelope
+  get a `502` instead of the raw, possibly-mangled text.
 - **No client-side API key.** `ANTHROPIC_API_KEY` is intentionally *not* injected into the
   client bundle (`vite.config.ts`'s `define` block comments this explicitly) — the
   `claude-cli` provider doesn't need it, and the future `anthropic-api` provider would
@@ -756,7 +776,8 @@ residuals; each item is unfixed as of this document and still real in the curren
 | `campaignService` CRUD hand-duplicated ×12 | Each entity type's create/update/delete is written out by hand rather than through a generic factory — real but consistent duplication that makes the file ~1900 lines and means a cross-cutting fix (e.g. a new cascade rule) has to be applied 12 times by hand |
 | Two incompatible `ModelTier` types | `types/RealmChat.ts` and `services/ai/modelConfig.ts` each define their own `ModelTier`, bridged by hand-written mapping tables instead of one shared type — a drift risk every time a tier is added or renamed |
 | `audioTranscription.ts` bypasses `aiService` | `SessionLogEditor.tsx` imports it directly, violating the "components only import `aiService`" rule; it also has no mock implementation, so it cannot be exercised in mock mode or unit-tested the way every other AI function can |
-| No streaming; proxy silently truncates >1MB stdout | Every AI call is single-shot request/response with no progressive output, and a CLI response whose JSON envelope exceeds `MAX_BUFFER` (1 MB) is silently cut off rather than erroring, which could produce a truncated-but-parseable-looking partial JSON payload |
+| No streaming | Every AI call is single-shot request/response with no progressive output, so a multi-entity batch generation blocks until the whole CLI invocation completes (the >1MB-stdout silent-truncation gap this used to also describe is fixed — the proxy now kills the child and rejects `ENOBUFS` instead) |
+| Per-session proxy token generated but not yet required | `vite-plugin-ai-proxy.ts` injects `PROXY_TOKEN` via `transformIndexHtml` and validates `X-Realmweaver-Token` when present, but the browser client doesn't send it yet, so the mandatory gate against a same-machine-but-non-browser caller is the TCP-peer-loopback check only, not the token — see the header comment in `vite-plugin-ai-proxy.ts` for the exact client-side change that would complete this |
 | `_rotateBackups` cost on every autosave | Every 2-second debounced save does a full serialize plus 3 additional `localStorage` round-trips to rotate backup slots, on top of the primary write — real overhead that scales with campaign size and autosave frequency |
 | `DialogShell` renders inline, no portal/`inert` | No React portal means dialog content participates in the surrounding DOM's stacking/layout context rather than a clean top-level layer, and the background app remains in the accessibility tree (no `aria-hidden`/`inert`) while a modal is open |
 | `ENTITY_TYPE_CONFIG` open `Record<string, ...>`, no `'secret'` entry | Not a closed union, so a typo'd entity-type key type-checks fine and silently falls through to no config anywhere it's looked up; `Secret` has no config entry at all, and `createDefaultSecret`/`createDefaultNote`/`createDefaultPlayerCharacter` factories don't exist alongside the other `createDefaultX()` functions in `entityUtils.ts` |

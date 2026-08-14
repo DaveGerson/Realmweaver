@@ -78,6 +78,37 @@ describe('AI proxy request body cap — finding #89', () => {
     expect(tornDown).toBe(true);
   });
 
+  it('actually delivers the 413 to the client — an inert destroy() can no longer fake this', async () => {
+    // Link req and res the way a real Node socket links IncomingMessage and
+    // ServerResponse: FakeRes.assertSocketAlive() throws if a write happens
+    // AFTER the linked req has been destroyed, exactly reproducing the real
+    // bug (destroy() resets the TCP socket, so a write into it never
+    // reaches the client -> ECONNRESET instead of a 413). A fix that
+    // destroys the request stream before writing the response would make
+    // this test throw/fail; the correct fix (pause first, destroy only
+    // after the response's 'finish' event) does not.
+    const handler = routeFor(mountDevServer(aiProxyPlugin()), '/api/ai/generate');
+    const req = new FakeReq();
+    const res = new FakeRes().attach(req);
+
+    handler(req, res);
+    for (let i = 0; i < 5; i++) {
+      req.emit('data', ONE_MB);
+    }
+    await waitFor(() => res.ended);
+
+    // If the response write had happened after req.destroy(), FakeRes would
+    // have thrown out of the handler and res.ended would still be false.
+    expect(res.ended).toBe(true);
+    expect(res.statusCode).toBe(413);
+    expect(res.json().error).toMatch(/too large|payload|4\s?MB/i);
+
+    // The request stream must still eventually be torn down (just deferred
+    // until after the response was flushed), so the socket doesn't leak.
+    await waitFor(() => req.destroyed);
+    expect(req.destroyed).toBe(true);
+  });
+
   it('writes exactly one response even if further chunks keep arriving', async () => {
     const handler = routeFor(mountDevServer(aiProxyPlugin()), '/api/ai/generate');
     const req = new FakeReq();
