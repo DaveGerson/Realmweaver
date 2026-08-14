@@ -578,10 +578,27 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             // `appStatus` starts (and stays) 'loading' until this resolves, which the
             // UI already renders a loading state for.
             void (async () => {
-                const [savedCampaigns, savedActiveId] = await Promise.all([
-                    storageService.load(CAMPAIGNS_STORAGE_KEY),
-                    storageService.load(ACTIVE_CAMPAIGN_ID_KEY),
-                ]);
+                // Finding #3 (wp-e-app-shell, service half — storageService.load()/
+                // campaignService.init() live in files owned by wp-a-persistence):
+                // storageService.load() reads `globalThis.localStorage` outside any
+                // try block, so in a browser that throws SecurityError on localStorage
+                // access (Firefox with all cookies blocked, Safari private mode) this
+                // whole IIFE rejected unhandled and appStatus was stranded at
+                // 'loading' forever — a permanently blank page with no recovery path.
+                // Wrapping the read (and the state-derivation below) in try/catch
+                // guarantees `init()` always resolves to a renderable appStatus.
+                let savedCampaigns: string | null = null;
+                let savedActiveId: string | null = null;
+                try {
+                    [savedCampaigns, savedActiveId] = await Promise.all([
+                        storageService.load(CAMPAIGNS_STORAGE_KEY),
+                        storageService.load(ACTIVE_CAMPAIGN_ID_KEY),
+                    ]);
+                } catch (e) {
+                    console.error('[campaignService] Failed to read from storage during init():', e);
+                    _internalUpdate(draft => { draft.appStatus = 'welcome'; });
+                    return;
+                }
 
                 _internalUpdate(draft => {
                     if (savedCampaigns) {
