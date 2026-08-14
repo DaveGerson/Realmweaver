@@ -280,26 +280,12 @@ function checkOrphanedEntities(campaign: Campaign, makeId: MakeId): ContinuityIs
     }
   }
 
-  // --- Orphaned Items ---
-  const referencedItemIds = new Set<string>();
-  for (const article of campaign.articles) {
-    for (const id of article.relatedEntityIds ?? []) referencedItemIds.add(id);
-  }
-
-  for (const item of campaign.items) {
-    if (!referencedItemIds.has(item.id)) {
-      issues.push({
-        id: makeId('orphan'),
-        severity: 'info',
-        ruleId: 'orphan',
-        title: 'Orphaned item',
-        description: `"${item.name}" is not referenced in any lore article.`,
-        entityIds: [item.id],
-        entityTypes: ['item'],
-        suggestedFix: 'Link this item from a lore article, or assign it as scene loot.',
-      });
-    }
-  }
+  // Orphaned-item detection is intentionally omitted: nothing in types/ can
+  // reference an Item other than an Article's relatedEntityIds (LootItem has
+  // no item id and Scene.rewards is free text), so the rule was 100% noise
+  // for any campaign without lore articles and its suggested fix ("assign it
+  // as scene loot") described an action the app cannot perform. See finding
+  // #97 in the wp-c-ai-services ship-readiness plan.
 
   return issues;
 }
