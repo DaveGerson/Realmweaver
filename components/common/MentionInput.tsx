@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, useId } from 'react';
 import { Icons } from '@/components/common/Icons';
 import { campaignService } from '@/services/campaignService';
 import type { Campaign } from '@/types/index';
@@ -81,15 +81,31 @@ function escapeRegExp(value: string): string {
 /**
  * Returns entity IDs whose `@Name` mention is actually present in `text`, requiring
  * a word boundary after the name so e.g. `@Ann` doesn't falsely match inside `@Anna`.
+ *
+ * Candidates are resolved longest-name-first and matched spans are consumed
+ * (mirroring services/linking/matchingEngine.ts), so a tracked name that is a
+ * word-prefix of another mention — e.g. "The Guild" inside
+ * "@The Guild of Blades" — is not spuriously credited (finding #101). Genuine
+ * separate mentions of both names are still each credited.
  */
 export function findMentionedIdsInText(text: string, candidates: { id: string; name: string }[]): string[] {
   const ids: string[] = [];
-  for (const { id, name } of candidates) {
+  const consumed: Array<[number, number]> = [];
+  const sorted = candidates.slice().sort((a, b) => b.name.length - a.name.length);
+
+  for (const { id, name } of sorted) {
     // Unicode-aware boundary (matches services/linking/matchingEngine.ts) so a
     // name isn't treated as "ended" by an accented letter (e.g. `@Ann` in `@Annë`).
-    const pattern = new RegExp(`@${escapeRegExp(name)}(?![\\p{L}\\p{N}])`, 'u');
-    if (pattern.test(text)) {
-      ids.push(id);
+    const pattern = new RegExp(`@${escapeRegExp(name)}(?![\\p{L}\\p{N}])`, 'gu');
+    let m: RegExpExecArray | null;
+    while ((m = pattern.exec(text))) {
+      const start = m.index;
+      const end = start + m[0].length;
+      const overlapsConsumed = consumed.some(([cs, ce]) => start < ce && end > cs);
+      if (!overlapsConsumed) {
+        consumed.push([start, end]);
+        if (!ids.includes(id)) ids.push(id);
+      }
     }
   }
   return ids;
@@ -199,12 +215,41 @@ export const MentionInput: React.FC<MentionInputProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
+  // Stable id for the listbox, so the input can point aria-controls /
+  // aria-activedescendant at it and its options (finding #51).
+  const listboxId = useId();
+  const getOptionId = useCallback(
+    (candidateId: string) => `${listboxId}-option-${candidateId}`,
+    [listboxId],
+  );
+
   // Maps entity name (as inserted) → entity ID, so we can report IDs later.
   // Seeded from `initialMentions` (if provided) so mentions tracked in a prior
   // session are still recognised after the component remounts.
   const mentionMapRef = useRef<Map<string, string>>(
     new Map(initialMentions?.map(c => [c.name, c.id])),
   );
+
+  // Snapshot of the entity IDs seeded via `initialMentions`. If an entity is
+  // renamed after prose that still reads its OLD name (`@Bob`) was written,
+  // nothing rewrites that prose — findMentionedIdsInText can never re-derive
+  // the ID by matching the entity's CURRENT name against stale text. Union
+  // this snapshot into every reported ID set so a rename doesn't silently
+  // drop the mention/backlink on the next edit (finding #18). The accepted
+  // trade-off: removing a mention purely by deleting the prose no longer
+  // un-tracks it — that needs an explicit affordance elsewhere.
+  const seededIdsRef = useRef<Set<string>>(
+    new Set(initialMentions?.map(c => c.id) ?? []),
+  );
+
+  /** Reports the union of freshly-parsed mention IDs and the seeded set. */
+  const reportMentionedIds = useCallback((text: string) => {
+    if (!onMentionedIdsChange) return;
+    const parsed = extractMentionedIds(text, mentionMapRef.current);
+    const union = new Set<string>(parsed);
+    for (const id of seededIdsRef.current) union.add(id);
+    onMentionedIdsChange(Array.from(union));
+  }, [onMentionedIdsChange]);
 
   // Candidate snapshot is refreshed whenever the dropdown opens or query changes,
   // ensuring newly created entities are available without a full page reload.
@@ -270,11 +315,8 @@ export const MentionInput: React.FC<MentionInputProps> = ({
     }
 
     // Notify parent of current mentioned IDs
-    if (onMentionedIdsChange) {
-      const ids = extractMentionedIds(newValue, mentionMapRef.current);
-      onMentionedIdsChange(ids);
-    }
-  }, [onChange, onMentionedIdsChange, getAtMentionQuery, updateDropdownPosition]);
+    reportMentionedIds(newValue);
+  }, [onChange, reportMentionedIds, getAtMentionQuery, updateDropdownPosition]);
 
   // --- Select an entity from the dropdown ---
   const selectEntity = useCallback((candidate: MentionCandidate) => {
@@ -297,11 +339,7 @@ export const MentionInput: React.FC<MentionInputProps> = ({
     mentionMapRef.current.set(candidate.name, candidate.id);
 
     onChange(newValue);
-
-    if (onMentionedIdsChange) {
-      const ids = extractMentionedIds(newValue, mentionMapRef.current);
-      onMentionedIdsChange(ids);
-    }
+    reportMentionedIds(newValue);
 
     setIsOpen(false);
     setQuery('');
@@ -314,7 +352,7 @@ export const MentionInput: React.FC<MentionInputProps> = ({
         el.setSelectionRange(newCaretPos, newCaretPos);
       }
     });
-  }, [value, onChange, onMentionedIdsChange]);
+  }, [value, onChange, reportMentionedIds]);
 
   // --- Keyboard navigation ---
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => {
@@ -338,6 +376,10 @@ export const MentionInput: React.FC<MentionInputProps> = ({
       }
       if (e.key === 'Escape') {
         e.preventDefault();
+        // Stop the event reaching a host's own Escape handling (e.g. DmCoach's
+        // document-level keydown listener, or a wrapping DialogShell) — this
+        // keystroke should close only the suggestion dropdown (finding #52).
+        e.stopPropagation();
         setIsOpen(false);
         return;
       }
@@ -368,8 +410,14 @@ export const MentionInput: React.FC<MentionInputProps> = ({
   useEffect(() => {
     if (!isOpen || !dropdownRef.current) return;
     const active = dropdownRef.current.querySelector<HTMLElement>('[data-active="true"]');
-    active?.scrollIntoView({ block: 'nearest' });
+    // Guard against environments (e.g. jsdom) that don't implement
+    // scrollIntoView at all, rather than crashing the whole effect.
+    active?.scrollIntoView?.({ block: 'nearest' });
   }, [activeIndex, isOpen]);
+
+  const activeOptionId = isOpen && filtered[activeIndex]
+    ? getOptionId(filtered[activeIndex].id)
+    : undefined;
 
   const inputProps = {
     ref: textareaRef as any,
@@ -379,9 +427,12 @@ export const MentionInput: React.FC<MentionInputProps> = ({
     placeholder,
     disabled,
     'aria-label': ariaLabel,
+    role: 'combobox' as const,
     'aria-autocomplete': 'list' as const,
     'aria-expanded': isOpen,
     'aria-haspopup': 'listbox' as const,
+    'aria-controls': isOpen ? listboxId : undefined,
+    'aria-activedescendant': activeOptionId,
     className: twMerge(
       'w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm',
       'focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500 outline-none',
@@ -417,6 +468,7 @@ export const MentionInput: React.FC<MentionInputProps> = ({
       {isOpen && filtered.length > 0 && (
         <div
           ref={dropdownRef}
+          id={listboxId}
           role="listbox"
           aria-label="Entity mentions"
           className={twMerge(
@@ -430,9 +482,10 @@ export const MentionInput: React.FC<MentionInputProps> = ({
             const meta = ENTITY_TYPE_META[type];
             const TypeIcon = meta.Icon;
             return (
-              <div key={type}>
-                {/* Group header */}
-                <div className="px-3 py-1 flex items-center gap-1.5 bg-slate-900/60 border-b border-slate-700">
+              <div key={type} role="group" aria-label={meta.label}>
+                {/* Group header (decorative — the accessible name comes from
+                    the group's aria-label above) */}
+                <div aria-hidden="true" className="px-3 py-1 flex items-center gap-1.5 bg-slate-900/60 border-b border-slate-700">
                   <TypeIcon className={twMerge('w-3 h-3', meta.dropdownIcon)} />
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                     {meta.label}
@@ -445,6 +498,7 @@ export const MentionInput: React.FC<MentionInputProps> = ({
                   return (
                     <button
                       key={candidate.id}
+                      id={getOptionId(candidate.id)}
                       role="option"
                       aria-selected={isActive}
                       data-active={isActive}
