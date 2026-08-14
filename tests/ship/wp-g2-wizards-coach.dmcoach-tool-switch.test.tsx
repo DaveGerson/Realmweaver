@@ -21,6 +21,7 @@
 
 import React from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { Mock } from 'vitest';
 import { render, cleanup, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { setupTestEnvironment } from '../helpers/testStoreFactory';
 import type { Campaign } from '../../types/index';
@@ -68,7 +69,7 @@ beforeEach(async () => {
 afterEach(cleanup);
 
 /** Start a narration generation the test controls, then switch to the Table tool. */
-async function startNarrationThenSwitchToTable(onResultGenerated: ReturnType<typeof vi.fn>) {
+async function startNarrationThenSwitchToTable(onResultGenerated: Mock<(content: string) => void>) {
     let resolveNarration: (v: string) => void = () => {};
     h.generateNarration.mockImplementation(
         () => new Promise<string>(res => { resolveNarration = res; })

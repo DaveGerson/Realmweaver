@@ -97,14 +97,15 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
     const [roleplayError, setRoleplayError] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    // H15: Escape key dismisses the coach panel
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose();
-        };
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [onClose]);
+    // Finding #77: guards against a generation resolving after the DM has
+    // switched to a different tool — bumped on every switch so stale
+    // resolve/catch/finally handlers can detect and discard themselves.
+    const generationIdRef = useRef(0);
+
+    // H15 / Finding #76: Escape dismisses the coach panel, scoped to the panel
+    // itself (via onKeyDown below) rather than a document-level listener, so
+    // Escape pressed elsewhere on the page (e.g. dismissing an unrelated
+    // popover) doesn't tear down the panel.
 
     useEffect(() => {
         if (activeTool === 'roleplay' && messagesEndRef.current) {
@@ -148,6 +149,9 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
             setError('Please enter a prompt.');
             return;
         }
+        // Snapshot the generation id so we can tell, once the async call
+        // settles, whether the DM has since switched tools (finding #77).
+        const generationId = ++generationIdRef.current;
         setIsLoading(true);
         setError(null);
         setResult(null);
@@ -166,6 +170,7 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
 
         try {
             const resultData = await currentTool!.action(prompt, campaignContext, useLiteModel, isMockMode);
+            if (generationId !== generationIdRef.current) return; // stale — tool switched mid-flight
             setResult(resultData);
             if (onResultGenerated) {
                 const textContent = typeof resultData === 'string'
@@ -174,19 +179,26 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
                 onResultGenerated(textContent);
             }
         } catch (err) {
+            if (generationId !== generationIdRef.current) return; // stale — tool switched mid-flight
             setError('Failed to get a response from the AI. Please try again.');
             console.error(err);
         } finally {
-            setIsLoading(false);
+            if (generationId === generationIdRef.current) {
+                setIsLoading(false);
+            }
         }
     };
 
     const handleSwitchTool = (tool: CoachTool) => {
+        // Invalidate any in-flight generation from the previous tool so its
+        // resolve/catch/finally handlers become no-ops (finding #77).
+        generationIdRef.current++;
         setActiveTool(tool);
         setPrompt('');
         setMentionedEntityIds([]);
         setResult(null);
         setError(null);
+        setIsLoading(false);
     }
 
     // --- Roleplay handlers ---
@@ -289,8 +301,8 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
     return (
         <aside
             role="dialog"
-            aria-modal="true"
             aria-label="DM Coach"
+            onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
             className={[
                 // Mobile: half-height bottom sheet anchored to bottom of parent
                 "absolute bottom-0 left-0 right-0 h-[60vh]",
@@ -728,9 +740,13 @@ const TextResultDisplay = ({ text, onSendToNotes, toolLabel, onNavigate }: { tex
     const [hasSent, setHasSent] = useState(false);
 
     const handleCopyToClipboard = () => {
-        navigator.clipboard.writeText(text);
-        setHasCopied(true);
-        setTimeout(() => setHasCopied(false), 2000);
+        if (!navigator.clipboard?.writeText) return;
+        navigator.clipboard.writeText(text)
+            .then(() => {
+                setHasCopied(true);
+                setTimeout(() => setHasCopied(false), 2000);
+            })
+            .catch(() => { /* copy failed silently; no success state shown */ });
     };
 
     const handleSendToNotes = () => {
@@ -789,10 +805,17 @@ const RollableTableDisplay = ({ table, onSendToNotes }: { table: RollableTable; 
         const roll = Math.floor(Math.random() * maxRoll) + 1;
 
         const findResult = (r: number, entries: RollableTableEntry[]): string => {
-            for (const entry of entries) {
-                const parts = entry.range.split('-').map(p => parseInt(p.trim(), 10));
-                if (parts.length === 1 && r === parts[0]) return entry.result;
-                if (parts.length === 2 && r >= parts[0] && r <= parts[1]) return entry.result;
+            for (const [i, entry] of entries.entries()) {
+                // AI-generated ranges routinely use an en dash / em dash / other
+                // Unicode dash instead of the ASCII hyphen (finding #78).
+                const normalizedRange = entry.range.replace(/[‐-―]/g, '-');
+                const parts = normalizedRange.split('-').map(p => parseInt(p.trim(), 10));
+                if (parts.length === 1 && !isNaN(parts[0]) && r === parts[0]) return entry.result;
+                if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1]) && r >= parts[0] && r <= parts[1]) return entry.result;
+                // Fall back to matching by row index when the range text doesn't
+                // parse as a number/range at all — the roll still needs to land
+                // on the entry that visually corresponds to it in the table.
+                if (parts.some(isNaN) && r === i + 1) return entry.result;
             }
             return "No result found for this roll.";
         }
