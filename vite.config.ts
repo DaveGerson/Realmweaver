@@ -31,12 +31,28 @@ export default defineConfig(({ mode }) => {
         rollupOptions: {
           output: {
             // Split out vendor code so the entry chunk isn't a single 900KB+
-            // blob users download before first paint. The per-view
-            // dashboards/editors themselves are further split via
-            // React.lazy in components/layout/ViewRouter.tsx.
-            manualChunks: {
-              react: ['react', 'react-dom'],
-              'lucide-react': ['lucide-react'],
+            // blob users download before first paint.
+            //
+            // NOTE (wp-i2, finding #90): this vendor split alone does not
+            // eliminate the >500KB entry-chunk warning — the bulk of the
+            // weight is the app's own component tree (25 dashboards/editors
+            // statically imported by ViewRouter.tsx), not vendor code. The
+            // per-view components are NOT yet React.lazy-split (only a
+            // handful of dialogs and RelationshipGraph/PlotTimeline are);
+            // ViewRouter.tsx is owned by wp-e-app-shell, so completing that
+            // half of the contract is tracked there, not here. Use an
+            // id-based function here (rather than a static package-name map)
+            // so the React runtime — which react-dom/scheduler pull in
+            // transitively and which other vendor deps like lucide-react
+            // otherwise hoist into their own chunk instead — reliably lands
+            // in the `react` chunk.
+            manualChunks(id) {
+              if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) {
+                return 'react';
+              }
+              if (/node_modules\/lucide-react\//.test(id)) {
+                return 'lucide-react';
+              }
             },
           },
         },

@@ -21,9 +21,9 @@ RealmWeaver is a single-page application (SPA) for tabletop RPG Game Masters to 
 | **Build** | Vite 6.2.0 | Dev server, HMR, production bundling |
 | **AI** | Claude Code CLI / `@anthropic-ai/sdk` 0.39.0 | Local Claude CLI (default) or Anthropic REST API |
 | **State** | Immer 10.1.3 | Immutable state updates with mutable syntax |
-| **Styling** | Tailwind CSS (CDN) | Utility-first CSS via `<script>` in index.html |
+| **Styling** | Tailwind CSS 4.3.3 (build-time) | Utility-first CSS via `@tailwindcss/vite` + `index.css` |
 | **Icons** | Lucide React 0.546.0 | SVG icon library, centralized through `Icons.tsx` |
-| **Graphs** | React Flow 11.10.1 + Dagre 0.8.5 + D3 7.8.5 | Entity relationship visualization |
+| **Graphs** | D3 7.8.5 | Entity relationship visualization |
 | **Utilities** | tailwind-merge 3.3.1 | Conditional className composition without conflicts |
 | **Testing** | Vitest 4.1.0 + Playwright 1.58.2 | Unit tests and E2E tests |
 

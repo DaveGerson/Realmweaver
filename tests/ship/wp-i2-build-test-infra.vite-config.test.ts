@@ -72,6 +72,57 @@ describe('wp-i2 — vite.config.ts define block (finding #86)', () => {
 
 });
 
+describe('wp-i2 — vendor chunking (finding #90, verifier round 2)', () => {
+  it('declares a manualChunks strategy that isolates react/react-dom/scheduler from other vendor code', async () => {
+    const config = await resolveViteConfig();
+    const manualChunks = config.build?.rollupOptions?.output?.manualChunks;
+
+    expect(manualChunks, 'vite.config.ts must configure build.rollupOptions.output.manualChunks').toBeDefined();
+
+    // Round-1 used a static `{ react: ['react', 'react-dom'] }` object map, which
+    // Rollup resolves by package name only — it does NOT pull in transitive deps
+    // like `scheduler` (or force what OTHER vendor chunks — e.g. lucide-react —
+    // pre-bundle to `react` internally), so the verifier found the real React
+    // runtime hoisted into the lucide-react chunk instead of the react chunk.
+    // The fix must be the id-matching function form so every module under
+    // node_modules/react*, node_modules/react-dom*, node_modules/scheduler*
+    // is routed to the same chunk regardless of which entry point pulled it in.
+    expect(typeof manualChunks).toBe('function');
+
+    const reactIds = [
+      '/repo/node_modules/react/index.js',
+      '/repo/node_modules/react-dom/index.js',
+      '/repo/node_modules/scheduler/index.js',
+    ];
+    for (const id of reactIds) {
+      expect(manualChunks(id), `manualChunks(${id}) should route to the react chunk`).toBe('react');
+    }
+    expect(manualChunks('/repo/node_modules/lucide-react/dist/esm/lucide-react.js')).toBe('lucide-react');
+    // Application source must not be swept into a vendor chunk by accident.
+    expect(manualChunks('/repo/components/dashboards/NpcDashboard.tsx')).toBeUndefined();
+  });
+
+  it('does not claim ViewRouter.tsx is React.lazy-split when it is not (comment accuracy)', () => {
+    const source = repoFile('vite.config.ts');
+    const viewRouterSource = repoFile('components/layout/ViewRouter.tsx');
+
+    // The comment must not assert, as settled fact, a per-view React.lazy split
+    // that hasn't actually landed in ViewRouter.tsx — that misleads the next
+    // reader into thinking the >500KB entry-chunk contract is fully satisfied.
+    // ViewRouter.tsx is owned by wp-e-app-shell, not wp-i2, so completing the
+    // per-view lazy split itself is out of scope here; what's in scope is not
+    // shipping a comment that overstates what landed.
+    const staticDashboardImports = (
+      viewRouterSource.match(/^import \{ \w+ \} from '@\/components\/dashboards\//gm) ?? []
+    ).length;
+    if (staticDashboardImports > 0) {
+      expect(source).not.toMatch(
+        /per-view dashboards\/editors themselves are further split via\s*\n?\s*\/\/?\s*React\.lazy/
+      );
+    }
+  });
+});
+
 describe('wp-i2 — dev server / e2e port binding (finding #85)', () => {
   it('uses strictPort so a taken port 4200 fails loudly instead of drifting to 4201', async () => {
     const config = await resolveViteConfig();

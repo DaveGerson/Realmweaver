@@ -54,3 +54,79 @@ describe('wp-i2 — e2e/helpers.ts visibility checks (finding #33)', () => {
     expect(matchingLines(helpersSource, /force:\s*true/)).toEqual([]);
   });
 });
+
+/**
+ * wp-i2-build-test-infra — verifier round 2, minor #7
+ *
+ * The #33 fix converted every `isVisible({timeout})` instant-probe into a genuinely
+ * waiting `isVisibleWithin`, which is correct, but `createCampaign` then probed its
+ * two pairs of mutually-exclusive locators (templateSelectHeading/creatorHeading,
+ * createFirstBtn/selectorCreateBtn) SERIALLY — so the common case (already on one of
+ * the two screens) pays up to 2x the per-candidate timeout before proceeding, adding
+ * real wall-clock to every spec that calls createCampaign across two Playwright
+ * projects in CI. Fix: race the mutually-exclusive candidates concurrently via a
+ * `raceVisible` helper so the winning candidate settles the check immediately.
+ */
+describe('wp-i2 — createCampaign races mutually-exclusive locators (minor #7)', () => {
+  it('defines a race-based visibility helper', () => {
+    expect(helpersSource).toMatch(/function raceVisible\s*\(/);
+    // Must wait concurrently (all candidates start together), not serially.
+    expect(helpersSource).toMatch(/raceVisible[\s\S]*?forEach/);
+  });
+
+  it('routes the template-select vs creator-form screen check through raceVisible', () => {
+    const createCampaignSource = helpersSource.slice(
+      helpersSource.indexOf('export async function createCampaign'),
+      helpersSource.indexOf('export async function createCampaign') + 2500
+    );
+
+    expect(createCampaignSource).toMatch(/raceVisible\(\[\s*\{\s*locator:\s*templateSelectHeading/);
+  });
+
+  it('routes the welcome-screen vs cross-campaign-dashboard entry point check through raceVisible', () => {
+    const createCampaignSource = helpersSource.slice(
+      helpersSource.indexOf('export async function createCampaign'),
+      helpersSource.indexOf('export async function createCampaign') + 2500
+    );
+
+    expect(createCampaignSource).toMatch(/raceVisible\(\[\s*\{\s*locator:\s*createFirstBtn/);
+  });
+
+  it('no longer serially awaits both mutually-exclusive candidates with isVisibleWithin', () => {
+    // The two removed serial-probe pairs must not reappear.
+    expect(helpersSource).not.toMatch(
+      /isVisibleWithin\(templateSelectHeading[\s\S]{0,200}isVisibleWithin\(creatorHeading/
+    );
+    expect(helpersSource).not.toMatch(
+      /isVisibleWithin\(createFirstBtn[\s\S]{0,200}isVisibleWithin\(selectorCreateBtn/
+    );
+  });
+});
+
+/**
+ * wp-i2-build-test-infra — verifier round 2, minor #6
+ *
+ * `reuseExistingServer: !process.env.CI` in playwright.config.ts means a stale (or
+ * unrelated) server already bound to the target port is silently reused locally.
+ * Fix: e2e/global-setup.ts asserts the served page really is Realmweaver before any
+ * spec runs.
+ */
+describe('wp-i2 — global setup guards against a stale/foreign dev server (minor #6)', () => {
+  it('playwright.config.ts wires up a globalSetup script', () => {
+    const playwrightConfig = readFileSync(
+      fileURLToPath(new URL('../../playwright.config.ts', import.meta.url)),
+      'utf8'
+    );
+    expect(playwrightConfig).toMatch(/globalSetup:\s*['"]\.\/e2e\/global-setup(\.ts)?['"]/);
+  });
+
+  it('global-setup.ts asserts the RealmWeaver title marker before letting specs run', () => {
+    const globalSetupSource = readFileSync(
+      fileURLToPath(new URL('../../e2e/global-setup.ts', import.meta.url)),
+      'utf8'
+    );
+    expect(globalSetupSource).toContain('<title>RealmWeaver</title>');
+    // Must actually fetch the live server rather than just reading source text.
+    expect(globalSetupSource).toMatch(/fetch\(/);
+  });
+});

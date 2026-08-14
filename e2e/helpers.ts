@@ -20,6 +20,45 @@ async function isVisibleWithin(locator: import('@playwright/test').Locator, time
   );
 }
 
+/**
+ * Race a set of mutually-exclusive locators and resolve to the index of
+ * whichever becomes visible first, or -1 if none do within their own
+ * timeout.
+ *
+ * Unlike probing candidates one at a time with `isVisibleWithin` (which pays
+ * each candidate's full timeout in sequence when an earlier candidate is
+ * absent), this waits on all candidates concurrently and settles the moment
+ * the first one resolves — the common case (the app is already on one of
+ * the expected screens) returns almost instantly instead of after N*timeout.
+ * Only resolves -1 once every candidate has genuinely timed out, so it never
+ * under-waits relative to the serial version.
+ */
+async function raceVisible(
+  candidates: Array<{ locator: import('@playwright/test').Locator; timeout: number }>
+): Promise<number> {
+  return new Promise<number>((resolve) => {
+    let settled = false;
+    let remaining = candidates.length;
+    candidates.forEach(({ locator, timeout }, index) => {
+      locator.waitFor({ state: 'visible', timeout }).then(
+        () => {
+          if (!settled) {
+            settled = true;
+            resolve(index);
+          }
+        },
+        () => {
+          remaining -= 1;
+          if (!settled && remaining === 0) {
+            settled = true;
+            resolve(-1);
+          }
+        }
+      );
+    });
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Storage helpers
 // ---------------------------------------------------------------------------
@@ -61,7 +100,12 @@ export async function gotoFresh(page: Page): Promise<void> {
  */
 export async function enableMockMode(page: Page): Promise<void> {
   const toggle = page.locator('[role="switch"]').first();
-  if (!(await isVisibleWithin(toggle, 2000))) {
+  // Every call site in the suite calls this after createCampaign(), which
+  // already waits for the sidebar heading — by then the header (and this
+  // toggle) is definitely mounted, so a short wait is enough; it only needs
+  // to be long enough to survive a paint/effect tick, not a full 2s budget
+  // for a "campaign never loads" case that createCampaign already ruled out.
+  if (!(await isVisibleWithin(toggle, 500))) {
     return;
   }
   const isChecked = (await toggle.getAttribute('aria-checked')) === 'true';
@@ -110,8 +154,16 @@ export async function createCampaign(
   const templateSelectHeading = page.getByRole('heading', { name: /start with a template/i });
   const creatorHeading = page.getByRole('heading', { name: 'Create Your Campaign' });
 
-  const isOnTemplateSelect = await isVisibleWithin(templateSelectHeading, 500);
-  const isOnCreatorForm = await isVisibleWithin(creatorHeading, 500);
+  // The two headings are mutually exclusive (at most one screen is showing at
+  // a time), so race them instead of probing each serially — the common case
+  // (already on one of these screens) resolves almost instantly instead of
+  // paying up to 2x500ms.
+  const initialScreen = await raceVisible([
+    { locator: templateSelectHeading, timeout: 500 },
+    { locator: creatorHeading, timeout: 500 },
+  ]);
+  const isOnTemplateSelect = initialScreen === 0;
+  const isOnCreatorForm = initialScreen === 1;
 
   if (!isOnTemplateSelect && !isOnCreatorForm) {
     // Welcome screen path — button text unchanged
@@ -119,9 +171,14 @@ export async function createCampaign(
     // CrossCampaignDashboard path — the "Create new campaign" dashed card
     const selectorCreateBtn = page.getByRole('button', { name: /create new campaign/i });
 
-    if (await isVisibleWithin(createFirstBtn, 1500)) {
+    const entryPoint = await raceVisible([
+      { locator: createFirstBtn, timeout: 1500 },
+      { locator: selectorCreateBtn, timeout: 1500 },
+    ]);
+
+    if (entryPoint === 0) {
       await createFirstBtn.click();
-    } else if (await isVisibleWithin(selectorCreateBtn, 1500)) {
+    } else if (entryPoint === 1) {
       await selectorCreateBtn.click();
     } else {
       // Already in editing mode — use header to start a new campaign

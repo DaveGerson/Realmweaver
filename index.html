@@ -20,11 +20,18 @@
     />
     <link rel="stylesheet" href="/index.css" />
     <style>
+      /*
+       * Font stacks: the Google Fonts <link> that used to load Roboto/
+       * Merriweather was removed as part of the CDN-Tailwind security fix
+       * (finding #29) and the fonts were not self-hosted, so naming them
+       * here would just fall through to the next stack entry on every load.
+       * These are plain system-font stacks — no remote font request is made.
+       */
       body {
-        font-family: 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+        font-family: -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
       }
       h1, h2, h3, h4, .font-serif {
-        font-family: 'Merriweather', Georgia, 'Times New Roman', serif;
+        font-family: Georgia, 'Times New Roman', serif;
       }
 
       /* -------------------------------------------------------
