@@ -106,6 +106,50 @@ export function buildCampaignContext(options: ContextOptions): string {
     return true;
   };
 
+  /**
+   * Add a list section (header + one entry per line) by filling entries one
+   * at a time until the remaining budget is exhausted, rather than dropping
+   * the whole section when the full list doesn't fit (finding #15). Once the
+   * budget runs out, appends an "…and N more" marker (if it fits) so callers
+   * know the list was truncated instead of silently missing entries.
+   *
+   * Note: this checks against `maxChars` directly on every entry rather than
+   * `hasBudget()`, since `hasBudget()`'s ~100-char slack would either stop
+   * short of the true limit or (worse) let one entry overshoot it.
+   */
+  const tryAddList = (header: string, entries: string[]): boolean => {
+    if (entries.length === 0) return false;
+
+    const lines: string[] = [header];
+    let runningLen = header.length;
+    let addedCount = 0;
+
+    for (const entry of entries) {
+      const newLen = runningLen + 1 + entry.length; // +1 for the joining newline
+      if (usedChars + newLen > maxChars) break;
+      lines.push(entry);
+      runningLen = newLen;
+      addedCount++;
+    }
+
+    if (addedCount === 0) return false;
+
+    const remaining = entries.length - addedCount;
+    if (remaining > 0) {
+      const marker = `  …and ${remaining} more`;
+      const newLen = runningLen + 1 + marker.length;
+      if (usedChars + newLen <= maxChars) {
+        lines.push(marker);
+        runningLen = newLen;
+      }
+    }
+
+    const text = lines.join('\n');
+    sections.push(text);
+    usedChars += text.length + 1; // +1 for the newline separator between sections
+    return true;
+  };
+
   /** Truncate a string to at most `limit` characters, appending '…' if cut. */
   const trunc = (s: string, limit: number): string => {
     if (!s) return '';
@@ -337,7 +381,7 @@ export function buildCampaignContext(options: ContextOptions): string {
         const oneLiner = n.description ? trunc(firstSentences(n.description, 1), 80) : '';
         return `  - ${n.name}${oneLiner ? ': ' + oneLiner : ''}`;
       });
-      tryAdd(['NPCs:', ...npcOverview].join('\n'));
+      tryAddList('NPCs:', npcOverview);
     }
 
     // Location overview
@@ -346,7 +390,7 @@ export function buildCampaignContext(options: ContextOptions): string {
         const oneLiner = l.description ? trunc(firstSentences(l.description, 1), 80) : '';
         return `  - ${l.name}${oneLiner ? ': ' + oneLiner : ''}`;
       });
-      tryAdd(['Locations:', ...locOverview].join('\n'));
+      tryAddList('Locations:', locOverview);
     }
 
     // Faction overview
@@ -355,7 +399,7 @@ export function buildCampaignContext(options: ContextOptions): string {
         const goal = f.goals ? trunc(f.goals, 80) : '';
         return `  - ${f.name}${goal ? ': ' + goal : ''}`;
       });
-      tryAdd(['Factions:', ...facOverview].join('\n'));
+      tryAddList('Factions:', facOverview);
     }
 
     // Lore article titles
