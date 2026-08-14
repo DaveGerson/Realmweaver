@@ -267,6 +267,31 @@ const ID_BEARING_ARRAY_KEYS = [
  * (in `ID_BEARING_ARRAY_KEYS` order, then array order) keeps its id; later
  * duplicates are dropped. Mutates `data` in place.
  */
+/** Dedupes a single id-bearing array against the campaign-wide `seenIds` set,
+ *  in place, incrementing `duplicateCount` (via the returned delta) for every
+ *  entry dropped. Non-plain-object entries are passed through untouched. */
+const dedupeArrayAgainstSeen = (
+  raw: unknown[],
+  seenIds: Set<string>,
+): { deduped: unknown[]; removed: number } => {
+  const deduped: unknown[] = [];
+  let removed = 0;
+  for (const entity of raw) {
+    if (!isPlainObject(entity)) {
+      deduped.push(entity);
+      continue;
+    }
+    const id = entity['id'];
+    if (typeof id === 'string' && seenIds.has(id)) {
+      removed++;
+      continue;
+    }
+    if (typeof id === 'string') seenIds.add(id);
+    deduped.push(entity);
+  }
+  return { deduped, removed };
+};
+
 const dedupeIdsAcrossCampaign = (
   data: Record<string, unknown>,
   warnings: string[],
@@ -277,22 +302,44 @@ const dedupeIdsAcrossCampaign = (
   for (const key of ID_BEARING_ARRAY_KEYS) {
     const raw = data[key];
     if (!Array.isArray(raw)) continue;
-
-    const deduped: unknown[] = [];
-    for (const entity of raw) {
-      if (!isPlainObject(entity)) {
-        deduped.push(entity);
-        continue;
-      }
-      const id = entity['id'];
-      if (typeof id === 'string' && seenIds.has(id)) {
-        duplicateCount++;
-        continue;
-      }
-      if (typeof id === 'string') seenIds.add(id);
-      deduped.push(entity);
-    }
+    const { deduped, removed } = dedupeArrayAgainstSeen(raw, seenIds);
     data[key] = deduped;
+    duplicateCount += removed;
+  }
+
+  // Nested id-bearing collections that are resolved by `id` exactly like the
+  // top-level arrays above (see updateScene/deleteScene in campaignService.ts
+  // and the PoI/loot lookups in LocationEditor.tsx) share the SAME seenIds
+  // set, so a scene id colliding with e.g. an NPC id is caught too.
+  const adventures = data['adventures'];
+  if (Array.isArray(adventures)) {
+    for (const adventure of adventures) {
+      if (!isPlainObject(adventure)) continue;
+      const scenes = adventure['scenes'];
+      if (!Array.isArray(scenes)) continue;
+      const { deduped, removed } = dedupeArrayAgainstSeen(scenes, seenIds);
+      adventure['scenes'] = deduped;
+      duplicateCount += removed;
+    }
+  }
+
+  const locations = data['locations'];
+  if (Array.isArray(locations)) {
+    for (const location of locations) {
+      if (!isPlainObject(location)) continue;
+      const pointsOfInterest = location['pointsOfInterest'];
+      if (Array.isArray(pointsOfInterest)) {
+        const { deduped, removed } = dedupeArrayAgainstSeen(pointsOfInterest, seenIds);
+        location['pointsOfInterest'] = deduped;
+        duplicateCount += removed;
+      }
+      const loot = location['loot'];
+      if (Array.isArray(loot)) {
+        const { deduped, removed } = dedupeArrayAgainstSeen(loot, seenIds);
+        location['loot'] = deduped;
+        duplicateCount += removed;
+      }
+    }
   }
 
   if (duplicateCount > 0) {
@@ -357,6 +404,23 @@ export const validateImportedCampaign = (
     };
   }
 
+  // Reject files from a future schema version BEFORE any mutation — a file
+  // stamped with a version newer than this build understands must not be
+  // silently downgraded and re-stamped (that would launder its provenance).
+  // This must run before the id/title checks and the legacy "name" → "title"
+  // migration below, since both of those can mutate/warn on `data` even on
+  // a path that ultimately rejects the file.
+  const declaredVersion = typeof data['version'] === 'number' ? data['version'] : 0;
+  if (declaredVersion > CURRENT_CAMPAIGN_VERSION) {
+    return {
+      success: false,
+      errors: [
+        'This file was created by a newer version of Realmweaver. Please update the app before importing it.',
+      ],
+      warnings,
+    };
+  }
+
   // Campaign-level required fields: id + (title or name)
   if (!isNonEmptyString(data['id'])) {
     errors.push('Campaign is missing a required "id" field.');
@@ -377,20 +441,6 @@ export const validateImportedCampaign = (
   // Block on structural errors before attempting entity validation
   if (errors.length > 0) {
     return { success: false, errors, warnings };
-  }
-
-  // Reject files from a future schema version BEFORE any mutation — a file
-  // stamped with a version newer than this build understands must not be
-  // silently downgraded and re-stamped (that would launder its provenance).
-  const declaredVersion = typeof data['version'] === 'number' ? data['version'] : 0;
-  if (declaredVersion > CURRENT_CAMPAIGN_VERSION) {
-    return {
-      success: false,
-      errors: [
-        'This file was created by a newer version of Realmweaver. Please update the app before importing it.',
-      ],
-      warnings,
-    };
   }
 
   // Apply schema version migrations
