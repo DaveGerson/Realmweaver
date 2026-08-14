@@ -231,6 +231,7 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
         isActiveScene={campaign.activeSceneId === selectedScene.id}
         onSetActive={campaignService.setActiveScene}
         onNavigate={onNavigate}
+        campaignContext={campaignContext}
       />
     );
   }
@@ -243,6 +244,8 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
         onUpdate={campaignService.updateAdventure}
         onDelete={(id) => { campaignService.deleteAdventure(id); onResetSelections(); }}
         onNavigate={onNavigate}
+        isMockMode={isMockMode}
+        campaignContext={campaignContext}
       />
     );
   }
