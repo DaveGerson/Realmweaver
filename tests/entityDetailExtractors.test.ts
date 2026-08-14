@@ -624,12 +624,17 @@ describe('getLocationExpandedDetails', () => {
 });
 
 describe('getArticleExpandedDetails', () => {
-    it('truncates content to 500 characters', () => {
+    it('keeps the full content on the editable field (never truncates)', () => {
+        // Regression guard for wp-d-linking #2: an editable, fieldKey-driven
+        // Content row is written back verbatim by EntityQuickCard's
+        // save-on-blur path (saveEntityField -> campaignService.updateArticle),
+        // so truncating it here silently destroys the rest of the article.
         const longContent = 'A'.repeat(1000);
         const article = makeArticle({ content: longContent });
         const details = getArticleExpandedDetails(article, null);
         const contentDetail = details.find(d => d.fieldKey === 'content');
-        expect(contentDetail?.value.length).toBeLessThanOrEqual(500);
+        expect(contentDetail?.value.length).toBe(1000);
+        expect(contentDetail?.value).toBe(longContent);
     });
 
     it('includes reference count and parent article', () => {
