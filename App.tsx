@@ -658,6 +658,7 @@ const App: FC = () => {
                   onSelectSessionLog={(id) => handleSelect('session-log', id)}
                   onSelectPlot={(id) => handleSelect('plot', id)}
                   onSelectPlayerCharacter={(id) => handleSelect('player-character', id)}
+                  onSelectScene={(id) => handleSelect('scene', id)}
                   onNavigateTo={(view) => { handleSelectView(view as EditorView); }}
                   onOpenCoach={() => setIsCoachOpen(true)}
                 />
