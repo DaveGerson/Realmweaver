@@ -9,7 +9,7 @@ import type { TestCampaignMeta } from '../../data/testCampaigns';
 
 interface CampaignCreatorProps {
   onCreateCampaign: (title: string, setting: string, settingType: SettingType, officialSetting?: string, dmStyle?: DmStyle) => void;
-  onTemplateSelected?: (templateData: Record<string, unknown>) => void;
+  onTemplateSelected?: (templateData: Record<string, unknown> | null) => void;
 }
 
 const OFFICIAL_SETTINGS = [
@@ -253,7 +253,17 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampai
   };
 
   const handleSkipTemplate = () => {
+    if (onTemplateSelected) {
+      onTemplateSelected(null);
+    }
     setStep('campaign-form');
+  };
+
+  const handleBackToTemplates = () => {
+    if (onTemplateSelected) {
+      onTemplateSelected(null);
+    }
+    setStep('template-select');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -305,7 +315,7 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampai
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => setStep('template-select')}
+            onClick={handleBackToTemplates}
             className="text-slate-400 hover:text-slate-200"
           >
             <Icons.ChevronLeft className="w-3.5 h-3.5 mr-1" />

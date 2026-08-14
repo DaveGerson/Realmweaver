@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { ToastProvider } from '@/hooks/useToast';
 import { ConfirmDialogProvider } from '@/hooks/useConfirmDialog';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -13,10 +14,12 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <ToastProvider>
-      <ConfirmDialogProvider>
-        <App />
-      </ConfirmDialogProvider>
-    </ToastProvider>
+    <ErrorBoundary>
+      <ToastProvider>
+        <ConfirmDialogProvider>
+          <App />
+        </ConfirmDialogProvider>
+      </ToastProvider>
+    </ErrorBoundary>
   </React.StrictMode>
 );

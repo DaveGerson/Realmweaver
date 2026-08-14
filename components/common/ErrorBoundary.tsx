@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button } from './Button';
+import { campaignService } from '../../services/campaignService';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,18 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
     reset = (): void => {
         this.setState({ hasError: false, error: null });
+    };
+
+    // Finding #61: flush the debounced (AUTO_SAVE_DELAY_MS) pending campaign
+    // write before reloading, so up to 2s of unsaved edits made right before
+    // the throw are not discarded by the reload.
+    handleReload = (): void => {
+        try {
+            campaignService.saveCampaign();
+        } catch (e) {
+            console.error('[ErrorBoundary] Failed to flush pending save before reload:', e);
+        }
+        window.location.reload();
     };
 
     render(): React.ReactNode {
@@ -128,9 +141,9 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
                         <Button
                             variant="secondary"
                             size="lg"
-                            onClick={() => window.location.reload()}
+                            onClick={this.handleReload}
                         >
-                            Return Home
+                            Reload App
                         </Button>
                     </div>
                 </div>

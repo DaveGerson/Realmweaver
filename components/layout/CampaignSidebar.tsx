@@ -158,11 +158,24 @@ const CampaignSidebarComponent: React.FC<CampaignSidebarProps> = ({
         e.preventDefault();
         setDragOverSceneId(null);
         const data = e.dataTransfer.getData('application/json');
-        if (data) {
-            const { adventureId: draggedAdventureId, sceneId: draggedSceneId } = JSON.parse(data);
-            if (draggedAdventureId === targetAdventureId && draggedSceneId !== targetSceneId) {
-                onReorderScene(draggedAdventureId, draggedSceneId, targetSceneId);
-            }
+        if (!data) return;
+        // Finding #19: a drop from outside the app (or any payload that isn't
+        // our own drag data) can advertise an application/json type without
+        // actually being JSON. JSON.parse throwing here used to escape the
+        // event handler, unmount the whole React tree (no ErrorBoundary wraps
+        // the sidebar) and leave a white page. Guard the parse and validate
+        // the shape before acting on it.
+        let parsed: unknown;
+        try {
+            parsed = JSON.parse(data);
+        } catch {
+            return;
+        }
+        if (typeof parsed !== 'object' || parsed === null) return;
+        const { adventureId: draggedAdventureId, sceneId: draggedSceneId } = parsed as { adventureId?: unknown; sceneId?: unknown };
+        if (typeof draggedAdventureId !== 'string' || typeof draggedSceneId !== 'string') return;
+        if (draggedAdventureId === targetAdventureId && draggedSceneId !== targetSceneId) {
+            onReorderScene(draggedAdventureId, draggedSceneId, targetSceneId);
         }
     };
 
@@ -526,7 +539,7 @@ const CampaignSidebarComponent: React.FC<CampaignSidebarProps> = ({
                                                     onDragLeave={handleDragLeave}
                                                     onDrop={(e) => handleDrop(e, adventure.id, scene.id)}
                                                     onDragEnd={handleDragEnd}
-                                                    onClick={() => { onSelect('adventure', adventure.id); onSelect('scene', scene.id); }}
+                                                    onClick={() => { onSelect('scene', scene.id); }}
                                                     className={twMerge(
                                                         'w-full text-left text-sm truncate px-2 py-1.5 rounded-md flex items-center transition-all duration-100',
                                                         selectedIds.scene === scene.id ? 'bg-slate-700 text-white' : 'hover:bg-slate-800 text-slate-400',

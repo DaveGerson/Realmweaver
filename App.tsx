@@ -111,8 +111,16 @@ const App: FC = () => {
     }
   }, [appStatus, pendingTemplateData]);
 
-  // Auto-show First Campaign Wizard for new empty campaigns
+  // Auto-show First Campaign Wizard for new empty campaigns.
+  // Gated on pendingTemplateData === null and keyed on the entity counts (not
+  // just activeCampaign?.id) so that when a template import lands in the
+  // commit right after campaign creation, this effect re-evaluates and closes
+  // the wizard instead of leaving it open over an already-populated campaign.
   useEffect(() => {
+    if (pendingTemplateData !== null) {
+      setIsFirstCampaignWizardOpen(false);
+      return;
+    }
     if (
       activeCampaign &&
       !activeCampaign.wizardDismissed &&
@@ -124,7 +132,13 @@ const App: FC = () => {
     } else {
       setIsFirstCampaignWizardOpen(false);
     }
-  }, [activeCampaign?.id]);
+  }, [
+    activeCampaign?.id,
+    pendingTemplateData,
+    activeCampaign?.npcs.length,
+    activeCampaign?.adventures.length,
+    activeCampaign?.locations.length,
+  ]);
 
   // Global keyboard shortcut handler
   useEffect(() => {
@@ -237,8 +251,15 @@ const App: FC = () => {
 
   const handleImportCampaign = async (file: File) => {
     try {
-      const title = await campaignService.importCampaign(file);
-      addToast(`Campaign "${title}" imported successfully!`, 'success');
+      const { title, warnings } = await campaignService.importCampaign(file);
+      for (const warning of warnings) {
+        addToast(warning, 'info');
+      }
+      if (warnings.length === 0) {
+        addToast(`Campaign "${title}" imported successfully!`, 'success');
+      } else {
+        addToast(`Campaign "${title}" imported with ${warnings.length} warning${warnings.length === 1 ? '' : 's'} — some data may have been dropped.`, 'info');
+      }
     } catch (error) {
       console.error('Import failed:', error);
       addToast(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
@@ -370,8 +391,14 @@ const App: FC = () => {
             onDeleteCampaign={campaignService.deleteCampaign}
           />
         );
-      case 'editing':
       case 'loading':
+        return (
+          <div className="h-screen w-full flex flex-col items-center justify-center gap-4 text-slate-300" role="status" aria-live="polite">
+            <div className="h-10 w-10 border-4 border-slate-700 border-t-amber-400 rounded-full animate-spin" aria-hidden="true" />
+            <p className="text-lg font-serif">Loading Realmweaver&hellip;</p>
+          </div>
+        );
+      case 'editing':
         if (activeCampaign) {
           return (
             <>
