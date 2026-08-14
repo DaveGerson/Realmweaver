@@ -102,6 +102,13 @@ export const PrepDocumentView: React.FC<PrepDocumentViewProps> = ({ adventure, c
   const markdownContent = useMemo(() => generateMarkdown(adventure, campaign), [adventure, campaign]);
 
   const handleCopy = () => {
+    // In a non-secure context (e.g. plain http), `navigator.clipboard` is
+    // undefined entirely, so calling `.writeText` would throw synchronously
+    // before any .then/.catch runs — guard first (finding #107).
+    if (!navigator.clipboard?.writeText) {
+      addToast('Could not copy to clipboard', 'error');
+      return;
+    }
     navigator.clipboard.writeText(markdownContent).then(() => {
       setHasCopied(true);
       setTimeout(() => setHasCopied(false), 2000);

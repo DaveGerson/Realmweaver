@@ -22,6 +22,15 @@ interface AdventureEditorProps {
   campaign: Campaign;
   onUpdate: (id: string, updatedData: Partial<Adventure>) => void;
   onDelete?: (id: string) => void;
+  // NOTE (finding #64): the suggested fix drops this default entirely so an
+  // omission fails typecheck. Left optional/defaulted here because
+  // EvocationWizard.tsx:479 (owned by wp-g2-wizards-coach, out of scope for
+  // this package) still renders <AdventureEditor> without isMockMode —
+  // making the prop required would break that file's build. Every call site
+  // this package owns or could fix (AdventureDashboard.tsx, RealmChatWidget.tsx,
+  // AdventureGenerator.tsx, ViewRouter.tsx) now passes it explicitly; only
+  // EvocationWizard.tsx still relies on the default and should stop doing so
+  // once wp-g2 wires isMockMode/campaignContext through at that call site.
   isMockMode?: boolean;
   campaignContext?: string;
   onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
@@ -34,6 +43,12 @@ const ADVENTURE_TABS: TabDefinition[] = [
 ];
 
 export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, campaign, onUpdate, onDelete, isMockMode = false, campaignContext, onNavigate }) => {
+  // Chat-generator/EvocationWizard preview panels render this editor against
+  // an unsaved draft with the synthetic id 'preview' — campaignService has no
+  // such adventure, so campaignService.createScene('preview', ...) silently
+  // no-ops (the adventure-side twin of finding #71). Disable scene generation
+  // there instead of letting the GM click a button that does nothing.
+  const isDraftPreview = adventure.id === 'preview';
   const [formData, setFormData] = useState(adventure);
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [isGeneratingScene, setIsGeneratingScene] = useState(false);
@@ -222,6 +237,8 @@ export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, cam
                   defaultPrompt={sceneGenerationDefaultPrompt}
                   isGenerating={isGeneratingScene}
                   onGenerate={handleGenerateNextScene}
+                  disabled={isDraftPreview}
+                  disabledReason={isDraftPreview ? 'Save this adventure before generating scenes.' : undefined}
                 />
               </div>
               {sceneGenerationError && (

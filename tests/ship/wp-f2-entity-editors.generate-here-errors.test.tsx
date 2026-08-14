@@ -21,11 +21,13 @@
 import React from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup, fireEvent, waitFor } from '@testing-library/react';
-import type { Campaign, Location } from '../../types/index';
+import type { Campaign, Location, Plot } from '../../types/index';
 
 const generateNpc = vi.fn(async () => { throw new Error('proxy 500'); });
+const generateScene = vi.fn(async () => { throw new Error('proxy 500'); });
 vi.mock('../../services/aiService', () => ({
   generateNpc: (...args: unknown[]) => generateNpc(...(args as [])),
+  generateScene: (...args: unknown[]) => generateScene(...(args as [])),
   generatePoiFromLoot: vi.fn(),
   generateEnhancedText: vi.fn(),
 }));
@@ -34,6 +36,7 @@ const storeState = { campaigns: [], activeCampaignId: null, saveStatus: 'idle', 
 vi.mock('../../services/campaignService', () => ({
   campaignService: {
     createNpc: vi.fn(() => 'npc-generated'),
+    createScene: vi.fn(() => 'scene-generated'),
     subscribe: () => () => {},
     getState: () => storeState,
     getActiveCampaign: () => undefined,
@@ -41,11 +44,13 @@ vi.mock('../../services/campaignService', () => ({
 }));
 
 const { LocationEditor } = await import('../../components/editors/LocationEditor');
+const { PlotEditor } = await import('../../components/editors/PlotEditor');
 const { ConfirmDialogProvider } = await import('../../hooks/useConfirmDialog');
 const { ToastProvider } = await import('../../hooks/useToast');
 
 afterEach(() => {
   generateNpc.mockClear();
+  generateScene.mockClear();
   cleanup();
 });
 
@@ -71,6 +76,21 @@ function byText(container: HTMLElement, re: RegExp): HTMLButtonElement | undefin
   return Array.from(container.querySelectorAll('button'))
     .find(b => re.test(b.textContent || '')) as HTMLButtonElement | undefined;
 }
+
+const plot = {
+  id: 'plot-1',
+  title: 'The Drowned Crown',
+  status: 'active' as const,
+  description: '',
+  relatedEntityIds: [],
+} as unknown as Plot;
+
+const plotCampaign = {
+  id: 'camp-2', title: 'Test Campaign',
+  npcs: [], locations: [], factions: [], items: [],
+  adventures: [{ id: 'adv-1', title: 'The Sunken City', scenes: [] }],
+  articles: [], sessionLogs: [], playerCharacters: [], plots: [plot], notes: [], secrets: [],
+} as unknown as Campaign;
 
 describe('wp-f2-entity-editors #72 — failed generate-here calls are visible to the GM', () => {
   it('shows an error when "Generate NPC at this location" rejects', async () => {
@@ -99,6 +119,45 @@ describe('wp-f2-entity-editors #72 — failed generate-here calls are visible to
     fireEvent.click(submit!);
 
     await waitFor(() => expect(generateNpc).toHaveBeenCalled());
+
+    await waitFor(() => {
+      const alerts = document.querySelectorAll('[role="alert"]');
+      const inlineError = Array.from(document.querySelectorAll('p, span, div'))
+        .some(el => /fail|error|could not|unable/i.test(el.textContent || '') && el.children.length === 0);
+      expect(
+        alerts.length > 0 || inlineError,
+        'a failed generation must surface a toast or inline error, not just console.error',
+      ).toBe(true);
+    });
+  });
+
+  it('shows an error when PlotEditor "Generate scene for this plot" rejects (PlotEditor.handleGeneratePlotScene)', async () => {
+    // PlotEditor.tsx is unowned in plan.json, but this residual half of
+    // finding #72 was assigned to wp-f2 — see verify-reports.json.
+    const { container } = render(
+      <ToastProvider>
+        <ConfirmDialogProvider>
+          <PlotEditor
+            plot={plot}
+            campaign={plotCampaign}
+            onUpdate={() => {}}
+            onDelete={() => {}}
+            isMockMode={false}
+            campaignContext="Setting: a drowned empire"
+          />
+        </ConfirmDialogProvider>
+      </ToastProvider>,
+    );
+
+    const trigger = byText(container, /generate scene for this plot/i);
+    expect(trigger, 'generate-here trigger not found').toBeTruthy();
+    fireEvent.click(trigger!);
+
+    const submit = byText(container, /^generate$/i);
+    expect(submit, 'panel submit button not found').toBeTruthy();
+    fireEvent.click(submit!);
+
+    await waitFor(() => expect(generateScene).toHaveBeenCalled());
 
     await waitFor(() => {
       const alerts = document.querySelectorAll('[role="alert"]');

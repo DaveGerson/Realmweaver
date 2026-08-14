@@ -90,7 +90,10 @@ export const PlotDashboard: React.FC<PlotDashboardProps> = ({ plots, sessionLogs
 
   // Each status group is its own roving-tabindex group — keyboard grid
   // navigation stays scoped to the cards actually adjacent on screen.
-  const { getRovingProps: getActiveRovingProps } = useRovingTabIndex({ direction: 'both', columns: 1 });
+  // Active Arcs renders `grid-cols-1 sm:grid-cols-2` (below), so `columns`
+  // must track that breakpoint too, or ArrowDown moves to the card to the
+  // right instead of the card below at >=640px (finding #104).
+  const { getRovingProps: getActiveRovingProps } = useRovingTabIndex({ direction: 'both', columns: { base: 1, sm: 2 } });
   const { getRovingProps: getDormantRovingProps } = useRovingTabIndex({ direction: 'vertical', columns: 1 });
   const { getRovingProps: getResolvedRovingProps } = useRovingTabIndex({ direction: 'vertical', columns: 1 });
 

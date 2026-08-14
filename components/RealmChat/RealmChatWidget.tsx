@@ -63,6 +63,15 @@ export const RealmChatWidget: React.FC<RealmChatWidgetProps> = ({ campaign, onAd
   // Modal State for editing/approving
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
 
+  // Context for AI calls (e.g. RegenerateButton, "Generate next scene") made
+  // from *inside* a draft editor below — CLAUDE.md requires campaignContext
+  // be passed to every AI generation call so results stay consistent with
+  // the world (finding #64).
+  const draftEditorContext = useMemo(
+    () => buildCampaignContext({ variant: 'generation', campaign }),
+    [campaign],
+  );
+
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -486,12 +495,17 @@ export const RealmChatWidget: React.FC<RealmChatWidgetProps> = ({ campaign, onAd
                                         />
                                     )}
                                     {selectedDraft.type === 'faction' && (
-                                        <FactionEditor 
-                                            faction={selectedDraft.data as Faction} 
+                                        <FactionEditor
+                                            faction={selectedDraft.data as Faction}
                                             allNpcs={campaign.npcs}
-                                            onUpdate={(_, data) => handleUpdateDraft(selectedDraft.id, data)} 
-                                            onDelete={() => {}} 
-                                            isMockMode={isMockMode} 
+                                            onUpdate={(_, data) => handleUpdateDraft(selectedDraft.id, data)}
+                                            onDelete={() => {}}
+                                            isMockMode={isMockMode}
+                                            // This faction is an unsaved chat draft — even though its id is a
+                                            // real uuid (not 'preview'), it isn't in the campaign yet, so
+                                            // "Generate member NPC" must stay disabled until Approve commits
+                                            // it (finding #71).
+                                            isPreview
                                         />
                                     )}
                                     {selectedDraft.type === 'item' && (
@@ -503,10 +517,12 @@ export const RealmChatWidget: React.FC<RealmChatWidgetProps> = ({ campaign, onAd
                                         />
                                     )}
                                     {selectedDraft.type === 'adventure' && (
-                                        <AdventureEditor 
-                                            adventure={selectedDraft.data as Adventure} 
+                                        <AdventureEditor
+                                            adventure={selectedDraft.data as Adventure}
                                             campaign={campaign}
-                                            onUpdate={(_, data) => handleUpdateDraft(selectedDraft.id, data)} 
+                                            onUpdate={(_, data) => handleUpdateDraft(selectedDraft.id, data)}
+                                            isMockMode={isMockMode}
+                                            campaignContext={draftEditorContext}
                                         />
                                     )}
                                     {selectedDraft.type === 'article' && (

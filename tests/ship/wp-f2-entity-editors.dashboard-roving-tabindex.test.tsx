@@ -36,6 +36,21 @@ function plotCards(container: HTMLElement): HTMLButtonElement[] {
     .filter(b => plots.some(p => (b.textContent || '').includes(p.title))) as HTMLButtonElement[];
 }
 
+/**
+ * Active Arcs renders `grid-cols-1 sm:grid-cols-2`, so the roving group's
+ * `columns` option (finding #104) must resolve differently depending on
+ * viewport width. jsdom defaults `window.innerWidth` to 1024 (>= the 640px
+ * `sm` breakpoint), so tests that care about the resolved column count set
+ * it explicitly rather than relying on that default.
+ */
+function setViewportWidth(width: number): () => void {
+  const original = window.innerWidth;
+  Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: width });
+  return () => {
+    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: original });
+  };
+}
+
 describe('wp-f2-entity-editors #104 — plot cards are a roving-tabindex group', () => {
   it('puts exactly one card in the tab order', () => {
     const { container } = render(
@@ -55,21 +70,56 @@ describe('wp-f2-entity-editors #104 — plot cards are a roving-tabindex group',
     expect(tabIndexes.filter(t => t === -1).length).toBe(2);
   });
 
-  it('moves focus with the arrow keys instead of requiring Tab per card', () => {
-    const { container } = render(
-      <PlotDashboard
-        plots={plots}
-        sessionLogs={[]}
-        onPlotCreated={() => {}}
-        onSelectPlot={vi.fn()}
-      />,
-    );
+  it('moves focus to the adjacent card below on a single-column (mobile) viewport', () => {
+    // Below the `sm` (640px) breakpoint the grid is `grid-cols-1`, so the
+    // roving group resolves to 1 column and ArrowDown must land on the very
+    // next card, exactly like a single-column list.
+    const restoreViewport = setViewportWidth(375);
+    try {
+      const { container } = render(
+        <PlotDashboard
+          plots={plots}
+          sessionLogs={[]}
+          onPlotCreated={() => {}}
+          onSelectPlot={vi.fn()}
+        />,
+      );
 
-    const cards = plotCards(container);
-    cards[0].focus();
-    fireEvent.keyDown(cards[0], { key: 'ArrowDown' });
+      const cards = plotCards(container);
+      cards[0].focus();
+      fireEvent.keyDown(cards[0], { key: 'ArrowDown' });
 
-    expect(document.activeElement).toBe(cards[1]);
+      expect(document.activeElement).toBe(cards[1]);
+    } finally {
+      restoreViewport();
+    }
+  });
+
+  it('skips a full row (2 columns) on ArrowDown once the `sm` grid breakpoint is active (finding #104)', () => {
+    // At >= 640px the grid is `grid-cols-1 sm:grid-cols-2` (PlotDashboard.tsx),
+    // so the roving group's `columns` must resolve to 2 here too — otherwise
+    // ArrowDown lands on the card to the right (index 1) instead of the card
+    // below it (index 2), which is what the verifier's #104 finding caught.
+    const restoreViewport = setViewportWidth(1024);
+    try {
+      const { container } = render(
+        <PlotDashboard
+          plots={plots}
+          sessionLogs={[]}
+          onPlotCreated={() => {}}
+          onSelectPlot={vi.fn()}
+        />,
+      );
+
+      const cards = plotCards(container);
+      cards[0].focus();
+      fireEvent.keyDown(cards[0], { key: 'ArrowDown' });
+
+      expect(document.activeElement).toBe(cards[2]);
+      expect(document.activeElement).not.toBe(cards[1]);
+    } finally {
+      restoreViewport();
+    }
   });
 });
 

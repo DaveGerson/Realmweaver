@@ -96,15 +96,32 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
   // (onUpdate) is debounced so unblurred keystrokes coalesce into a single
   // campaign-wide update instead of one per character.
   const mentionFieldTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  // Latest not-yet-committed value per field. Flushed (not discarded) on
+  // unmount so text typed within the debounce window of e.g. switching
+  // entities in the sidebar isn't silently lost (finding #70).
+  const mentionFieldPendingRef = useRef<Record<string, string>>({});
   useEffect(() => {
     const timers = mentionFieldTimersRef.current;
-    return () => { Object.values(timers).forEach(clearTimeout); };
+    const pending = mentionFieldPendingRef.current;
+    return () => {
+      Object.values(timers).forEach(clearTimeout);
+      Object.entries(pending).forEach(([field, value]) => {
+        onUpdate(location.id, { [field]: value });
+      });
+      Object.keys(pending).forEach(field => { delete pending[field]; });
+    };
+    // Runs only on mount/unmount by design: onUpdate is campaignService's
+    // stable singleton method reference, so capturing it here is safe and
+    // guarantees the flush fires exactly once, on real unmount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const handleMentionFieldChange = (field: keyof Location) => (value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     const timers = mentionFieldTimersRef.current;
+    mentionFieldPendingRef.current[field] = value;
     if (timers[field]) clearTimeout(timers[field]);
     timers[field] = setTimeout(() => {
+      delete mentionFieldPendingRef.current[field];
       onUpdate(location.id, { [field]: value });
     }, 400);
   };
@@ -116,21 +133,31 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     () => resolveMentionCandidates(campaign, location.mentionedEntityIds),
     [campaign, location.mentionedEntityIds],
   );
-  const [mentionedIdsByField, setMentionedIdsByField] = useState<Record<string, string[]>>(() => ({
+  // Per-field mention ID sets. Kept in a ref, not state — nothing renders off
+  // of this value directly, it exists purely so handleMentionedIdsChange can
+  // compute the merged set without writing to the store from inside a
+  // setState updater (React invokes functional updaters during the render
+  // phase, and StrictMode intentionally double-invokes them — doing the
+  // store write there fired it twice).
+  const mentionedIdsByFieldRef = useRef<Record<string, string[]>>({
     description: findMentionedIdsInText(location.description, mentionCandidates),
     secrets: findMentionedIdsInText(location.secrets, mentionCandidates),
-  }));
-  // Kept in sync with `mentionedIdsByField` so the merged set can be computed
-  // and reported without writing to the store from inside a setState updater
-  // (React invokes functional updaters during the render phase, and StrictMode
-  // intentionally double-invokes them — doing the store write there fired it twice).
-  const mentionedIdsByFieldRef = useRef(mentionedIdsByField);
+  });
+  // Last merged id set actually written to the store. MentionInput reports
+  // its field's id set on every keystroke even when that set hasn't changed,
+  // so without this the store (and every useSyncExternalStore subscriber)
+  // would still churn once per character (finding #70).
+  const lastMergedIdsKeyRef = useRef<string>(
+    Array.from(new Set(Object.values(mentionedIdsByFieldRef.current).flat())).sort().join(String.fromCharCode(0)),
+  );
   // Reports the merged set of mentioned IDs (across every mention field) whenever any field changes.
   const handleMentionedIdsChange = (field: string) => (ids: string[]) => {
     const next = { ...mentionedIdsByFieldRef.current, [field]: ids };
     mentionedIdsByFieldRef.current = next;
-    setMentionedIdsByField(next);
     const merged = Array.from(new Set(Object.values(next).flat()));
+    const mergedKey = merged.slice().sort().join(String.fromCharCode(0));
+    if (mergedKey === lastMergedIdsKeyRef.current) return;
+    lastMergedIdsKeyRef.current = mergedKey;
     setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
     onUpdate(location.id, { mentionedEntityIds: merged });
   };

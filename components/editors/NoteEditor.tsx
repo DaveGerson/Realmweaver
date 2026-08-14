@@ -91,8 +91,13 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete
     // the cleaned list is ever persisted.
     if (e.target.name === 'tags') {
       const cleanedTags = Array.from(new Set(formData.tags.map(t => t.trim()).filter(Boolean)));
+      // Always reflect the cleaned list locally — even when it matches the
+      // already-persisted `note.tags` — so the input stops displaying the
+      // raw trailing comma/empty entry the user just typed (finding #108).
+      // Only the store write (which triggers a campaign-wide update) is
+      // gated on it actually differing from what's already saved.
+      setFormData(prev => ({ ...prev, tags: cleanedTags }));
       if (cleanedTags.join(',') !== note.tags.join(',')) {
-        setFormData(prev => ({ ...prev, tags: cleanedTags }));
         onUpdate(note.id, { tags: cleanedTags });
       }
     } else {

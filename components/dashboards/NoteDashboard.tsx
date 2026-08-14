@@ -126,8 +126,13 @@ export const NoteDashboard: React.FC<NoteDashboardProps> = ({ notes, onNoteCreat
                   </div>
                   <p className="text-sm text-slate-400 line-clamp-3 flex-grow">{note.content || <span className="italic opacity-50">Empty note...</span>}</p>
                   <div className="mt-2 flex gap-2 overflow-hidden">
-                      {note.tags.map(tag => (
-                          <span key={tag} className="text-[10px] bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded-full uppercase tracking-wider">{tag}</span>
+                      {/* Dedupe + drop empty entries at render time: notes persisted
+                          before the NoteEditor commit-time cleanup (or created via
+                          import/AI, which doesn't clean tags) can still carry
+                          duplicate/empty tags, which would otherwise produce a
+                          duplicate React key and an empty pill (finding #108). */}
+                      {Array.from(new Set(note.tags.filter(Boolean))).map((tag, i) => (
+                          <span key={`${tag}-${i}`} className="text-[10px] bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded-full uppercase tracking-wider">{tag}</span>
                       ))}
                   </div>
                   <div className="absolute bottom-2 right-2 text-[10px] text-slate-600">
