@@ -112,7 +112,7 @@ function buildFreeformPrompt(config: FreeformTextConfig, prompt: string): string
     config.taskDescription,
     config.outputConstraints,
     '',
-    config.userPromptTemplate.replace('{{prompt}}', prompt),
+    config.userPromptTemplate.replace('{{prompt}}', () => prompt),
   ].filter(Boolean).join('\n\n');
 }
 
