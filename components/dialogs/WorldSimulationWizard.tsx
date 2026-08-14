@@ -2,6 +2,7 @@
 import React, { useState, useCallback } from 'react';
 import type { Campaign } from '../../types/index';
 import type { WorldEvent } from '../../services/ai/worldSimulation';
+import { isValidSuggestedUpdate } from '../../services/ai/worldSimulation';
 import { generateWorldEvents } from '../../services/aiService';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
@@ -61,10 +62,18 @@ function resolveEntityName(campaign: Campaign, entityId: string, entityType: str
   }
 }
 
-// Apply a list of approved events to the campaign via campaignService
-function applyWorldEventsToCampaign(events: WorldEvent[]): void {
+// Apply a list of approved events to the campaign via campaignService.
+// Defense in depth: even though generateWorldEvents already filters
+// suggestedUpdates against the writable-field allowlist, re-validate here
+// at the write site so a model-chosen structural field (id, relationships,
+// factionId, ...) can never be written via Object.assign-based updaters.
+function applyWorldEventsToCampaign(campaign: Campaign, events: WorldEvent[]): void {
   for (const event of events) {
     for (const update of event.suggestedUpdates) {
+      if (!isValidSuggestedUpdate(campaign, update)) {
+        console.warn(`[WorldSim] Skipping invalid suggested update: ${update.entityType}.${update.field}`);
+        continue;
+      }
       switch (update.entityType) {
         case 'npc':
           campaignService.updateNpc(update.entityId, { [update.field]: update.proposedValue });
@@ -100,10 +109,14 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
   const [approvedIds, setApprovedIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [appliedCount, setAppliedCount] = useState(0);
+  // The events that were approved and applied, handed to the parent once the
+  // DM acknowledges the 'applied' confirmation via the Done button.
+  const [approvedEvents, setApprovedEvents] = useState<WorldEvent[]>([]);
   // Tracks which (eventId, updateIndex) pairs have been expanded beyond 3 lines
   const [expandedUpdates, setExpandedUpdates] = useState<Set<string>>(new Set());
-  // Cancellation ref — set to true when the user cancels mid-generation
-  const cancelledRef = React.useRef(false);
+  // Monotonic run id — identifies the current in-flight simulation request so
+  // a cancelled-then-superseded run can never populate the review list.
+  const runIdRef = React.useRef(0);
 
   const selectedLabel =
     DAYS_LABELS.reduce((best, opt) => {
@@ -112,26 +125,28 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
     }, DAYS_LABELS[0]).label;
 
   const handleSimulate = useCallback(async () => {
-    cancelledRef.current = false;
+    const myRun = ++runIdRef.current;
     setStep('loading');
     setError(null);
     try {
       const result = await generateWorldEvents(campaign, daysPassed, isMockMode);
-      // If the user cancelled while the promise was in-flight, discard the result
-      if (cancelledRef.current) return;
+      // If a newer run has started (or this one was cancelled) since this
+      // request began, discard the result — it belongs to a stale request.
+      if (runIdRef.current !== myRun) return;
       setEvents(result);
       // Default: all events approved
       setApprovedIds(new Set(result.map(e => e.id)));
       setStep('review');
     } catch (err) {
-      if (cancelledRef.current) return;
+      if (runIdRef.current !== myRun) return;
       setError(err instanceof Error ? err.message : 'An unknown error occurred.');
       setStep('setup');
     }
   }, [campaign, daysPassed, isMockMode]);
 
   const handleCancelGeneration = useCallback(() => {
-    cancelledRef.current = true;
+    // Invalidate the in-flight run so its eventual resolve/reject is ignored.
+    runIdRef.current += 1;
     setStep('setup');
   }, []);
 
@@ -161,10 +176,18 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
 
   const handleApply = () => {
     const approved = events.filter(e => approvedIds.has(e.id));
-    applyWorldEventsToCampaign(approved);
+    applyWorldEventsToCampaign(campaign, approved);
     setAppliedCount(approved.length);
-    onApplyEvents(approved);
+    setApprovedEvents(approved);
+    // Show the 'applied' confirmation first — onApplyEvents (which the
+    // parent uses to close the wizard) is deferred until the DM
+    // acknowledges via the Done button, so a destructive apply always
+    // gives visible feedback instead of the modal vanishing silently.
     setStep('applied');
+  };
+
+  const handleDone = () => {
+    onApplyEvents(approvedEvents);
   };
 
   const approvedCount = events.filter(e => approvedIds.has(e.id)).length;
@@ -364,7 +387,7 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
                                   <div className="flex-1 bg-green-950/30 border border-green-800/30 rounded p-2">
                                     <p className="text-green-400 text-[10px] font-semibold mb-0.5 uppercase tracking-wide">After</p>
                                     <p className={twMerge('text-slate-300 leading-relaxed', !isExpanded && 'line-clamp-3')}>
-                                      {upd.proposedValue}
+                                      {String(upd.proposedValue)}
                                     </p>
                                   </div>
                                 </div>
@@ -455,7 +478,7 @@ export const WorldSimulationWizard: React.FC<WorldSimulationWizardProps> = ({
 
           {step === 'applied' && (
             <div className="flex-1 flex justify-end">
-              <Button variant="primary" onClick={onClose}>Done</Button>
+              <Button variant="primary" onClick={handleDone}>Done</Button>
             </div>
           )}
         </div>

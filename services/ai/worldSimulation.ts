@@ -163,6 +163,53 @@ SETTING: ${campaign.setting}
   return prompt;
 }
 
+// Per-entity-type allowlist of writable, prose-string fields. Anything not
+// listed here (ids, relationship arrays, history, membership arrays, etc.)
+// is a structural field and must never be written from a model-supplied
+// `field` name — see wp-g1-worldsim-dialogs finding #14 / #5.
+export const WORLD_SIM_WRITABLE_FIELDS: Record<string, string[]> = {
+  npc: ['description', 'traits', 'backstory', 'motivations', 'secrets', 'stats', 'exampleQuote'],
+  faction: ['description', 'goals', 'alignment', 'resources', 'influence'],
+  location: ['description', 'secrets'],
+  plot: ['description'],
+  adventure: ['hook', 'theme'],
+};
+
+function entityExists(campaign: Campaign, entityType: string, entityId: string): boolean {
+  switch (entityType) {
+    case 'npc':
+      return campaign.npcs.some(e => e.id === entityId);
+    case 'faction':
+      return campaign.factions.some(e => e.id === entityId);
+    case 'location':
+      return campaign.locations.some(e => e.id === entityId);
+    case 'plot':
+      return (campaign.plots || []).some(e => e.id === entityId);
+    case 'adventure':
+      return campaign.adventures.some(e => e.id === entityId);
+    default:
+      return false;
+  }
+}
+
+/**
+ * Validates a single model-supplied suggested update against the writable
+ * field allowlist and the actual campaign data. Returns false for unknown
+ * entity types, non-allowlisted (structural) fields, non-string proposed
+ * values, or entity ids that don't exist in the campaign.
+ */
+export function isValidSuggestedUpdate(
+  campaign: Campaign,
+  update: { entityId: string; entityType: string; field: string; proposedValue: unknown }
+): boolean {
+  const allowedFields = WORLD_SIM_WRITABLE_FIELDS[update.entityType];
+  if (!allowedFields) return false;
+  if (!allowedFields.includes(update.field)) return false;
+  if (typeof update.proposedValue !== 'string') return false;
+  if (!entityExists(campaign, update.entityType, update.entityId)) return false;
+  return true;
+}
+
 export async function generateWorldEvents(
   campaign: Campaign,
   daysPassed: number,
@@ -181,13 +228,15 @@ export async function generateWorldEvents(
     campaignContext
   );
 
-  // Attach stable IDs to each event
+  // Attach stable IDs to each event, and drop any suggested update that
+  // names an unvalidated field, entity type, value type, or entity id —
+  // the event itself is always kept even if all of its updates are dropped.
   const events: WorldEvent[] = (result.events || []).map((e: Omit<WorldEvent, 'id'>) => ({
     ...e,
     id: crypto.randomUUID(),
     affectedEntityIds: e.affectedEntityIds || [],
     affectedEntityTypes: e.affectedEntityTypes || [],
-    suggestedUpdates: e.suggestedUpdates || [],
+    suggestedUpdates: (e.suggestedUpdates || []).filter(u => isValidSuggestedUpdate(campaign, u)),
   }));
 
   return events;
