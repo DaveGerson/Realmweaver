@@ -2294,20 +2294,33 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 const allLocationsInDraft = campaign.locations;
                 const allFactionsInDraft = campaign.factions;
         
+                // Finding #74: `npc.factionId` / `location.parentLocationId` may already
+                // be a resolved id (e.g. EvocationWizard's "Detailed" mode links a
+                // generated NPC/Location to an EXISTING faction/location by UUID, not
+                // by name) rather than the AI-generated name string the maps below are
+                // keyed on. Resolve BOTH cases so the reverse relationship
+                // (faction.memberIds / parent.subLocationIds) is always established —
+                // a name-only lookup silently drops the reverse link for any
+                // already-resolved id, breaking the bidirectional NPC<->Faction and
+                // Location-hierarchy invariant.
                 allNpcsInDraft.forEach(npc => {
-                    const factionName = npc.factionId;
-                    if (factionName && factionNameMap.has(factionName.toLowerCase())) {
-                        const resolvedFactionId = factionNameMap.get(factionName.toLowerCase())!;
+                    const factionRef = npc.factionId;
+                    if (!factionRef) return;
+                    const resolvedFactionId = factionNameMap.get(factionRef.toLowerCase())
+                        ?? (allFactionsInDraft.some(f => f.id === factionRef) ? factionRef : undefined);
+                    if (resolvedFactionId) {
                         const faction = allFactionsInDraft.find(f => f.id === resolvedFactionId);
                         if (faction && !faction.memberIds.includes(npc.id)) faction.memberIds.push(npc.id);
                         npc.factionId = resolvedFactionId;
                     }
                 });
-        
+
                 allLocationsInDraft.forEach(loc => {
-                    const parentLocationName = loc.parentLocationId;
-                    if (parentLocationName && locationNameMap.has(parentLocationName.toLowerCase())) {
-                        const resolvedParentId = locationNameMap.get(parentLocationName.toLowerCase())!;
+                    const parentRef = loc.parentLocationId;
+                    if (!parentRef) return;
+                    const resolvedParentId = locationNameMap.get(parentRef.toLowerCase())
+                        ?? (allLocationsInDraft.some(l => l.id === parentRef) ? parentRef : undefined);
+                    if (resolvedParentId && resolvedParentId !== loc.id) {
                         const parent = allLocationsInDraft.find(p => p.id === resolvedParentId);
                         if (parent && !parent.subLocationIds.includes(loc.id)) parent.subLocationIds.push(loc.id);
                         loc.parentLocationId = resolvedParentId;
