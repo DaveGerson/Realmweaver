@@ -1369,6 +1369,12 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
                 if (campaign) {
+                    // Drop a factionId that doesn't resolve to an existing faction
+                    // in this campaign (e.g. a chat-generator preview's synthetic
+                    // 'preview' id) rather than persisting a dangling reference.
+                    if (newNpc.factionId && !campaign.factions.some(f => f.id === newNpc.factionId)) {
+                        newNpc.factionId = undefined;
+                    }
                     campaign.npcs.push(newNpc);
                     // Also handle initial faction assignment
                     if (newNpc.factionId) {
@@ -1421,7 +1427,8 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             const newLocation: Location = { ...newLocationData, id: crypto.randomUUID() };
             // Ensure history is initialized
             if (!newLocation.history) newLocation.history = [];
-            
+            if (!newLocation.subLocationIds) newLocation.subLocationIds = [];
+
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
                 if(campaign) {
@@ -1487,6 +1494,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         
         createFaction(newFactionData: Omit<Faction, 'id'>) {
             const newFaction: Faction = { ...newFactionData, id: crypto.randomUUID() };
+            if (!newFaction.memberIds) newFaction.memberIds = [];
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
                 if(campaign) campaign.factions.push(newFaction)

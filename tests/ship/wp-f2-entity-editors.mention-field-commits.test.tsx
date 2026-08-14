@@ -34,6 +34,11 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup, fireEvent, waitFor } from '@testing-library/react';
 import type { Campaign, NPC } from '../../types/index';
 
+// Matches NpcEditorProps['onUpdate'] so the mock is assignable to the
+// component prop without weakening the assertions made against its calls.
+type OnUpdateFn = (id: string, updatedData: Partial<NPC>) => void;
+const createOnUpdateMock = () => vi.fn<OnUpdateFn>();
+
 vi.mock('../../services/aiService', () => ({
   generateEnhancedText: vi.fn(),
 }));
@@ -81,7 +86,7 @@ function descriptionField(container: HTMLElement): HTMLTextAreaElement {
   return el as HTMLTextAreaElement;
 }
 
-function renderEditor(onUpdate: ReturnType<typeof vi.fn>, strict = false) {
+function renderEditor(onUpdate: ReturnType<typeof createOnUpdateMock>, strict = false) {
   const tree = (
     <ConfirmDialogProvider>
       <NpcEditor
@@ -99,7 +104,7 @@ function renderEditor(onUpdate: ReturnType<typeof vi.fn>, strict = false) {
 
 describe('wp-f2-entity-editors #70 — MentionInput fields commit like every other field', () => {
   it('does not write to the store on every keystroke', async () => {
-    const onUpdate = vi.fn();
+    const onUpdate = createOnUpdateMock();
     const { container } = renderEditor(onUpdate);
     const field = descriptionField(container);
 
@@ -117,7 +122,7 @@ describe('wp-f2-entity-editors #70 — MentionInput fields commit like every oth
   });
 
   it('still commits the final text once the field settles', async () => {
-    const onUpdate = vi.fn();
+    const onUpdate = createOnUpdateMock();
     const { container } = renderEditor(onUpdate);
     const field = descriptionField(container);
 
@@ -136,7 +141,7 @@ describe('wp-f2-entity-editors #70 — MentionInput fields commit like every oth
 
 describe('wp-f2-entity-editors #69 — mention tracking must not write from a render-phase updater', () => {
   it('writes mentionedEntityIds at most once per change under StrictMode', () => {
-    const onUpdate = vi.fn();
+    const onUpdate = createOnUpdateMock();
     const { container } = renderEditor(onUpdate, true);
     const field = descriptionField(container);
 
