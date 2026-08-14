@@ -11,6 +11,24 @@ const FOCUSABLE_SELECTORS = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(', ');
 
+/**
+ * Whether an element inside the dialog is actually reachable by a keyboard
+ * user — i.e. not hidden behind an in-dialog overlay (inert/hidden/
+ * aria-hidden ancestor) and not itself display:none / visibility:hidden.
+ *
+ * NOTE: deliberately does NOT rely on `el.offsetParent` or
+ * `el.getClientRects()` — jsdom performs no layout, so those are always
+ * null/empty even for elements that are genuinely visible, which would
+ * filter out every element under any jsdom-based test. Attribute and
+ * computed-style checks work correctly in both jsdom and real browsers.
+ */
+function isReachable(el: HTMLElement): boolean {
+  if (el.closest('[inert], [hidden], [aria-hidden="true"]')) return false;
+  const style = window.getComputedStyle(el);
+  if (style.display === 'none' || style.visibility === 'hidden') return false;
+  return true;
+}
+
 interface DialogShellProps {
   isOpen: boolean;
   onClose: () => void;
@@ -41,6 +59,14 @@ export const DialogShell: React.FC<DialogShellProps> = ({
 
   // Focus the first focusable element when opened; restore focus when closed.
   const previousFocusRef = useRef<Element | null>(null);
+
+  // Tracks whether the mousedown that started the current press landed
+  // directly on the backdrop (not inside the panel). A `click` event fires
+  // on the nearest common ancestor of the mousedown/mouseup targets, so a
+  // text-selection drag that starts inside the panel and is released over
+  // the backdrop would otherwise dispatch its click on the backdrop and
+  // close the dialog, discarding unsaved in-progress state.
+  const backdropPressStartedRef = useRef(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -89,9 +115,7 @@ export const DialogShell: React.FC<DialogShellProps> = ({
         const allFocusable: HTMLElement[] = Array.from(
           dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTORS)
         );
-        const focusable: HTMLElement[] = allFocusable.filter(
-          (el: HTMLElement) => !el.closest('[aria-hidden="true"]')
-        );
+        const focusable: HTMLElement[] = allFocusable.filter(isReachable);
 
         if (focusable.length === 0) {
           e.preventDefault();
@@ -117,9 +141,15 @@ export const DialogShell: React.FC<DialogShellProps> = ({
     [onClose]
   );
 
+  const handleBackdropMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    backdropPressStartedRef.current = e.target === e.currentTarget;
+  }, []);
+
   const handleBackdropClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      if (e.target === e.currentTarget) {
+      const pressStartedOnBackdrop = backdropPressStartedRef.current;
+      backdropPressStartedRef.current = false;
+      if (e.target === e.currentTarget && pressStartedOnBackdrop) {
         onClose();
       }
     },
@@ -131,6 +161,7 @@ export const DialogShell: React.FC<DialogShellProps> = ({
   return (
     <div
       className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center"
+      onMouseDown={handleBackdropMouseDown}
       onClick={handleBackdropClick}
       // Keyboard events bubble up from children inside the portal
     >

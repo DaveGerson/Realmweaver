@@ -1,5 +1,5 @@
 
-import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 
 interface ConfirmOptions {
@@ -39,6 +39,10 @@ export const ConfirmDialogProvider: React.FC<ConfirmDialogProviderProps> = ({ ch
 
   const confirm = useCallback(
     (title: string, message: string, options: ConfirmOptions = {}): Promise<boolean> => {
+      // A second confirm() while one is already pending supersedes it: the
+      // newest dialog becomes the visible one, and the superseded promise
+      // must still settle (with false) rather than hang forever.
+      resolveRef.current?.(false);
       return new Promise<boolean>((resolve) => {
         resolveRef.current = resolve;
         setDialogState({ isOpen: true, title, message, options });
@@ -57,6 +61,15 @@ export const ConfirmDialogProvider: React.FC<ConfirmDialogProviderProps> = ({ ch
     resolveRef.current?.(false);
     resolveRef.current = null;
     setDialogState(INITIAL_STATE);
+  }, []);
+
+  // If the provider unmounts while a confirm() is still pending, settle it
+  // with false instead of leaking the promise forever.
+  useEffect(() => {
+    return () => {
+      resolveRef.current?.(false);
+      resolveRef.current = null;
+    };
   }, []);
 
   return React.createElement(
