@@ -106,11 +106,13 @@ export async function startAudioTranscription(
           const base64Data = btoa(binary);
 
           if (sessionPromise) {
-            sessionPromise.then(session => {
-              session.sendRealtimeInput({
-                media: { mimeType: 'audio/pcm;rate=16000', data: base64Data },
-              });
-            });
+            sessionPromise
+              .then(session => {
+                session.sendRealtimeInput({
+                  media: { mimeType: 'audio/pcm;rate=16000', data: base64Data },
+                });
+              })
+              .catch(onError);
           }
         };
 
@@ -140,6 +142,19 @@ export async function startAudioTranscription(
       },
     },
   });
+
+  // Await the connection so a rejection (e.g. an invalid API key) actually
+  // propagates to the caller instead of leaving a live mic stream with no
+  // way to detect the failure (finding #41). Tear down the mic/audio
+  // context first so the browser's recording indicator goes off and the
+  // resources don't leak on a failed connection attempt.
+  try {
+    await sessionPromise;
+  } catch (err) {
+    sessionPromise = null;
+    await teardown();
+    throw err;
+  }
 
   return {
     stop: teardown,

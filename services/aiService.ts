@@ -2,6 +2,7 @@
 import type { NPC, Location, Faction, RollableTable, Item, Scene, Adventure, Article, PointOfInterest, PlayerCharacter, RealmChatResponse, ChatMessage, DraftEntity, ModelTier, Campaign } from '../types/index';
 import type { BatchAddData, AdventureForBatchAdd, SceneType, SceneStatus } from '../types/index';
 import type { WorldEvent } from './ai/worldSimulation';
+import type { AudioTranscriptionConfig, AudioTranscriptionSession } from './ai/audioTranscription';
 
 import * as aiRealmWeaver from './ai/realmWeaver';
 import * as aiDmCoach from './ai/dmCoach';
@@ -10,6 +11,7 @@ import * as aiRealmChat from './ai/realmChat';
 import * as aiWorldSimulation from './ai/worldSimulation';
 import * as aiStyleMatching from './ai/styleMatching';
 import * as mockService from './ai/mockService';
+import * as aiAudioTranscription from './ai/audioTranscription';
 
 export const generateNpc = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<NPC, 'id' | 'factionId'>> => {
   if (isMockMode) {
@@ -245,6 +247,23 @@ export const analyzeWritingStyle = (
         return mockService.analyzeWritingStyle(samples, campaignContext);
     }
     return aiStyleMatching.analyzeWritingStyle(samples, campaignContext);
+};
+
+/**
+ * Starts a real-time audio transcription session (AI Scribe). Per
+ * CLAUDE.md, this is the only entry point components should import — never
+ * `services/ai/audioTranscription` directly — so mock mode is always
+ * honoured (finding #42). Pass `isMockMode: true` on the config to route to
+ * the mock, which emits canned transcript chunks on a timer and never
+ * touches the microphone or the real-time Gemini Live API.
+ */
+export const startAudioTranscription = (
+    config: AudioTranscriptionConfig & { isMockMode?: boolean }
+): Promise<AudioTranscriptionSession> => {
+    if (config.isMockMode) {
+        return mockService.startAudioTranscription(config);
+    }
+    return aiAudioTranscription.startAudioTranscription(config);
 };
 
 export { WorldEvent };

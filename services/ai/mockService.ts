@@ -2,6 +2,7 @@
 import type { NPC, Location, Faction, RollableTable, Item, Scene, SceneType, AdventureForBatchAdd, Article, PointOfInterest, PlayerCharacter, RealmChatResponse, ChatMessage, DraftEntity, ModelTier, Campaign } from '../../types/index';
 import type { BatchAddData } from '../../types/index';
 import type { WorldEvent } from './worldSimulation';
+import type { AudioTranscriptionConfig, AudioTranscriptionSession } from './audioTranscription';
 
 // --- Mock Data ---
 const mockNpcData: Omit<NPC, 'id' | 'factionId'> = {
@@ -714,4 +715,44 @@ export const generateWorldEvents = async (
 
     // Only include events that have at least some campaign data to anchor them
     return Promise.resolve(events);
+};
+
+// --- Audio Transcription (Mock) ---
+const MOCK_TRANSCRIPT_CHUNKS = [
+    "The party approaches the crumbling gate.",
+    "Someone whispers, 'Did you hear that?'",
+    "Dice clatter across the table.",
+];
+
+/**
+ * Mock implementation of audio transcription. Never touches the microphone
+ * or the real-time Gemini Live API — instead emits a handful of canned
+ * transcript chunks on a short timer, so mock-mode runs and E2E tests never
+ * open a live, billed websocket or request mic permission (finding #42).
+ */
+export const startAudioTranscription = (
+    config: AudioTranscriptionConfig
+): Promise<AudioTranscriptionSession> => {
+    const { onTranscript, onConnected, onDisconnected } = config;
+
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    let stopped = false;
+
+    timers.push(setTimeout(() => {
+        if (!stopped) onConnected();
+    }, 0));
+
+    MOCK_TRANSCRIPT_CHUNKS.forEach((chunk, i) => {
+        timers.push(setTimeout(() => {
+            if (!stopped) onTranscript(chunk);
+        }, (i + 1) * 50));
+    });
+
+    const stop = async (): Promise<void> => {
+        stopped = true;
+        timers.forEach(clearTimeout);
+        onDisconnected();
+    };
+
+    return Promise.resolve({ stop });
 };
