@@ -10,10 +10,9 @@ import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { EntityLink } from '../common/EntityLink';
 import { campaignService } from '../../services/campaignService';
 import { AiTextarea } from '../common/Textarea';
-import { generateEnhancedText, analyzeSessionNotes } from '../../services/aiService';
+import { generateEnhancedText, analyzeSessionNotes, startAudioTranscription } from '../../services/aiService';
 import { twMerge } from 'tailwind-merge';
-import { startAudioTranscription } from '../../services/ai/audioTranscription';
-import type { AudioTranscriptionSession } from '../../services/ai/audioTranscription';
+import type { AudioTranscriptionSession } from '../../services/aiService';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
 import { BacklinksPanel } from '../common/BacklinksPanel';
 
@@ -65,6 +64,16 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
   // Transcript file import state
   const [isImportingTranscript, setIsImportingTranscript] = useState(false);
   const transcriptFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Live transcript preview — auto-scrolls to the newest text as it streams in,
+  // since the preview box is height-capped and has no auto-scroll otherwise.
+  const transcriptPreviewRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = transcriptPreviewRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [liveTranscript]);
 
   const activePlots = campaign.plots.filter(p => p.status === 'active');
 
@@ -127,7 +136,14 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
     }
   }
 
+  // A second, unguarded door to "there can only be one active session" (the
+  // same guarantee campaignService.goLive enforces): this button bypasses
+  // goLive entirely, so it must not be clickable while another log is
+  // already active or it would produce two logs with status 'active'.
+  const anotherSessionIsLive = campaign.sessionLogs.some(s => s.status === 'active' && s.id !== log.id);
+
   const handleStartSession = () => {
+      if (anotherSessionIsLive) return;
       onUpdate(log.id, { status: 'active', sessionDate: new Date().toISOString() });
   }
 
@@ -333,9 +349,17 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
         });
         
         if (newEntries.length > 0) {
-            const updatedNotes = [...(formData.structuredNotes || []), ...newEntries];
-            setFormData(prev => ({...prev, structuredNotes: updatedNotes}));
-            onUpdate(log.id, { structuredNotes: updatedNotes });
+            // Derive the merged list from the CURRENT structuredNotes (functional
+            // update), not the `formData` captured in this closure at click time —
+            // analysis takes seconds and the Log Entries tab stays interactive, so
+            // manual adds/removes made while this was in flight must not be
+            // silently clobbered when the AI-derived entries land (see #65's fix
+            // for handleGenerateNpcForScene, same shape).
+            setFormData(prev => {
+                const next = [...(prev.structuredNotes || []), ...newEntries];
+                onUpdate(log.id, { structuredNotes: next });
+                return { ...prev, structuredNotes: next };
+            });
             setActiveTab('structured');
         }
     } catch (e) {
@@ -378,8 +402,17 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
                             const val = e.target.value;
                             // <input type="date"> can be cleared by the user, which fires
                             // onChange with ''. Ignore invalid/empty values instead of
-                            // persisting a sessionDate that later throws on render.
-                            if (!val || Number.isNaN(new Date(val).getTime())) return;
+                            // persisting a sessionDate that later throws on render — but
+                            // still force a state update (a no-op spread) so React
+                            // re-renders and pushes the retained sessionDate back into
+                            // this controlled input. Without it, the DOM value stays at
+                            // '' (the browser already cleared it) even though formData
+                            // and the store still hold the real date, until some
+                            // unrelated re-render happens to resync it.
+                            if (!val || Number.isNaN(new Date(val).getTime())) {
+                                setFormData(prev => ({ ...prev }));
+                                return;
+                            }
                             setFormData(prev => ({...prev, sessionDate: val}));
                             onUpdate(log.id, { sessionDate: val });
                         }}
@@ -469,7 +502,12 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
                         </div>
                     </div>
 
-                    <Button onClick={handleStartSession} className="bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/20">
+                    <Button
+                        onClick={handleStartSession}
+                        disabled={anotherSessionIsLive}
+                        title={anotherSessionIsLive ? 'A session is already live' : undefined}
+                        className="bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/20"
+                    >
                         <Icons.Play className="w-4 h-4 mr-2" /> Start Session
                     </Button>
                     {onGoLive && (
@@ -643,11 +681,14 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
                             value={formData.runningNotes}
                             onChange={handleChange}
                             onBlur={handleBlur}
-                            className="w-full h-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-amber-500 outline-none resize-none placeholder:text-slate-600 font-mono leading-relaxed pb-12"
+                            className="w-full flex-1 min-h-0 bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-amber-500 outline-none resize-none placeholder:text-slate-600 font-mono leading-relaxed pb-12"
                             placeholder="Freeform text area for quick, unstructured notes..."
                         />
                         {liveTranscript && (
-                            <div className="mt-2 text-xs text-slate-500 bg-slate-950/60 border border-slate-800 rounded-md px-3 py-2 max-h-24 overflow-y-auto custom-scrollbar">
+                            <div
+                                ref={transcriptPreviewRef}
+                                className="mt-2 flex-shrink-0 text-xs text-slate-500 bg-slate-950/60 border border-slate-800 rounded-md px-3 py-2 max-h-24 overflow-y-auto custom-scrollbar"
+                            >
                                 <span className="text-slate-400 font-semibold">[Live Transcription]: </span>
                                 {liveTranscript}
                             </div>

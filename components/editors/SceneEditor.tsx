@@ -103,6 +103,15 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
   const [dismissedSuggestionIds, setDismissedSuggestionIds] = useState<Set<string>>(new Set());
   const { confirm } = useConfirmDialog();
 
+  // Mirrors formData.npcIds so async handlers (e.g. NPC generation, which spans
+  // an await) can read the CURRENT npcIds without a store write inside a
+  // setFormData updater — React (and StrictMode double-invocation) requires
+  // updaters to be pure, so `onUpdate` must never be called from inside one.
+  const npcIdsRef = useRef(formData.npcIds);
+  useEffect(() => {
+    npcIdsRef.current = formData.npcIds;
+  }, [formData.npcIds]);
+
   // Tracks the last `scene` prop we've reconciled against, so incoming prop
   // updates can be merged field-by-field instead of overwriting formData wholesale.
   const prevSceneRef = useRef(scene);
@@ -189,6 +198,23 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
 
   const sceneEntityContext = `Scene Title: ${formData.title}\nScene Type: ${formData.type}\nRead-Aloud Text: ${formData.readAloudText || 'Not specified'}\nGM Notes: ${formData.gmNotes || 'Not specified'}`;
 
+  // Stable candidate arrays for the linking panels below. These are useMemo
+  // deps (LinkSuggestionsPanel.tsx) for its matching-engine memo — building
+  // fresh array literals inline on every render defeats that memo entirely,
+  // so `findMatches` would re-run on every keystroke (finding #50).
+  const npcCandidates = useMemo<EntityCandidate[]>(
+    () => allNpcs.map((n): EntityCandidate => ({ id: n.id, name: n.name, type: 'npc' })),
+    [allNpcs],
+  );
+  const locationCandidates = useMemo<EntityCandidate[]>(
+    () => allLocations.map((l): EntityCandidate => ({ id: l.id, name: l.name, type: 'location' })),
+    [allLocations],
+  );
+  const allLinkCandidates = useMemo<EntityCandidate[]>(
+    () => [...npcCandidates, ...locationCandidates],
+    [npcCandidates, locationCandidates],
+  );
+
   // ── Generate NPC for Scene ─────────────────────────────────────────────────
   const sceneLocation = allLocations.find(l => l.id === scene.locationId);
   const npcGenerationDefaultPrompt = sceneLocation
@@ -200,15 +226,17 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
     try {
       const npcData = await generateNpc(prompt, isMockMode, campaignContext);
       const newNpcId = campaignService.createNpc({ ...npcData, factionId: undefined, relationships: [], history: [] });
-      // Derive the payload from the CURRENT npcIds (functional update), not the
-      // `formData` captured in this closure at click time — generation takes
-      // seconds and the NPC checkbox list stays interactive, so any NPC ticked
-      // while this was in flight must not be dropped.
-      setFormData(prev => {
-        const next = [...prev.npcIds, newNpcId];
-        onUpdate(scene.id, { npcIds: next });
-        return { ...prev, npcIds: next };
-      });
+      // Derive the payload from the CURRENT npcIds via the ref (kept in sync by
+      // the effect above), not the `formData` captured in this closure at click
+      // time — generation takes seconds and the NPC checkbox list stays
+      // interactive, so any NPC ticked while this was in flight must not be
+      // dropped. `onUpdate` is called here, outside the setFormData updater, so
+      // the updater itself stays a pure function of `prev` (safe under
+      // StrictMode's double-invocation of updaters).
+      const next = [...npcIdsRef.current, newNpcId];
+      npcIdsRef.current = next;
+      setFormData(prev => ({ ...prev, npcIds: next }));
+      onUpdate(scene.id, { npcIds: next });
     } catch (error) {
       console.error('Failed to generate NPC for scene:', error);
     } finally {
@@ -449,8 +477,8 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                 gmNotes={formData.gmNotes}
                 currentNpcIds={formData.npcIds}
                 currentLocationId={formData.locationId ?? null}
-                allNpcs={allNpcs.map((n): EntityCandidate => ({ id: n.id, name: n.name, type: 'npc' }))}
-                allLocations={allLocations.map((l): EntityCandidate => ({ id: l.id, name: l.name, type: 'location' }))}
+                allNpcs={npcCandidates}
+                allLocations={locationCandidates}
                 onAddNpc={handleNpcToggle}
                 onSetLocation={(locationId) => {
                   setFormData(prev => ({ ...prev, locationId }));
@@ -463,10 +491,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                 textFields={[formData.readAloudText, formData.gmNotes]}
                 linkedNpcIds={formData.npcIds}
                 linkedLocationId={formData.locationId ?? null}
-                allCandidates={[
-                  ...allNpcs.map((n): EntityCandidate => ({ id: n.id, name: n.name, type: 'npc' })),
-                  ...allLocations.map((l): EntityCandidate => ({ id: l.id, name: l.name, type: 'location' })),
-                ]}
+                allCandidates={allLinkCandidates}
                 onAccept={(entityId, action) => {
                   const npcMatch = allNpcs.find(n => n.id === entityId);
                   if (npcMatch) {

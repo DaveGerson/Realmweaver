@@ -33,6 +33,9 @@ type TranscriptOptions = {
 
 let captured: TranscriptOptions | null = null;
 
+// SessionLogEditor imports `startAudioTranscription` from the aiService facade
+// (never `services/ai/audioTranscription` directly, per CLAUDE.md), so the
+// facade mock below is what actually backs the component under test.
 vi.mock('../../services/ai/audioTranscription', () => ({
   startAudioTranscription: async (opts: TranscriptOptions) => {
     captured = opts;
@@ -44,6 +47,11 @@ vi.mock('../../services/ai/audioTranscription', () => ({
 vi.mock('../../services/aiService', () => ({
   generateEnhancedText: vi.fn(async () => ''),
   analyzeSessionNotes: vi.fn(async () => ({ entries: [] })),
+  startAudioTranscription: async (opts: TranscriptOptions) => {
+    captured = opts;
+    opts.onConnected();
+    return { stop: async () => {} };
+  },
 }));
 
 const { SessionLogEditor } = await import('../../components/editors/SessionLogEditor');
