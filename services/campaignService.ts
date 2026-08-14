@@ -24,7 +24,7 @@ import type {
     Beat,
     DmStyle
 } from '../types/index';
-import { importCampaignFromJson } from './importExportService';
+import { importCampaignFromJsonValidated } from './importExportService';
 import { parseCharacterSheetPdf } from './aiService';
 import { storageService } from './storageService';
 import { autoLinkScenes, autoLinkNpcFactions } from './linking/autoLinker';
@@ -85,6 +85,68 @@ function migrateCampaignsData(campaignsData: any[]): Campaign[] {
         // Ensure activeEncounter is initialized if missing in older saves
         activeEncounter: c.activeEncounter || { id: crypto.randomUUID(), round: 1, turnIndex: 0, combatants: [] },
     }));
+}
+
+/** Reads a File's contents as text via FileReader (works in both browser and jsdom test envs). */
+function _readFileAsText(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => resolve((event.target?.result as string) ?? '');
+        reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'));
+        reader.readAsText(file);
+    });
+}
+
+/**
+ * Finding #38: `importExportService.validateImportedCampaign` (owned by
+ * wp-b-import-export) doesn't know about the legacy `plots[].name` /
+ * `plots[].keyNpcIds` shape — its generic title-entity validator auto-names
+ * an untitled plot "Unnamed Plot N" and its array-normaliser resets a missing
+ * `relatedEntityIds` to `[]`, which happens BEFORE campaignService ever sees
+ * the data and permanently destroys the legacy field values. `init()` (via
+ * `migrateCampaignsData`) migrates this exact legacy shape correctly because
+ * it reads localStorage JSON directly, with no intervening validator.
+ *
+ * To make the import path apply the identical migration without editing
+ * `importExportService.ts` (out of scope for wp-a-persistence), this rewrites
+ * the raw file contents BEFORE handing them to `importCampaignFromJsonValidated`
+ * — by the time the validator sees the plot, `title`/`relatedEntityIds` are
+ * already populated exactly as `migrateCampaignsData` would have set them, so
+ * the validator's own fallback naming never has a reason to fire.
+ * Falls back to the original file untouched if it isn't valid JSON (the
+ * validator's own parse-error handling still applies unchanged) or contains
+ * no `plots` array.
+ */
+async function _preMigrateLegacyPlotFields(file: File): Promise<File> {
+    let raw: string;
+    try {
+        raw = await _readFileAsText(file);
+    } catch {
+        return file;
+    }
+
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(raw);
+    } catch {
+        return file; // Let importCampaignFromJsonValidated report the parse error as usual.
+    }
+
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return file;
+    const data = parsed as Record<string, unknown>;
+    if (!Array.isArray(data.plots)) return file;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    data.plots = (data.plots as any[]).map((p) => {
+        if (!p || typeof p !== 'object') return p;
+        return {
+            ...p,
+            title: p.title || p.name || undefined,
+            relatedEntityIds: p.relatedEntityIds || p.keyNpcIds || undefined,
+        };
+    });
+
+    return new File([JSON.stringify(data)], file.name, { type: file.type || 'application/json' });
 }
 
 type CampaignState = {
@@ -838,41 +900,50 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
 
             return newCampaignId;
         },
-        async importCampaign(file: File): Promise<string> {
+        /**
+         * Imports a campaign from an exported JSON file.
+         *
+         * Finding #12: uses `importCampaignFromJsonValidated` (rather than the
+         * throw-on-error `importCampaignFromJson` wrapper) so the structural
+         * validation warnings collected by `validateImportedCampaign` (e.g.
+         * "N NPC(s) were removed because they were missing a required id
+         * field") are not silently discarded — they are returned to the
+         * caller alongside the title so the UI can surface each one. On
+         * validation failure, throws (preserving the previous catch/throw
+         * contract callers already rely on).
+         *
+         * Finding #38: runs the imported campaign through the same
+         * `migrateCampaignsData` mapper `init()` uses, so legacy fields
+         * (`plots[].name` → `title`, `plots[].keyNpcIds` → `relatedEntityIds`,
+         * and every other required-array backfill) are migrated identically
+         * regardless of which ingestion path the data came through.
+         */
+        async importCampaign(file: File): Promise<{ title: string; warnings: string[] }> {
             try {
-                const importedCampaign = await importCampaignFromJson(file);
+                const preMigratedFile = await _preMigrateLegacyPlotFields(file);
+                const result = await importCampaignFromJsonValidated(preMigratedFile);
+                if (!result.success || !result.campaign) {
+                    throw new Error(result.errors.join(' '));
+                }
+                const warnings = result.warnings;
+                const rawCampaign = result.campaign;
+
+                let finalTitle = rawCampaign.title;
                 updateState(draft => {
-                    if (draft.campaigns.some(c => c.id === importedCampaign.id)) {
-                        importedCampaign.id = crypto.randomUUID();
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const campaignToImport: any = { ...rawCampaign };
+                    if (draft.campaigns.some(c => c.id === campaignToImport.id)) {
+                        campaignToImport.id = crypto.randomUUID();
                     }
-                    // Ensure compatibility
-                    importedCampaign.settingType = importedCampaign.settingType || 'custom';
-                    importedCampaign.plots = importedCampaign.plots || [];
-                    importedCampaign.notes = importedCampaign.notes || [];
-                    importedCampaign.sessionLogs = (importedCampaign.sessionLogs || []).map((l: any) => ({
-                        ...l, 
-                        structuredNotes: l.structuredNotes || [],
-                        relatedPlotIds: l.relatedPlotIds || []
-                    }));
-                    importedCampaign.playerCharacters = importedCampaign.playerCharacters || [];
-                    importedCampaign.npcs = (importedCampaign.npcs || []).map(n => ({...n, relationships: n.relationships || [], history: n.history || []}));
-                    importedCampaign.locations = (importedCampaign.locations || []).map(l => ({...l, history: l.history || []}));
-                    // Imported JSON is only lightly validated (id/name checks) — backfill
-                    // required array fields on factions/adventures so later CRUD (faction
-                    // membership sync, location/adventure deletion, etc.) can't crash on
-                    // an undefined array.
-                    importedCampaign.factions = (importedCampaign.factions || []).map(f => ({ ...f, memberIds: f.memberIds || [] }));
-                    importedCampaign.adventures = (importedCampaign.adventures || []).map(a => ({
-                        ...a,
-                        scenes: (a.scenes || []).map(s => ({ ...s, npcIds: s.npcIds || [] })),
-                    }));
-                    importedCampaign.activeEncounter = importedCampaign.activeEncounter || { id: crypto.randomUUID(), round: 1, turnIndex: 0, combatants: [] };
-                    
-                    draft.campaigns.push(importedCampaign);
+
+                    const [migrated] = migrateCampaignsData([campaignToImport]);
+                    finalTitle = migrated.title;
+
+                    draft.campaigns.push(migrated);
                     draft.activeCampaignId = null;
                     draft.appStatus = 'selecting';
                 });
-                return importedCampaign.title;
+                return { title: finalTitle, warnings };
             } catch (error) {
                 console.error("Import failed:", error);
                 throw error;
