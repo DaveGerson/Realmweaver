@@ -32,6 +32,14 @@ export interface LinkSuggestionsPanelProps {
 
 const CONFIDENCE_THRESHOLD = 0.5;
 
+// Module-level stable identity so the `dismissedIds` default doesn't defeat
+// the suggestions useMemo below: a fresh `new Set()` created inline as a
+// default parameter gets a NEW identity on every render, which never equals
+// the previous render's default by reference, so the memo (which lists
+// `dismissedIds` as a dep) recomputed — and re-ran the O(candidates ×
+// matches × textLength) matching engine — on every render (finding #50).
+const EMPTY_SET: Set<string> = new Set();
+
 function getActionLabel(entityType: string): string {
   switch (entityType) {
     case 'npc':      return 'Add NPC';
@@ -58,7 +66,7 @@ export const LinkSuggestionsPanel: React.FC<LinkSuggestionsPanelProps> = ({
   onAccept,
   onDismiss,
   onNavigate: _onNavigate,
-  dismissedIds = new Set(),
+  dismissedIds = EMPTY_SET,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
