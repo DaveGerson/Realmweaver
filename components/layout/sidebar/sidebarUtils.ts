@@ -43,6 +43,19 @@ export function resolvePinnedEntityName(campaign: Campaign, type: string, id: st
     case 'session-log': return campaign.sessionLogs?.find(e => e.id === id)?.title ?? null;
     case 'player-character': return campaign.playerCharacters?.find(e => e.id === id)?.characterSocial?.characterName ?? null;
     case 'plot': return campaign.plots?.find(e => e.id === id)?.title ?? null;
+    // Findings #92/#102: 'scene' and 'note' are pinnable (QuickCardEntityType
+    // includes both, and EntityQuickCard's pin button calls pinEntity
+    // unconditionally) but were missing here, so a pinned scene/note fell
+    // into `default: return null` and PinnedEntities dropped the row —
+    // leaving an unremovable pin permanently occupying one of the 15 slots.
+    case 'scene': {
+      for (const adv of campaign.adventures) {
+        const scene = adv.scenes.find(s => s.id === id);
+        if (scene) return scene.title;
+      }
+      return null;
+    }
+    case 'note': return campaign.notes?.find(e => e.id === id)?.title ?? null;
     default: return null;
   }
 }

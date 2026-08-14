@@ -273,6 +273,15 @@ export const Header: React.FC<HeaderProps> = ({
                     <span>Save Failed (Retry)</span>
                  </button>
              )}
+             {saveStatus === 'quota-warning' && (
+                 <span
+                    className="flex items-center gap-2 text-amber-400"
+                    title="Your browser's local storage is full — this save was written to a fallback IndexedDB store instead. Free up storage space to restore normal saving."
+                 >
+                    <Icons.AlertTriangle className="w-4 h-4" />
+                    <span>Saved (fallback storage)</span>
+                 </span>
+             )}
           </div>
 
           <div className="hidden sm:block h-6 w-px bg-slate-700"></div>

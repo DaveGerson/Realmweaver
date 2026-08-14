@@ -23,17 +23,25 @@ export function useEntitySearch<T extends { id: string; name: string; [key: stri
   const [searchTerm, setSearchTerm] = useState('');
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
+  // Finding #59: every call site passes an inline array literal
+  // (`useEntitySearch(npcs, ['name', 'description', 'traits'])`), so a fresh
+  // array is allocated on every render and the memo below never hit its
+  // cache if keyed on `searchFields` identity. Key on the field NAMES
+  // instead — an equal-but-new array reuses the memoised filter result.
+  const fieldKey = searchFields.join(',');
+
   const filteredEntities = useMemo(() => {
     const trimmed = deferredSearchTerm.trim().toLowerCase();
     if (!trimmed) return entities;
+    const fields = fieldKey ? fieldKey.split(',') : [];
     return entities.filter(entity => {
-      return searchFields.some(field => {
+      return fields.some(field => {
         const value = entity[field];
         if (value == null) return false;
         return String(value).toLowerCase().includes(trimmed);
       });
     });
-  }, [entities, searchFields, deferredSearchTerm]);
+  }, [entities, fieldKey, deferredSearchTerm]);
 
   return { filteredEntities, searchTerm, setSearchTerm };
 }
