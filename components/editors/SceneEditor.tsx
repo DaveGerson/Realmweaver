@@ -200,9 +200,15 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
     try {
       const npcData = await generateNpc(prompt, isMockMode, campaignContext);
       const newNpcId = campaignService.createNpc({ ...npcData, factionId: undefined, relationships: [], history: [] });
-      const newNpcIds = [...formData.npcIds, newNpcId];
-      setFormData(prev => ({ ...prev, npcIds: newNpcIds }));
-      onUpdate(scene.id, { npcIds: newNpcIds });
+      // Derive the payload from the CURRENT npcIds (functional update), not the
+      // `formData` captured in this closure at click time — generation takes
+      // seconds and the NPC checkbox list stays interactive, so any NPC ticked
+      // while this was in flight must not be dropped.
+      setFormData(prev => {
+        const next = [...prev.npcIds, newNpcId];
+        onUpdate(scene.id, { npcIds: next });
+        return { ...prev, npcIds: next };
+      });
     } catch (error) {
       console.error('Failed to generate NPC for scene:', error);
     } finally {

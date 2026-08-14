@@ -34,6 +34,18 @@ declare global {
   }
 }
 
+/**
+ * Converts a stored sessionDate (ISO string, or any value) into the
+ * 'YYYY-MM-DD' shape <input type="date"> expects. Falls back to '' for
+ * empty/garbage values instead of throwing (RangeError: Invalid time value),
+ * so a log whose stored sessionDate is already corrupted can still render
+ * and be repaired from the UI.
+ */
+function toDateInputValue(sessionDate: string): string {
+  const d = new Date(sessionDate);
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0];
+}
+
 export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaign, onUpdate, onDelete, isMockMode, onGoLive, onNavigate }) => {
   const [formData, setFormData] = useState(log);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -140,10 +152,14 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
       const combinedNotes = `${formData.runningNotes}\n\n${structuredText}`;
       
       const prompt = `Based on the following rough notes taken during the session, write a cohesive narrative recap of the events:\n\n${combinedNotes}`;
+      const context = `Campaign: ${campaign.title}\nSetting: ${campaign.setting}`;
       try {
-          const recap = await generateEnhancedText(prompt, undefined, isMockMode);
+          const recap = await generateEnhancedText(prompt, context, isMockMode);
           setFormData(prev => ({...prev, recap}));
           onUpdate(log.id, { recap });
+      } catch (e) {
+          console.error('Recap generation failed', e);
+          addToast('Failed to generate recap. See console.', 'error');
       } finally {
           setIsGenerating(false);
       }
@@ -357,9 +373,13 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
                       <input
                         type="date"
                         name="sessionDate"
-                        value={new Date(formData.sessionDate).toISOString().split('T')[0]}
+                        value={toDateInputValue(formData.sessionDate)}
                         onChange={(e) => {
                             const val = e.target.value;
+                            // <input type="date"> can be cleared by the user, which fires
+                            // onChange with ''. Ignore invalid/empty values instead of
+                            // persisting a sessionDate that later throws on render.
+                            if (!val || Number.isNaN(new Date(val).getTime())) return;
                             setFormData(prev => ({...prev, sessionDate: val}));
                             onUpdate(log.id, { sessionDate: val });
                         }}
@@ -620,12 +640,18 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
                       <div className="relative h-full flex flex-col">
                         <textarea
                             name="runningNotes"
-                            value={formData.runningNotes + (liveTranscript ? `\n\n[Live Transcription]: ${liveTranscript}` : "")}
+                            value={formData.runningNotes}
                             onChange={handleChange}
                             onBlur={handleBlur}
                             className="w-full h-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-amber-500 outline-none resize-none placeholder:text-slate-600 font-mono leading-relaxed pb-12"
                             placeholder="Freeform text area for quick, unstructured notes..."
                         />
+                        {liveTranscript && (
+                            <div className="mt-2 text-xs text-slate-500 bg-slate-950/60 border border-slate-800 rounded-md px-3 py-2 max-h-24 overflow-y-auto custom-scrollbar">
+                                <span className="text-slate-400 font-semibold">[Live Transcription]: </span>
+                                {liveTranscript}
+                            </div>
+                        )}
                         {isLiveConnected && (
                             <div className="absolute bottom-16 right-2 text-[10px] text-slate-500 bg-slate-900/80 px-2 py-1 rounded border border-slate-700">
                                 Transcribing...
