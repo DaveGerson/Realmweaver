@@ -1,7 +1,8 @@
 # High-Level Design Document: RealmWeaver
 
-> **Last Updated:** 2026-03-26
-> **Status:** Phases A through F complete, plus UX refactoring sprint, Claude migration, and Phase 7 polish. Local-only SPA, fully functional.
+> **Last Updated:** 2026-08-14
+> **Status:** Phases A through F complete, plus UX refactoring sprint, Claude migration, Phase 7 polish, and the 124-finding ship-readiness hardening pass (`docs/ship-readiness/remediation-plan.md`). Local-only SPA, fully functional.
+> **See also:** `system-architecture.md` is the authoritative reference for runtime topology, the AI-proxy security posture, and the full component catalog.
 
 ---
 
@@ -18,8 +19,9 @@ RealmWeaver is an AI-native campaign management tool for tabletop RPG Game Maste
 | **In-Session Tools** | DM Coach (narrate, improvise, rollable tables, NPC roleplay), Combat Tracker, Dice Roller, Secrets & Clues Tracker |
 | **Navigation** | Entity cross-linking (EntityLink + QuickCard hover), backlinks ("Referenced By"), back stack, recent items, pinned favorites, command palette (Ctrl+K) |
 | **World Intelligence** | Continuity Checker (8 rules), Plot Timeline, World Simulation Engine, Content Style Matching, Smart Context Builder (tiered, token-budget-aware) |
+| **Smart Linking** | `services/linking/` matching engine behind `@mention` capture, template-import auto-linking, scene smart-link bar, link suggestions panel |
 | **Onboarding** | First Campaign Wizard (5-step), 4 template campaigns, DM Style progressive disclosure (guided/standard/power) |
-| **Persistence** | localStorage with debounced auto-save, JSON import/export, Obsidian markdown export |
+| **Persistence** | localStorage with debounced auto-save (2s debounce / 10s max wait / synchronous flush on page teardown), IndexedDB fallback on quota overflow, 3-slot rotating backups with startup recovery, cross-tab conflict detection, JSON import/export, Obsidian markdown export |
 | **Cross-Campaign** | CrossCampaignDashboard with search/filter across all stored campaigns |
 
 ---
@@ -36,27 +38,34 @@ RealmWeaver is an AI-native campaign management tool for tabletop RPG Game Maste
 |  Dashboards    |  +------------------+     |  (facade)               |
 |  Editors       |  | Factory Store    |     |       |                 |
 |  Generators    |  | + Immer          |     |       v                 |
-|  Dialogs       |  | + Auto-save (2s) |     |  ai/core.ts             |
-|  Tools         |  | + localStorage   |     |  ai/realmWeaver.ts      |
+|  Dialogs       |  | + Auto-save      |     |  ai/core.ts             |
+|  Tools         |  |   (2s / 10s max) |     |  ai/realmWeaver.ts      |
 |  RealmChat     |  | + Relationship   |     |  ai/dmCoach.ts          |
 |  Visualizers   |  |   syncing        |     |  ai/realmChat.ts        |
-|                |  | + Cascade delete |     |  ai/evocationWizard.ts  |
-|                |  +------------------+     |  ai/worldSimulation.ts  |
-|                |                           |  ai/styleMatching.ts    |
-|                |  useSyncExternalStore()   |  ai/mockService.ts      |
-|                |  contextBuilder.ts        |       |                 |
-|                |  continuityChecker.ts     |       v                 |
-|                |                           |  providers/             |
-|                |                           |  claude-cli.ts (default)|
+|  StatusBanners |  | + Cascade delete |     |  ai/evocationWizard.ts  |
+|                |  +--------+---------+     |  ai/worldSimulation.ts  |
+|                |           |               |  ai/styleMatching.ts    |
+|                |           v               |  ai/audioTranscription  |
+|                |  storageService.ts        |  ai/mockService.ts      |
+|                |  | localStorage           |       |                 |
+|                |  | -> IndexedDB (quota)   |       v                 |
+|                |  | + 3-slot backups       |  providers/             |
+|                |  | + conflict events      |  claude-cli.ts (default)|
 |                |                           |  anthropic-api.ts (stub)|
+|                |  useSyncExternalStore()   |                         |
+|                |  contextBuilder.ts        |                         |
+|                |  continuityChecker.ts     |                         |
+|                |  linking/ (match engine)  |                         |
 +----------------+---------------------------+-------------------------+
+|  Vite dev/preview server: vite-plugin-ai-proxy.ts (/api/ai/*)       |
++---------------------------------------------------------------------+
 |           Claude CLI (local) / Anthropic API (future) / Mock        |
 +---------------------------------------------------------------------+
 ```
 
 ### Key Architectural Patterns
 
-1. **Factory-based external store** — `createCampaignStore()` returns a service object with Immer-powered immutable updates, debounced localStorage persistence, and `subscribe`/`getState` for React's `useSyncExternalStore`.
+1. **Factory-based external store** — `createCampaignStore()` returns a service object with Immer-powered immutable updates, debounced persistence, and `subscribe`/`getState` for React's `useSyncExternalStore`. `createCampaignStore({ persist: false })` gives tests an isolated, non-writing instance; `destroy()` tears down the listeners `init()` registered.
 
 2. **Three-layer AI facade** — Components call `aiService.ts` (never `ai/` modules directly). The facade routes to mock or real implementations based on `isMockMode`. Real implementations use `ai/core.ts`, which delegates to the active provider via `providers/registry.ts`.
 
@@ -72,11 +81,21 @@ RealmWeaver is an AI-native campaign management tool for tabletop RPG Game Maste
 
 8. **Accessible dialog system** — All modals compose `DialogShell` for consistent focus trap, Escape-to-close, body scroll lock, and ARIA roles. Confirmations go through `useConfirmDialog` (context-provider); ephemeral feedback through `useToast` (context-provider). Direct use of `window.confirm` / `window.alert` is prohibited. Phase 7 additions: `DmStylePanel` uses `role="radiogroup"` semantics; `BacklinksPanel` exposes collapsed link count to screen readers.
 
-9. **ENTITY_TYPE_CONFIG** — Canonical map in `utils/entityUtils.ts` from entity type key to `{ icon, color, label }`. All components that render entity type metadata (dashboards, quick cards, command palette, sidebar) derive from this config.
+9. **ENTITY_TYPE_CONFIG** — Canonical map in `utils/entityUtils.ts` from entity type key to `{ icon, color, label }`. All components that render entity type metadata (dashboards, quick cards, command palette, sidebar) derive from this config. Colors: npc=amber, location=emerald, faction=violet, item=sky, adventure=orange, article=cyan, sessionLog=rose, playerCharacter=teal, plot=yellow, note=slate, **scene=blue**. Adding a color here also requires extending the `@source inline(...)` safelist in `index.css`, since these classes are composed at runtime and invisible to Tailwind's scanner. There is still no `secret` entry.
 
 10. **Shared Button component** — `components/common/Button.tsx` provides a unified button abstraction with 5 variants (`primary`, `secondary`, `ghost`, `danger`, `icon`) and 3 sizes (`sm`, `md`, `lg`). `twMerge` handles className composition and override. 219+ instances across the codebase use it. Cards, tabs, and chip elements with semantic roles may stay as raw `<button>` elements.
 
 11. **Sidebar persistence defaults** — All `CampaignSidebar` sections expand by default. Drag-and-drop reordering tracks state in React (`draggingSceneId`, `dragOverSceneId`) rather than via direct DOM manipulation. The First Campaign Wizard hands off to the sidebar and expands the relevant section automatically.
+
+12. **Durable persistence ladder** — `services/storageService.ts` sits between the store and the browser. Writes go to `localStorage`; a `QuotaExceededError` falls back to IndexedDB and surfaces `saveStatus: 'quota-warning'` (with the stale localStorage copy removed so `load()` cannot shadow the fresher IDB copy). Every write rotates the previous value through 3 backup slots namespaced per primary key (`<key>__backup_1..3`), and `init()` walks those slots newest-first when the primary payload fails to parse — the corrupt payload is never deleted. Autosave debounces 2s with a 10s max wait, and `pagehide`/`beforeunload`/`visibilitychange` flush any pending write synchronously.
+
+13. **Explicit cross-tab conflict resolution** — a `storage` event from another tab sets `state.conflictDetected`; `persistToStorage` refuses to write while it is set, so no tab silently clobbers another. `components/layout/StatusBanners.tsx` renders the `ConflictBanner` (reload the other tab's snapshot vs. keep mine → `campaignService.resolveConflict`) and the `BackupRecoveryBanner` (fired by `state.recoveredFromBackup` → `dismissBackupRecoveryNotice`).
+
+14. **Debounced per-field store commits** — `hooks/useDebouncedFieldCommit.ts` coalesces the per-keystroke `onUpdate(id, updates)` writes that `MentionInput`-backed editor fields produce. Editors are not remounted when the user switches between entities of the same type, so the hook flushes pending edits against the id they were typed under whenever `entityId` changes, and again on unmount. Used by the NPC, Location, Faction, Article, and Plot editors.
+
+15. **Build-time Tailwind + provider env flow** — Tailwind is compiled by `@tailwindcss/vite` from `index.css` (no CDN script, no runtime JIT); classes composed at runtime from `ENTITY_TYPE_CONFIG` colors are kept alive by `@source inline(...)` safelists in that file. Provider knobs (`REALMWEAVER_AI_PROVIDER`, `_DEFAULT_TIER`, `_MAX_RETRIES`, `_TIMEOUT_MS`, `_API_BASE_URL`) travel from `.env.local` through `vite.config.ts`'s `define` as literal `process.env.<KEY>` tokens, and `services/ai/modelConfig.ts` reads them back through guarded live getters so Node-side callers (tests, middleware) still see runtime mutations.
+
+16. **Localhost-only AI proxy** — `vite-plugin-ai-proxy.ts` registers `/api/ai/generate` and `/api/ai/health` on both the dev server (`configureServer`) and the preview server (`configurePreviewServer`). Requests must arrive from a loopback TCP peer (unforgeable), with `Origin` and `Host` both resolving to localhost; bodies are capped at 4 MB, CLI invocation at 120 s and 1 MB of stdout. A per-session token is injected into the page and validated when present, but is not yet required.
 
 ---
 
@@ -111,31 +130,44 @@ Campaign
 ### Entity Relationships
 
 ```
-NPC.factionId          -> Faction     (member-of, bidirectional)
-NPC.relationships[]    -> NPC         (ally/rival/family)
-Location.parentId      -> Location    (within, cycle-detected)
-Location.connections[] -> Location    (connected-to)
-Location.factionId     -> Faction     (controlled-by)
-Faction.leaderId       -> NPC         (led-by)
-Faction.memberIds[]    -> NPC         (has-member, bidirectional)
-Faction.headquartersId -> Location    (headquartered-at)
-Scene.locationId       -> Location    (set-in)
-Scene.npcIds[]         -> NPC         (features)
-Article.relatedIds[]   -> Any entity  (references)
-Plot.relatedIds[]      -> Any entity  (involves)
+NPC.factionId                    -> Faction    (member-of, bidirectional)
+NPC.relationships[]              -> NPC        (ally/rival/family)
+Location.parentLocationId        -> Location   (within, cycle-detected)
+Location.subLocationIds[]        -> Location   (contains, bidirectional)
+Location.connections[]           -> Location   (connected-to, via targetLocationId)
+Location.controllingFactionId    -> Faction    (controlled-by)
+Faction.leaderId                 -> NPC        (led-by)
+Faction.memberIds[]              -> NPC        (has-member, bidirectional)
+Faction.headquartersLocationId   -> Location   (headquartered-at)
+Article.parentArticleId          -> Article    (Lorebook tree, cycle-detected)
+Scene.locationId                 -> Location   (set-in)
+Scene.npcIds[]                   -> NPC        (features)
+Article.relatedEntityIds[]       -> Any entity (references)
+Plot.relatedEntityIds[]          -> Any entity (involves)
+Secret.linkedEntityIds[]         -> Any entity (concerns)
+*.mentionedEntityIds[]           -> Any entity (@mention backlinks)
 ```
 
 ### Cascade Deletion
 
-Entity deletion in `campaignService` cleans up all references to keep data consistent:
+Every `deleteX()` does two things: type-specific relationship unwinding, plus a shared
+`_purgeEntityReferences(campaign, id)` sweep so no dangling reference survives anywhere.
 
-| Deleted entity | Cascade effect |
-|----------------|---------------|
-| NPC | Clears `factionId` from faction member list; removes from `Scene.npcIds` |
-| Faction | Nulls `factionId` on member NPCs; nulls `Location.factionId` |
-| Location | Nulls parent refs on child locations; nulls `Scene.locationId` |
-| Adventure | Clears `Campaign.activeSceneId` if it belongs to the adventure; nulls `SessionLog.adventureId` references |
+| Deleted entity | Type-specific cascade |
+|----------------|----------------------|
+| NPC | Removed from `Faction.memberIds`; removed from `Scene.npcIds` |
+| Faction | Clears `factionId` on member NPCs; clears `Location.controllingFactionId` |
+| Location | Un-parents child locations; clears `Scene.locationId` |
+| Article | Detaches from its parent and un-parents every sub-article in the Lorebook tree |
+| Adventure | Clears `Campaign.activeSceneId` if it belonged to the adventure; nulls `SessionLog.adventureId`; strips its scene ids from every `SessionLog.plannedSceneIds` |
 | Scene | Removed from `Adventure.scenes`; `Campaign.activeSceneId` cleared if it matches |
+
+`_purgeEntityReferences` additionally strips the deleted id from: `NPC.relationships`,
+`Faction.leaderId` / `headquartersLocationId`, `Location.connections[].targetLocationId`,
+`Plot`/`Article.relatedEntityIds`, `SessionLog.relatedPlotIds` / `plotProgressions` /
+`structuredNotes[].taggedEntityIds` / `plannedNpcIds` / `plannedLocationIds`,
+`Secret.linkedEntityIds` / `revealedInSessionId`, `Campaign.pinnedEntities`, and
+`mentionedEntityIds` on every entity type that carries it.
 
 ---
 
@@ -159,7 +191,10 @@ Entity deletion in `campaignService` cleans up all references to keep data consi
 | Continuity Check | `dialogs/ContinuityChecker.tsx` | `continuityChecker.ts` (pure, no AI) |
 | Plot Timeline | `visualizers/PlotTimeline.tsx` | Pure component |
 | Relationship Graph | `visualizers/RelationshipGraph.tsx` | Pure component (D3) |
+| AI Scribe (voice capture) | `editors/SessionLogEditor.tsx` | `aiService.startAudioTranscription` -> `ai/audioTranscription` (mocked in mock mode) |
+| Smart Linking | `common/SceneSmartLinkBar.tsx`, `common/LinkSuggestionsPanel.tsx`, `common/MentionInput.tsx` | `services/linking/` (`matchingEngine`, `engineRegistry`, `autoLinker`) |
 | Navigation | `EntityLink`, `BacklinksPanel`, `LinkedText`, `Breadcrumbs` | `backlinkUtils.ts` |
+| Persistence status | `layout/StatusBanners.tsx` (conflict + backup recovery) | `campaignService` / `storageService` |
 | Command Palette | `common/CommandPalette.tsx` | `campaignService` |
 | First Campaign Wizard | `views/FirstCampaignWizard.tsx` | `aiService` -> `ai/evocationWizard` |
 | Campaign Templates | `views/CampaignCreator.tsx` | `data/templates/` |
@@ -172,10 +207,11 @@ Entity deletion in `campaignService` cleans up all references to keep data consi
 
 | Layer | Framework | Count | Purpose |
 |-------|-----------|-------|---------|
-| Unit | Vitest | 516 (34 files) | Service logic, context builder, utilities, linking engine, storage/migration, archetype scenarios |
-| E2E | Playwright | 118 (6 skipped) | User workflows: campaign CRUD, navigation, session runner, DM tools |
-| Smoke | Built-in (`smokeTest.ts`) | ~20 | Service function availability, entity CRUD on app startup |
-| Type Check | `npm run typecheck` (`tsc --noEmit`) | 0 errors | Standalone quality gate; not yet wired into CI (no `.github/workflows`) |
+| Unit + component | Vitest | 990 (143 files) | Service logic, storage/migration/backup recovery, context builder, utilities, linking engine, AI adapters/providers, archetype scenarios, plus jsdom render tests (`@testing-library/react`) for editors, dialogs and hooks under `tests/ship/` |
+| E2E | Playwright | 114 per project × 2 projects (chromium, mobile-chrome), 14 spec files, 2 permanently skipped + 4 runtime skip guards | User workflows: campaign CRUD, navigation, entity CRUD, generators, dialogs, session runner, DM tools, visualizers, mobile, RealmChat |
+| Smoke | Built-in (`smokeTest.ts`) | ~20 | Service function availability, entity CRUD on app startup — opt-in via `VITE_RUN_SMOKE_TESTS=true` in dev only |
+| Type Check | `npm run typecheck` (`tsc --noEmit`) | 0 errors | Standalone gate; `npm run build` does **not** typecheck |
+| CI | GitHub Actions (`.github/workflows/ci.yml`) | — | typecheck → unit → build → Chromium E2E on push to `main` and every PR (`mobile-chrome` temporarily excluded) |
 | Manual | Mock mode | — | Full app testing without API key |
 
 ---
@@ -184,18 +220,21 @@ Entity deletion in `campaignService` cleans up all references to keep data consi
 
 ```
 Realmweaver/
-├── App.tsx                          # Root: campaign state, isMockMode, top-level layout (~564L)
-├── index.tsx                        # React entry point (mounts providers)
-├── index.html                       # Tailwind CDN, Google Fonts, import maps
-├── vite.config.ts                   # Dev server (port 3000), path alias, env injection
-├── vite-plugin-ai-proxy.ts          # Vite middleware: POST /api/ai/generate -> claude CLI
+├── App.tsx                          # Root: campaign state, isMockMode, top-level layout (~751L)
+├── index.tsx                        # React entry point (ErrorBoundary > ToastProvider > ConfirmDialogProvider)
+├── index.html                       # CSP meta, system font stacks, local animation/scrollbar CSS
+├── index.css                        # Tailwind build-time entry (`@import "tailwindcss"` + @source safelists)
+├── vite.config.ts                   # Dev server (127.0.0.1:4200, strictPort), Tailwind plugin, AI proxy, path alias, env define, vendor chunking
+├── vite-plugin-ai-proxy.ts          # Vite dev + preview middleware: POST /api/ai/generate -> claude CLI
+├── .github/workflows/ci.yml         # typecheck -> unit -> build -> Chromium E2E
 │
 ├── hooks/                           # Custom React hooks (extracted from App.tsx)
 │   ├── useEntitySelection.ts        # Selected entity state, nav stack, breadcrumbs, recent items
 │   ├── useModalState.ts             # All modal open/close state with closeTopModal() priority
 │   ├── useConfirmDialog.ts          # Context-provider: programmatic confirm dialogs
-│   ├── useToast.ts                  # Context-provider: toast notification queue
+│   ├── useToast.ts                  # Context-provider: toast notification queue (capped at 3)
 │   ├── useEntitySearch.ts           # Dashboard search/filter (case-insensitive multi-field)
+│   ├── useDebouncedFieldCommit.ts   # Coalesced per-field store writes; flushes across entity switch + unmount
 │   └── useRovingTabIndex.ts         # Keyboard roving tabindex (grid/list navigation)
 │
 ├── components/
@@ -213,7 +252,9 @@ Realmweaver/
 │   │   ├── EntityLink.tsx           # Inline entity link with QuickCard hover popover
 │   │   ├── EntityQuickCard.tsx      # Floating entity preview (portal-rendered, mobile bottom sheet)
 │   │   ├── BacklinksPanel.tsx       # "Referenced By" inbound cross-references
-│   │   ├── LinkedText.tsx           # Auto-linkify entity names in text
+│   │   ├── LinkedText.tsx           # Auto-linkify entity names in text (Unicode word-boundary tokenizer)
+│   │   ├── LinkSuggestionsPanel.tsx # Detected-but-unlinked entity suggestions with per-item dismissal
+│   │   ├── SceneSmartLinkBar.tsx    # Inline "+Add" chips for NPCs/locations found in a scene's text
 │   │   ├── MentionInput.tsx         # Textarea with @mention autocomplete; accepts `initialMentions` so persisted mentions are recognized after an editor remount
 │   │   ├── CommandPalette.tsx       # Ctrl+K global entity search
 │   │   ├── Breadcrumbs.tsx          # Navigation breadcrumb trail
@@ -229,6 +270,7 @@ Realmweaver/
 │   │   ├── Header.tsx               # Top navigation bar
 │   │   ├── CampaignSidebar.tsx      # Left nav (orchestrates sidebar/ sub-components)
 │   │   ├── ContentWrapper.tsx       # Main content area wrapper
+│   │   ├── StatusBanners.tsx        # ConflictBanner (multi-tab) + BackupRecoveryBanner
 │   │   ├── ViewRouter.tsx           # Renders active EditorView (extracted from App.tsx)
 │   │   └── sidebar/                 # Sidebar sub-components
 │   │       ├── SidebarEntityList.tsx
@@ -254,17 +296,19 @@ Realmweaver/
 │   ├── dashboards/                  # Entity list views (10 dashboards, all use EntityCreationPanel)
 │   ├── generators/                  # AI creation forms (8 generators + EntityChatGenerator)
 │   ├── editors/                     # Detail editors with tabbed layouts (12 editors + PrepDocumentView)
-│   ├── dialogs/                     # Modals (all use DialogShell): DmCoach, 4 Wizards, etc.
+│   ├── dialogs/                     # Modals (all use DialogShell): DmCoach, 4 wizards, ContinuityChecker, ExportModal
 │   ├── tools/                       # CombatTracker, DiceRoller, SecretsTracker
 │   ├── visualizers/                 # RelationshipGraph (D3), PlotTimeline
 │   └── RealmChat/                   # Floating chat assistant (indigo accent only)
 │
 ├── services/
-│   ├── campaignService.ts           # Central state store (factory, Immer, auto-save)
+│   ├── campaignService.ts           # Central state store (factory, Immer, auto-save, conflict/backup state)
+│   ├── storageService.ts            # Persistence ladder: localStorage -> IndexedDB, backups, conflict events
 │   ├── aiService.ts                 # AI facade -- the ONLY import for AI in components
 │   ├── contextBuilder.ts            # Tiered token-budget-aware context assembly
 │   ├── continuityChecker.ts         # 8 rule-based consistency checks (pure function)
-│   ├── importExportService.ts       # JSON/Obsidian import-export
+│   ├── importExportService.ts       # JSON/Obsidian import-export with validation warnings
+│   ├── linking/                     # Smart linking: matchingEngine, engineRegistry, autoLinker
 │   └── ai/                          # AI implementation layer
 │       ├── core.ts                  # Backward-compat adapter (preserves 3 func signatures)
 │       ├── modelConfig.ts           # ModelTier type, tier->model mappings, provider config
@@ -274,6 +318,7 @@ Realmweaver/
 │       ├── evocationWizard.ts       # Batch generation & parsing
 │       ├── worldSimulation.ts       # World event simulation
 │       ├── styleMatching.ts         # DM writing style analysis
+│       ├── audioTranscription.ts    # AI Scribe live transcription (reached via the aiService facade)
 │       ├── mockService.ts           # Static mock data for offline dev and tests
 │       └── providers/               # AI provider backends
 │           ├── types.ts             # AIProvider interface

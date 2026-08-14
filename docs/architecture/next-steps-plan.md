@@ -1,5 +1,8 @@
 # Realmweaver — Next Steps Execution Plan
 
+> **Status:** Historical planning record — kept for provenance, not maintained as a description of
+> the current codebase. For what actually shipped and what debt remains, see
+> `system-architecture.md` (§11–12) and `docs/ship-readiness/remediation-plan.md`.
 > **Created:** 2026-03-26
 > **Scope:** All remaining work from gap analysis — audit items, technical debt, performance, testing, data robustness
 > **Approach:** Phased execution with intelligent sequencing. Quick wins first, then building blocks, then features that depend on them.
