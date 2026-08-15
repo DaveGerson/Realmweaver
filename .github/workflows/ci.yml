@@ -32,16 +32,11 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: E2E tests
-        # NOTE (wp-i2, finding #33/#3): the mobile-chrome (Pixel 5) project is
-        # temporarily excluded. Header.tsx renders `relative z-[60]` while
-        # DialogShell's overlay and the mobile sidebar both render at z-50/
-        # z-40, so on narrow viewports the header can paint above modals/the
-        # slid-in sidebar and intercept the very clicks e2e/helpers.ts makes
-        # (createCampaign's "Skip wizard" dismiss, navigateToView's sidebar
-        # buttons). That z-index ordering lives in Header.tsx/App.tsx
-        # (wp-e-app-shell) and DialogShell.tsx (wp-g1-worldsim-dialogs), both
-        # outside wp-i2's ownedFiles — re-enable `mobile-chrome` here once the
-        # stacking order is fixed there (content < header < sidebar < modal).
-        run: npm run test:e2e -- --project=chromium
+        # Runs both projects (chromium + mobile-chrome). The stacking-order
+        # bug that once forced a chromium-only run is fixed: the ladder is
+        # content < header z-[60] < drawer z-[70] < dialogs z-[80] < toasts
+        # z-[90], and the header action cluster scrolls internally instead of
+        # expanding the mobile layout viewport.
+        run: npm run test:e2e
         env:
           CI: true

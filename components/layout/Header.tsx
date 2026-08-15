@@ -235,12 +235,17 @@ export const Header: React.FC<HeaderProps> = ({
               )}
           </div>
         </div>
-        <div className="flex items-center gap-2 sm:gap-6">
+        {/* min-w-0 + overflow-x-auto: on narrow (mobile) viewports the action
+            cluster must scroll inside the header rather than overflow the
+            page — content wider than the screen makes mobile browsers expand
+            the layout viewport permanently, which shifts every fixed overlay
+            (dialogs, drawers) partly off-screen. */}
+        <div className="flex items-center gap-2 sm:gap-6 min-w-0 overflow-x-auto">
           {/* Command Palette Search Button */}
           {onOpenCommandPalette && (
             <button
               onClick={onOpenCommandPalette}
-              className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-800 border border-slate-700 text-sm text-slate-400 hover:text-white hover:border-slate-600 transition-colors"
+              className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-800 border border-slate-700 text-sm text-slate-400 hover:text-white hover:border-slate-600 transition-colors"
               title={`Search (${getModifierSymbol()}+K)`}
               aria-label={`Search (${getModifierSymbol()}+K)`}
             >

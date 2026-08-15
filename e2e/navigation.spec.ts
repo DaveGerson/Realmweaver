@@ -23,6 +23,7 @@ import {
   createCampaign,
   enableMockMode,
   navigateToView,
+  openMobileSidebar,
 } from './helpers';
 
 test.describe('Navigation', () => {
@@ -118,7 +119,8 @@ test.describe('Navigation', () => {
     const npcEntry = sidebar.getByRole('button', { name: 'Mocked Bjorn Ironhand' });
     await expect(npcEntry).toBeVisible({ timeout: 5000 });
     // Click the NPC entry — this calls handleSelect → pushNavStack
-    await npcEntry.click({ force: true });
+    await openMobileSidebar(page);
+    await npcEntry.click();
 
     // Clear the filter
     await filterInput.fill('');
@@ -166,7 +168,8 @@ test.describe('Navigation', () => {
     // Click the NPC entry — this calls handleSelect → trackRecentItem
     const npcEntry = sidebar.getByRole('button', { name: 'Mocked Bjorn Ironhand' });
     await expect(npcEntry).toBeVisible({ timeout: 5000 });
-    await npcEntry.click({ force: true });
+    await openMobileSidebar(page);
+    await npcEntry.click();
 
     // Clear the filter so the Recent section becomes visible
     await filterInput.fill('');
