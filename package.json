@@ -1,7 +1,13 @@
 {
-  "name": "realmweaver---the-adventure-and-campaign-prep-app",
+  "name": "realmweaver",
   "private": true,
   "version": "0.0.0",
+  "description": "AI-native campaign cockpit for tabletop RPG Game Masters — build worlds, craft stories, run sessions.",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DaveGerson/Realmweaver"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",

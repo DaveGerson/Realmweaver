@@ -485,14 +485,13 @@ Dependencies: none.
 
 **L8. New-DM Onboarding Revamp**
 `WelcomeScreen.tsx` remains close to a logo + tagline + one button; `CampaignCreator.tsx` has no seed
-questions or "what good looks like" scaffolding for the Custom World textarea; there are no starter campaign
-templates beyond the single "Winter's Daughter" default baked into `utils/demoTemplates.ts` (itself drifted
-from the real `NPC`/`Location` types — missing required `history`/`relationships` fields — and 95% unused,
-since `FirstCampaignWizard.tsx` only reads its `.setting` string).
+questions or "what good looks like" scaffolding for the Custom World textarea. *(Partly addressed: four real
+starter templates now ship in `data/templates/` — The Sunken Vault, The Crown Conspiracy, The Untamed Wilds,
+The Festival of Shadows — and `utils/demoTemplates.ts` has been reduced to the `WINTERS_DAUGHTER_SETTING`
+prose that quick-fills the wizard's world-description field, so the drifted shadow entity types are gone.)*
 Personas: New DM 5, Lazy DM 2, Forever DM 1, Tactical DM 1, Worldbuilder 1 · **Aggregate 10**
-Effort: **L** — a 3-step value-explainer for `WelcomeScreen.tsx`, seed-question scaffolding in
-`CampaignCreator.tsx`, and 2–3 real starter templates built from actual `NPC`/`Location`/`Faction` factories
-(`utils/entityUtils.ts`'s `createDefault*` functions) rather than `demoTemplates.ts`'s drifted shadow types.
+Effort: **M** — a 3-step value-explainer for `WelcomeScreen.tsx` and seed-question scaffolding in
+`CampaignCreator.tsx`; the starter-template half of this item is done.
 Dependencies: X10 (entity-type-config completeness) if starter templates are to include Secrets/Notes/PCs.
 
 **L9. Import/Export Foreign-Tool Adapters**

@@ -2,7 +2,7 @@
 # RealmWeaver User Guide
 
 <p align="center">
-  <img src="https://storage.googleapis.com/aistudio-ux-team-bucket/apps/lu-lp/logo.png" alt="RealmWeaver Logo" width="120">
+  <img src="../public/favicon.svg" alt="RealmWeaver Logo" width="96">
 </p>
 
 <h3 align="center">Your AI-powered companion for crafting unforgettable campaigns.</h3>
@@ -41,7 +41,9 @@ You can skip the wizard and build manually at any time by clicking **"Skip"**.
 
 ### Using a Demo Template
 
-When creating a campaign, you can load a pre-built template (such as the Winter's Daughter starter scenario) to see a fully populated campaign and explore how everything fits together before building your own.
+When creating a campaign, you can load one of four pre-built templates — **The Sunken Vault** (classic dungeon crawl), **The Crown Conspiracy** (political intrigue), **The Untamed Wilds** (sandbox exploration), or **The Festival of Shadows** (one-shot) — to see a fully populated campaign and explore how everything fits together before building your own.
+
+Separately, the First Campaign Wizard's **"Try a Demo World"** button quick-fills the world-description field with the *Winter's Daughter* sample setting. That is a starting prompt, not a populated campaign — the AI then generates NPCs, locations and an adventure from it as usual.
 
 ### Interface Overview
 

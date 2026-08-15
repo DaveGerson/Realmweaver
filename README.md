@@ -2,7 +2,7 @@
 # RealmWeaver
 
 <p align="center">
-  <img src="https://storage.googleapis.com/aistudio-ux-team-bucket/apps/lu-lp/logo.png" alt="RealmWeaver Logo" width="150">
+  <img src="public/favicon.svg" alt="RealmWeaver Logo" width="96">
 </p>
 
 <h3 align="center">The AI-native campaign cockpit for tabletop RPG Game Masters.</h3>
@@ -215,4 +215,5 @@ ship-readiness hardening pass.**
 
 ## License
 
-Proprietary. All rights reserved.
+Proprietary. All rights reserved. There is no separate `LICENSE` file — this section is the single
+source of truth, and `package.json` records it as `"license": "UNLICENSED"`.
