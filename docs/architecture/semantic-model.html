@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Realmweaver Semantic Model</title>
+<style>
+  :root {
+    --bg: #faf9f6;
+    --surface: #ffffff;
+    --surface-2: #f3f1ec;
+    --ink: #1e293b;
+    --ink-strong: #0f172a;
+    --muted: #64748b;
+    --accent: #b45309;
+    --line: #e4e0d8;
+    --code-bg: #f3f1ec;
+    --bidi: #b45309;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f172a; --surface: #16213a; --surface-2: #1e293b;
+      --ink: #e2e8f0; --ink-strong: #f8fafc; --muted: #94a3b8;
+      --accent: #fbbf24; --line: #2c3a54; --code-bg: #1e293b; --bidi: #fbbf24;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f172a; --surface: #16213a; --surface-2: #1e293b;
+    --ink: #e2e8f0; --ink-strong: #f8fafc; --muted: #94a3b8;
+    --accent: #fbbf24; --line: #2c3a54; --code-bg: #1e293b; --bidi: #fbbf24;
+  }
+
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 16px/1.62 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0; padding: 0 24px 96px;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+  h1, h2, h3, h4 {
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    color: var(--ink-strong); text-wrap: balance; line-height: 1.2;
+  }
+  h1 { font-size: 2.5rem; font-weight: 600; margin: 0 0 10px; }
+  h2 { font-size: 1.6rem; font-weight: 600; margin: 0 0 16px; }
+  h3 { font-size: 1.15rem; font-weight: 600; margin: 26px 0 8px; }
+  h4 { font-size: 1rem; font-weight: 600; margin: 18px 0 6px; }
+  p { margin: 0 0 13px; max-width: 76ch; }
+  a { color: var(--accent); }
+  .eyebrow {
+    font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--accent); font-weight: 700; margin: 0 0 8px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  header { padding: 56px 0 6px; }
+  .meta { color: var(--muted); font-size: 0.92rem; }
+  code {
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.86em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px;
+  }
+  section { margin-top: 58px; }
+  .rule { border: 0; border-top: 1px solid var(--line); margin: 52px 0 0; }
+
+  .toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 0; padding: 0; list-style: none; }
+  .toc a {
+    display: inline-block; font-size: 0.83rem; text-decoration: none;
+    color: var(--ink); background: var(--surface); border: 1px solid var(--line);
+    border-radius: 999px; padding: 4px 12px;
+  }
+  .toc a:hover { border-color: var(--accent); color: var(--accent); }
+
+  .stat-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+  .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px 16px; }
+  .stat .n {
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    font-size: 1.5rem; font-weight: 600; color: var(--ink-strong); font-variant-numeric: tabular-nums;
+  }
+  .stat .l { font-size: 0.75rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  .scroll-x { overflow-x: auto; margin-top: 14px; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 0.71rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); font-weight: 600; white-space: nowrap; }
+  td code { white-space: nowrap; }
+
+  .tier { margin-top: 26px; }
+  .tier-label { font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 700; margin-bottom: 10px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; }
+  .card h4 { margin: 0 0 2px; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .card .file { font-size: 0.76rem; color: var(--muted); margin-bottom: 8px; }
+  .card dl { margin: 0; font-size: 0.86rem; }
+  .card dt { font-size: 0.68rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); font-weight: 700; margin-top: 8px; }
+  .card dd { margin: 2px 0 0; }
+  .keyed { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; color: var(--accent); background: var(--code-bg); border-radius: 999px; padding: 1px 8px; margin-left: auto; }
+
+  figure { margin: 26px 0 0; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 18px; }
+  figure svg { max-width: 100%; height: auto; display: block; color: var(--ink); }
+  figcaption { font-size: 0.88rem; color: var(--muted); margin-top: 12px; max-width: 90ch; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 18px; font-size: 0.82rem; color: var(--muted); margin-top: 10px; align-items: center; }
+  .legend svg { vertical-align: middle; }
+
+  .callout { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 6px; padding: 14px 18px; margin: 16px 0; max-width: none; }
+  .callout p { margin: 0; max-width: none; }
+  ul.plain { padding-left: 20px; margin: 10px 0; }
+  ul.plain li { margin-bottom: 7px; max-width: 78ch; }
+  .quiet { color: var(--muted); font-size: 0.88rem; }
+  footer { margin-top: 64px; color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--line); padding-top: 18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">Realmweaver · architecture reference</p>
+  <h1>Realmweaver Semantic Model</h1>
+  <p class="meta">The complete node and edge taxonomy of the campaign data model — every entity, every reference between entities, who maintains each invariant, and the vocabulary systems that name them. Grounded in <code>types/</code> and <code>services/campaignService.ts</code> as shipped on <code>main</code>.</p>
+  <ul class="toc">
+    <li><a href="#shape">Overall shape</a></li>
+    <li><a href="#nodes">Node taxonomy</a></li>
+    <li><a href="#identity">Identity conventions</a></li>
+    <li><a href="#graph">The graph</a></li>
+    <li><a href="#edges">Edge taxonomy</a></li>
+    <li><a href="#subobjects">Sub-objects</a></li>
+    <li><a href="#integrity">Integrity machinery</a></li>
+    <li><a href="#operations">Derived operations</a></li>
+    <li><a href="#vocab">Vocabulary systems</a></li>
+    <li><a href="#wire">AI wire shapes</a></li>
+  </ul>
+</header>
+
+<div class="stat-row">
+  <div class="stat"><div class="n">12</div><div class="l">node types</div></div>
+  <div class="stat"><div class="n">21</div><div class="l">edge kinds</div></div>
+  <div class="stat"><div class="n">3</div><div class="l">bidi-maintained pairs</div></div>
+  <div class="stat"><div class="n">6 → 7</div><div class="l">mention sources → targets</div></div>
+  <div class="stat"><div class="n">12</div><div class="l">cascade-swept delete paths</div></div>
+</div>
+
+<section id="shape">
+  <p class="eyebrow">Section 1</p>
+  <h2>Overall shape: one aggregate, forward-only edges</h2>
+  <p>Everything hangs off a single aggregate root. A <code>Campaign</code> (<code>types/Campaign.ts</code>) owns ten required entity arrays — <code>articles</code>, <code>adventures</code>, <code>npcs</code>, <code>locations</code>, <code>factions</code>, <code>items</code>, <code>sessionLogs</code>, <code>playerCharacters</code>, <code>plots</code>, <code>notes</code> — one optional array (<code>secrets?</code>, the only entity array an older save may legitimately lack), and non-array live state: <code>activeEncounter?</code>, <code>activeSceneId?</code>, <code>activeSessionId?</code>, <code>pinnedEntities?</code>, <code>dmStyle?</code>, <code>featureOverrides?</code>, <code>wizardDismissed?</code>, <code>styleProfile?</code>, <code>gcpApiKey?</code>. <code>Scene</code>s are the one nested entity kind: they live only inside <code>Adventure.scenes</code>, yet are id-addressable everywhere (pins, mentions, the graph view, session planning).</p>
+  <p>Three properties define how the model behaves as a graph:</p>
+  <ul class="plain">
+    <li><strong>Edges are stored forward-only.</strong> Every reference is an id (or id array) on the source entity. "Backlinks" are never stored — they are derived by scanning the campaign (<code>utils/backlinkUtils.ts</code>), which at localStorage scale (hundreds of entities) is a sub-millisecond full sweep.</li>
+    <li><strong>Three edge pairs are bidirectionally maintained</strong> by the store itself (NPC↔Faction membership and the Location and Article hierarchies); everything else is a one-way pointer whose integrity is preserved by cascade deletion rather than reciprocal writes.</li>
+    <li><strong>Untyped id-sets form a second overlay graph.</strong> <code>mentionedEntityIds</code>, <code>relatedEntityIds</code>, <code>linkedEntityIds</code>, <code>taggedEntityIds</code>, and <code>pinnedEntities</code> can point at (nearly) any entity kind; they power backlinks, AI context, and navigation, and are resolved by scan against every collection.</li>
+  </ul>
+</section>
+
+<hr class="rule">
+
+<section id="nodes">
+  <p class="eyebrow">Section 2</p>
+  <h2>Node taxonomy</h2>
+  <p>Twelve entity kinds in three tiers: <strong>world</strong> nodes describe the setting, <strong>narrative</strong> nodes describe what is planned to happen, <strong>table</strong> nodes record what actually happens at the table. Each card lists the entity's key field, its file, and its outbound edges. The color dot is the entity's accent from <code>ENTITY_TYPE_CONFIG</code> (<code>utils/entityUtils.ts</code>) — the single source of truth for entity colors and icons across the UI.</p>
+
+  <div class="tier">
+    <div class="tier-label">World tier — the setting</div>
+    <div class="cards">
+      <div class="card">
+        <h4><span class="dot" style="background:#f59e0b"></span>NPC <span class="keyed">name</span></h4>
+        <div class="file">types/NPC.ts · accent amber</div>
+        <dl>
+          <dt>Content</dt><dd><code>description</code>, <code>traits</code>, <code>backstory</code>, <code>motivations</code>, <code>secrets</code>, <code>stats</code>, <code>exampleQuote</code></dd>
+          <dt>Edges out</dt><dd><code>factionId?</code> → Faction (bidi) · <code>relationships[]</code> → NPC | PlayerCharacter (reified, labeled) · <code>mentionedEntityIds?</code> · <code>history[].referenceId?</code> → SessionLog | Article</dd>
+          <dt>Legacy</dt><dd><code>knowsPlayerHistory[]</code> (deprecated, kept for compatibility)</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h4><span class="dot" style="background:#10b981"></span>Location <span class="keyed">name</span></h4>
+        <div class="file">types/Location.ts · accent emerald</div>
+        <dl>
+          <dt>Content</dt><dd><code>description</code>, <code>secrets</code>, <code>loot?[]</code>, <code>pointsOfInterest?[]</code></dd>
+          <dt>Edges out</dt><dd><code>parentLocationId?</code> ↔ <code>subLocationIds[]</code> (bidi hierarchy, cycle-guarded) · <code>connections?[]</code> → Location (described links) · <code>controllingFactionId?</code> → Faction · <code>mentionedEntityIds?</code> · <code>history[].referenceId?</code></dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h4><span class="dot" style="background:#8b5cf6"></span>Faction <span class="keyed">name</span></h4>
+        <div class="file">types/Faction.ts · accent violet</div>
+        <dl>
+          <dt>Content</dt><dd><code>description</code>, <code>goals</code>, <code>alignment?</code>, <code>resources?</code>, <code>influence?</code></dd>
+          <dt>Edges out</dt><dd><code>memberIds[]</code> ↔ NPC.<code>factionId</code> (bidi) · <code>leaderId?</code> → NPC · <code>headquartersLocationId?</code> → Location · <code>mentionedEntityIds?</code></dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h4><span class="dot" style="background:#0ea5e9"></span>Item <span class="keyed">name</span></h4>
+        <div class="file">types/Item.ts · accent sky</div>
+        <dl>
+          <dt>Content</dt><dd><code>description</code>, <code>rarity</code> (6-step union), <code>properties</code>, <code>itemType?</code>, <code>attunement?</code>, <code>weight?</code>, <code>value?</code></dd>
+          <dt>Edges out</dt><dd><em>None.</em> Items participate in the graph only inbound — via article/plot <code>relatedEntityIds</code>, @-mentions, and secrets.</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h4><span class="dot" style="background:#06b6d4"></span>Article <span class="keyed">title</span></h4>
+        <div class="file">types/Article.ts · accent cyan</div>
+        <dl>
+          <dt>Content</dt><dd><code>category</code> (<code>lore | history | cosmology</code>), <code>content</code></dd>
+          <dt>Edges out</dt><dd><code>parentArticleId?</code> ↔ <code>subArticleIds[]</code> (bidi hierarchy, cycle-guarded) · <code>relatedEntityIds?</code> → any entity · <code>mentionedEntityIds?</code></dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <div class="tier">
+    <div class="tier-label">Narrative tier — what is planned</div>
+    <div class="cards">
+      <div class="card">
+        <h4><span class="dot" style="background:#f97316"></span>Adventure <span class="keyed">title</span></h4>
+        <div class="file">types/Adventure.ts · accent orange</div>
+        <dl>
+          <dt>Content</dt><dd><code>level</code>, <code>hook</code>, <code>theme</code></dd>
+          <dt>Contains</dt><dd><code>scenes: Scene[]</code> — the only nested entity collection in the model</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h4><span class="dot" style="background:#3b82f6"></span>Scene <span class="keyed">title</span></h4>
+        <div class="file">types/Scene.ts · accent blue · nested in Adventure</div>
+        <dl>
+          <dt>Content</dt><dd><code>type</code> (<code>combat | social | exploration | puzzle</code>), <code>status</code> (<code>planned | in-progress | completed</code>), <code>readAloudText</code>, <code>gmNotes</code>, <code>skillChecks[]</code>, <code>rewards</code></dd>
+          <dt>Edges out</dt><dd><code>locationId?</code> → Location · <code>npcIds[]</code> → NPC · <code>mentionedEntityIds?</code></dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h4><span class="dot" style="background:#eab308"></span>Plot <span class="keyed">title</span></h4>
+        <div class="file">types/Plot.ts · accent yellow</div>
+        <dl>
+          <dt>Content</dt><dd><code>description</code>, <code>status</code> (<code>active | resolved | dormant</code>)</dd>
+          <dt>Edges out</dt><dd><code>relatedEntityIds[]</code> → any entity · <code>mentionedEntityIds?</code></dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h4><span class="dot" style="background:#64748b"></span>Secret <span class="keyed">title</span></h4>
+        <div class="file">types/Secret.ts · GM-only facts</div>
+        <dl>
+          <dt>Content</dt><dd><code>content</code>, <code>category</code> (<code>secret | clue | revelation | rumor</code>), <code>isRevealed</code>, <code>notes?</code>, <code>createdAt</code></dd>
+          <dt>Edges out</dt><dd><code>linkedEntityIds?[]</code> → any entity · <code>revealedInSessionId?</code> → SessionLog</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <div class="tier">
+    <div class="tier-label">Table tier — what actually happened</div>
+    <div class="cards">
+      <div class="card">
+        <h4><span class="dot" style="background:#f43f5e"></span>SessionLog <span class="keyed">title</span></h4>
+        <div class="file">types/SessionLog.ts · accent rose · richest node in the model</div>
+        <dl>
+          <dt>Lifecycle</dt><dd><code>status</code> (<code>planned | active | completed</code>), <code>sessionDate</code>, <code>startedAt?</code></dd>
+          <dt>Planning edges</dt><dd><code>adventureId?</code> → Adventure · <code>plannedSceneIds[]</code> → Scene · <code>plannedNpcIds?[]</code> → NPC · <code>plannedLocationIds?[]</code> → Location (curated session cast; <code>undefined</code> = derive from scene)</dd>
+          <dt>Plot edges</dt><dd><code>relatedPlotIds[]</code> → Plot · <code>plotProgressions?</code>: <code>Record&lt;plotId, advanced | stalled | unchanged&gt;</code> — the model's only <em>attributed</em> edge map</dd>
+          <dt>Execution</dt><dd><code>runningNotes</code>, <code>structuredNotes[]</code> (typed entries with <code>taggedEntityIds</code>), <code>beats?[]</code>, <code>diceRolls?[]</code>, <code>encounterLog[]</code> (archived Encounters)</dd>
+          <dt>Post-session</dt><dd><code>recap</code>, <code>notableEvents</code>, <code>looseEnds</code>, <code>playerRecap?</code></dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h4><span class="dot" style="background:#14b8a6"></span>PlayerCharacter <span class="keyed">neither</span></h4>
+        <div class="file">types/PlayerCharacter.ts · accent teal</div>
+        <dl>
+          <dt>Identity</dt><dd>No top-level <code>name</code> or <code>title</code> — display name is <code>characterSocial.characterName</code>; the owning player is <code>playerName</code></dd>
+          <dt>Content</dt><dd><code>characterSocial</code> (background, species, personality, appearance, backstory, ideals, bonds, flaws) · <code>characterStatistics</code> (<code>ClassLevel</code>, <code>AbilityScores</code>, 18-skill <code>Skills</code> map, actions)</dd>
+          <dt>Edges out</dt><dd><em>None.</em> PCs are edge targets only (NPC <code>relationships</code>, planned cast, mentions) and seed <code>Combatant</code>s at runtime.</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h4><span class="dot" style="background:#64748b"></span>Encounter</h4>
+        <div class="file">types/Encounter.ts · live combat state</div>
+        <dl>
+          <dt>Content</dt><dd><code>round</code>, <code>turnIndex</code>, <code>combatants[]</code> (initiative, hp/maxHp, ac?, conditions)</dd>
+          <dt>Edges out</dt><dd><code>sessionId?</code> → SessionLog · <code>sceneId?</code> → Scene</dd>
+          <dt>Lifecycle</dt><dd>Lives as <code>campaign.activeEncounter</code> while running; archived into <code>SessionLog.encounterLog</code> on session end. A <code>'combat'</code> Scene is the <em>prep</em>; an Encounter is the <em>running state</em>.</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h4><span class="dot" style="background:#64748b"></span>Note <span class="keyed">title</span></h4>
+        <div class="file">types/Note.ts · accent slate</div>
+        <dl>
+          <dt>Content</dt><dd><code>content</code>, <code>tags[]</code> (free strings), <code>createdAt</code>, <code>lastModified</code></dd>
+          <dt>Edges out</dt><dd><em>None.</em> Notes are deliberately graph-isolated: taggable, pinnable, searchable — but they point at nothing.</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section id="identity">
+  <p class="eyebrow">Section 3</p>
+  <h2>Identity conventions</h2>
+  <p>Every entity has <code>id: string</code> (minted with <code>crypto.randomUUID()</code> by the store — AI wire shapes deliberately omit it). The <em>display key</em> is not uniform, and generic code must not assume <code>.name</code>:</p>
+  <div class="scroll-x"><table>
+    <thead><tr><th>Key field</th><th>Entity kinds</th><th>Consequence</th></tr></thead>
+    <tbody>
+      <tr><td><code>name</code></td><td>NPC, Location, Faction, Item (also sub-objects <code>PointOfInterest</code>, <code>Combatant</code>, <code>GraphNode</code>)</td><td>Work directly with generic <code>{ id, name }</code> surfaces</td></tr>
+      <tr><td><code>title</code></td><td>Adventure, Scene, Article, Plot, Note, Secret, SessionLog, Campaign, RollableTable</td><td>Mapped at call sites as <code>{ ...e, name: e.title }</code> for <code>useEntitySearch</code> and dashboards — by convention, never by adding a redundant <code>name</code> field</td></tr>
+      <tr><td>neither</td><td>PlayerCharacter</td><td>Resolved via <code>characterSocial.characterName</code>; <code>utils/entityDetailExtractors.ts</code>'s <code>lookupEntity</code> is the canonical per-type name resolver</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<hr class="rule">
+
+<section id="graph">
+  <p class="eyebrow">Section 4</p>
+  <h2>The graph at a glance</h2>
+  <figure>
+    <svg viewBox="0 0 1040 780" role="img" aria-label="Realmweaver entity graph: twelve entity nodes in world, narrative, and table tiers, connected by typed foreign-key edges; three edge pairs (NPC–Faction membership, Location hierarchy, Article hierarchy) are bidirectionally maintained; a dashed rail at the bottom represents untyped id-set edges that can target any entity.">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+        </marker>
+        <marker id="ahA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--bidi)"/>
+        </marker>
+      </defs>
+
+      <!-- ======== edges behind nodes ======== -->
+      <!-- Faction.headquartersLocationId -> Location (high arc) -->
+      <path d="M 115 82 C 115 24, 515 24, 515 82" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#ah)"/>
+      <text x="315" y="34" text-anchor="middle" font-size="11" fill="currentColor">headquartersLocationId</text>
+
+      <!-- NPC <-> Faction (bidi) -->
+      <line x1="196" y1="104" x2="274" y2="104" stroke="var(--bidi)" stroke-width="2" marker-start="url(#ahA)" marker-end="url(#ahA)"/>
+      <text x="235" y="96" text-anchor="middle" font-size="11" fill="var(--bidi)">factionId ↔ memberIds</text>
+
+      <!-- Faction.leaderId -> NPC -->
+      <path d="M 196 126 C 220 140, 250 140, 274 126" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#ah)"/>
+      <text x="235" y="152" text-anchor="middle" font-size="11" fill="currentColor">leaderId</text>
+
+      <!-- Location.controllingFactionId -> Faction (low arc) -->
+      <path d="M 520 138 C 400 208, 200 208, 120 138" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#ah)"/>
+      <text x="320" y="200" text-anchor="middle" font-size="11" fill="currentColor">controllingFactionId</text>
+
+      <!-- Location parent bidi self-loop -->
+      <path d="M 552 82 C 552 44, 618 44, 618 82" fill="none" stroke="var(--bidi)" stroke-width="2" marker-start="url(#ahA)" marker-end="url(#ahA)"/>
+      <text x="585" y="38" text-anchor="middle" font-size="11" fill="var(--bidi)">parentLocationId ↔ subLocationIds</text>
+
+      <!-- Location.connections self-loop -->
+      <path d="M 656 96 C 700 96, 700 130, 656 130" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#ah)"/>
+      <text x="712" y="117" font-size="11" fill="currentColor">connections[]</text>
+
+      <!-- Article parent bidi self-loop -->
+      <path d="M 782 82 C 782 44, 848 44, 848 82" fill="none" stroke="var(--bidi)" stroke-width="2" marker-start="url(#ahA)" marker-end="url(#ahA)"/>
+      <text x="815" y="38" text-anchor="middle" font-size="11" fill="var(--bidi)">parentArticleId ↔ subArticleIds</text>
+
+      <!-- Scene.npcIds -> NPC -->
+      <path d="M 385 296 C 365 230, 350 190, 342 140" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#ah)"/>
+      <text x="340" y="222" text-anchor="end" font-size="11" fill="currentColor">npcIds (multi)</text>
+
+      <!-- Scene.locationId -> Location -->
+      <path d="M 475 296 C 500 220, 550 190, 578 140" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#ah)"/>
+      <text x="560" y="222" font-size="11" fill="currentColor">locationId</text>
+
+      <!-- NPC.relationships -> NPC/PC -->
+      <path d="M 300 140 C 230 280, 175 380, 152 464" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#ah)"/>
+      <text x="196" y="330" text-anchor="middle" font-size="11" fill="currentColor">relationships[] → npc | pc</text>
+      <text x="196" y="344" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">(reified: relationType + description)</text>
+
+      <!-- SessionLog.adventureId -> Adventure -->
+      <line x1="392" y1="464" x2="392" y2="378" stroke="currentColor" stroke-width="1.3" marker-end="url(#ah)"/>
+      <text x="384" y="424" text-anchor="end" font-size="11" fill="currentColor">adventureId</text>
+
+      <!-- SessionLog.plannedSceneIds -> Scene -->
+      <line x1="452" y1="464" x2="452" y2="356" stroke="currentColor" stroke-width="1.3" marker-end="url(#ah)"/>
+      <text x="460" y="424" font-size="11" fill="currentColor">plannedSceneIds</text>
+
+      <!-- SessionLog.plannedNpcIds -> NPC (left sweep) -->
+      <path d="M 328 486 C 120 440, 90 240, 296 116" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#ah)"/>
+      <text x="96" y="300" text-anchor="middle" font-size="11" fill="currentColor" transform="rotate(-74 96 300)">plannedNpcIds (curated cast)</text>
+
+      <!-- SessionLog.plannedLocationIds -> Location (right of adventure) -->
+      <path d="M 512 478 C 600 420, 610 240, 600 140" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#ah)"/>
+      <text x="616" y="300" text-anchor="middle" font-size="11" fill="currentColor" transform="rotate(-84 616 300)">plannedLocationIds</text>
+
+      <!-- SessionLog -> Plot -->
+      <path d="M 516 500 C 580 470, 630 410, 668 350" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#ah)"/>
+      <text x="648" y="428" font-size="11" fill="currentColor">relatedPlotIds ·</text>
+      <text x="648" y="442" font-size="11" fill="currentColor">plotProgressions{status}</text>
+
+      <!-- Secret.revealedInSessionId -> SessionLog -->
+      <path d="M 858 350 C 800 430, 620 470, 520 486" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#ah)"/>
+      <text x="762" y="452" font-size="11" fill="currentColor">revealedInSessionId</text>
+
+      <!-- Encounter -> SessionLog -->
+      <line x1="622" y1="520" x2="518" y2="510" stroke="currentColor" stroke-width="1.3" marker-end="url(#ah)"/>
+      <text x="570" y="536" text-anchor="middle" font-size="11" fill="currentColor">sessionId</text>
+
+      <!-- Encounter -> Scene -->
+      <path d="M 686 466 C 650 420, 570 390, 524 354" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#ah)"/>
+      <text x="638" y="402" font-size="11" fill="currentColor">sceneId</text>
+
+      <!-- dashed drops to the any-entity rail -->
+      <path d="M 795 140 L 795 636" stroke="currentColor" stroke-width="1.1" stroke-dasharray="5 4" fill="none" marker-end="url(#ah)" opacity="0.65"/>
+      <text x="803" y="560" font-size="10.5" fill="currentColor" opacity="0.8">Article.relatedEntityIds</text>
+      <path d="M 706 350 C 730 460, 740 560, 742 636" stroke="currentColor" stroke-width="1.1" stroke-dasharray="5 4" fill="none" marker-end="url(#ah)" opacity="0.65"/>
+      <text x="712" y="590" font-size="10.5" fill="currentColor" opacity="0.8">Plot.relatedEntityIds</text>
+      <path d="M 900 350 C 912 460, 916 560, 916 636" stroke="currentColor" stroke-width="1.1" stroke-dasharray="5 4" fill="none" marker-end="url(#ah)" opacity="0.65"/>
+      <text x="924" y="560" font-size="10.5" fill="currentColor" opacity="0.8">Secret.linkedEntityIds</text>
+      <path d="M 420 532 L 420 636" stroke="currentColor" stroke-width="1.1" stroke-dasharray="5 4" fill="none" marker-end="url(#ah)" opacity="0.65"/>
+      <text x="428" y="592" font-size="10.5" fill="currentColor" opacity="0.8">structuredNotes[].taggedEntityIds</text>
+
+      <!-- ======== nodes ======== -->
+      <!-- world tier -->
+      <g>
+        <rect x="40" y="82" width="156" height="56" rx="7" fill="var(--surface-2)" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="58" cy="103" r="5" fill="#8b5cf6"/>
+        <text x="70" y="107" font-size="13" font-weight="600" fill="currentColor">Faction</text>
+        <text x="58" y="126" font-size="10.5" fill="currentColor" opacity="0.7">goals · alignment · influence</text>
+      </g>
+      <g>
+        <rect x="280" y="82" width="130" height="56" rx="7" fill="var(--surface-2)" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="298" cy="103" r="5" fill="#f59e0b"/>
+        <text x="310" y="107" font-size="13" font-weight="600" fill="currentColor">NPC</text>
+        <text x="298" y="126" font-size="10.5" fill="currentColor" opacity="0.7">traits · secrets · quote</text>
+      </g>
+      <g>
+        <rect x="520" y="82" width="136" height="56" rx="7" fill="var(--surface-2)" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="538" cy="103" r="5" fill="#10b981"/>
+        <text x="550" y="107" font-size="13" font-weight="600" fill="currentColor">Location</text>
+        <text x="538" y="126" font-size="10.5" fill="currentColor" opacity="0.7">PoIs · loot · secrets</text>
+      </g>
+      <g>
+        <rect x="750" y="82" width="130" height="56" rx="7" fill="var(--surface-2)" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="768" cy="103" r="5" fill="#06b6d4"/>
+        <text x="780" y="107" font-size="13" font-weight="600" fill="currentColor">Article</text>
+        <text x="768" y="126" font-size="10.5" fill="currentColor" opacity="0.7">lore · history · cosmology</text>
+      </g>
+      <g>
+        <rect x="916" y="82" width="106" height="56" rx="7" fill="var(--surface-2)" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="934" cy="103" r="5" fill="#0ea5e9"/>
+        <text x="946" y="107" font-size="13" font-weight="600" fill="currentColor">Item</text>
+        <text x="934" y="126" font-size="10.5" fill="currentColor" opacity="0.7">inbound only</text>
+      </g>
+
+      <!-- narrative tier -->
+      <g>
+        <rect x="310" y="262" width="256" height="116" rx="7" fill="none" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="328" cy="282" r="5" fill="#f97316"/>
+        <text x="340" y="286" font-size="13" font-weight="600" fill="currentColor">Adventure</text>
+        <text x="435" y="286" font-size="10.5" fill="currentColor" opacity="0.7">hook · theme · level</text>
+        <rect x="332" y="298" width="212" height="58" rx="6" fill="var(--surface-2)" stroke="currentColor" stroke-width="1.1"/>
+        <circle cx="350" cy="318" r="5" fill="#3b82f6"/>
+        <text x="362" y="322" font-size="12.5" font-weight="600" fill="currentColor">Scene (scenes: Scene[])</text>
+        <text x="350" y="341" font-size="10.5" fill="currentColor" opacity="0.7">read-aloud · gmNotes · skillChecks</text>
+      </g>
+      <g>
+        <rect x="646" y="294" width="116" height="56" rx="7" fill="var(--surface-2)" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="664" cy="315" r="5" fill="#eab308"/>
+        <text x="676" y="319" font-size="13" font-weight="600" fill="currentColor">Plot</text>
+        <text x="664" y="338" font-size="10.5" fill="currentColor" opacity="0.7">active · resolved</text>
+      </g>
+      <g>
+        <rect x="828" y="294" width="122" height="56" rx="7" fill="var(--surface-2)" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="846" cy="315" r="5" fill="#64748b"/>
+        <text x="858" y="319" font-size="13" font-weight="600" fill="currentColor">Secret</text>
+        <text x="846" y="338" font-size="10.5" fill="currentColor" opacity="0.7">GM-only · isRevealed</text>
+      </g>
+
+      <!-- table tier -->
+      <g>
+        <rect x="64" y="464" width="176" height="56" rx="7" fill="var(--surface-2)" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="82" cy="485" r="5" fill="#14b8a6"/>
+        <text x="94" y="489" font-size="13" font-weight="600" fill="currentColor">PlayerCharacter</text>
+        <text x="82" y="508" font-size="10.5" fill="currentColor" opacity="0.7">edge target only</text>
+      </g>
+      <g>
+        <rect x="328" y="464" width="190" height="68" rx="7" fill="var(--surface-2)" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="346" cy="485" r="5" fill="#f43f5e"/>
+        <text x="358" y="489" font-size="13" font-weight="600" fill="currentColor">SessionLog</text>
+        <text x="346" y="507" font-size="10.5" fill="currentColor" opacity="0.7">running log · recap · beats</text>
+        <text x="346" y="521" font-size="10.5" fill="currentColor" opacity="0.7">contains encounterLog: Encounter[]</text>
+      </g>
+      <g>
+        <rect x="622" y="464" width="140" height="56" rx="7" fill="var(--surface-2)" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="640" cy="485" r="5" fill="#64748b"/>
+        <text x="652" y="489" font-size="13" font-weight="600" fill="currentColor">Encounter</text>
+        <text x="640" y="508" font-size="10.5" fill="currentColor" opacity="0.7">live combat · combatants</text>
+      </g>
+      <g>
+        <rect x="846" y="464" width="110" height="56" rx="7" fill="var(--surface-2)" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="864" cy="485" r="5" fill="#64748b"/>
+        <text x="876" y="489" font-size="13" font-weight="600" fill="currentColor">Note</text>
+        <text x="864" y="508" font-size="10.5" fill="currentColor" opacity="0.7">graph-isolated</text>
+      </g>
+
+      <!-- any-entity rail -->
+      <rect x="40" y="640" width="982" height="92" rx="8" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="7 5"/>
+      <text x="60" y="666" font-size="12.5" font-weight="700" fill="currentColor" letter-spacing="1">ANY ENTITY — untyped id-set overlay (resolved by scan, surfaced as backlinks)</text>
+      <text x="60" y="690" font-size="11" fill="currentColor" opacity="0.8">mentionedEntityIds — 6 sources (NPC · Location · Faction · Article · Plot · Scene) → 7 mention-candidate targets (+ Item, Adventure)</text>
+      <text x="60" y="708" font-size="11" fill="currentColor" opacity="0.8">Article.relatedEntityIds · Plot.relatedEntityIds · Secret.linkedEntityIds · SessionLogEntry.taggedEntityIds · Campaign.pinnedEntities {type, id} · history[].referenceId (typed by referenceType)</text>
+    </svg>
+    <figcaption><strong>The campaign graph.</strong> Solid arrows are typed foreign-key edges stored on the source entity; the three <span style="color:var(--bidi); font-weight:600;">accented double-headed edges</span> are the pairs the store maintains bidirectionally on every mutation. The dashed rail is the untyped overlay: id-sets that may target (nearly) any entity and are resolved by scanning, never stored in reverse. Item and Note deliberately have no outbound typed edges; PlayerCharacter is an edge target only. Not drawn (intra-entity): <code>LootItem.pointOfInterestId</code> inside Location.</figcaption>
+    <div class="legend">
+      <span><svg width="40" height="12" viewBox="0 0 40 12"><line x1="2" y1="6" x2="30" y2="6" stroke="var(--bidi)" stroke-width="2"/><path d="M30 2 L38 6 L30 10 z" fill="var(--bidi)"/></svg> bidirectionally maintained</span>
+      <span><svg width="40" height="12" viewBox="0 0 40 12"><line x1="2" y1="6" x2="30" y2="6" stroke="currentColor" stroke-width="1.3"/><path d="M30 2 L38 6 L30 10 z" fill="currentColor"/></svg> one-way typed FK</span>
+      <span><svg width="40" height="12" viewBox="0 0 40 12"><line x1="2" y1="6" x2="30" y2="6" stroke="currentColor" stroke-width="1.1" stroke-dasharray="5 4"/><path d="M30 2 L38 6 L30 10 z" fill="currentColor"/></svg> untyped id-set (scan-resolved)</span>
+    </div>
+  </figure>
+</section>
+
+<hr class="rule">
+
+<section id="edges">
+  <p class="eyebrow">Section 5</p>
+  <h2>Edge taxonomy — every reference in the model</h2>
+  <p>Classes: <strong>bidi</strong> — the store writes both sides on every mutation; <strong>FK</strong> — one-way typed pointer; <strong>reified</strong> — the edge is itself an object with attributes; <strong>soft</strong> — a pointer that degrades gracefully when dangling; <strong>untyped</strong> — id-set that may target any entity kind. "On delete" describes what happens to the edge when its <em>target</em> is deleted.</p>
+  <div class="scroll-x"><table>
+    <thead><tr><th>Edge</th><th>From → To</th><th>Card.</th><th>Class</th><th>Maintained / guarded by</th><th>On target delete</th></tr></thead>
+    <tbody>
+      <tr><td><code>NPC.factionId</code> ↔ <code>Faction.memberIds</code></td><td>NPC ↔ Faction</td><td>1 : N</td><td>bidi</td><td><code>_synchronizeNpcFactionLink</code> on create/update; <code>autoLinkNpcFactions</code> maintains both sides on template import</td><td><code>deleteFaction</code> clears each member's <code>factionId</code>; <code>deleteNpc</code> removes the id from <code>memberIds</code></td></tr>
+      <tr><td><code>Location.parentLocationId</code> ↔ <code>subLocationIds</code></td><td>Location ↔ Location</td><td>tree</td><td>bidi</td><td><code>_synchronizeLocationHierarchy</code>; <code>_isLocationParentingAllowed</code> rejects cycles (visited-set-guarded ancestor walk)</td><td>Parent/child pointers unwound by <code>deleteLocation</code></td></tr>
+      <tr><td><code>Article.parentArticleId</code> ↔ <code>subArticleIds</code></td><td>Article ↔ Article</td><td>tree</td><td>bidi</td><td><code>_synchronizeArticleHierarchy</code>; <code>_isArticleParentingAllowed</code> (visited-set-guarded)</td><td>Unwound by <code>deleteArticle</code></td></tr>
+      <tr><td><code>Faction.leaderId</code></td><td>Faction → NPC</td><td>1 : 1</td><td>FK</td><td>Set via <code>updateFaction</code></td><td>Cleared by <code>_purgeEntityReferences</code></td></tr>
+      <tr><td><code>Faction.headquartersLocationId</code></td><td>Faction → Location</td><td>1 : 1</td><td>FK</td><td>Set via <code>updateFaction</code>; drawn as <code>hq-at</code> in RelationshipGraph</td><td>Cleared by sweep</td></tr>
+      <tr><td><code>Location.controllingFactionId</code></td><td>Location → Faction</td><td>1 : 1</td><td>FK</td><td>Set via <code>updateLocation</code></td><td>Cleared by sweep</td></tr>
+      <tr><td><code>Location.connections[]</code></td><td>Location → Location</td><td>N : N</td><td>reified</td><td><code>LocationConnection { targetLocationId, description }</code> — the one FK edge carrying prose</td><td>Entry filtered by sweep</td></tr>
+      <tr><td><code>Scene.locationId</code></td><td>Scene → Location</td><td>1 : 1</td><td>FK</td><td><code>updateScene</code></td><td>Cleared by sweep</td></tr>
+      <tr><td><code>Scene.npcIds[]</code></td><td>Scene → NPC</td><td>1 : N</td><td>FK</td><td><code>updateScene</code>; seeds the live-session cast and combat auto-seeding</td><td>Id filtered by sweep</td></tr>
+      <tr><td><code>NPC.relationships[]</code></td><td>NPC → NPC | PC</td><td>N : N</td><td>reified</td><td><code>EntityRelationship { targetId, relationType: string, description }</code> — free-string label, no reciprocal write; the model's only labeled inter-entity edge</td><td>Entry filtered by sweep</td></tr>
+      <tr><td><code>NPC.history[].referenceId</code>, <code>Location.history[].referenceId</code></td><td>NPC/Location → SessionLog | Article</td><td>N : 1</td><td>soft</td><td><code>HistoryEntry.referenceType</code> (<code>session | article | manual</code>) discriminates the target collection</td><td>Nulled to <code>referenceType: 'manual'</code> by sweep — the timeline row survives</td></tr>
+      <tr><td><code>SessionLog.adventureId</code></td><td>SessionLog → Adventure</td><td>1 : 1</td><td>FK</td><td>Session prep</td><td>Cleared by sweep</td></tr>
+      <tr><td><code>SessionLog.plannedSceneIds[]</code></td><td>SessionLog → Scene</td><td>1 : N</td><td>FK</td><td>SessionPrepWizard; go-live promotes the first planned scene</td><td>Filtered by <code>deleteScene</code> and <code>deleteAdventure</code> (per-scene sweep)</td></tr>
+      <tr><td><code>SessionLog.plannedNpcIds?[]</code>, <code>plannedLocationIds?[]</code></td><td>SessionLog → NPC / Location</td><td>1 : N</td><td>FK</td><td>Prep-wizard curation; SessionRunner prefers them when present, falls back to scene-derived cast when <code>undefined</code></td><td>Ids filtered by sweep</td></tr>
+      <tr><td><code>SessionLog.relatedPlotIds[]</code></td><td>SessionLog → Plot</td><td>1 : N</td><td>FK</td><td>Session end wizard</td><td>Id filtered by sweep</td></tr>
+      <tr><td><code>SessionLog.plotProgressions</code></td><td>SessionLog → Plot</td><td>map</td><td>FK + attribute</td><td><code>Record&lt;plotId, advanced | stalled | unchanged&gt;</code> — the model's only attributed edge map</td><td>Key deleted by sweep</td></tr>
+      <tr><td><code>Secret.revealedInSessionId</code></td><td>Secret → SessionLog</td><td>1 : 1</td><td>FK</td><td>SecretsTracker reveal flow</td><td>Cleared by sweep</td></tr>
+      <tr><td><code>Encounter.sessionId</code>, <code>Encounter.sceneId</code></td><td>Encounter → SessionLog / Scene</td><td>1 : 1</td><td>soft</td><td>Stamped when combat starts; archived copies live inside <code>SessionLog.encounterLog</code></td><td>Outside the sweep — dangles harmlessly (display-only provenance)</td></tr>
+      <tr><td><code>Article.relatedEntityIds?[]</code>, <code>Plot.relatedEntityIds[]</code></td><td>Article/Plot → any</td><td>1 : N</td><td>untyped</td><td>Editors + AI generation; surfaced as backlinks; validated by <code>continuityChecker</code> against the full id universe</td><td>Id filtered by sweep</td></tr>
+      <tr><td><code>*.mentionedEntityIds?[]</code></td><td>NPC, Location, Faction, Article, Plot, Scene → any mention target</td><td>1 : N</td><td>untyped</td><td><code>MentionInput</code> @-mentions; rename-safe (id-tracked, not text-tracked); editor-level per-field maps rebuilt on entity switch; swept by <code>scanAllMentionSources</code></td><td>Id filtered by sweep</td></tr>
+      <tr><td><code>SessionLogEntry.taggedEntityIds[]</code></td><td>SessionLog entry → any</td><td>1 : N</td><td>untyped</td><td>Running-log tagging</td><td>Id filtered by sweep</td></tr>
+      <tr><td><code>Campaign.pinnedEntities?[]</code></td><td>Campaign → any</td><td>≤ 15</td><td>untyped</td><td><code>pinEntity/unpinEntity</code> (<code>{ type: string, id }</code>, capped at 15)</td><td>Entry removed by sweep</td></tr>
+      <tr><td><code>LootItem.pointOfInterestId?</code></td><td>Location.loot → Location.pointsOfInterest</td><td>intra</td><td>soft</td><td>Links loot to the PoI that hides it — never crosses the entity boundary</td><td>n/a (dies with its Location)</td></tr>
+      <tr><td><code>NPC.knowsPlayerHistory[].playerId</code></td><td>NPC → PC</td><td>1 : N</td><td>deprecated</td><td>Kept for save compatibility; no writer in the current UI; outside the sweep</td><td>Dangles (accepted legacy)</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<hr class="rule">
+
+<section id="subobjects">
+  <p class="eyebrow">Section 6</p>
+  <h2>Sub-object taxonomy</h2>
+  <p>Value objects that live inside an entity and never leave it. All carry their own <code>id</code> (remapped on duplicate/import) except where noted.</p>
+  <div class="scroll-x"><table>
+    <thead><tr><th>Sub-object</th><th>Lives in</th><th>Shape</th></tr></thead>
+    <tbody>
+      <tr><td><code>PointOfInterest</code></td><td><code>Location.pointsOfInterest?</code></td><td><code>name</code>, <code>passivePerceptionDC</code>, read-aloud <code>description</code>, <code>investigationChecks[]</code> + <code>interactions[]</code> (both <code>PoiInteraction { description, outcome }</code>)</td></tr>
+      <tr><td><code>LootItem</code></td><td><code>Location.loot?</code></td><td><code>description</code>, <code>pointOfInterestId?</code> — intra-entity link to the PoI concealing it</td></tr>
+      <tr><td><code>HistoryEntry</code></td><td><code>NPC.history</code>, <code>Location.history</code></td><td><code>summary</code>, <code>referenceType</code> (<code>session | article | manual</code>), <code>referenceId?</code> — the model's temporal breadcrumb</td></tr>
+      <tr><td><code>SessionLogEntry</code></td><td><code>SessionLog.structuredNotes</code></td><td><code>timestamp</code>, <code>content</code>, <code>taggedEntityIds[]</code>, <code>type?</code> (<code>manual | scene-transition | combat | npc-created | dice-roll | coach-used</code>), <code>tags?</code>, <code>isImportant?</code></td></tr>
+      <tr><td><code>Beat</code></td><td><code>SessionLog.beats?</code></td><td>Lightweight planning checklist: <code>title</code>, <code>notes?</code>, <code>isCompleted</code></td></tr>
+      <tr><td><code>DiceRoll</code></td><td><code>SessionLog.diceRolls?</code></td><td><code>formula</code>, <code>results[]</code>, <code>total</code>, <code>timestamp</code>, <code>note?</code></td></tr>
+      <tr><td><code>Combatant</code></td><td><code>Encounter.combatants</code></td><td><code>name</code>, <code>type</code> (<code>pc | npc | monster</code>), <code>initiative</code>, <code>hp/maxHp</code>, <code>ac?</code>, <code>notes?</code> — seeded from Scene NPCs (HP parsed from <code>stats</code>) and party PCs</td></tr>
+      <tr><td><code>SkillCheck</code></td><td><code>Scene.skillChecks</code></td><td><code>skill</code>, <code>dc</code>, <code>description</code></td></tr>
+      <tr><td><code>EntityRelationship</code></td><td><code>NPC.relationships</code></td><td><code>targetId</code>, <code>relationType</code> (free string — "Ally", "Rival", "Family"…), <code>description</code></td></tr>
+      <tr><td><code>RollableTable</code> / <code>RollableTableEntry</code></td><td><em>transient</em></td><td>AI output only (DM Coach), never persisted on Campaign; carries no <code>id</code></td></tr>
+      <tr><td><code>CharacterSocial</code>, <code>CharacterStatistics</code>, <code>AbilityScores</code>, <code>Skills</code>, <code>ClassLevel</code></td><td><code>PlayerCharacter</code></td><td>Id-less value objects; <code>Skills</code> is an 18-key map of <code>ProficiencyLevel</code> (<code>none | half | proficient | expertise</code>)</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<hr class="rule">
+
+<section id="integrity">
+  <p class="eyebrow">Section 7</p>
+  <h2>Integrity machinery</h2>
+  <p>Integrity is enforced in <code>services/campaignService.ts</code> (all writes flow through it via Immer) plus the two ingestion paths. The contract, path by path:</p>
+  <ul class="plain">
+    <li><strong>Bidirectional sync</strong> — <code>_synchronizeNpcFactionLink</code>, <code>_synchronizeLocationHierarchy</code>, <code>_synchronizeArticleHierarchy</code> run inside the normal updaters (<code>updateNpc({factionId})</code>, <code>updateLocation({parentLocationId})</code>, …). There are no dedicated "link" methods; the relationship field <em>is</em> the API.</li>
+    <li><strong>Cycle guards</strong> — <code>_isLocationParentingAllowed</code> / <code>_isArticleParentingAllowed</code> reject any re-parenting that would close a loop, and their ancestor walks carry visited-sets so a pre-existing cycle in imported data cannot hang them. AI batch-add runs the same guard on name-resolved parents. Editors' <code>possibleParents</code> walks are guarded identically.</li>
+    <li><strong>Cascade deletion</strong> — every one of the 12 delete methods calls the central sweep <code>_purgeEntityReferences(campaign, id)</code>, which clears the deleted id from: NPC <code>relationships</code> + <code>mentionedEntityIds</code> + <code>history[].referenceId</code>; Location <code>mentionedEntityIds</code> + <code>connections</code> + <code>history[].referenceId</code>; Faction <code>leaderId</code>/<code>headquartersLocationId</code>/<code>memberIds</code>; Scene <code>locationId</code>/<code>npcIds</code>/<code>mentionedEntityIds</code>; Article/Plot <code>relatedEntityIds</code> + <code>mentionedEntityIds</code>; SessionLog planning ids, <code>relatedPlotIds</code>, <code>plotProgressions</code> keys, <code>structuredNotes[].taggedEntityIds</code>; Secret <code>linkedEntityIds</code>/<code>revealedInSessionId</code>; <code>pinnedEntities</code>. <code>deleteAdventure</code> additionally runs the sweep for every contained scene id.</li>
+    <li><strong>Duplicate / template import</strong> — <code>duplicateCampaign</code> and <code>importTemplateData</code> do a two-pass id remap: pass one mints new ids for every entity <em>and nested sub-object</em> (scenes, PoIs, loot, history entries), pass two rewrites every edge through the map — <code>idMap.get(id) ?? id</code> on duplicate (preserve external refs) vs. remap-or-drop on template import (no dangling refs from partial payloads).</li>
+    <li><strong>JSON import</strong> — <code>validateImportedCampaign</code> (<code>services/importExportService.ts</code>) structurally validates, backfills required arrays (<code>normaliseRequiredArrays</code>), dedupes ids campaign-wide including nested collections, and rejects files whose envelope <code>version</code> exceeds <code>CURRENT_CAMPAIGN_VERSION</code> <em>before</em> any mutation.</li>
+    <li><strong>Versioning</strong> — the <code>Campaign</code> interface itself is unversioned; <code>version</code> exists only on the exported JSON envelope. In-memory/localStorage payloads are upgraded structurally by <code>migrateCampaignsData</code> (shape-sniffing, e.g. legacy <code>plots[].name</code> → <code>title</code>), which backfills every required array and is kept in lockstep with <code>normaliseRequiredArrays</code>.</li>
+  </ul>
+  <div class="callout"><p><strong>The standing risk this design carries:</strong> integrity is a hand-maintained N-place contract. A new edge type must be registered in the purge sweep, both remap passes, the backlink scanner, the continuity checker, the graph view, and (if AI-visible) the context builder. The highest-leverage future refactor is a single <code>forEachReference(campaign, visitor)</code> edge registry that those six consumers share — turning "add an edge" into a one-place change.</p></div>
+</section>
+
+<hr class="rule">
+
+<section id="operations">
+  <p class="eyebrow">Section 8</p>
+  <h2>Derived graph operations</h2>
+  <div class="scroll-x"><table>
+    <thead><tr><th>Operation</th><th>Where</th><th>What it derives</th></tr></thead>
+    <tbody>
+      <tr><td>Backlinks</td><td><code>utils/backlinkUtils.ts</code></td><td>Full inbound-edge scan per entity: memberships, hierarchy children, scene casts, relationships ("Relationship with"), any-entity related/linked/tagged sets, and @-mentions via <code>scanAllMentionSources</code> (the six source types in one sweep). O(V+E) per panel open, memoized.</td></tr>
+      <tr><td>Graph view</td><td><code>components/visualizers/RelationshipGraph.tsx</code></td><td>D3 force layout over 11 edge kinds: faction membership, leader, HQ, location parent + connections + controlling faction, adventure→scene, scene→location/npcs, article parent + related, NPC relationships (labeled with <code>relationType</code>). Every assembled link is filtered against the node-id set, so dangling refs degrade to a missing edge, never a d3 throw.</td></tr>
+      <tr><td>AI context</td><td><code>services/contextBuilder.ts</code></td><td>Tiered, token-budgeted context assembly (<code>generation | coach | chat</code> variants): active scene → its NPCs → their factions, active location, focus-entity detail. One hop deep by design.</td></tr>
+      <tr><td>Continuity lint</td><td><code>services/continuityChecker.ts</code></td><td>Rule-based checks: broken references (validated against the full id universe — all twelve collections), circular hierarchies, orphaned entities, contradictory state.</td></tr>
+      <tr><td>Prose → id inference</td><td><code>services/linking/</code></td><td><code>TextMatchingEngine</code> (swappable via <code>engineRegistry</code>) finds entity names in free text with Unicode-aware word boundaries; powers link suggestions, the scene smart-link bar, and <code>autoLinker</code>'s template-import linking. <code>LinkedText</code> renders with byte-identical matcher semantics.</td></tr>
+      <tr><td>Session cast resolution</td><td><code>components/views/SessionRunner.tsx</code></td><td>Live cast = <code>sessionLog.plannedNpcIds/plannedLocationIds</code> when present (curated), else derived from <code>activeScene.npcIds/locationId</code>.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<hr class="rule">
+
+<section id="vocab">
+  <p class="eyebrow">Section 9</p>
+  <h2>Type-vocabulary systems</h2>
+  <p>Several parallel unions name entity kinds for different surfaces. They overlap but are <em>not</em> interchangeable — check the import before assuming members. <code>ENTITY_TYPE_CONFIG</code> is the styling source of truth; the others gate feature surfaces.</p>
+  <div class="scroll-x"><table>
+    <thead><tr><th>System</th><th>Lives in</th><th>Members</th></tr></thead>
+    <tbody>
+      <tr><td><code>ENTITY_TYPE_CONFIG</code> keys</td><td><code>utils/entityUtils.ts</code></td><td>npc · location · faction · item · adventure · article · sessionLog · playerCharacter · plot · note · scene (+ kebab aliases <code>session-log</code>, <code>player-character</code> mapping to the same entries). Single source for accent colors and icons.</td></tr>
+      <tr><td><code>EntityType</code> enum</td><td><code>types/Graph.ts</code></td><td>LOCATION · NPC · ITEM · FACTION · ADVENTURE · SCENE · ARTICLE — the graph view's node vocabulary (uppercase, a real enum). Plots, session logs, and PCs are not graph nodes today.</td></tr>
+      <tr><td><code>CommandPaletteEntityType</code></td><td><code>components/common/CommandPalette.tsx</code></td><td>npc · location · faction · item · adventure · article · session-log · plot · player-character · scene · note — everything Cmd+K can find (11 kinds).</td></tr>
+      <tr><td><code>QuickCardEntityType</code></td><td><code>utils/entityDetailExtractors.ts</code></td><td>npc · location · faction · item · adventure · article · plot · session-log · player-character · scene — hover-card + pin vocabulary; <code>lookupEntity</code> here is the canonical name resolver.</td></tr>
+      <tr><td><code>MentionEntityType</code></td><td><code>components/common/MentionInput.tsx</code></td><td>npc · location · faction · item · adventure · article · plot — the 7 kinds an @-mention can target (sources are the 6 types carrying <code>mentionedEntityIds</code>).</td></tr>
+    </tbody>
+  </table></div>
+  <p class="quiet">Casing convention: camelCase keys in config/state, kebab-case in UI-facing unions; <code>ENTITY_TYPE_CONFIG</code> bridges with dual keys. A future consolidation into one <code>EntityKind</code> union with derived casings is on the roadmap.</p>
+</section>
+
+<hr class="rule">
+
+<section id="wire">
+  <p class="eyebrow">Section 10</p>
+  <h2>AI wire shapes — what generation is allowed to say</h2>
+  <p>AI output never carries store-owned fields. <code>types/Evocation.ts</code> encodes the omission contract:</p>
+  <ul class="plain">
+    <li><code>AdventureForBatchAdd</code> = <code>Adventure</code> minus <code>id</code>/<code>scenes</code>, with scenes minus <code>id</code> and with <code>status</code>/<code>npcIds</code> <em>optional</em> — the real provider's scene schema never returns them, so consumers of the raw shape get a compile error instead of a false promise. Normalization to full <code>Scene</code>s (defaulting <code>status: 'planned'</code>, <code>npcIds: []</code>, <code>skillChecks: []</code>) happens in exactly two places, both in <code>campaignService.ts</code>: <code>createFullAdventure</code> and <code>batchAddToCampaign</code>, each building from <code>createDefaultScene()</code> and spreading AI data over it.</li>
+    <li><code>BatchAddData</code> applies the same rule per kind: NPCs omit <code>id</code> + <code>knowsPlayerHistory</code>; locations omit <code>id</code> + <code>subLocationIds</code>; factions omit <code>id</code> + <code>leaderId</code> + <code>memberIds</code>; items omit <code>id</code>. <code>batchAddToCampaign</code> resolves AI-returned faction/location <em>names or ids</em> to real ids and establishes the bidirectional links (membership, hierarchy — cycle-guarded) itself.</li>
+    <li>The world simulation goes further: <code>WORLD_SIM_WRITABLE_FIELDS</code> allowlists prose fields only — the simulation can narrate change but can never rewire ids, arrays, or edges.</li>
+  </ul>
+</section>
+
+<footer>
+  <p>Generated from the shipped code on <code>main</code> (post ship-readiness merge, 2026-08-15). Primary sources: <code>types/*.ts</code>, <code>services/campaignService.ts</code>, <code>utils/backlinkUtils.ts</code>, <code>utils/entityUtils.ts</code>, <code>services/contextBuilder.ts</code>, <code>services/continuityChecker.ts</code>, <code>services/linking/*</code>, <code>components/visualizers/RelationshipGraph.tsx</code>. Companion documents: <a href="system-architecture.md">system-architecture.md</a> (runtime topology), <a href="high-level-design.md">high-level-design.md</a>, <a href="technical-design.md">technical-design.md</a>, and <code>types/CLAUDE.md</code> for the working-agreement view of the same model.</p>
+</footer>
+
+</div>
+</body>
+</html>
