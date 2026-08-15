@@ -132,6 +132,7 @@ All code at **project root** (no `src/` directory). Import alias `@/` maps to ro
 | Document | Description |
 |----------|-------------|
 | [`docs/architecture/system-architecture.md`](docs/architecture/system-architecture.md) | **Start here.** Authoritative reference: runtime topology, AI-proxy security posture, component catalog, state deep-dive, known debt |
+| [`docs/architecture/semantic-model.html`](docs/architecture/semantic-model.html) | Full semantic model and taxonomy: every entity, every edge, integrity machinery, vocabulary systems (open in a browser) |
 | [`docs/architecture/high-level-design.md`](docs/architecture/high-level-design.md) | System overview, architecture diagram, data model, feature map, project structure |
 | [`docs/architecture/technical-design.md`](docs/architecture/technical-design.md) | Detailed technical design: state management, AI integration, hooks, dialog system, styling, build |
 | [`docs/architecture/implementation-plan.md`](docs/architecture/implementation-plan.md) | Phased implementation plan (Phases A-F) with work packages |
