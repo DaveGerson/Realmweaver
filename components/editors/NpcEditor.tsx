@@ -16,6 +16,7 @@ import type { QuickCardEntityType } from '../common/EntityQuickCard';
 import { BacklinksPanel } from '../common/BacklinksPanel';
 import { TabLayout } from '../common/TabLayout';
 import type { TabDefinition } from '../common/TabLayout';
+import { useDebouncedFieldCommit } from '../../hooks/useDebouncedFieldCommit';
 
 interface NpcEditorProps {
   npc: NPC;
@@ -86,10 +87,15 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
     }
   }
 
-  // Used by MentionInput fields (onChange receives string, not event)
+  // Store writes are debounced per field and keyed to the entity id by
+  // useDebouncedFieldCommit, which flushes pending edits when the edited
+  // entity changes under this same mounted editor or on unmount, so text
+  // typed inside the debounce window is committed to the entity it was
+  // typed against (finding #70).
+  const { commit: commitMentionField } = useDebouncedFieldCommit<NPC>(npc.id, onUpdate);
   const handleMentionFieldChange = (field: keyof NPC) => (value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    onUpdate(npc.id, { [field]: value });
+    commitMentionField(field, value);
   };
 
   // --- @-mention tracking across all MentionInput fields ---
@@ -99,22 +105,57 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
     () => resolveMentionCandidates(campaignProp, npc.mentionedEntityIds),
     [campaignProp, npc.mentionedEntityIds],
   );
-  const [mentionedIdsByField, setMentionedIdsByField] = useState<Record<string, string[]>>(() => ({
+  // Per-field mention ID sets. Kept in a ref, not state — nothing renders off
+  // of this value directly, it exists purely so handleMentionedIdsChange can
+  // compute the merged set without writing to the store from inside a
+  // setState updater (React invokes functional updaters during the render
+  // phase, and StrictMode intentionally double-invokes them — doing the
+  // store write there fired it twice).
+  const mentionedIdsByFieldRef = useRef<Record<string, string[]>>({
     description: findMentionedIdsInText(npc.description, mentionCandidates),
     traits: findMentionedIdsInText(npc.traits, mentionCandidates),
     motivations: findMentionedIdsInText(npc.motivations, mentionCandidates),
     secrets: findMentionedIdsInText(npc.secrets, mentionCandidates),
     backstory: findMentionedIdsInText(npc.backstory, mentionCandidates),
-  }));
+  });
+  // Last merged id set actually written to the store. MentionInput reports
+  // its field's id set on every keystroke even when that set hasn't changed,
+  // so without this the store (and every useSyncExternalStore subscriber)
+  // would still churn once per character (finding #70).
+  const lastMergedIdsKeyRef = useRef<string>(
+    Array.from(new Set(Object.values(mentionedIdsByFieldRef.current).flat())).sort().join('\u0000'),
+  );
+  // Editors are not remounted when the GM navigates A -> B (ViewRouter renders
+  // this editor at a fixed position with no key), so the useRef initialisers
+  // above only ever ran for the FIRST entity. Rebuild both refs from the
+  // incoming entity on every id change, mirroring the mount-time seeding —
+  // otherwise B's first keystroke merges A's stale per-field sets into B's
+  // mentionedEntityIds (or A's stale merged key suppresses B's first
+  // legitimate write). Keyed on the id ONLY — resetting on every
+  // mentionCandidates recompute would discard in-session tracked mentions
+  // (same rationale as MentionInput's seedKey resync).
+  useEffect(() => {
+    mentionedIdsByFieldRef.current = {
+      description: findMentionedIdsInText(npc.description, mentionCandidates),
+      traits: findMentionedIdsInText(npc.traits, mentionCandidates),
+      motivations: findMentionedIdsInText(npc.motivations, mentionCandidates),
+      secrets: findMentionedIdsInText(npc.secrets, mentionCandidates),
+      backstory: findMentionedIdsInText(npc.backstory, mentionCandidates),
+    };
+    lastMergedIdsKeyRef.current =
+      Array.from(new Set(Object.values(mentionedIdsByFieldRef.current).flat())).sort().join(String.fromCharCode(0));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [npc.id]);
   // Reports the merged set of mentioned IDs (across every mention field) whenever any field changes.
   const handleMentionedIdsChange = (field: string) => (ids: string[]) => {
-    setMentionedIdsByField(prev => {
-      const next = { ...prev, [field]: ids };
-      const merged = Array.from(new Set(Object.values(next).flat()));
-      setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
-      onUpdate(npc.id, { mentionedEntityIds: merged });
-      return next;
-    });
+    const next = { ...mentionedIdsByFieldRef.current, [field]: ids };
+    mentionedIdsByFieldRef.current = next;
+    const merged = Array.from(new Set(Object.values(next).flat()));
+    const mergedKey = merged.slice().sort().join('\u0000');
+    if (mergedKey === lastMergedIdsKeyRef.current) return;
+    lastMergedIdsKeyRef.current = mergedKey;
+    setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
+    onUpdate(npc.id, { mentionedEntityIds: merged });
   };
 
   const handleFieldRegenerate = (field: keyof Omit<NPC, 'id' | 'factionId' | 'knowsPlayerHistory' | 'relationships' | 'history'>) => (newValue: string) => {

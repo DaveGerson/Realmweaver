@@ -68,6 +68,7 @@ export const SceneGenerator: React.FC<SceneGeneratorProps> = ({
       onSceneCreated(newScene);
       setPrompt('');
     } catch (err) {
+      console.error('[SceneGenerator] generation failed', err);
       if (isMountedRef.current) {
         setError('Failed to generate scene. Please check your API key and try again.');
       }

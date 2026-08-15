@@ -1,6 +1,65 @@
 import { Page, expect } from '@playwright/test';
 
 // ---------------------------------------------------------------------------
+// Internal utilities
+// ---------------------------------------------------------------------------
+
+/**
+ * Genuinely wait for a locator to become visible within `timeout`, resolving
+ * to `true`/`false` instead of throwing.
+ *
+ * Playwright documents `isVisible`'s timeout option as ignored — that call
+ * does not wait for the element to become visible and returns immediately,
+ * so using it as a boolean probe is a race: the element may appear a moment
+ * later and the probe still reports false.
+ */
+async function isVisibleWithin(locator: import('@playwright/test').Locator, timeout: number): Promise<boolean> {
+  return locator.waitFor({ state: 'visible', timeout }).then(
+    () => true,
+    () => false
+  );
+}
+
+/**
+ * Race a set of mutually-exclusive locators and resolve to the index of
+ * whichever becomes visible first, or -1 if none do within their own
+ * timeout.
+ *
+ * Unlike probing candidates one at a time with `isVisibleWithin` (which pays
+ * each candidate's full timeout in sequence when an earlier candidate is
+ * absent), this waits on all candidates concurrently and settles the moment
+ * the first one resolves — the common case (the app is already on one of
+ * the expected screens) returns almost instantly instead of after N*timeout.
+ * Only resolves -1 once every candidate has genuinely timed out, so it never
+ * under-waits relative to the serial version.
+ */
+async function raceVisible(
+  candidates: Array<{ locator: import('@playwright/test').Locator; timeout: number }>
+): Promise<number> {
+  return new Promise<number>((resolve) => {
+    let settled = false;
+    let remaining = candidates.length;
+    candidates.forEach(({ locator, timeout }, index) => {
+      locator.waitFor({ state: 'visible', timeout }).then(
+        () => {
+          if (!settled) {
+            settled = true;
+            resolve(index);
+          }
+        },
+        () => {
+          remaining -= 1;
+          if (!settled && remaining === 0) {
+            settled = true;
+            resolve(-1);
+          }
+        }
+      );
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Storage helpers
 // ---------------------------------------------------------------------------
 
@@ -38,18 +97,20 @@ export async function gotoFresh(page: Page): Promise<void> {
  * The toggle is a <button role="switch" aria-checked={isMockMode}>. It only
  * appears in the header once a campaign is active. Mock mode defaults to true
  * in App.tsx, so this is mainly needed after toggling it off.
- *
- * On mobile the button can be partially obscured by the fixed sidebar stacking
- * context; we use { force: true } to reliably dispatch the click.
  */
 export async function enableMockMode(page: Page): Promise<void> {
   const toggle = page.locator('[role="switch"]').first();
-  if (!(await toggle.isVisible({ timeout: 2000 }).catch(() => false))) {
+  // Every call site in the suite calls this after createCampaign(), which
+  // already waits for the sidebar heading — by then the header (and this
+  // toggle) is definitely mounted, so a short wait is enough; it only needs
+  // to be long enough to survive a paint/effect tick, not a full 2s budget
+  // for a "campaign never loads" case that createCampaign already ruled out.
+  if (!(await isVisibleWithin(toggle, 500))) {
     return;
   }
   const isChecked = (await toggle.getAttribute('aria-checked')) === 'true';
   if (!isChecked) {
-    await toggle.click({ force: true });
+    await toggle.click();
     await expect(toggle).toHaveAttribute('aria-checked', 'true');
   }
 }
@@ -93,8 +154,16 @@ export async function createCampaign(
   const templateSelectHeading = page.getByRole('heading', { name: /start with a template/i });
   const creatorHeading = page.getByRole('heading', { name: 'Create Your Campaign' });
 
-  const isOnTemplateSelect = await templateSelectHeading.isVisible({ timeout: 500 }).catch(() => false);
-  const isOnCreatorForm = await creatorHeading.isVisible({ timeout: 500 }).catch(() => false);
+  // The two headings are mutually exclusive (at most one screen is showing at
+  // a time), so race them instead of probing each serially — the common case
+  // (already on one of these screens) resolves almost instantly instead of
+  // paying up to 2x500ms.
+  const initialScreen = await raceVisible([
+    { locator: templateSelectHeading, timeout: 500 },
+    { locator: creatorHeading, timeout: 500 },
+  ]);
+  const isOnTemplateSelect = initialScreen === 0;
+  const isOnCreatorForm = initialScreen === 1;
 
   if (!isOnTemplateSelect && !isOnCreatorForm) {
     // Welcome screen path — button text unchanged
@@ -102,9 +171,14 @@ export async function createCampaign(
     // CrossCampaignDashboard path — the "Create new campaign" dashed card
     const selectorCreateBtn = page.getByRole('button', { name: /create new campaign/i });
 
-    if (await createFirstBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
+    const entryPoint = await raceVisible([
+      { locator: createFirstBtn, timeout: 1500 },
+      { locator: selectorCreateBtn, timeout: 1500 },
+    ]);
+
+    if (entryPoint === 0) {
       await createFirstBtn.click();
-    } else if (await selectorCreateBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
+    } else if (entryPoint === 1) {
       await selectorCreateBtn.click();
     } else {
       // Already in editing mode — use header to start a new campaign
@@ -155,10 +229,13 @@ export async function createCampaign(
 
   // Dismiss the FirstCampaignWizard if it auto-opened for the empty campaign.
   // It renders as a fixed full-screen overlay with a close button titled "Skip wizard".
+  // FirstCampaignWizard auto-opens from a React effect after the campaign
+  // transitions to 'editing', so we must genuinely wait for it rather than
+  // probe instantly — an instant check can lose that race and leave the
+  // overlay covering every later action in the test.
   const skipWizardBtn = page.locator('button[title="Skip wizard"]');
-  if (await skipWizardBtn.isVisible({ timeout: 500 }).catch(() => false)) {
-    // On mobile the header z-index can intercept pointer events; use force:true.
-    await skipWizardBtn.click({ force: true });
+  if (await isVisibleWithin(skipWizardBtn, 2000)) {
+    await skipWizardBtn.click();
     // Wait for the overlay to disappear
     await expect(skipWizardBtn).not.toBeVisible({ timeout: 3000 });
   }
@@ -172,7 +249,7 @@ export async function createCampaign(
  * On mobile, the sidebar is a hidden drawer. Open it by clicking the
  * hamburger button in the header (md:hidden class means desktop doesn't show it).
  */
-async function openMobileSidebar(page: Page): Promise<void> {
+export async function openMobileSidebar(page: Page): Promise<void> {
   // The hamburger button sits before the logo in the header — it's md:hidden
   const hamburger = page.locator('header').getByRole('button').first();
   // Only click it if the sidebar is not currently visible in the viewport
@@ -180,9 +257,13 @@ async function openMobileSidebar(page: Page): Promise<void> {
   const sidebarBox = await sidebar.boundingBox();
   // On mobile, sidebar is translated -100% left so x is negative
   if (sidebarBox && sidebarBox.x < 0) {
-    await hamburger.click({ force: true });
-    // Wait for sidebar to slide into view
-    await page.waitForTimeout(300);
+    await hamburger.click();
+    // Wait for the slide-in transition to actually finish instead of a fixed
+    // sleep: poll the sidebar's bounding box until it has slid on-screen.
+    await expect(async () => {
+      const box = await sidebar.boundingBox();
+      expect(box && box.x >= 0).toBe(true);
+    }).toPass({ timeout: 2000 });
   }
 }
 
@@ -200,7 +281,7 @@ async function openMobileSidebar(page: Page): Promise<void> {
 export async function navigateToView(page: Page, label: string): Promise<void> {
   await openMobileSidebar(page);
   const btn = page.locator('aside').getByRole('button', { name: new RegExp(label, 'i') }).first();
-  await btn.click({ force: true });
+  await btn.click();
 }
 
 /** Wait for the main content area to be rendered. */
@@ -266,4 +347,20 @@ export async function waitForAutoSave(page: Page, expectedTitle: string): Promis
     expectedTitle,
     { timeout: 8000, polling: 200 }
   );
+}
+
+/**
+ * In the SessionRunner on mobile, panels live behind a tab bar
+ * (Scenes / Active / Tools — md:hidden, so absent on desktop). Switch to the
+ * named tab when the bar is present; a no-op on desktop where all panels are
+ * visible side by side.
+ */
+export async function switchMobileSessionTab(
+  page: Page,
+  label: 'Scenes' | 'Active' | 'Tools'
+): Promise<void> {
+  const tab = page.getByRole('button', { name: label, exact: true }).first();
+  if (await isVisibleWithin(tab, 1000)) {
+    await tab.click();
+  }
 }

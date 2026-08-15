@@ -3,6 +3,7 @@ import React, { useState, useMemo, Suspense } from 'react';
 import type { Plot } from '../../types/index';
 import type { SessionLog } from '../../types/index';
 import { useEntitySearch } from '@/hooks/useEntitySearch';
+import { useRovingTabIndex, type RovingProps } from '@/hooks/useRovingTabIndex';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 // Lazy-loaded — only bundled when the timeline panel is expanded
@@ -87,6 +88,15 @@ export const PlotDashboard: React.FC<PlotDashboardProps> = ({ plots, sessionLogs
   const dormantPlots = filteredPlots.filter(p => p.status === 'dormant');
   const [timelineOpen, setTimelineOpen] = useState(true);
 
+  // Each status group is its own roving-tabindex group — keyboard grid
+  // navigation stays scoped to the cards actually adjacent on screen.
+  // Active Arcs renders `grid-cols-1 sm:grid-cols-2` (below), so `columns`
+  // must track that breakpoint too, or ArrowDown moves to the card to the
+  // right instead of the card below at >=640px (finding #104).
+  const { getRovingProps: getActiveRovingProps } = useRovingTabIndex({ direction: 'both', columns: { base: 1, sm: 2 } });
+  const { getRovingProps: getDormantRovingProps } = useRovingTabIndex({ direction: 'vertical', columns: 1 });
+  const { getRovingProps: getResolvedRovingProps } = useRovingTabIndex({ direction: 'vertical', columns: 1 });
+
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
 
@@ -158,7 +168,7 @@ export const PlotDashboard: React.FC<PlotDashboardProps> = ({ plots, sessionLogs
                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Active Arcs
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {activePlots.map(plot => <PlotCard key={plot.id} plot={plot} onClick={() => onSelectPlot(plot.id)} />)}
+                {activePlots.map((plot, index) => <PlotCard key={plot.id} plot={plot} onClick={() => onSelectPlot(plot.id)} rovingProps={getActiveRovingProps(index)} />)}
                 {activePlots.length === 0 && <p className="text-sm text-slate-500 italic col-span-2">No active plots running.</p>}
             </div>
           </div>
@@ -170,7 +180,7 @@ export const PlotDashboard: React.FC<PlotDashboardProps> = ({ plots, sessionLogs
                     <span className="w-2 h-2 rounded-full bg-slate-600"></span> Dormant / Backburner
                 </h2>
                 <div className="space-y-2">
-                    {dormantPlots.map(plot => <PlotCard key={plot.id} plot={plot} onClick={() => onSelectPlot(plot.id)} compact />)}
+                    {dormantPlots.map((plot, index) => <PlotCard key={plot.id} plot={plot} onClick={() => onSelectPlot(plot.id)} compact rovingProps={getDormantRovingProps(index)} />)}
                     {dormantPlots.length === 0 && <p className="text-xs text-slate-600 italic">No dormant plots.</p>}
                 </div>
               </div>
@@ -179,7 +189,7 @@ export const PlotDashboard: React.FC<PlotDashboardProps> = ({ plots, sessionLogs
                     <span className="w-2 h-2 rounded-full bg-amber-900"></span> Resolved History
                 </h2>
                 <div className="space-y-2">
-                    {resolvedPlots.map(plot => <PlotCard key={plot.id} plot={plot} onClick={() => onSelectPlot(plot.id)} compact />)}
+                    {resolvedPlots.map((plot, index) => <PlotCard key={plot.id} plot={plot} onClick={() => onSelectPlot(plot.id)} compact rovingProps={getResolvedRovingProps(index)} />)}
                     {resolvedPlots.length === 0 && <p className="text-xs text-slate-600 italic">No resolved plots yet.</p>}
                 </div>
               </div>
@@ -195,6 +205,7 @@ interface PlotCardProps {
     plot: Plot;
     onClick: () => void;
     compact?: boolean;
+    rovingProps: RovingProps;
 }
 
 const PLOT_STATUS_STYLES: Record<string, string> = {
@@ -203,13 +214,14 @@ const PLOT_STATUS_STYLES: Record<string, string> = {
     resolved: 'bg-amber-900/40 text-amber-300 border-amber-500/30',
 };
 
-const PlotCard: React.FC<PlotCardProps> = ({ plot, onClick, compact }) => {
+const PlotCard: React.FC<PlotCardProps> = ({ plot, onClick, compact, rovingProps }) => {
     const statusStyle = PLOT_STATUS_STYLES[plot.status] ?? PLOT_STATUS_STYLES['active'];
     const descSnippet = plot.description ? plot.description.slice(0, 100) + (plot.description.length > 100 ? '…' : '') : '';
     const pct = plotCompleteness(plot);
     return (
         <button
             onClick={onClick}
+            {...rovingProps}
             className={`card-parchment w-full border border-slate-800 border-l-4 border-l-yellow-500 p-4 rounded-lg hover:border-slate-700 hover:border-l-yellow-400 transition-all text-left flex flex-col group relative space-y-2 ${compact ? 'py-3' : ''}`}
         >
             <span className={`absolute top-2 right-2 w-1.5 h-1.5 rounded-full ${completenessColor(pct)}`} title={`${pct}% complete`} />

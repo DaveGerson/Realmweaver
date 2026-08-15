@@ -34,7 +34,7 @@ import { CombatTracker } from '@/components/tools/CombatTracker';
 import { SecretsTracker } from '@/components/tools/SecretsTracker';
 import { Icons } from '@/components/common/Icons';
 
-// Lazy-loaded visualizers — contain heavy dependencies (D3, dagre, React Flow)
+// Lazy-loaded RelationshipGraph — pulls in D3
 const RelationshipGraph = React.lazy(() => import('@/components/visualizers/RelationshipGraph').then(m => ({ default: m.RelationshipGraph })));
 
 const VisualizerFallback = () => (
@@ -231,6 +231,7 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
         isActiveScene={campaign.activeSceneId === selectedScene.id}
         onSetActive={campaignService.setActiveScene}
         onNavigate={onNavigate}
+        campaignContext={campaignContext}
       />
     );
   }
@@ -243,6 +244,8 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
         onUpdate={campaignService.updateAdventure}
         onDelete={(id) => { campaignService.deleteAdventure(id); onResetSelections(); }}
         onNavigate={onNavigate}
+        isMockMode={isMockMode}
+        campaignContext={campaignContext}
       />
     );
   }

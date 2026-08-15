@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E tests
+        # Runs both projects (chromium + mobile-chrome). The stacking-order
+        # bug that once forced a chromium-only run is fixed: the ladder is
+        # content < header z-[60] < drawer z-[70] < dialogs z-[80] < toasts
+        # z-[90], and the header action cluster scrolls internally instead of
+        # expanding the mobile layout viewport.
+        run: npm run test:e2e
+        env:
+          CI: true

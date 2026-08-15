@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 
 // Provide a minimal localStorage polyfill before importing campaignService.
 // The module-level singleton (persist: true) accesses localStorage on init.
@@ -20,6 +20,19 @@ beforeAll(async () => {
     createCampaignStore = campaignMod.createCampaignStore;
     const storageMod = await import('../services/storageService');
     storageService = storageMod.storageService;
+});
+
+// tests/CLAUDE.md: every `{ persist: true }` store must be destroyed in
+// afterEach — init() registers real page-lifecycle listeners plus a
+// storageService conflict subscription that would otherwise outlive the test.
+const liveStores: Array<{ destroy: () => void }> = [];
+const trackStore = <T extends { destroy: () => void }>(service: T): T => {
+    liveStores.push(service);
+    return service;
+};
+
+afterEach(() => {
+    liveStores.splice(0).forEach(service => service.destroy());
 });
 
 // Flush pending microtasks (the Promise.all + _internalUpdate chain inside
@@ -58,7 +71,7 @@ describe('campaignService.init(): migration backfill for older saved data', () =
         store['realmweaver-campaigns'] = JSON.stringify([legacyCampaign]);
         store['realmweaver-active-campaign-id'] = 'camp-1';
 
-        const service = createCampaignStore({ persist: true });
+        const service = trackStore(createCampaignStore({ persist: true }));
         await flushMicrotasks();
 
         const campaign = service.getState().campaigns.find(c => c.id === 'camp-1')!;
@@ -100,7 +113,7 @@ describe('campaignService.init(): IndexedDB fallback recovery', () => {
             return null;
         });
 
-        const service = createCampaignStore({ persist: true });
+        const service = trackStore(createCampaignStore({ persist: true }));
         await flushMicrotasks();
 
         expect(service.getState().campaigns.some(c => c.id === 'camp-idb')).toBe(true);

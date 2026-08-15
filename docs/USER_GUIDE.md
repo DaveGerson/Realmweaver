@@ -2,7 +2,7 @@
 # RealmWeaver User Guide
 
 <p align="center">
-  <img src="https://storage.googleapis.com/aistudio-ux-team-bucket/apps/lu-lp/logo.png" alt="RealmWeaver Logo" width="120">
+  <img src="../public/favicon.svg" alt="RealmWeaver Logo" width="96">
 </p>
 
 <h3 align="center">Your AI-powered companion for crafting unforgettable campaigns.</h3>
@@ -29,7 +29,7 @@
 
 ### First Launch and the First Campaign Wizard
 
-When you open RealmWeaver for the first time, you land on the **Welcome Screen**. Click **"Create New Campaign"** to begin, or click **"Import an existing campaign"** to load a previously exported RealmWeaver JSON file and pick up right where you left off. After you name your world and write a brief setting description, the **First Campaign Wizard** launches automatically. This five-step guided setup walks you through:
+When you open RealmWeaver for the first time, you land on the **Welcome Screen**. Click **"Create a Campaign"** to begin, or click **"Import an existing campaign"** to load a previously exported RealmWeaver JSON file and pick up right where you left off. After you name your world and write a brief setting description, the **First Campaign Wizard** launches automatically. This five-step guided setup walks you through:
 
 1. **World Description** — refine your campaign's setting (at least a sentence or two works; more detail produces better AI output)
 2. **Starting NPCs** — the AI generates a set of characters based on your setting; edit names, traits, and secrets before saving
@@ -41,7 +41,9 @@ You can skip the wizard and build manually at any time by clicking **"Skip"**.
 
 ### Using a Demo Template
 
-When creating a campaign, you can load a pre-built template (such as the Winter's Daughter starter scenario) to see a fully populated campaign and explore how everything fits together before building your own.
+When creating a campaign, you can load one of four pre-built templates — **The Sunken Vault** (classic dungeon crawl), **The Crown Conspiracy** (political intrigue), **The Untamed Wilds** (sandbox exploration), or **The Festival of Shadows** (one-shot) — to see a fully populated campaign and explore how everything fits together before building your own.
+
+Separately, the First Campaign Wizard's **"Try a Demo World"** button quick-fills the world-description field with the *Winter's Daughter* sample setting. That is a starting prompt, not a populated campaign — the AI then generates NPCs, locations and an adventure from it as usual.
 
 ### Interface Overview
 
@@ -49,7 +51,7 @@ RealmWeaver has three persistent areas:
 
 - **Sidebar (left)** — your campaign's table of contents, organized by entity type. All entity sections start expanded so your content is immediately visible. Hover any category and click the **+** icon to create a new entity. After completing the First Campaign Wizard, all sections automatically expand to reveal the content that was just created.
 - **Main workspace (center)** — shows dashboards, editors, generators, and tools depending on what is selected.
-- **Header (top)** — quick access to tools: DM Coach, Evocation Wizard, Session Runner, Export, and the Mock Mode toggle.
+- **Header (top)** — the campaign menu (switch campaigns, create, import, export), global search, the save indicator, and quick access to the Continuity Checker, Evocation Wizard, World Simulation, Session Weaver (session prep), DM Coach, the keyboard shortcuts list, and the Mock Mode toggle.
 
 ### Button Visual Hierarchy
 
@@ -85,6 +87,36 @@ Found under **Setting** in the sidebar, this is where you configure your campaig
 - **World Setting Synopsis** — a free-form description of your world, its history, and current state. This text is the single most important input for AI consistency. Write two to five paragraphs for best results.
 - **Writing Style Profile** — see [Style Matching](#style-matching) below.
 - **Google Cloud API Key** — optional; enables real-time voice transcription in session logs.
+
+### Saving, Backups, and Multiple Tabs
+
+RealmWeaver saves continuously in the background. The **save indicator** sits in the header (hidden on very narrow screens) and shows one of four states:
+
+| Indicator | Meaning |
+|-----------|---------|
+| **Saving...** (spinner) | A write is in flight |
+| **Saved** | Everything is on disk. Hover the indicator to see the exact time of the last save |
+| **Save Failed (Retry)** | The write failed. Click the indicator to retry immediately |
+| **Saved (fallback storage)** | Your browser's localStorage is full, so the save was written to a fallback IndexedDB store instead. Your data is safe, but free up storage space to restore normal saving |
+
+Saves are debounced — a burst of typing settles into one write — but a save is never delayed more than ten seconds, and any pending write is flushed when you close, reload, or switch away from the tab. Press **Ctrl+S** (**Cmd+S**) at any time to force a save.
+
+Every save also rotates three recent backup snapshots. If RealmWeaver ever finds your saved data unreadable at startup, it loads the most recent intact backup and shows a **recovery notice** across the top of the app:
+
+> Your saved campaign data couldn't be read and was recovered from a recent backup — a small amount of very recent work may be missing.
+
+Click **Dismiss** once you have checked your campaign over.
+
+**Working in two tabs at once.** If another browser tab writes campaign data while this tab has its own unsaved changes, RealmWeaver pauses autosave here and shows a conflict banner:
+
+> This campaign was changed in another browser tab. Autosave is paused here until you choose which copy to keep.
+
+You get two choices, and autosave resumes as soon as you pick one:
+
+- **Reload other tab's version** — discard this tab's in-memory copy and adopt the saved snapshot the other tab wrote
+- **Keep mine** — force this tab's copy over the other tab's, overwriting it
+
+Neither choice merges the two copies. If you are unsure which is newer, export a JSON backup from one tab before deciding.
 
 ---
 
@@ -122,6 +154,8 @@ Switch to the Chat tab to talk with the AI conversationally. Describe what you h
 
 Click any entity in the sidebar to open its editor. Every field is editable. Look for the **sparkle icon** next to text fields — clicking it asks the AI to generate or rewrite that specific field using the entity's other information as context.
 
+Edits save themselves as you type. In the NPC, Location, Faction, Article, and Plot editors, the rich `@`-mention fields settle a moment after you stop typing, and anything still in flight is written out the instant you click away to another entity — so jumping straight from one NPC to the next never strands a half-typed paragraph on the wrong character.
+
 ### Linking Entities
 
 Connections make your world feel alive and improve AI generation quality:
@@ -153,6 +187,8 @@ Drag and drop scenes in the sidebar to reorder them. Open an adventure and click
 
 The **Backlinks Panel** appears in entity editors and shows every other entity in your campaign that references the current one. The collapsed header displays a count at a glance (for example, "Referenced By (3)"), so you can quickly see how connected an entity is without opening the panel. Expand it to see the full list and click any entry to navigate there directly.
 
+Backlinks cover structural links (faction membership, scene casts, location hierarchy, article references) *and* `@`-mentions typed into any entity's text — NPCs, locations, factions, articles, plots, and scenes are all scanned as mention sources. Session logs, player characters, and notes get backlinks too: opening a player character shows the articles, plots, and NPC relationships that point at them.
+
 ### Entity History and Versions
 
 NPCs, Locations, and several other entity types maintain a version history. Use the **History** panel in the editor to see previous versions and restore earlier drafts if an AI-assist edit went in the wrong direction.
@@ -167,7 +203,7 @@ The Lorebook is your campaign encyclopedia. Articles are ideal for historical ev
 
 ### Session Prep Wizard
 
-Open from the header (or start a session directly from a Session Log). The wizard walks you through five steps:
+Open the **Session Weaver** from the header (or start a session directly from a Session Log). The wizard walks you through five steps:
 
 1. **Adventure** — choose which adventure you are running, or run a session without an adventure
 2. **Scenes** — select which scenes from the adventure to include; planned and in-progress scenes are pre-checked
@@ -199,7 +235,7 @@ The Session Runner is a three-column live-game interface:
 - **Center column — Active Scene** — the full active scene view: read-aloud text with a copy button, GM notes, linked NPCs with relationship dynamics summary, linked location, and a Next Scene button
 - **Right column — Quick Tools** — DM Coach shortcut, dice roller, Secrets Tracker, plot status cycling, and Quick NPC Generator
 
-On mobile, the three columns collapse into tabs you can swipe between.
+On mobile, the three columns collapse into tabs you can swipe between, and a floating **Quick Tools** button appears in the bottom-right corner with shortcuts to DM Coach, the Dice Roller, and — when your DM Style mode shows them — the Combat Tracker and Secrets & Clues. The menu is fully keyboard-operable: opening it moves focus to the first item, Up/Down arrows move between items, and Escape closes it and returns focus to the button.
 
 ### Running Log
 
@@ -213,7 +249,9 @@ The Running Log sits at the bottom of the Session Runner. Use it to capture note
 
 ### Voice Capture
 
-Tap the microphone icon in the Running Log to start voice capture. RealmWeaver uses browser speech recognition to transcribe your words in real time. Speak naturally — the captured text appears as a note entry. For higher-quality transcription, add a Google Cloud API key in Campaign Settings.
+Tap the microphone icon in the Running Log to start voice capture. RealmWeaver uses browser speech recognition to transcribe your words in real time. Speak naturally — the captured text appears as a note entry. The microphone button only appears in browsers that support speech recognition.
+
+For a longer-form transcript, open a Session Log and use **AI Scribe**, which streams audio to Google's live transcription service and appends the result to your running notes. AI Scribe requires a Google Cloud API key in Campaign Settings; if the connection fails you get a toast telling you to check the key.
 
 ### Quick NPC Generator
 
@@ -225,7 +263,21 @@ A live session timer displays in the Session Runner header, counting up from whe
 
 ### Combat Tracker
 
-Access the **Combat Tracker** from the quick tools panel or the sidebar. Add combatants (NPCs and player characters), set initiative values, track HP and conditions, and advance through rounds. Encounter results are recorded in the session log automatically.
+Access the **Combat Tracker** from the quick tools panel or the sidebar. Add combatants (NPCs, player characters, or ad-hoc monsters), set initiative values, track current/max HP, and advance through rounds. Each combatant also has a freeform **Notes** field — use it for conditions, resistances, or tactics reminders.
+
+Details worth knowing at the table:
+
+- **Sort by initiative** reorders the list without changing whose turn it is. Sorting mid-fight never skips or rewinds a turn.
+- **Next/Previous turn** wrap around the order; wrapping forward past the last combatant advances the round, wrapping backward decrements it (never below round 1).
+- **HP is not clamped.** The ▲/▼ steppers and the HP field accept values above max HP (temporary hit points) and at or below zero (downed or dying), so the tracker never fights your bookkeeping.
+- **Escape** closes the Combat Tracker slide-out. If a dialog is open on top of it, Escape closes that dialog first and leaves the tracker open.
+- The active encounter is archived into the session log when you **end the session**. Clicking **End Combat** mid-session clears the board and writes a one-line summary event to the running log — it does not archive that fight's combatant detail, so record anything you want to keep as a note first.
+
+### Dice Roller
+
+The Dice Roller lives in the Session Runner's quick tools. Type a formula (`2d6+4`, `4d6kh3`, `2d20kl1`) or use the preset buttons. `kh`/`kl` keep the highest or lowest N dice — handy for advantage, disadvantage, and ability-score rolls.
+
+Every roll lands in a **History** list. Each history entry is a button — click it (or focus it with Tab and press Enter) to log that roll into the session's running notes, optionally with a note of your own. Logged rolls record the dice that actually counted toward the total, so a `4d6kh3` entry logs the three kept dice, not all four. Logging the same roll twice creates two separate log entries rather than overwriting the first.
 
 ---
 
@@ -235,15 +287,17 @@ Access the **Combat Tracker** from the quick tools panel or the sidebar. Add com
 
 When you click **End Session** in the Session Runner, the **Session End Wizard** opens and guides you through five steps:
 
-1. **AI Recap** — paste or dictate your session notes and click **Generate Recap**. The AI writes a summary of the session and detects unresolved loose ends.
-2. **Plot Status** — for each plot linked to the session, mark it as Advanced, Stalled, or Unchanged
+1. **AI Recap** — the wizard reads the notes you captured in the Running Log and writes a summary, also detecting unresolved loose ends. It runs automatically on open once you have five or more logged notes; with fewer, it tells you how many notes it found and waits for you to click **Generate AI Recap** (sparse notes produce unreliable recaps). The generated text is fully editable, and **Regenerate** re-runs it. If generation fails, the error is shown inline with a **Try Again** button.
+2. **Plot Status** — for each plot linked to the session, click it to cycle Advanced → Stalled → Unchanged
 3. **Loose Ends** — review the AI-suggested loose ends and add your own; these carry forward into the next session
 4. **Player Recap** — the AI generates a player-facing version of the recap (spoiler-free) you can copy and share with your group
 5. **Save and End** — saves everything and closes the runner
 
+Everything the wizard collects — the GM recap, loose ends, per-plot progressions, and the player-facing recap — is written to the session log when you finish. Reopening the wizard on a session that already has a saved recap loads those values back in rather than starting blank, so a second pass edits your existing text instead of overwriting it with an empty field.
+
 ### Session Logs
 
-All session data is stored in **Session Logs**, accessible from the sidebar. Each log records the adventure played, planned scenes, running notes, structured note entries, plot progressions, loose ends, the GM recap, and the player-facing recap. You can edit any field after the session ends.
+All session data is stored in **Session Logs**, accessible from the sidebar. Each log records the adventure played, planned scenes, running notes, structured note entries, plot progressions, loose ends, the GM recap, and the player-facing recap. You can edit any field after the session ends. Only one session can be live at a time — the **Start Session** button on a session log is disabled while another log is already active.
 
 ---
 
@@ -257,7 +311,9 @@ Access from the header under the tools menu. The **World Simulation Wizard** let
 2. Click **Simulate** — the AI generates world events involving your factions, NPCs, locations, and plots, rated as Minor, Major, or Critical
 3. Review the events and the specific entity field changes each one proposes
 4. Approve or reject individual events
-5. Click **Apply** — approved changes are written directly to your campaign
+5. Click **Apply** — approved changes are written directly to your campaign, and a confirmation screen reports exactly how many events were applied and how many entity fields were actually updated. Click **Done** to close.
+
+The simulation only ever rewrites prose. It can touch NPCs (description, traits, backstory, motivations, secrets, stats, example quote), factions (description, goals, alignment, resources, influence), locations (description, secrets), plots (description), and adventures (hook, theme) — nothing else. Structural data such as entity IDs, relationship links, and faction membership is never modified, so a bad suggestion can reword an NPC but cannot rewire your world. If an approved event's proposed changes all fall outside that list, the confirmation screen reports zero field updates.
 
 This is useful before a time-skip, to simulate faction politics while players were off-screen, or to give the world a sense of momentum.
 
@@ -271,9 +327,11 @@ Access from the header. The Continuity Checker scans your entire campaign data a
 
 Click any issue to navigate directly to the entity with the problem. Dismiss issues you have intentionally set up that way. Run the checker before session prep to catch problems before they surface at the table.
 
+The checker deliberately does not flag items that no lore article references — an item can legitimately live in a scene's rewards or in a player's pack, and the app has no way for you to "fix" the flag.
+
 ### Secrets and Clues Tracker
 
-Available from the **Quick Tools** panel in the Session Runner, and from the sidebar in Power mode. The Secrets Tracker lets you catalog four types of information:
+Available from the **Quick Tools** panel in the Session Runner, and from the sidebar in Standard and Power modes (Guided mode hides it unless you turn it back on with a feature override). The Secrets Tracker lets you catalog four types of information:
 
 - **Secrets** — hidden truths players do not know yet
 - **Clues** — discoverable hints pointing toward secrets
@@ -286,28 +344,32 @@ Each entry can be linked to specific entities — the NPC who holds the secret, 
 
 Access from the **Relationships** view in the sidebar. The graph is a live, interactive visualization of how all your entities connect:
 
-- **Nodes** represent NPCs (green), factions (indigo), locations (amber), items (purple), adventures (blue), scenes (red), and articles (cyan)
+- **Nodes** use each entity type's own accent color — NPCs (amber), locations (emerald), factions (violet), items (sky), adventures (orange), scenes (blue), and articles (cyan) — the same colors used on dashboard cards and search badges
 - **Edges** show relationships — faction membership, scene links, location hierarchy, article references
 - **Click** any node to jump to that entity's editor
 - **Zoom and pan** to explore dense connection webs
 - **Toggle entity type filters** to reduce clutter
 
+The graph is keyboard-navigable: press **Tab** to step through nodes (the focused node gets an amber ring) and **Enter** or **Space** to open the focused entity. Each node carries its entity name as its accessible label, and the graph itself is labeled for screen readers.
+
 The graph uses D3 force-directed layout and updates as your world grows.
 
 ### Plot Timeline
 
-Found inside the **Plots** view. The Plot Timeline shows each of your active plots as a horizontal row, with sessions as columns. For each session, a colored dot shows the plot's status that session: Advanced (filled), Stalled (ring), or Unchanged (hollow). Hover a dot for the exact status. Click a plot row or a session column to navigate there. Six rotating accent colors keep plots visually distinct even at scale.
+Found inside the **Plots** view. The Plot Timeline shows each of your active plots as a horizontal row, with sessions as columns. For each session, a colored dot shows the plot's status that session: Advanced (filled), Stalled (ring), or Unchanged (hollow). Hover a dot for the exact status. Six rotating accent colors keep plots visually distinct even at scale.
+
+Plot names and session headers are buttons — click or Tab to them and press Enter to navigate. Each status cell is focusable too, announcing its session and status (for example "Session 4: Advanced") and jumping to that session on Enter or Space, so the timeline can be read and driven entirely from the keyboard.
 
 ### RealmChat
 
-The **RealmChat widget** (blue chat icon in the bottom-right corner) is a floating conversational AI assistant. Unlike the entity generators in dashboards, RealmChat is open-ended and multi-turn:
+The **RealmChat widget** (indigo chat icon in the bottom-right corner) is a floating conversational AI assistant. Unlike the entity generators in dashboards, RealmChat is open-ended and multi-turn:
 
 - Chat freely — ask it to create entities, iterate on ideas, or brainstorm
 - Drafts appear in the right panel of the widget as you chat
 - Click any draft to open a full entity editor inline
 - Click **Approve** to add the finished entity to your campaign
 
-RealmChat persists your conversation history for the session (stored in sessionStorage per campaign). Use the model tier selector to choose between **Performance** (fastest), **Medium** (default), or **Quality** (deepest reasoning) depending on your needs.
+RealmChat persists your conversation history for the browser session, per campaign, and clears it when you start a new chat. Use the model selector to choose between **Fast**, **Smart** (the default), and **Best** (deepest reasoning) depending on what you are asking for.
 
 ### Evocation Wizard
 
@@ -339,12 +401,30 @@ Press **Ctrl+K** (Windows/Linux) or **Cmd+K** (Mac) from anywhere in the app to 
 
 The Command Palette also shows **Recent Items** — the last several entities you opened — at the top when the search field is empty.
 
+Selecting a scene from the Command Palette opens that scene directly, not just its parent adventure.
+
+### Global Shortcuts
+
+Press **?** at any time to see this list in-app.
+
+| Shortcut | Action |
+|----------|--------|
+| **Ctrl+K** / **Cmd+K** | Open search / command palette |
+| **/** | Open search / command palette |
+| **Ctrl+N** / **Cmd+N** | New entity — jumps to the current view's dashboard |
+| **Ctrl+S** / **Cmd+S** | Force an immediate save |
+| **Escape** | Close the active modal |
+| **?** | Show the keyboard shortcuts list |
+
+Single-key shortcuts (**/** and **?**) are suppressed while you are typing in a text field, so they never interrupt writing. The modifier shortcuts work everywhere.
+
 ### Other Keyboard Navigation
 
-- **Escape** — closes any open dialog or modal
 - **Arrow keys** — navigate lists in dashboards (roving tabindex pattern)
 - **Enter or Space** — activate the focused item in a list
 - **Tab** — move between interactive elements in the standard order
+
+Dialogs trap Tab inside themselves while open and skip controls that are hidden behind an in-dialog overlay, so Tab never lands on something you cannot see. Escape closes the topmost layer only — if a picker or sub-dialog is open inside a wizard, the first Escape closes that, not the whole wizard. Clicking a dialog's dimmed backdrop closes it, but a text selection that starts inside the dialog and releases over the backdrop does not, so dragging to select text can no longer discard your work.
 
 ---
 
@@ -354,11 +434,11 @@ RealmWeaver has three experience modes, set in the **Campaign Setting Editor** u
 
 | Mode | Who it is for | What changes |
 |------|--------------|--------------|
-| **Guided** | New DMs or players new to the app | Hides advanced tools to reduce overwhelm: Continuity Checker, Relationship Graph, Plot Timeline, Backlinks Panel, Secrets Tracker, Combat Tracker, keyboard shortcut hints |
+| **Guided** | New DMs or players new to the app | Hides advanced tools to reduce overwhelm: Continuity Checker, World Graph, Secrets & Clues, Combat Tracker, and the keyboard shortcuts help |
 | **Standard** | Most DMs | All core features visible; advanced tools accessible |
 | **Power** | Experienced DMs who want everything | All features and panels always shown |
 
-Switching modes does not delete anything — it only shows or hides controls. Individual features can also be manually toggled on or off regardless of mode using the feature override toggles in the settings panel. This lets you, for example, run in Guided mode but enable the Combat Tracker.
+Switching modes does not delete anything — it only shows or hides controls. Individual features can also be manually toggled on or off regardless of mode using the feature override toggles in the settings panel. This lets you, for example, run in Guided mode but enable the Combat Tracker. The override list shows exactly those five features — every toggle in it changes something on screen.
 
 ---
 
@@ -371,6 +451,8 @@ In Mock Mode:
 - The full UI and every workflow is functional
 - Wizards, the Session Runner, and all dialogs work normally
 - Useful for learning the app, offline preparation, or demonstrating it to others
+
+One exception: **AI Scribe** live audio transcription in the Session Log editor still calls the real Google transcription service and still needs a Google Cloud API key. Everything else routes through the mock.
 
 Switch back off to use your actual AI backend.
 
@@ -388,14 +470,18 @@ Click **Export** in the header to save your campaign data:
 ### Importing
 
 - **Campaign JSON** — re-import a previously exported RealmWeaver campaign
-- **PDF Character Sheets** — upload a PDF character sheet for a player character; the AI parses it to extract name, class, level, stats, and backstory automatically
+- **PDF Character Sheets** — upload a PDF character sheet for a player character; the AI parses it to extract name, class, level, stats, and backstory automatically. Files are capped at **3 MB** — larger PDFs are rejected immediately with their size in the error message rather than failing partway through upload. Most character-sheet exports are well under this; if yours is not, print it to a smaller PDF or export a flattened copy.
+
+**What you see after an import.** A clean import shows a success toast naming the campaign. If the file needed repairs — a field that was not a list and got reset, entries dropped for missing IDs, a legacy `name` field migrated to `title` — you get a single toast listing every warning, so nothing is lost to a toast queue that only shows three at a time. Read it before you start editing; it tells you exactly what was changed on the way in.
+
+Files exported by a **newer version of RealmWeaver** are rejected outright with a clear message rather than partially imported. Update the app first.
 
 ### Data Storage
 
-RealmWeaver stores all data in your browser's **localStorage**. This means:
+RealmWeaver stores all data in your browser's **localStorage**, falling back to **IndexedDB** if localStorage runs out of room (see [Saving, Backups, and Multiple Tabs](#saving-backups-and-multiple-tabs)). This means:
 - Your data stays on your device — nothing is sent to a server except AI generation requests
 - Data persists between browser sessions
-- Clearing browser data or cookies will delete your campaigns — export regular backups
+- Clearing browser data or cookies will delete your campaigns, backups and all — export regular backups
 - Data is tied to your browser; a different browser or device will not see the same campaigns
 
 ---

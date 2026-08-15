@@ -117,7 +117,10 @@ const BacklinkGroup: React.FC<BacklinkGroupProps> = ({ entityType, entries, onNa
       {/* Entries */}
       <ul className="space-y-1 pl-5">
         {visible.map((entry) => (
-          <li key={`${entry.entityType}-${entry.id}`} className="flex items-center gap-2 text-sm">
+          // computeBacklinks emits one entry per relationship kind, so the same
+          // source entity can legitimately appear twice in a group — the label is
+          // part of the identity, or the keys collide.
+          <li key={`${entry.entityType}-${entry.id}-${entry.relationshipLabel}`} className="flex items-center gap-2 text-sm">
             {onNavigate ? (
               <EntityLink
                 entityType={entry.entityType as QuickCardEntityType}

@@ -41,10 +41,62 @@ export const removeCombatantFromEncounter = (encounter: Encounter, id: string): 
   });
 };
 
+/**
+ * Advances to the next combatant's turn, wrapping around to the top of the
+ * order and incrementing the round when it moves past the last combatant.
+ * No-op when there are no combatants.
+ */
+export const advanceTurn = (encounter: Encounter): Encounter => {
+  return produce(encounter, draft => {
+    if (draft.combatants.length === 0) return;
+    draft.turnIndex++;
+    if (draft.turnIndex >= draft.combatants.length) {
+      draft.turnIndex = 0;
+      draft.round++;
+    }
+  });
+};
+
+/**
+ * Rewinds to the previous combatant's turn, wrapping around to the bottom of
+ * the order and decrementing the round (floored at 1) when it moves before
+ * the first combatant. No-op when there are no combatants.
+ */
+export const rewindTurn = (encounter: Encounter): Encounter => {
+  return produce(encounter, draft => {
+    if (draft.combatants.length === 0) return;
+    draft.turnIndex--;
+    if (draft.turnIndex < 0) {
+      draft.turnIndex = draft.combatants.length - 1;
+      draft.round = Math.max(1, draft.round - 1);
+    }
+  });
+};
+
+/**
+ * Sorts combatants descending by initiative while preserving whose turn it
+ * is by identity — mirrors removeCombatantFromEncounter's approach so that
+ * sorting mid-combat never silently rewinds or skips a turn. `round` is
+ * never touched. No-op when there are no combatants.
+ */
+export const sortByInitiative = (encounter: Encounter): Encounter => {
+  return produce(encounter, draft => {
+    if (draft.combatants.length === 0) return;
+    const activeCombatantId = draft.combatants[draft.turnIndex]?.id;
+    draft.combatants.sort((a, b) => b.initiative - a.initiative);
+    if (activeCombatantId !== undefined) {
+      const newIndex = draft.combatants.findIndex(c => c.id === activeCombatantId);
+      draft.turnIndex = newIndex >= 0 ? newIndex : 0;
+    } else {
+      draft.turnIndex = 0;
+    }
+  });
+};
+
 export const CombatTracker: React.FC<CombatTrackerProps> = ({ encounter, onUpdate, campaignNpcs, campaignPcs }) => {
   const [isAdding, setIsAdding] = useState(false);
   const { confirm } = useConfirmDialog();
-  
+
   // Handlers for Combatant State
   const updateCombatant = (id: string, updates: Partial<Combatant>) => {
       const nextEncounter = produce(encounter, draft => {
@@ -79,35 +131,15 @@ export const CombatTracker: React.FC<CombatTrackerProps> = ({ encounter, onUpdat
 
   // Handlers for Encounter Flow
   const nextTurn = () => {
-      const nextEncounter = produce(encounter, draft => {
-          if (draft.combatants.length === 0) return;
-          draft.turnIndex++;
-          if (draft.turnIndex >= draft.combatants.length) {
-              draft.turnIndex = 0;
-              draft.round++;
-          }
-      });
-      onUpdate(nextEncounter);
+      onUpdate(advanceTurn(encounter));
   };
 
   const prevTurn = () => {
-      const nextEncounter = produce(encounter, draft => {
-        if (draft.combatants.length === 0) return;
-          draft.turnIndex--;
-          if (draft.turnIndex < 0) {
-              draft.turnIndex = draft.combatants.length - 1;
-              draft.round = Math.max(1, draft.round - 1);
-          }
-      });
-      onUpdate(nextEncounter);
+      onUpdate(rewindTurn(encounter));
   };
 
   const sortInitiative = () => {
-      const nextEncounter = produce(encounter, draft => {
-          draft.combatants.sort((a, b) => b.initiative - a.initiative);
-          draft.turnIndex = 0; // Reset turn to start
-      });
-      onUpdate(nextEncounter);
+      onUpdate(sortByInitiative(encounter));
   };
 
   const clearEncounter = async () => {
@@ -219,7 +251,7 @@ export const CombatTracker: React.FC<CombatTrackerProps> = ({ encounter, onUpdat
                                 />
                                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] text-slate-500 bg-slate-900 px-1">Max</span>
                             </div>
-                            <Button variant="icon" onClick={() => updateCombatant(combatant.id, { hp: Math.min(combatant.maxHp, combatant.hp + 1) })} className="text-green-400 hover:bg-green-500/20" aria-label="Increase HP">
+                            <Button variant="icon" onClick={() => updateCombatant(combatant.id, { hp: combatant.hp + 1 })} className="text-green-400 hover:bg-green-500/20" aria-label="Increase HP">
                                 <Icons.ChevronUp className="w-4 h-4" />
                             </Button>
                         </div>

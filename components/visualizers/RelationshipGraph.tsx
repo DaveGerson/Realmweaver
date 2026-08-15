@@ -39,7 +39,7 @@ const ENTITY_TYPE_TO_CONFIG_KEY: Record<string, string> = {
   [EntityType.FACTION]:   'faction',
   [EntityType.ITEM]:      'item',
   [EntityType.ADVENTURE]: 'adventure',
-  [EntityType.SCENE]:     'adventure', // Scene uses adventure color family
+  [EntityType.SCENE]:     'scene',
   [EntityType.ARTICLE]:   'article',
 };
 
@@ -51,9 +51,6 @@ const TYPE_COLORS: Record<string, string> = Object.fromEntries(
     return [entityTypeKey, hex];
   })
 );
-
-// Override SCENE to be slightly distinct from ADVENTURE
-TYPE_COLORS[EntityType.SCENE] = '#ef4444'; // red-500
 
 export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, onNodeSelect }) => {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -80,6 +77,9 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
       if (filters[EntityType.FACTION]) {
           campaign.factions.forEach(f => {
               nodes.push({ id: f.id, group: EntityType.FACTION, name: f.name });
+              if (filters[EntityType.LOCATION] && f.headquartersLocationId) {
+                  links.push({ source: f.id, target: f.headquartersLocationId, label: 'hq-at' });
+              }
           });
       }
 
@@ -96,6 +96,14 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
                   const label = factionLeaderIds.has(n.id) ? 'leads' : 'member-of';
                   links.push({ source: n.id, target: n.factionId, label });
               }
+              // Guarded — older saves predate the array. Targets that are player
+              // characters or deleted entities are dropped by the dangling-id
+              // filter below, since they are never pushed as nodes.
+              (n.relationships || []).forEach(r => {
+                  if (r.targetId) {
+                      links.push({ source: n.id, target: r.targetId, label: r.relationType || 'related-to' });
+                  }
+              });
           });
       }
 
@@ -183,11 +191,18 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
 
     const svg = d3.select(svgRef.current)
       .attr("viewBox", [0, 0, width, height])
+      .attr("role", "application")
+      .attr("aria-label", "Entity relationship graph")
       .style("max-width", "100%")
       .style("height", "100%")
       .style("background-color", "#020617"); // slate-950
 
     const g = svg.append("g");
+
+    // d3-zoom stores the current transform on the <svg> node itself, so it survives
+    // the wipe above while the freshly appended <g> starts at identity. Re-apply it
+    // or every filter toggle silently resets pan/zoom and desyncs the zoom behavior.
+    g.attr("transform", d3.zoomTransform(svgRef.current).toString());
 
     const zoom = d3.zoom<SVGSVGElement, unknown>()
         .scaleExtent([0.1, 4])
@@ -254,10 +269,19 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
       .selectAll<SVGGElement, GraphNode>("g")
       .data(simulationNodes)
       .join("g")
+      .attr("tabindex", 0)
+      .attr("role", "button")
+      .on("keydown", handleNodeKeyDown)
+      .on("focus", handleNodeFocus)
+      .on("blur", handleNodeBlur)
       .call(d3.drag<SVGGElement, GraphNode>()
         .on("start", dragstarted)
         .on("drag", dragged)
         .on("end", dragended));
+
+    // Accessible name for keyboard/AT users — mirrors the link groups' <title>.
+    nodeGroup.append("title")
+      .text((d: GraphNode) => d.name);
 
     // Invisible large hit area for touch-friendly interaction (44px diameter = r:22).
     // This circle captures click/touch events; the visible circle below provides the visual.
@@ -269,6 +293,7 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
 
     // Visible node circle (r:8 = 16px visual diameter)
     nodeGroup.append("circle")
+      .attr("class", "node-ring")
       .attr("r", 8)
       .attr("fill", (d: GraphNode) => TYPE_COLORS[d.group] || '#94a3b8')
       .attr("stroke", "#fff")
@@ -287,7 +312,7 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
       .style("pointer-events", "none")
       .style("text-shadow", "2px 2px 4px #000");
 
-    function handleNodeClick(event: MouseEvent, d: GraphNode) {
+    function handleNodeClick(event: MouseEvent | KeyboardEvent, d: GraphNode) {
       event.stopPropagation();
       const typeMap: Record<string, string> = {
           [EntityType.NPC]: 'npc',
@@ -302,6 +327,27 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
       if (mappedType) {
           onNodeSelect(mappedType, d.id);
       }
+    }
+
+    function handleNodeKeyDown(event: KeyboardEvent, d: GraphNode) {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      handleNodeClick(event, d);
+    }
+
+    // Explicit focus indicator for keyboard users — the node group itself has
+    // no visible chrome, so relying on the browser's default outline on an
+    // SVG <g> is unreliable. Highlight the visible node circle instead.
+    function handleNodeFocus(event: FocusEvent) {
+      d3.select(event.currentTarget as SVGGElement).select<SVGCircleElement>("circle.node-ring")
+        .attr("stroke", "#f59e0b") // amber-400
+        .attr("stroke-width", 3);
+    }
+
+    function handleNodeBlur(event: FocusEvent) {
+      d3.select(event.currentTarget as SVGGElement).select<SVGCircleElement>("circle.node-ring")
+        .attr("stroke", "#fff")
+        .attr("stroke-width", 1.5);
     }
 
     simulation.on("tick", () => {

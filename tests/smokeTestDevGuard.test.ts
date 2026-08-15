@@ -80,13 +80,16 @@ describe('runSmokeTests dev-only guard', () => {
         );
     });
 
-    it('proceeds past the guard and touches localStorage when import.meta.env.DEV is true', async () => {
+    it('still does nothing when DEV is true but the explicit smoke-test opt-in is unset', async () => {
+        // Finding #94: DEV alone is not a safe enough guard — every `npm run
+        // dev` session is DEV=true, so the suite must also require an
+        // explicit VITE_RUN_SMOKE_TESTS opt-in before touching storage.
         vi.stubEnv('DEV', true);
+        vi.stubEnv('VITE_RUN_SMOKE_TESTS', undefined as unknown as string);
         const { runSmokeTests } = await import('../smokeTest');
 
         await runSmokeTests(true);
 
-        expect(removeItemSpy).toHaveBeenCalledWith('realmweaver-campaigns');
-        expect(removeItemSpy).toHaveBeenCalledWith('realmweaver-active-campaign-id');
+        expect(removeItemSpy).not.toHaveBeenCalled();
     });
 });

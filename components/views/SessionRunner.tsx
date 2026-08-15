@@ -6,6 +6,7 @@ import { Button } from '@/components/common/Button';
 import { twMerge } from 'tailwind-merge';
 import { campaignService } from '@/services/campaignService';
 import { CombatTracker } from '@/components/tools/CombatTracker';
+import { DialogShell } from '@/components/common/DialogShell';
 // Lazy-loaded — only bundled when the session end flow is triggered
 const SessionEndWizard = React.lazy(() => import('@/components/dialogs/SessionEndWizard').then(m => ({ default: m.SessionEndWizard })));
 import { estimatePcHp } from '@/utils/entityUtils';
@@ -84,6 +85,48 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
     const [showCombatPanel, setShowCombatPanel] = useState(false);
     const [mobileTab, setMobileTab] = useState<'scenes' | 'active' | 'tools'>('active');
     const [fabOpen, setFabOpen] = useState(false);
+    const fabMenuRef = useRef<HTMLDivElement>(null);
+    const fabButtonRef = useRef<HTMLButtonElement>(null);
+
+    // Finding #57: the FAB menu's arrow-key/Escape handler lives on the menu
+    // <div> itself, so it only fires once focus is already inside the menu.
+    // Nothing moved focus there on open — mirror Header's requestAnimationFrame
+    // pattern here, and return focus to the FAB button when the menu closes.
+    useEffect(() => {
+        if (!fabOpen) return;
+        const frame = requestAnimationFrame(() => {
+            const first = fabMenuRef.current?.querySelector<HTMLElement>('[role="menuitem"]');
+            first?.focus();
+        });
+        return () => {
+            cancelAnimationFrame(frame);
+            fabButtonRef.current?.focus();
+        };
+    }, [fabOpen]);
+
+    // Finding #56: the Combat Tracker slide-out is a full modal but had no
+    // Escape handling. DialogShell's own Escape handler only fires when the
+    // event bubbles up through its own subtree; a document-level listener
+    // (mirroring DmCoach's pattern) also catches an Escape dispatched
+    // directly at `document`.
+    //
+    // Verifier follow-up: this listener fired for ANY Escape while
+    // showCombatPanel was true, with no defaultPrevented check — bypassing
+    // DialogShell's own cross-package guard (a child that already consumed
+    // Escape marks it defaultPrevented, and the dialog must stay open) and
+    // closing the combat panel out from under a modal opened on top of it
+    // (e.g. Escape dismissing the SessionEndWizard would also close the
+    // combat tracker underneath). Guard it the same way DialogShell does.
+    useEffect(() => {
+        if (!showCombatPanel) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key !== 'Escape') return;
+            if (e.defaultPrevented) return;
+            setShowCombatPanel(false);
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [showCombatPanel]);
 
     // Plot session status tracking (persisted on sessionLog)
     const plotSessionStatus = sessionLog.plotProgressions || {};
@@ -109,17 +152,25 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
         return adventure.scenes.find(s => s.id === campaign.activeSceneId) || null;
     }, [campaign.activeSceneId, adventure]);
 
+    // Finding #26: the prep wizard's step-3 curation is persisted as
+    // plannedNpcIds / plannedLocationIds on the session log. When present
+    // (arrays — an empty one is a deliberate all-removed curation) they are
+    // the session cast and win over the scene-linked sets; logs created
+    // before these fields existed leave them undefined and keep the pure
+    // scene-derived behavior.
     const activeSceneLocation = useMemo(() => {
         if (!activeScene?.locationId) return null;
+        if (sessionLog.plannedLocationIds && !sessionLog.plannedLocationIds.includes(activeScene.locationId)) return null;
         return campaign.locations.find(l => l.id === activeScene.locationId) || null;
-    }, [activeScene, campaign.locations]);
+    }, [activeScene, campaign.locations, sessionLog.plannedLocationIds]);
 
     const activeSceneNpcs = useMemo(() => {
         if (!activeScene) return [];
-        return activeScene.npcIds
+        const castIds = sessionLog.plannedNpcIds ?? activeScene.npcIds;
+        return castIds
             .map(id => campaign.npcs.find(n => n.id === id))
             .filter((n): n is NPC => !!n);
-    }, [activeScene, campaign.npcs]);
+    }, [activeScene, campaign.npcs, sessionLog.plannedNpcIds]);
 
     const sceneNpcRelationshipMap = useMemo(() => {
         const sceneNpcIds = new Set(activeSceneNpcs.map(n => n.id));
@@ -274,6 +325,8 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                         variant="secondary"
                         size="sm"
                         onClick={handleEndSession}
+                        aria-label="End Session"
+                        title="End Session"
                     >
                         <Icons.Stop className="w-4 h-4" />
                         <span className="hidden sm:inline ml-1.5">End Session</span>
@@ -365,6 +418,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                     <div className="fixed bottom-4 right-4 md:hidden z-30">
                         {fabOpen && (
                             <div
+                                ref={fabMenuRef}
                                 className="absolute bottom-16 right-0 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-2 space-y-1 min-w-[180px]"
                                 role="menu"
                                 aria-label="Quick tools"
@@ -428,6 +482,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                             </div>
                         )}
                         <button
+                            ref={fabButtonRef}
                             onClick={() => setFabOpen(p => !p)}
                             aria-haspopup="menu"
                             aria-expanded={fabOpen}
@@ -458,51 +513,55 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                 </Suspense>
             )}
 
-            {/* Combat Tracker Slide-out Panel */}
-            {canShowCombatTracker && showCombatPanel && (
-                <>
-                    <div
-                        className="fixed inset-0 bg-black/50 z-40"
-                        onClick={() => setShowCombatPanel(false)}
-                    />
-                    <div className="fixed right-0 top-0 bottom-0 w-[500px] bg-slate-900 border-l border-slate-700 z-50 shadow-2xl flex flex-col">
-                        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
-                            <div className="flex items-center gap-2">
-                                <Icons.Combat className="w-5 h-5 text-red-400" />
-                                <h2 className="text-lg font-bold text-white font-serif">Combat Tracker</h2>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                {campaign.activeEncounter && campaign.activeEncounter.combatants.length > 0 && (
-                                    <Button
-                                        variant="danger"
-                                        size="sm"
-                                        onClick={handleEndCombat}
-                                        title="End combat and log summary"
-                                    >
-                                        <Icons.Stop className="w-4 h-4 mr-1.5" />
-                                        End Combat
-                                    </Button>
-                                )}
-                                <Button
-                                    variant="icon"
-                                    onClick={() => setShowCombatPanel(false)}
-                                >
-                                    <Icons.X className="w-5 h-5" />
-                                </Button>
-                            </div>
+            {/* Combat Tracker Slide-out Panel — Finding #56: previously raw divs
+                with no role="dialog"/aria-modal/focus trap/scroll lock/Escape
+                handling. DialogShell provides all of that; the panel keeps its
+                slide-out look via `fixed` positioning (which escapes
+                DialogShell's centering flex layout) and gains a responsive
+                max-width instead of a hard-coded 500px. */}
+            {canShowCombatTracker && (
+                <DialogShell
+                    isOpen={showCombatPanel}
+                    onClose={() => setShowCombatPanel(false)}
+                    ariaLabel="Combat Tracker"
+                    className="fixed right-0 top-0 bottom-0 w-full max-w-[500px] bg-slate-900 border-l border-slate-700 shadow-2xl flex flex-col"
+                >
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+                        <div className="flex items-center gap-2">
+                            <Icons.Combat className="w-5 h-5 text-red-400" />
+                            <h2 className="text-lg font-bold text-white font-serif">Combat Tracker</h2>
                         </div>
-                        <div className="flex-1 overflow-hidden">
-                            {campaign.activeEncounter && (
-                                <CombatTracker
-                                    encounter={campaign.activeEncounter}
-                                    onUpdate={handleUpdateEncounter}
-                                    campaignNpcs={campaign.npcs}
-                                    campaignPcs={campaign.playerCharacters || []}
-                                />
+                        <div className="flex items-center gap-2">
+                            {campaign.activeEncounter && campaign.activeEncounter.combatants.length > 0 && (
+                                <Button
+                                    variant="danger"
+                                    size="sm"
+                                    onClick={handleEndCombat}
+                                    title="End combat and log summary"
+                                >
+                                    <Icons.Stop className="w-4 h-4 mr-1.5" />
+                                    End Combat
+                                </Button>
                             )}
+                            <Button
+                                variant="icon"
+                                onClick={() => setShowCombatPanel(false)}
+                            >
+                                <Icons.X className="w-5 h-5" />
+                            </Button>
                         </div>
                     </div>
-                </>
+                    <div className="flex-1 overflow-hidden">
+                        {campaign.activeEncounter && (
+                            <CombatTracker
+                                encounter={campaign.activeEncounter}
+                                onUpdate={handleUpdateEncounter}
+                                campaignNpcs={campaign.npcs}
+                                campaignPcs={campaign.playerCharacters || []}
+                            />
+                        )}
+                    </div>
+                </DialogShell>
             )}
         </div>
     );

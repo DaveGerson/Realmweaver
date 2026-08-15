@@ -298,7 +298,7 @@ test.describe('Entity Generators', () => {
         // Wait for the mock response to appear in the chat
         // Mock response starts with "[Mock]" in the message
         await expect(
-          page.getByText(/mock|response|draft/i).first()
+          page.locator('main').getByText(/\[mock\]|response|draft/i).first()
         ).toBeVisible({ timeout: 8000 });
       }
     });

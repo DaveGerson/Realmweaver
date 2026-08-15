@@ -14,6 +14,7 @@ import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
 import { BacklinksPanel } from '../common/BacklinksPanel';
+import { useDebouncedFieldCommit } from '../../hooks/useDebouncedFieldCommit';
 
 interface PlotEditorProps {
   plot: Plot;
@@ -28,6 +29,7 @@ interface PlotEditorProps {
 export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, campaign, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(plot);
   const [isGeneratingScene, setIsGeneratingScene] = useState(false);
+  const [sceneGenerationError, setSceneGenerationError] = useState<string | null>(null);
   const { confirm } = useConfirmDialog();
 
   // Tracks the last `plot` prop we've reconciled against, so incoming prop
@@ -68,10 +70,15 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, campaign, onUpdate
     }
   }
   
-  // Used by MentionInput fields (onChange receives string, not event)
+  // Store writes are debounced per field and keyed to the entity id by
+  // useDebouncedFieldCommit, which flushes pending edits when the edited
+  // entity changes under this same mounted editor or on unmount, so text
+  // typed inside the debounce window is committed to the entity it was
+  // typed against (finding #70).
+  const { commit: commitMentionField } = useDebouncedFieldCommit<Plot>(plot.id, onUpdate);
   const handleMentionFieldChange = (field: keyof Plot) => (value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    onUpdate(plot.id, { [field]: value } as Partial<Plot>);
+    commitMentionField(field, value);
   };
 
   // --- @-mention tracking across all MentionInput fields ---
@@ -81,18 +88,50 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, campaign, onUpdate
     () => resolveMentionCandidates(campaign, plot.mentionedEntityIds),
     [campaign, plot.mentionedEntityIds],
   );
-  const [mentionedIdsByField, setMentionedIdsByField] = useState<Record<string, string[]>>(() => ({
+  // Per-field mention ID sets. Kept in a ref, not state — nothing renders off
+  // of this value directly, it exists purely so handleMentionedIdsChange can
+  // compute the merged set without writing to the store from inside a
+  // setState updater (React invokes functional updaters during the render
+  // phase, and StrictMode intentionally double-invokes them — doing the
+  // store write there fired it twice, and doing a store write during React's
+  // render phase at all is invalid — finding #69).
+  const mentionedIdsByFieldRef = useRef<Record<string, string[]>>({
     description: findMentionedIdsInText(plot.description, mentionCandidates),
-  }));
+  });
+  // Last merged id set actually written to the store. MentionInput reports
+  // its field's id set on every keystroke even when that set hasn't changed,
+  // so without this the store (and every useSyncExternalStore subscriber)
+  // would still churn once per character (finding #70).
+  const lastMergedIdsKeyRef = useRef<string>(
+    Array.from(new Set(Object.values(mentionedIdsByFieldRef.current).flat())).sort().join(String.fromCharCode(0)),
+  );
+  // Editors are not remounted when the GM navigates A -> B (ViewRouter renders
+  // this editor at a fixed position with no key), so the useRef initialisers
+  // above only ever ran for the FIRST entity. Rebuild both refs from the
+  // incoming entity on every id change, mirroring the mount-time seeding —
+  // otherwise B's first keystroke merges A's stale per-field sets into B's
+  // mentionedEntityIds (or A's stale merged key suppresses B's first
+  // legitimate write). Keyed on the id ONLY — resetting on every
+  // mentionCandidates recompute would discard in-session tracked mentions
+  // (same rationale as MentionInput's seedKey resync).
+  useEffect(() => {
+    mentionedIdsByFieldRef.current = {
+      description: findMentionedIdsInText(plot.description, mentionCandidates),
+    };
+    lastMergedIdsKeyRef.current =
+      Array.from(new Set(Object.values(mentionedIdsByFieldRef.current).flat())).sort().join(String.fromCharCode(0));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plot.id]);
   // Reports the merged set of mentioned IDs (across every mention field) whenever any field changes.
   const handleMentionedIdsChange = (field: string) => (ids: string[]) => {
-    setMentionedIdsByField(prev => {
-      const next = { ...prev, [field]: ids };
-      const merged = Array.from(new Set(Object.values(next).flat()));
-      setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
-      onUpdate(plot.id, { mentionedEntityIds: merged });
-      return next;
-    });
+    const next = { ...mentionedIdsByFieldRef.current, [field]: ids };
+    mentionedIdsByFieldRef.current = next;
+    const merged = Array.from(new Set(Object.values(next).flat()));
+    const mergedKey = merged.slice().sort().join(String.fromCharCode(0));
+    if (mergedKey === lastMergedIdsKeyRef.current) return;
+    lastMergedIdsKeyRef.current = mergedKey;
+    setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
+    onUpdate(plot.id, { mentionedEntityIds: merged });
   };
 
   const handleFieldRegenerate = (field: 'description') => (newValue: string) => {
@@ -111,6 +150,7 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, campaign, onUpdate
   const handleGeneratePlotScene = async (prompt: string) => {
     if (!targetAdventure) return;
     setIsGeneratingScene(true);
+    setSceneGenerationError(null);
     try {
       const sceneData = await generateScene(prompt, isMockMode, campaignContext);
       campaignService.createScene(targetAdventure.id, {
@@ -120,6 +160,7 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, campaign, onUpdate
       });
     } catch (error) {
       console.error('Failed to generate scene for plot:', error);
+      setSceneGenerationError('Failed to generate scene. Please try again.');
     } finally {
       setIsGeneratingScene(false);
     }
@@ -147,15 +188,20 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, campaign, onUpdate
               <h1 className="text-3xl font-bold font-serif text-slate-100">Plot Arc Editor</h1>
             </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <GenerateHerePanel
-            buttonLabel="Generate scene for this plot"
-            defaultPrompt={sceneGenerationDefaultPrompt}
-            isGenerating={isGeneratingScene}
-            onGenerate={handleGeneratePlotScene}
-            disabled={!targetAdventure}
-            disabledReason="Create an adventure first to generate scenes."
-          />
+        <div className="flex flex-wrap items-start gap-2">
+          <div className="flex flex-col items-end gap-1.5">
+            <GenerateHerePanel
+              buttonLabel="Generate scene for this plot"
+              defaultPrompt={sceneGenerationDefaultPrompt}
+              isGenerating={isGeneratingScene}
+              onGenerate={handleGeneratePlotScene}
+              disabled={!targetAdventure}
+              disabledReason="Create an adventure first to generate scenes."
+            />
+            {sceneGenerationError && (
+              <p role="alert" className="text-xs text-red-400">{sceneGenerationError}</p>
+            )}
+          </div>
           <Button variant="danger" size="sm" onClick={handleDelete}>
               <Icons.Trash className="w-3.5 h-3.5 mr-2" />
               Delete Plot

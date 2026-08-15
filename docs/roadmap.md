@@ -10,6 +10,19 @@
 > Every item below was re-checked against the live source tree at write time; effort estimates cite the
 > actual files and line ranges involved.
 
+> **Status update, 2026-08-14 — ship-readiness hardening pass (124 findings, 13 work packages).**
+> Seven roadmap items are now **DONE** and struck through below: **N1**, **N2**, **N3**, **N5**, **N6**,
+> **X3**, **X8**. Two are **partly done**: **X9** (the wizard's discard confirmation and the batch-save
+> duplicate risk are fixed; `DmCoach` still calls `setPrompt('')` on every tool-tab switch) and **L7**
+> (the Unicode word-boundary divergence is gone — `LinkedText.tsx` now uses `/[\p{L}\p{N}]/u` — but it
+> still runs its own matcher instead of `services/linking`'s engine registry, and match `confidence` is
+> still hardcoded). Everything else in NOW/NEXT/LATER was re-verified against the source tree on that
+> date and remains open, including **N4**, **X1**, **X2**, **X4**, **X6**, **X7**, **X10**, **X11**.
+> **X10** was partially touched from a different direction: `ENTITY_TYPE_CONFIG` gained a `'scene'` entry
+> (color `blue`), replacing the hardcoded red scene overrides in `RelationshipGraph.tsx` and
+> `CommandPalette.tsx` — but there is still no `'secret'` entry, the record is still typed
+> `Record<string, …>`, and `createDefaultSecret`/`createDefaultNote` still do not exist.
+
 ---
 
 ## 1. Method
@@ -44,8 +57,10 @@ score is modest.
 **Job-to-be-done:** Run a first campaign without knowing D&D conventions cold; wants the app to supply
 structure and confidence, not just a blank canvas.
 **Top 3 pain points today:**
-1. `FirstCampaignWizard.tsx`'s dismiss path (Escape, backdrop click, header ✕) discards all hand-edited
-   drafts with zero confirmation, while a much smaller action (regenerating one step) *is* confirm-gated.
+1. ~~`FirstCampaignWizard.tsx`'s dismiss path (Escape, backdrop click, header ✕) discards all hand-edited
+   drafts with zero confirmation, while a much smaller action (regenerating one step) *is* confirm-gated.~~
+   **Fixed 2026-08-14** — every dismiss path routes through `useConfirmDialog` once there is unsaved draft
+   content.
 2. `DmCoach.tsx` clears the prompt box on every tool-tab switch (`setPrompt('')`), punishing exploration.
 3. `WelcomeScreen`/`CampaignCreator` still offer no seed questions, starter templates, or "what good looks
    like" guidance — the onboarding gap the 2026-03-22 archetype audit graded D+ is still largely unaddressed.
@@ -54,14 +69,19 @@ structure and confidence, not just a blank canvas.
 **Job-to-be-done:** Minimal prep, maximum AI leverage; wants one click to get usable content and to never
 lose a fast improvised note mid-session.
 **Top 3 pain points today:**
-1. Session notes/dice/beats persist only through `campaignService`'s 2-second debounced localStorage save
+1. ~~Session notes/dice/beats persist only through `campaignService`'s 2-second debounced localStorage save
    (`scheduleSave`, `services/campaignService.ts`) with no `beforeunload`/`visibilitychange` flush — a
-   crashed tab or closed laptop loses the last burst of live-session activity outright.
+   crashed tab or closed laptop loses the last burst of live-session activity outright.~~
+   **Fixed 2026-08-14** — `flushPendingSaveSync()` runs on `pagehide`/`beforeunload`/`visibilitychange`,
+   and a 10-second max-wait timer caps how long any edit can sit undebounced.
 2. Every AI generation call is a single buffered request with no streaming and no cancellation
    (`services/ai/providers/claude-cli.ts`, all 7 `components/generators/*.tsx`) — nothing to look at during
    a 30–120s quality-tier wait, and switching away mid-request doesn't stop a stale result reopening later.
-3. `services/ai/audioTranscription.ts` bypasses the `aiService.ts` facade entirely (imported directly by
-   `SessionLogEditor.tsx`) with no mock — it's the one feature a Lazy DM can't exercise/trust offline.
+3. ~~`services/ai/audioTranscription.ts` bypasses the `aiService.ts` facade entirely (imported directly by
+   `SessionLogEditor.tsx`) with no mock~~ — **fixed 2026-08-14**: `aiService.startAudioTranscription` is
+   the facade and `mockService.startAudioTranscription` emits canned chunks. Residual gap:
+   `SessionLogEditor.tsx`'s AI Scribe call site does not pass `isMockMode`, so the mock branch is never
+   taken from the UI and this is still the one feature a Lazy DM can't exercise offline.
 
 ### Forever DM
 **Job-to-be-done:** Run one world across years and hundreds of sessions; wants the store to hold up at
@@ -94,14 +114,18 @@ scale and never silently drop or corrupt long-accumulated data.
 **Job-to-be-done:** Build deep, cross-referenced lore — NPCs, locations, factions, articles — and keep it
 navigable as the web of relationships grows.
 **Top 3 pain points today:**
-1. `RelationshipGraph.tsx`'s only interaction surface is a D3 `on('click', ...)` handler with no `tabindex`,
+1. ~~`RelationshipGraph.tsx`'s only interaction surface is a D3 `on('click', ...)` handler with no `tabindex`,
    `role`, or keyboard path, and no `role="img"`/`aria-label` on the `<svg>` — the graph is a total black box
-   to keyboard/screen-reader users, despite being one of only two ways to jump directly to an entity.
+   to keyboard/screen-reader users, despite being one of only two ways to jump directly to an entity.~~
+   **Fixed 2026-08-14** — node groups carry `tabindex=0`, `role="button"`, a `<title>` accessible name,
+   Enter/Space activation, and an explicit amber focus ring; the `<svg>` is labelled.
 2. `LinkedText.tsx` hand-rolls its own tokenizer/word-boundary matcher instead of routing through the
    `services/linking` engine registry every other consumer uses — `services/linking/matchingEngine.ts`'s
    `isWordBoundary` was fixed to be Unicode-aware (`/[\p{L}\p{N}]/u`), but `LinkedText.tsx`'s duplicate
    (line 106) is still the old ASCII-only regex, so inline entity links in NPC/Location/Article descriptions
    still mis-link fantasy names with diacritics differently than the "Detected" suggestion UI does.
+   **Partly fixed 2026-08-14** — `LinkedText.tsx`'s matcher is now Unicode-aware, so the two agree on
+   word boundaries; it is still a second implementation rather than a call into the shared engine (see L7).
 3. `utils/entityUtils.ts`'s `buildEntityContext` — fully implemented, fully unit-tested, documented as the
    `RegenerateButton` context builder — has zero call sites in production; all 9 editors hand-roll a
    divergent inline template string instead, so AI-assisted regeneration context quality varies by editor
@@ -119,7 +143,8 @@ right; and a scale/durability bug in the store is a trust-destroying failure mod
 
 ---
 
-**N1. CI Pipeline (typecheck + test + build gate)**
+**~~N1. CI Pipeline (typecheck + test + build gate)~~ — DONE (2026-08-14)**
+`.github/workflows/ci.yml` now exists and gates PRs. Original write-up below for provenance.
 No `.github/workflows` directory exists at all. `npm run typecheck` (`tsc --noEmit`) already exists as a
 script but nothing invokes it automatically — a contributor can introduce a real type error, `npm test`
 (vitest only) and `npm run build` (esbuild transpile only, no type-checking) both still go green, and it
@@ -130,7 +155,11 @@ Effort: **S** — the `typecheck` script already exists (`package.json`); add on
 running `npm run typecheck && npm test && npm run build` on PR.
 Dependencies: none.
 
-**N2. Tailwind Build-Time Migration**
+**~~N2. Tailwind Build-Time Migration~~ — DONE (2026-08-14)**
+The CDN `<script>` is gone: `@tailwindcss/vite` is a devDependency, `vite.config.ts` registers the
+`tailwindcss()` plugin, and `index.html` links a compiled `/index.css`. Runtime-composed class strings are
+protected by an explicit safelist (`tests/ship/wp-i2-build-test-infra.tailwind-safelist.test.ts`). Original
+write-up below for provenance.
 `index.html:9` still loads `<script src="https://cdn.tailwindcss.com">` and JIT-compiles in the browser —
 Tailwind's own docs say this build is unsupported for production. No purge, a hard runtime dependency on a
 third-party CDN (unstyled app if blocked by a CSP/proxy/ad-blocker), and real first-paint cost.
@@ -141,7 +170,11 @@ Tailwind class strings across dashboards/badges (flagged by the prior UX audit a
 so purge doesn't strip classes assembled via template literals.
 Dependencies: none, but should land before any component-level test suite (N6) that snapshots styling.
 
-**N3. Session-Runner Data Durability & Autosave Cost**
+**~~N3. Session-Runner Data Durability & Autosave Cost~~ — DONE (2026-08-14)**
+`flushPendingSaveSync()` fires on `pagehide`/`beforeunload`/`visibilitychange`, a 10s max-wait timer caps
+debounce latency, and `_rotateBackups` now runs after the primary write using the caller-captured previous
+value, so it never re-reads the primary or competes with it for quota. Backup slots are namespaced per
+primary key. Original write-up below for provenance.
 Two related defects in the same save path: (1) `services/campaignService.ts`'s `scheduleSave` only ever
 flushes on a 2-second debounce with no `beforeunload`/`visibilitychange` listener, so a crashed tab, closed
 laptop, or accidental refresh loses the newest burst of session notes/dice/beats outright — exactly the
@@ -169,7 +202,10 @@ heavy dependency) behind a size threshold (~100 items) for the 10 dashboard grid
 result lists, reusing the existing `React.memo`-wrapped `*Card` components as row renderers.
 Dependencies: none, but pairs naturally with N6 (regression-test the new windowing logic).
 
-**N5. AI Response Buffer Truncation & Error Visibility**
+**~~N5. AI Response Buffer Truncation & Error Visibility~~ — DONE (2026-08-14)**
+`vite-plugin-ai-proxy.ts` now fails fast with an explicit "claude CLI output exceeded the N-byte buffer
+limit" error instead of silently dropping chunks past `MAX_BUFFER`; request bodies over `MAX_REQUEST_BODY`
+are rejected with a 413. Streaming remains open as X5. Original write-up below for provenance.
 `vite-plugin-ai-proxy.ts`'s stdin-piped invocation path (`invokeClaudeCli`, line ~207) only pushes stdout
 chunks `if (totalBytes <= MAX_BUFFER)` (1MB) — bytes beyond that are **silently dropped**, not errored. A
 large `generateCampaignFill`/`generateAdventure` response (multi-scene JSON, several full entities) that
@@ -183,7 +219,11 @@ change, but the fail-fast signal is the must-fix half); full chunked/SSE streami
 NEXT item (X5).
 Dependencies: none.
 
-**N6. Component Test Infrastructure Bootstrap**
+**~~N6. Component Test Infrastructure Bootstrap~~ — DONE (2026-08-14)**
+`@testing-library/react` and `@testing-library/dom` are devDependencies, the jsdom environment is
+configured per-file, and roughly seventy render/interaction suites now live under `tests/ship/` (focus
+traps, editors, dialogs, dashboards, visualizers). Suite total went 516 → 990 tests. Original write-up
+below for provenance.
 There is no `@testing-library/react` (or any render/interaction test tooling) anywhere in `package.json`.
 `tests/components/` currently holds three files (`CombatTracker.test.ts`, `PlotTimeline.test.ts`,
 `SceneSmartLinkBar.test.ts`) that exercise **pure extracted functions**, not actual component rendering —
@@ -229,7 +269,11 @@ Effort: **S** — rename the RealmChat-local type (e.g. `RealmChatModelTier`) an
 directly instead of maintaining a second mapping table.
 Dependencies: none.
 
-**X3. Audio Transcription Facade Compliance**
+**~~X3. Audio Transcription Facade Compliance~~ — DONE (2026-08-14, with one residual gap)**
+`aiService.startAudioTranscription` is the facade, `mockService.startAudioTranscription` emits canned
+chunks on a timer, and `SessionLogEditor.tsx` imports through the facade. Residual: that call site does
+not pass `isMockMode`, so the mock branch is unreachable from the UI — a one-line follow-up. Original
+write-up below for provenance.
 `services/ai/audioTranscription.ts` is imported directly by `SessionLogEditor.tsx` (lines 14–15), violating
 CLAUDE.md's "components import ONLY from `aiService.ts`" rule. There's no `isMockMode` parameter and no
 stub in `ai/mockService.ts` — it's the one AI-adjacent feature that can't be exercised offline/in tests, and
@@ -288,7 +332,11 @@ Effort: **M** — render the existing `ac` field (small UI change), add a delta-
 row, and add a `conditions: string[]` field to `Combatant` (`types/Encounter.ts`) plus a picker/badge UI.
 Dependencies: none; pairs well with L5 (structured NPC stat blocks) but doesn't require it.
 
-**X8. Keyboard-Accessible Relationship Graph**
+**~~X8. Keyboard-Accessible Relationship Graph~~ — DONE (2026-08-14)**
+D3 node groups are `tabindex=0` / `role="button"` with a `<title>` accessible name, Enter/Space activation
+mirroring the click handler, and an explicit amber focus ring (the browser default outline on an SVG `<g>`
+is unreliable); the `<svg>` carries `role="application"` and an `aria-label`. Node colors are now derived
+from `ENTITY_TYPE_CONFIG` rather than hardcoded. Original write-up below for provenance.
 `components/visualizers/RelationshipGraph.tsx` wires node selection exclusively through
 `nodeGroup.append('circle')...on('click', handleNodeClick)` with no `tabindex`, `role`, or `keydown` handler,
 and the top-level `<svg>` has no `role`/`aria-label`. A keyboard-only or screen-reader user has no way to
@@ -300,7 +348,10 @@ Effort: **M** — add an accessible fallback list (or make D3 node groups focusa
 `aria-label` summarizing node/link counts on the `<svg>`.
 Dependencies: none.
 
-**X9. DM Coach & Wizard Reliability Polish**
+**X9. DM Coach & Wizard Reliability Polish** — *partly done (2026-08-14)*
+Sub-items (2) and (3) are fixed: `FirstCampaignWizard`'s dismiss paths confirm before discarding drafts,
+and the batch-save loop no longer re-creates already-persisted entities. Sub-item (1) is open —
+`DmCoach.handleSwitchTool` still calls `setPrompt('')` on every tool-tab switch.
 Two small, high-friction bugs bundled together because both live in the "trust the app during a guided
 flow" surface: (1) `DmCoach.tsx` calls `setPrompt('')` on every tool-tab switch, wiping in-progress typing;
 (2) `FirstCampaignWizard.tsx`'s dismiss path (`DialogShell`'s Escape/backdrop-click, header ✕, footer "Skip")
@@ -434,14 +485,13 @@ Dependencies: none.
 
 **L8. New-DM Onboarding Revamp**
 `WelcomeScreen.tsx` remains close to a logo + tagline + one button; `CampaignCreator.tsx` has no seed
-questions or "what good looks like" scaffolding for the Custom World textarea; there are no starter campaign
-templates beyond the single "Winter's Daughter" default baked into `utils/demoTemplates.ts` (itself drifted
-from the real `NPC`/`Location` types — missing required `history`/`relationships` fields — and 95% unused,
-since `FirstCampaignWizard.tsx` only reads its `.setting` string).
+questions or "what good looks like" scaffolding for the Custom World textarea. *(Partly addressed: four real
+starter templates now ship in `data/templates/` — The Sunken Vault, The Crown Conspiracy, The Untamed Wilds,
+The Festival of Shadows — and `utils/demoTemplates.ts` has been reduced to the `WINTERS_DAUGHTER_SETTING`
+prose that quick-fills the wizard's world-description field, so the drifted shadow entity types are gone.)*
 Personas: New DM 5, Lazy DM 2, Forever DM 1, Tactical DM 1, Worldbuilder 1 · **Aggregate 10**
-Effort: **L** — a 3-step value-explainer for `WelcomeScreen.tsx`, seed-question scaffolding in
-`CampaignCreator.tsx`, and 2–3 real starter templates built from actual `NPC`/`Location`/`Faction` factories
-(`utils/entityUtils.ts`'s `createDefault*` functions) rather than `demoTemplates.ts`'s drifted shadow types.
+Effort: **M** — a 3-step value-explainer for `WelcomeScreen.tsx` and seed-question scaffolding in
+`CampaignCreator.tsx`; the starter-template half of this item is done.
 Dependencies: X10 (entity-type-config completeness) if starter templates are to include Secrets/Notes/PCs.
 
 **L9. Import/Export Foreign-Tool Adapters**
@@ -461,21 +511,21 @@ Dependencies: none, but benefits from X1's cleaner CRUD surface to target.
 
 | Item | New DM | Lazy DM | Forever DM | Tactical DM | Worldbuilder | Aggregate | Effort | Priority | Dependencies |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|---|
-| N1. CI Pipeline | 3 | 3 | 3 | 3 | 3 | 15 | S | P0 | none |
-| N2. Tailwind Build Migration | 3 | 3 | 3 | 3 | 3 | 15 | M | P0 | none |
-| N3. Session-Runner Data Durability | 2 | 5 | 4 | 5 | 2 | 18 | M | P0 | none |
+| ~~N1. CI Pipeline~~ **DONE** | 3 | 3 | 3 | 3 | 3 | 15 | S | P0 | none |
+| ~~N2. Tailwind Build Migration~~ **DONE** | 3 | 3 | 3 | 3 | 3 | 15 | M | P0 | none |
+| ~~N3. Session-Runner Data Durability~~ **DONE** | 2 | 5 | 4 | 5 | 2 | 18 | M | P0 | none |
 | N4. Dashboard & Palette Virtualization | 1 | 2 | 5 | 2 | 5 | 15 | M | P0 | none |
-| N5. AI Buffer Truncation & Error Visibility | 2 | 4 | 3 | 2 | 4 | 15 | S | P0 | none |
-| N6. Component Test Infra Bootstrap | 3 | 3 | 3 | 3 | 3 | 15 | M | P0 | none |
+| ~~N5. AI Buffer Truncation & Error Visibility~~ **DONE** | 2 | 4 | 3 | 2 | 4 | 15 | S | P0 | none |
+| ~~N6. Component Test Infra Bootstrap~~ **DONE** | 3 | 3 | 3 | 3 | 3 | 15 | M | P0 | none |
 | X1. Generic Entity CRUD Factory | 1 | 2 | 5 | 2 | 4 | 14 | L | P2 | N6 |
 | X2. ModelTier Unification | 2 | 3 | 2 | 2 | 3 | 12 | S | P1 | none |
-| X3. Audio Transcription Facade Compliance | 2 | 4 | 3 | 3 | 2 | 14 | M | P1 | none |
+| ~~X3. Audio Transcription Facade Compliance~~ **DONE** | 2 | 4 | 3 | 3 | 2 | 14 | M | P1 | none |
 | X4. DialogShell Portal + Inert | 3 | 3 | 3 | 3 | 3 | 15 | M | P1 | none |
 | X5. Streaming AI Responses | 4 | 5 | 3 | 2 | 4 | 18 | L | P2 | N5 |
 | X6. Combat Encounter Full-State Archiving | 1 | 1 | 3 | 5 | 1 | 11 | S | P1 | none |
 | X7. Structured Combat Essentials | 2 | 2 | 1 | 5 | 1 | 11 | M | P2 | none |
-| X8. Keyboard-Accessible Relationship Graph | 1 | 1 | 2 | 1 | 5 | 10 | M | P2 | none |
-| X9. DM Coach & Wizard Reliability Polish | 5 | 4 | 1 | 1 | 1 | 12 | S | P1 | none |
+| ~~X8. Keyboard-Accessible Relationship Graph~~ **DONE** | 1 | 1 | 2 | 1 | 5 | 10 | M | P2 | none |
+| X9. DM Coach & Wizard Reliability Polish *(partly done)* | 5 | 4 | 1 | 1 | 1 | 12 | S | P1 | none |
 | X10. Entity-Type-Config Completeness | 1 | 1 | 3 | 1 | 3 | 9 | S | P1 | none |
 | X11. buildEntityContext Consolidation | 1 | 2 | 3 | 1 | 4 | 11 | M | P2 | none |
 | L1. Generator Consolidation & Cancellation | 3 | 4 | 2 | 1 | 2 | 12 | L | P3 | N6 |
@@ -484,7 +534,7 @@ Dependencies: none, but benefits from X1's cleaner CRUD surface to target.
 | L4. Cross-Campaign Entity Reuse | 1 | 1 | 5 | 1 | 3 | 11 | XL | P3 | X1 |
 | L5. Structured NPC Stat Blocks + Difficulty Calc | 3 | 1 | 1 | 5 | 1 | 11 | L | P3 | X7 |
 | L6. Selection/Navigation State Consolidation | 2 | 2 | 2 | 2 | 2 | 10 | XL | P3 | N6, L2 |
-| L7. Linking Engine Unification | 1 | 1 | 2 | 1 | 4 | 9 | M | P2 | none |
+| L7. Linking Engine Unification *(partly done)* | 1 | 1 | 2 | 1 | 4 | 9 | M | P2 | none |
 | L8. New-DM Onboarding Revamp | 5 | 2 | 1 | 1 | 1 | 10 | L | P3 | X10 (soft) |
 | L9. Import/Export Foreign-Tool Adapters | 1 | 1 | 4 | 1 | 3 | 10 | XL | P3 | X1 (soft) |
 
@@ -502,7 +552,8 @@ long-tail depth work.*
 3. X5 — Streaming AI Responses (a spinner reads as "is this broken?" to someone new to the app)
 
 **Lazy DM**
-1. N3 — Session-Runner Data Durability (never lose a fast improvised note again)
+1. ~~N3 — Session-Runner Data Durability~~ **shipped 2026-08-14**; next up is L1's request cancellation, so a
+   generation abandoned mid-thought stops instead of resolving into the campaign later
 2. X5 — Streaming AI Responses (feedback during every "just generate it for me" wait)
 3. L3 — Prep-to-Play Continuity Bridge (minimal prep means the app should remember what's unresolved)
 
@@ -517,6 +568,7 @@ long-tail depth work.*
 3. L5 — Structured NPC Stat Blocks + Encounter Difficulty Calculator (turn freeform stats into real tools)
 
 **Worldbuilder**
-1. X8 — Keyboard-Accessible Relationship Graph (the graph is currently invisible to a whole class of users)
+1. ~~X8 — Keyboard-Accessible Relationship Graph~~ **shipped 2026-08-14**; next up is X11, so AI regeneration
+   context stops varying editor by editor across a deeply cross-referenced world
 2. N4 — Dashboard & Command Palette Virtualization (shared with Forever DM — deep lore means many entities)
 3. L7 — Linking Engine Unification (one consistent linking behavior everywhere lore text is rendered)

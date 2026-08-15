@@ -21,6 +21,7 @@ import { SceneResourcesPanel } from '../common/SceneResourcesPanel';
 import { SceneSmartLinkBar } from '../common/SceneSmartLinkBar';
 import { LinkSuggestionsPanel } from '../common/LinkSuggestionsPanel';
 import type { EntityCandidate } from '../../services/linking/matchingEngine';
+import { useDebouncedFieldCommit } from '../../hooks/useDebouncedFieldCommit';
 
 // ─── Save Status Indicator ────────────────────────────────────────────────────
 
@@ -100,17 +101,29 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
   const [formData, setFormData] = useState(scene);
   const [activeTab, setActiveTab] = useState('narrative');
   const [isGeneratingNpc, setIsGeneratingNpc] = useState(false);
+  const [npcGenerationError, setNpcGenerationError] = useState<string | null>(null);
   const [dismissedSuggestionIds, setDismissedSuggestionIds] = useState<Set<string>>(new Set());
   const { confirm } = useConfirmDialog();
+
+  // Mirrors formData.npcIds so async handlers (e.g. NPC generation, which spans
+  // an await) can read the CURRENT npcIds without a store write inside a
+  // setFormData updater — React (and StrictMode double-invocation) requires
+  // updaters to be pure, so `onUpdate` must never be called from inside one.
+  const npcIdsRef = useRef(formData.npcIds);
+  useEffect(() => {
+    npcIdsRef.current = formData.npcIds;
+  }, [formData.npcIds]);
 
   // Tracks the last `scene` prop we've reconciled against, so incoming prop
   // updates can be merged field-by-field instead of overwriting formData wholesale.
   const prevSceneRef = useRef(scene);
 
-  // Reset to first tab and clear dismissed suggestions when entity changes
+  // Reset to first tab and clear dismissed suggestions / stale errors when
+  // the entity changes (this editor is not remounted per entity)
   useEffect(() => {
     setActiveTab('narrative');
     setDismissedSuggestionIds(new Set());
+    setNpcGenerationError(null);
   }, [scene.id]);
 
   useEffect(() => {
@@ -154,10 +167,16 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
     }
   };
 
+  // Store writes are debounced per field and keyed to the entity id by
+  // useDebouncedFieldCommit, which flushes pending edits when the edited
+  // entity changes under this same mounted editor or on unmount, so text
+  // typed inside the debounce window is committed to the entity it was
+  // typed against (finding #70).
+  const { commit: commitMentionField } = useDebouncedFieldCommit<Scene>(scene.id, onUpdate);
   // Used by MentionInput fields (onChange receives string, not event)
   const handleMentionFieldChange = (field: keyof Scene) => (value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    onUpdate(scene.id, { [field]: value });
+    commitMentionField(field, value);
   };
 
   // --- @-mention tracking across all MentionInput fields ---
@@ -167,19 +186,47 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
     () => resolveMentionCandidates(campaign, scene.mentionedEntityIds),
     [campaign, scene.mentionedEntityIds],
   );
-  const [mentionedIdsByField, setMentionedIdsByField] = useState<Record<string, string[]>>(() => ({
+  // Per-field mention ID sets. Kept in a ref, not state — nothing renders off
+  // of this value directly, it exists purely so handleMentionedIdsChange can
+  // compute the merged set without writing to the store from inside a
+  // setState updater (React invokes functional updaters during the render
+  // phase, and StrictMode intentionally double-invokes them — doing the
+  // store write there fired it twice).
+  const mentionedIdsByFieldRef = useRef<Record<string, string[]>>({
     readAloudText: findMentionedIdsInText(scene.readAloudText, mentionCandidates),
     gmNotes: findMentionedIdsInText(scene.gmNotes, mentionCandidates),
-  }));
+  });
+  // Last merged id set actually written to the store. MentionInput reports
+  // its field's id set on every keystroke even when that set hasn't changed,
+  // so without this the store (and every useSyncExternalStore subscriber)
+  // would still churn once per character (finding #70).
+  const lastMergedIdsKeyRef = useRef<string>(
+    Array.from(new Set(Object.values(mentionedIdsByFieldRef.current).flat())).sort().join(String.fromCharCode(0)),
+  );
+  // Both refs above are initialised on first mount only, but this editor is
+  // reused across scene switches — rebuild them from the incoming scene so the
+  // previous scene's per-field sets can neither be merged into the next
+  // scene's writes nor suppress its legitimate first write.
+  useEffect(() => {
+    mentionedIdsByFieldRef.current = {
+      readAloudText: findMentionedIdsInText(scene.readAloudText, mentionCandidates),
+      gmNotes: findMentionedIdsInText(scene.gmNotes, mentionCandidates),
+    };
+    lastMergedIdsKeyRef.current = Array.from(new Set(Object.values(mentionedIdsByFieldRef.current).flat())).sort().join(String.fromCharCode(0));
+    // keyed on the id ONLY — resetting on every mentionCandidates recompute would
+    // discard in-session tracked mentions (same rationale as MentionInput's seedKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene.id]);
   // Reports the merged set of mentioned IDs (across every mention field) whenever any field changes.
   const handleMentionedIdsChange = (field: string) => (ids: string[]) => {
-    setMentionedIdsByField(prev => {
-      const next = { ...prev, [field]: ids };
-      const merged = Array.from(new Set(Object.values(next).flat()));
-      setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
-      onUpdate(scene.id, { mentionedEntityIds: merged });
-      return next;
-    });
+    const next = { ...mentionedIdsByFieldRef.current, [field]: ids };
+    mentionedIdsByFieldRef.current = next;
+    const merged = Array.from(new Set(Object.values(next).flat()));
+    const mergedKey = merged.slice().sort().join(String.fromCharCode(0));
+    if (mergedKey === lastMergedIdsKeyRef.current) return;
+    lastMergedIdsKeyRef.current = mergedKey;
+    setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
+    onUpdate(scene.id, { mentionedEntityIds: merged });
   };
 
   const handleFieldRegenerate = (field: 'readAloudText' | 'gmNotes' | 'rewards') => (newValue: string) => {
@@ -189,6 +236,23 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
 
   const sceneEntityContext = `Scene Title: ${formData.title}\nScene Type: ${formData.type}\nRead-Aloud Text: ${formData.readAloudText || 'Not specified'}\nGM Notes: ${formData.gmNotes || 'Not specified'}`;
 
+  // Stable candidate arrays for the linking panels below. These are useMemo
+  // deps (LinkSuggestionsPanel.tsx) for its matching-engine memo — building
+  // fresh array literals inline on every render defeats that memo entirely,
+  // so `findMatches` would re-run on every keystroke (finding #50).
+  const npcCandidates = useMemo<EntityCandidate[]>(
+    () => allNpcs.map((n): EntityCandidate => ({ id: n.id, name: n.name, type: 'npc' })),
+    [allNpcs],
+  );
+  const locationCandidates = useMemo<EntityCandidate[]>(
+    () => allLocations.map((l): EntityCandidate => ({ id: l.id, name: l.name, type: 'location' })),
+    [allLocations],
+  );
+  const allLinkCandidates = useMemo<EntityCandidate[]>(
+    () => [...npcCandidates, ...locationCandidates],
+    [npcCandidates, locationCandidates],
+  );
+
   // ── Generate NPC for Scene ─────────────────────────────────────────────────
   const sceneLocation = allLocations.find(l => l.id === scene.locationId);
   const npcGenerationDefaultPrompt = sceneLocation
@@ -197,14 +261,24 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
 
   const handleGenerateNpcForScene = async (prompt: string) => {
     setIsGeneratingNpc(true);
+    setNpcGenerationError(null);
     try {
       const npcData = await generateNpc(prompt, isMockMode, campaignContext);
       const newNpcId = campaignService.createNpc({ ...npcData, factionId: undefined, relationships: [], history: [] });
-      const newNpcIds = [...formData.npcIds, newNpcId];
-      setFormData(prev => ({ ...prev, npcIds: newNpcIds }));
-      onUpdate(scene.id, { npcIds: newNpcIds });
+      // Derive the payload from the CURRENT npcIds via the ref (kept in sync by
+      // the effect above), not the `formData` captured in this closure at click
+      // time — generation takes seconds and the NPC checkbox list stays
+      // interactive, so any NPC ticked while this was in flight must not be
+      // dropped. `onUpdate` is called here, outside the setFormData updater, so
+      // the updater itself stays a pure function of `prev` (safe under
+      // StrictMode's double-invocation of updaters).
+      const next = [...npcIdsRef.current, newNpcId];
+      npcIdsRef.current = next;
+      setFormData(prev => ({ ...prev, npcIds: next }));
+      onUpdate(scene.id, { npcIds: next });
     } catch (error) {
       console.error('Failed to generate NPC for scene:', error);
+      setNpcGenerationError('Failed to generate NPC. Please try again.');
     } finally {
       setIsGeneratingNpc(false);
     }
@@ -443,8 +517,8 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                 gmNotes={formData.gmNotes}
                 currentNpcIds={formData.npcIds}
                 currentLocationId={formData.locationId ?? null}
-                allNpcs={allNpcs.map((n): EntityCandidate => ({ id: n.id, name: n.name, type: 'npc' }))}
-                allLocations={allLocations.map((l): EntityCandidate => ({ id: l.id, name: l.name, type: 'location' }))}
+                allNpcs={npcCandidates}
+                allLocations={locationCandidates}
                 onAddNpc={handleNpcToggle}
                 onSetLocation={(locationId) => {
                   setFormData(prev => ({ ...prev, locationId }));
@@ -457,10 +531,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                 textFields={[formData.readAloudText, formData.gmNotes]}
                 linkedNpcIds={formData.npcIds}
                 linkedLocationId={formData.locationId ?? null}
-                allCandidates={[
-                  ...allNpcs.map((n): EntityCandidate => ({ id: n.id, name: n.name, type: 'npc' })),
-                  ...allLocations.map((l): EntityCandidate => ({ id: l.id, name: l.name, type: 'location' })),
-                ]}
+                allCandidates={allLinkCandidates}
                 onAccept={(entityId, action) => {
                   const npcMatch = allNpcs.find(n => n.id === entityId);
                   if (npcMatch) {
@@ -494,6 +565,9 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                     onGenerate={handleGenerateNpcForScene}
                   />
                 </div>
+                {npcGenerationError && (
+                  <p role="alert" className="text-xs text-red-400 mb-1.5">{npcGenerationError}</p>
+                )}
                 <div className="max-h-60 overflow-y-auto bg-slate-950 border border-slate-800 rounded-md p-3 space-y-2 custom-scrollbar">
                   {allNpcs.length > 0 ? allNpcs.map(npc => (
                     <label key={npc.id} className="flex items-center text-sm text-slate-300 select-none p-1 rounded-md hover:bg-slate-800/50 transition-colors">

@@ -6,9 +6,21 @@ import type { Adventure, Scene, NPC, Location, Faction, Item } from './index';
 /**
  * Represents an Adventure object before it's added to the campaign.
  * It does not have an `id`, and its `scenes` also lack `id`s.
+ *
+ * `status` and `npcIds` are additionally OPTIONAL (not just id-less) on each
+ * scene: the real-provider `sceneSchema` (services/ai/realmWeaver.ts) never
+ * returns them, so a type that promised them as required (finding #7) let
+ * `tsc` wave through consumer code — e.g. `adv.scenes.map(s => s.npcIds...)`
+ * — that trusted fields the AI response never populates. Optional rather
+ * than removed keeps the ~20 test files / call sites that DO supply both
+ * fields (batch-add from evocationWizard.postProcessResult, which fills
+ * them in) compiling unchanged, while a future consumer of the raw
+ * provider shape gets a real compiler error instead of a false promise.
+ * Runtime normalisation (defaulting missing status/npcIds) happens in
+ * campaignService.ts's createFullAdventure/batchAddToCampaign.
  */
 export type AdventureForBatchAdd = Omit<Adventure, 'id' | 'scenes'> & {
-    scenes: Omit<Scene, 'id'>[];
+    scenes: (Omit<Scene, 'id' | 'status' | 'npcIds'> & Partial<Pick<Scene, 'status' | 'npcIds'>>)[];
 };
 
 /**

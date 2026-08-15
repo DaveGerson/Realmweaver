@@ -79,6 +79,7 @@ export const ItemGenerator: React.FC<ItemGeneratorProps> = ({
       setRarity('');
       setItemType('');
     } catch (err) {
+      console.error('[ItemGenerator] generation failed', err);
       if (isMountedRef.current) {
         setError('Failed to generate item. Please check your API key and try again.');
       }

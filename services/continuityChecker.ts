@@ -113,8 +113,25 @@ function checkBrokenReferences(campaign: Campaign, makeId: MakeId): ContinuityIs
     }
   }
 
-  // Article.relatedEntityIds — validate against all known entities
-  const allEntityIds = new Set([...npcIds, ...locationIds, ...factionIds, ...itemIds, ...articleIds]);
+  // Article.relatedEntityIds — validate against all known entities. The field's
+  // documented contract is "any entity" (backlinkUtils surfaces these links on
+  // adventures, plots, session logs, PCs, notes and secrets too), so every
+  // entity collection must count as valid or a legitimate reference gets
+  // flagged as broken.
+  const allEntityIds = new Set([
+    ...npcIds,
+    ...locationIds,
+    ...factionIds,
+    ...itemIds,
+    ...articleIds,
+    ...campaign.adventures.map(a => a.id),
+    ...campaign.adventures.flatMap(a => a.scenes.map(s => s.id)),
+    ...(campaign.plots ?? []).map(p => p.id),
+    ...(campaign.sessionLogs ?? []).map(l => l.id),
+    ...(campaign.playerCharacters ?? []).map(pc => pc.id),
+    ...(campaign.notes ?? []).map(n => n.id),
+    ...(campaign.secrets ?? []).map(s => s.id),
+  ]);
   for (const article of campaign.articles) {
     for (const refId of article.relatedEntityIds ?? []) {
       if (!allEntityIds.has(refId)) {
@@ -280,26 +297,12 @@ function checkOrphanedEntities(campaign: Campaign, makeId: MakeId): ContinuityIs
     }
   }
 
-  // --- Orphaned Items ---
-  const referencedItemIds = new Set<string>();
-  for (const article of campaign.articles) {
-    for (const id of article.relatedEntityIds ?? []) referencedItemIds.add(id);
-  }
-
-  for (const item of campaign.items) {
-    if (!referencedItemIds.has(item.id)) {
-      issues.push({
-        id: makeId('orphan'),
-        severity: 'info',
-        ruleId: 'orphan',
-        title: 'Orphaned item',
-        description: `"${item.name}" is not referenced in any lore article.`,
-        entityIds: [item.id],
-        entityTypes: ['item'],
-        suggestedFix: 'Link this item from a lore article, or assign it as scene loot.',
-      });
-    }
-  }
+  // Orphaned-item detection is intentionally omitted: nothing in types/ can
+  // reference an Item other than an Article's relatedEntityIds (LootItem has
+  // no item id and Scene.rewards is free text), so the rule was 100% noise
+  // for any campaign without lore articles and its suggested fix ("assign it
+  // as scene loot") described an action the app cannot perform. See finding
+  // #97 in the wp-c-ai-services ship-readiness plan.
 
   return issues;
 }

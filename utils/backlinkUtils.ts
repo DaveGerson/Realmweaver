@@ -64,6 +64,84 @@ function scanMentionedEntityIds(
   }
 }
 
+/**
+ * Sweep every entity type that can hold `mentionedEntityIds` (npcs, locations,
+ * factions, articles, plots, scenes) for an @-mention of the target entity.
+ * Shared by every computeBacklinksFor* function so the source list can never
+ * drift out of sync between entity types again (findings #47, #48).
+ *
+ * Items are deliberately excluded as a mention SOURCE: Item has no
+ * `mentionedEntityIds` field and no editor mounts MentionInput for items, so
+ * items are a mention TARGET only.
+ */
+function scanAllMentionSources(
+  acc: Map<string, BacklinkEntry[]>,
+  entityId: string,
+  campaign: Campaign,
+): void {
+  const allScenes = campaign.adventures.flatMap(a => a.scenes);
+  scanMentionedEntityIds(acc, entityId, campaign.npcs, 'npc');
+  scanMentionedEntityIds(acc, entityId, campaign.locations, 'location');
+  scanMentionedEntityIds(acc, entityId, campaign.factions, 'faction');
+  scanMentionedEntityIds(acc, entityId, campaign.articles.map(a => ({ id: a.id, name: a.title, mentionedEntityIds: a.mentionedEntityIds })), 'article');
+  scanMentionedEntityIds(acc, entityId, campaign.plots.map(p => ({ id: p.id, name: p.title, mentionedEntityIds: p.mentionedEntityIds })), 'plot');
+  scanMentionedEntityIds(acc, entityId, allScenes.map(s => ({ id: s.id, name: s.title, mentionedEntityIds: s.mentionedEntityIds })), 'scene');
+}
+
+/**
+ * Generic relatedEntityIds sweep for entity types that can only ever be the
+ * TARGET of a relatedEntityIds reference, never a mention/relationship SOURCE
+ * themselves: session logs, player characters and notes (finding #46).
+ * Covers articles and plots, the two entity types whose relatedEntityIds is
+ * used as a general-purpose "related to" pointer.
+ *
+ * Also scans NPC relationships (finding #46 follow-up): NpcEditor lets a GM
+ * point an NPC relationship at a PlayerCharacter (NpcEditor.tsx builds its
+ * relationship-target list from `playerCharacters`), so `npc.relationships[].
+ * targetId` routinely holds a PC's id. Without this, opening that PC's editor
+ * shows the affirmative-false "No other entities reference this one" even
+ * though an NPC visibly has a relationship pointing at them. This is a no-op
+ * for session-log/note since nothing ever targets those via relationships.
+ */
+function computeGenericRelatedEntitySweep(entityId: string, campaign: Campaign): GroupedBacklinks {
+  const acc = new Map<string, BacklinkEntry[]>();
+
+  for (const article of campaign.articles) {
+    if (article.relatedEntityIds?.includes(entityId)) {
+      addEntry(acc, 'article', {
+        id: article.id,
+        name: article.title,
+        entityType: 'article',
+        relationshipLabel: 'Referenced by',
+      });
+    }
+  }
+
+  for (const plot of campaign.plots) {
+    if (plot.relatedEntityIds?.includes(entityId)) {
+      addEntry(acc, 'plot', {
+        id: plot.id,
+        name: plot.title,
+        entityType: 'plot',
+        relationshipLabel: 'Referenced by',
+      });
+    }
+  }
+
+  for (const npc of campaign.npcs) {
+    if (npc.relationships.some(rel => rel.targetId === entityId)) {
+      addEntry(acc, 'npc', {
+        id: npc.id,
+        name: npc.name,
+        entityType: 'npc',
+        relationshipLabel: 'Relationship with',
+      });
+    }
+  }
+
+  return finalise(acc);
+}
+
 // ---------------------------------------------------------------------------
 // Per-entity-type scanner functions
 // ---------------------------------------------------------------------------
@@ -145,13 +223,7 @@ function computeBacklinksForNpc(entityId: string, campaign: Campaign): GroupedBa
   }
 
   // @-mention backlinks
-  const allScenes = campaign.adventures.flatMap(a => a.scenes);
-  scanMentionedEntityIds(acc, entityId, campaign.npcs, 'npc');
-  scanMentionedEntityIds(acc, entityId, campaign.locations, 'location');
-  scanMentionedEntityIds(acc, entityId, campaign.factions, 'faction');
-  scanMentionedEntityIds(acc, entityId, campaign.articles.map(a => ({ id: a.id, name: a.title, mentionedEntityIds: a.mentionedEntityIds })), 'article');
-  scanMentionedEntityIds(acc, entityId, campaign.plots.map(p => ({ id: p.id, name: p.title, mentionedEntityIds: p.mentionedEntityIds })), 'plot');
-  scanMentionedEntityIds(acc, entityId, allScenes.map(s => ({ id: s.id, name: s.title, mentionedEntityIds: s.mentionedEntityIds })), 'scene');
+  scanAllMentionSources(acc, entityId, campaign);
 
   return finalise(acc);
 }
@@ -227,13 +299,7 @@ function computeBacklinksForLocation(entityId: string, campaign: Campaign): Grou
   }
 
   // @-mention backlinks
-  const allScenes = campaign.adventures.flatMap(a => a.scenes);
-  scanMentionedEntityIds(acc, entityId, campaign.npcs, 'npc');
-  scanMentionedEntityIds(acc, entityId, campaign.locations, 'location');
-  scanMentionedEntityIds(acc, entityId, campaign.factions, 'faction');
-  scanMentionedEntityIds(acc, entityId, campaign.articles.map(a => ({ id: a.id, name: a.title, mentionedEntityIds: a.mentionedEntityIds })), 'article');
-  scanMentionedEntityIds(acc, entityId, campaign.plots.map(p => ({ id: p.id, name: p.title, mentionedEntityIds: p.mentionedEntityIds })), 'plot');
-  scanMentionedEntityIds(acc, entityId, allScenes.map(s => ({ id: s.id, name: s.title, mentionedEntityIds: s.mentionedEntityIds })), 'scene');
+  scanAllMentionSources(acc, entityId, campaign);
 
   return finalise(acc);
 }
@@ -290,13 +356,7 @@ function computeBacklinksForFaction(entityId: string, campaign: Campaign): Group
   }
 
   // @-mention backlinks
-  const allScenes = campaign.adventures.flatMap(a => a.scenes);
-  scanMentionedEntityIds(acc, entityId, campaign.npcs, 'npc');
-  scanMentionedEntityIds(acc, entityId, campaign.locations, 'location');
-  scanMentionedEntityIds(acc, entityId, campaign.factions, 'faction');
-  scanMentionedEntityIds(acc, entityId, campaign.articles.map(a => ({ id: a.id, name: a.title, mentionedEntityIds: a.mentionedEntityIds })), 'article');
-  scanMentionedEntityIds(acc, entityId, campaign.plots.map(p => ({ id: p.id, name: p.title, mentionedEntityIds: p.mentionedEntityIds })), 'plot');
-  scanMentionedEntityIds(acc, entityId, allScenes.map(s => ({ id: s.id, name: s.title, mentionedEntityIds: s.mentionedEntityIds })), 'scene');
+  scanAllMentionSources(acc, entityId, campaign);
 
   return finalise(acc);
 }
@@ -329,12 +389,7 @@ function computeBacklinksForItem(entityId: string, campaign: Campaign): GroupedB
   }
 
   // @-mention backlinks
-  const allScenes = campaign.adventures.flatMap(a => a.scenes);
-  scanMentionedEntityIds(acc, entityId, campaign.npcs, 'npc');
-  scanMentionedEntityIds(acc, entityId, campaign.locations, 'location');
-  scanMentionedEntityIds(acc, entityId, campaign.articles.map(a => ({ id: a.id, name: a.title, mentionedEntityIds: a.mentionedEntityIds })), 'article');
-  scanMentionedEntityIds(acc, entityId, campaign.plots.map(p => ({ id: p.id, name: p.title, mentionedEntityIds: p.mentionedEntityIds })), 'plot');
-  scanMentionedEntityIds(acc, entityId, allScenes.map(s => ({ id: s.id, name: s.title, mentionedEntityIds: s.mentionedEntityIds })), 'scene');
+  scanAllMentionSources(acc, entityId, campaign);
 
   return finalise(acc);
 }
@@ -365,6 +420,9 @@ function computeBacklinksForAdventure(entityId: string, campaign: Campaign): Gro
       });
     }
   }
+
+  // @-mention backlinks (adventures are @-mention candidates too — finding #47)
+  scanAllMentionSources(acc, entityId, campaign);
 
   return finalise(acc);
 }
@@ -399,11 +457,7 @@ function computeBacklinksForArticle(entityId: string, campaign: Campaign): Group
   }
 
   // @-mention backlinks
-  scanMentionedEntityIds(acc, entityId, campaign.npcs, 'npc');
-  scanMentionedEntityIds(acc, entityId, campaign.locations, 'location');
-  scanMentionedEntityIds(acc, entityId, campaign.factions, 'faction');
-  scanMentionedEntityIds(acc, entityId, campaign.articles.map(a => ({ id: a.id, name: a.title, mentionedEntityIds: a.mentionedEntityIds })), 'article');
-  scanMentionedEntityIds(acc, entityId, campaign.plots.map(p => ({ id: p.id, name: p.title, mentionedEntityIds: p.mentionedEntityIds })), 'plot');
+  scanAllMentionSources(acc, entityId, campaign);
 
   return finalise(acc);
 }
@@ -436,11 +490,7 @@ function computeBacklinksForPlot(entityId: string, campaign: Campaign): GroupedB
   }
 
   // @-mention backlinks
-  scanMentionedEntityIds(acc, entityId, campaign.npcs, 'npc');
-  scanMentionedEntityIds(acc, entityId, campaign.locations, 'location');
-  scanMentionedEntityIds(acc, entityId, campaign.factions, 'faction');
-  scanMentionedEntityIds(acc, entityId, campaign.articles.map(a => ({ id: a.id, name: a.title, mentionedEntityIds: a.mentionedEntityIds })), 'article');
-  scanMentionedEntityIds(acc, entityId, campaign.plots.map(p => ({ id: p.id, name: p.title, mentionedEntityIds: p.mentionedEntityIds })), 'plot');
+  scanAllMentionSources(acc, entityId, campaign);
 
   return finalise(acc);
 }
@@ -479,7 +529,8 @@ function computeBacklinksForScene(entityId: string, campaign: Campaign): Grouped
  *
  * @param entityId   - The ID of the entity whose inbound references to find.
  * @param entityType - One of: 'npc' | 'location' | 'faction' | 'item' |
- *                    'adventure' | 'article' | 'plot' | 'scene'
+ *                    'adventure' | 'article' | 'plot' | 'scene' |
+ *                    'session-log' | 'player-character' | 'note'
  * @param campaign   - The full campaign data object.
  */
 export function computeBacklinks(
@@ -504,6 +555,14 @@ export function computeBacklinks(
       return computeBacklinksForPlot(entityId, campaign);
     case 'scene':
       return computeBacklinksForScene(entityId, campaign);
+    // Types that BacklinksPanel mounts for but can never be a mention/
+    // relationship SOURCE themselves — surface generic relatedEntityIds
+    // references instead of the always-false "no references" state
+    // (finding #46).
+    case 'session-log':
+    case 'player-character':
+    case 'note':
+      return computeGenericRelatedEntitySweep(entityId, campaign);
     default:
       return {};
   }

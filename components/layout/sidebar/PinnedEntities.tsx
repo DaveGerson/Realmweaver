@@ -45,7 +45,7 @@ export const PinnedEntities: React.FC<PinnedEntitiesProps> = React.memo(({
               </button>
               <button
                 onClick={() => onUnpin(pinned.type, pinned.id)}
-                className="flex-shrink-0 mr-2 p-1 text-slate-600 hover:text-slate-300 opacity-0 group-hover:opacity-100 transition-all"
+                className="flex-shrink-0 mr-2 p-1 text-slate-600 hover:text-slate-300 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 group-focus-within:opacity-100 transition-all"
                 title="Unpin"
                 aria-label={`Unpin ${name}`}
               >

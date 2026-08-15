@@ -187,6 +187,23 @@ export function useEntitySelection({ activeCampaign, onSidebarClose }: UseEntity
         sceneId: selectedSceneId,
         label,
       };
+      // Finding #54: two synchronous handleSelect calls in the same click
+      // handler (e.g. the sidebar's scene button firing
+      // onSelect('adventure', …) then onSelect('scene', …)) both read
+      // activeView/selectedXId from this same stale render closure, so both
+      // pushes would otherwise capture identical pre-click state and grow the
+      // stack by 2 for a single logical navigation. Dedupe against the
+      // current top of stack instead of pushing a duplicate.
+      const top = prev[prev.length - 1];
+      if (
+        top &&
+        top.view === entry.view &&
+        top.selectedId === entry.selectedId &&
+        top.adventureId === entry.adventureId &&
+        top.sceneId === entry.sceneId
+      ) {
+        return prev;
+      }
       return [...prev, entry].slice(-20);
     });
   }, [
@@ -232,7 +249,16 @@ export function useEntitySelection({ activeCampaign, onSidebarClose }: UseEntity
       const parentAdventure = activeCampaign?.adventures.find(adv => adv.scenes.some(s => s.id === id));
       if (parentAdventure) {
         const scene = parentAdventure.scenes.find(s => s.id === id);
+        // pushNavStack must run BEFORE resetSelections so it still captures
+        // the pre-navigation state (it reads the current selection ids from
+        // this render's closure). Finding #21: this branch previously never
+        // called resetSelections() at all — every other branch does — so a
+        // stale selectedNoteId/selectedPlotId/etc. from a prior navigation
+        // survived, and ViewRouter's editor-precedence chain (which checks
+        // those before selectedScene) kept rendering the old editor instead
+        // of navigating to the scene.
         if (scene) pushNavStack(scene.title);
+        resetSelections();
         setActiveView('adventures');
         setSelectedAdventureId(parentAdventure.id);
         setSelectedSceneId(id);

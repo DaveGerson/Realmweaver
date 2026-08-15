@@ -100,61 +100,51 @@ ${approvedEntitiesLog.join('\n')}
     const lastUserMessage = history[history.length - 1];
     const prompt = `Conversation History:\n${transcript}\n\nUser's Last Input: "${lastUserMessage.text}"\n\nRespond to the user and update any drafts.`;
 
-    try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const rawResponse: any = await generateWithSchema(prompt, realmChatResponseSchema, systemInstruction, {}, modelName, campaignContext);
-        
-        // Post-process to flatten the data structure for the app.
-        // The model may return entity data in several formats:
-        //   1. Type-specific key: { npcData: {...} } (schema-enforced by Gemini)
-        //   2. Generic data key: { data: {...} } (common with schema-in-prompt)
-        //   3. Inline fields: { id, type, status, name, description, ... } (Claude CLI)
-        // We handle all three gracefully.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const processedDrafts: DraftEntity[] = (rawResponse.draftEntities || []).map((raw: any) => {
-            // Try type-specific key first (original Gemini pattern)
-            const typeKeyMap: Record<string, string> = {
-                npc: 'npcData', location: 'locationData', faction: 'factionData',
-                item: 'itemData', adventure: 'adventureData', article: 'articleData',
-            };
-            const typeKey = typeKeyMap[raw.type];
-            let data = typeKey ? raw[typeKey] : undefined;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rawResponse: any = await generateWithSchema(prompt, realmChatResponseSchema, systemInstruction, {}, modelName, campaignContext);
 
-            // Fallback: generic "data" key
-            if (!data && raw.data && typeof raw.data === 'object') {
-                data = raw.data;
+    // Post-process to flatten the data structure for the app.
+    // The model may return entity data in several formats:
+    //   1. Type-specific key: { npcData: {...} } (schema-enforced by Gemini)
+    //   2. Generic data key: { data: {...} } (common with schema-in-prompt)
+    //   3. Inline fields: { id, type, status, name, description, ... } (Claude CLI)
+    // We handle all three gracefully.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const processedDrafts: DraftEntity[] = (rawResponse.draftEntities || []).map((raw: any) => {
+        // Try type-specific key first (original Gemini pattern)
+        const typeKeyMap: Record<string, string> = {
+            npc: 'npcData', location: 'locationData', faction: 'factionData',
+            item: 'itemData', adventure: 'adventureData', article: 'articleData',
+        };
+        const typeKey = typeKeyMap[raw.type];
+        let data = typeKey ? raw[typeKey] : undefined;
+
+        // Fallback: generic "data" key
+        if (!data && raw.data && typeof raw.data === 'object') {
+            data = raw.data;
+        }
+
+        // Fallback: inline fields — extract everything except meta fields
+        if (!data || (typeof data === 'object' && Object.keys(data).length === 0)) {
+            const { id: _id, type: _type, status: _status, npcData: _n, locationData: _l, factionData: _f, itemData: _i, adventureData: _a, articleData: _ar, ...inlineFields } = raw;
+            if (Object.keys(inlineFields).length > 0) {
+                data = inlineFields;
             }
-
-            // Fallback: inline fields — extract everything except meta fields
-            if (!data || (typeof data === 'object' && Object.keys(data).length === 0)) {
-                const { id: _id, type: _type, status: _status, npcData: _n, locationData: _l, factionData: _f, itemData: _i, adventureData: _a, articleData: _ar, ...inlineFields } = raw;
-                if (Object.keys(inlineFields).length > 0) {
-                    data = inlineFields;
-                }
-            }
-
-            return {
-                id: raw.id,
-                type: raw.type,
-                status: 'draft',
-                data: data || {}
-            } as DraftEntity;
-        });
+        }
 
         return {
-            message: rawResponse.message,
-            suggestions: rawResponse.suggestions || [],
-            draftEntities: processedDrafts
-        };
+            id: raw.id,
+            type: raw.type,
+            status: 'draft',
+            data: data || {}
+        } as DraftEntity;
+    });
 
-    } catch (error) {
-        console.error("RealmChat Error:", error);
-        return {
-            message: "I'm having trouble connecting to the Weave right now. Please try again.",
-            suggestions: [],
-            draftEntities: []
-        };
-    }
+    return {
+        message: rawResponse.message,
+        suggestions: rawResponse.suggestions || [],
+        draftEntities: processedDrafts
+    };
 };
 
 const npcRoleplayResponseSchema = {
@@ -199,24 +189,16 @@ ${npcContext}
         ? `Conversation so far:\n${historyLines}\n\nPlayer says: "${userMessage}"\n\nRespond as the NPC.`
         : `Player says: "${userMessage}"\n\nRespond as the NPC.`;
 
-    try {
-        const rawResponse = await generateWithSchema(
-            prompt,
-            npcRoleplayResponseSchema,
-            systemInstruction,
-            {},
-            'standard',
-            campaignContext
-        );
-        return {
-            dialogue: rawResponse.dialogue || '',
-            moodCue: rawResponse.moodCue || '',
-        };
-    } catch (error) {
-        console.error("NPC Roleplay Error:", error);
-        return {
-            dialogue: "...",
-            moodCue: "seems distracted, saying nothing",
-        };
-    }
+    const rawResponse = await generateWithSchema(
+        prompt,
+        npcRoleplayResponseSchema,
+        systemInstruction,
+        {},
+        'standard',
+        campaignContext
+    );
+    return {
+        dialogue: rawResponse.dialogue || '',
+        moodCue: rawResponse.moodCue || '',
+    };
 };

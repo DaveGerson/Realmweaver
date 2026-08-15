@@ -10,10 +10,9 @@ import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { EntityLink } from '../common/EntityLink';
 import { campaignService } from '../../services/campaignService';
 import { AiTextarea } from '../common/Textarea';
-import { generateEnhancedText, analyzeSessionNotes } from '../../services/aiService';
+import { generateEnhancedText, analyzeSessionNotes, startAudioTranscription } from '../../services/aiService';
 import { twMerge } from 'tailwind-merge';
-import { startAudioTranscription } from '../../services/ai/audioTranscription';
-import type { AudioTranscriptionSession } from '../../services/ai/audioTranscription';
+import type { AudioTranscriptionSession } from '../../services/aiService';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
 import { BacklinksPanel } from '../common/BacklinksPanel';
 
@@ -34,8 +33,25 @@ declare global {
   }
 }
 
+/**
+ * Converts a stored sessionDate (ISO string, or any value) into the
+ * 'YYYY-MM-DD' shape <input type="date"> expects. Falls back to '' for
+ * empty/garbage values instead of throwing (RangeError: Invalid time value),
+ * so a log whose stored sessionDate is already corrupted can still render
+ * and be repaired from the UI.
+ */
+function toDateInputValue(sessionDate: string): string {
+  const d = new Date(sessionDate);
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0];
+}
+
 export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaign, onUpdate, onDelete, isMockMode, onGoLive, onNavigate }) => {
   const [formData, setFormData] = useState(log);
+  // Latest rendered formData, for async handlers that must merge against
+  // current state without doing side effects inside a setState updater
+  // (updaters run during render and StrictMode double-invokes them).
+  const formDataRef = useRef(formData);
+  formDataRef.current = formData;
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState<'structured' | 'scratchpad'>('structured');
   const [newNoteContent, setNewNoteContent] = useState('');
@@ -54,6 +70,16 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
   const [isImportingTranscript, setIsImportingTranscript] = useState(false);
   const transcriptFileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Live transcript preview — auto-scrolls to the newest text as it streams in,
+  // since the preview box is height-capped and has no auto-scroll otherwise.
+  const transcriptPreviewRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = transcriptPreviewRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [liveTranscript]);
+
   const activePlots = campaign.plots.filter(p => p.status === 'active');
 
   // Tracks the last `log` prop we've reconciled against, so incoming prop
@@ -67,6 +93,27 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
     }
     prevLogRef.current = log;
   }, [log]);
+
+  // Per-entity state reset on log switch. This editor is not remounted when
+  // the GM navigates between two logs (ViewRouter renders it with no key), so
+  // without this the draft note, tab, and any running AI Scribe session
+  // survive the switch — a half-typed entry would be filed against the wrong
+  // session, and the mic would stay hot while its Stop button (gated on the
+  // active log) is no longer rendered. Tears the scribe down exactly like the
+  // unmount cleanup below. A no-op on first mount.
+  useEffect(() => {
+    setActiveTab('structured');
+    setNewNoteContent('');
+    setNewNoteTags([]);
+    if (audioSessionRef.current) {
+      audioSessionRef.current.stop().catch(e => {
+        console.error('Error stopping audio session on log switch', e);
+      });
+      audioSessionRef.current = null;
+    }
+    setIsLiveConnected(false);
+    setLiveTranscript('');
+  }, [log.id]);
 
   // Clean up the audio transcription session on unmount
   useEffect(() => {
@@ -115,7 +162,14 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
     }
   }
 
+  // A second, unguarded door to "there can only be one active session" (the
+  // same guarantee campaignService.goLive enforces): this button bypasses
+  // goLive entirely, so it must not be clickable while another log is
+  // already active or it would produce two logs with status 'active'.
+  const anotherSessionIsLive = campaign.sessionLogs.some(s => s.status === 'active' && s.id !== log.id);
+
   const handleStartSession = () => {
+      if (anotherSessionIsLive) return;
       onUpdate(log.id, { status: 'active', sessionDate: new Date().toISOString() });
   }
 
@@ -140,10 +194,14 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
       const combinedNotes = `${formData.runningNotes}\n\n${structuredText}`;
       
       const prompt = `Based on the following rough notes taken during the session, write a cohesive narrative recap of the events:\n\n${combinedNotes}`;
+      const context = `Campaign: ${campaign.title}\nSetting: ${campaign.setting}`;
       try {
-          const recap = await generateEnhancedText(prompt, undefined, isMockMode);
+          const recap = await generateEnhancedText(prompt, context, isMockMode);
           setFormData(prev => ({...prev, recap}));
           onUpdate(log.id, { recap });
+      } catch (e) {
+          console.error('Recap generation failed', e);
+          addToast('Failed to generate recap. See console.', 'error');
       } finally {
           setIsGenerating(false);
       }
@@ -173,6 +231,7 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
     try {
       const session = await startAudioTranscription({
         gcpApiKey: campaign.gcpApiKey!,
+        isMockMode,
         onTranscript: (text) => setLiveTranscript(prev => prev + text),
         onConnected: () => setIsLiveConnected(true),
         onDisconnected: () => setIsLiveConnected(false),
@@ -317,9 +376,15 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
         });
         
         if (newEntries.length > 0) {
-            const updatedNotes = [...(formData.structuredNotes || []), ...newEntries];
-            setFormData(prev => ({...prev, structuredNotes: updatedNotes}));
-            onUpdate(log.id, { structuredNotes: updatedNotes });
+            // Merge against the LATEST structuredNotes (via formDataRef), not
+            // the closure captured at click time — analysis takes seconds and
+            // the Log Entries tab stays interactive, so manual adds/removes
+            // made while this was in flight must not be clobbered. The store
+            // write happens out here, never inside the setState updater
+            // (updaters run during render and StrictMode double-invokes them).
+            const next = [...(formDataRef.current.structuredNotes || []), ...newEntries];
+            setFormData(prev => ({ ...prev, structuredNotes: next }));
+            onUpdate(log.id, { structuredNotes: next });
             setActiveTab('structured');
         }
     } catch (e) {
@@ -357,9 +422,22 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
                       <input
                         type="date"
                         name="sessionDate"
-                        value={new Date(formData.sessionDate).toISOString().split('T')[0]}
+                        value={toDateInputValue(formData.sessionDate)}
                         onChange={(e) => {
                             const val = e.target.value;
+                            // <input type="date"> can be cleared by the user, which fires
+                            // onChange with ''. Ignore invalid/empty values instead of
+                            // persisting a sessionDate that later throws on render — but
+                            // still force a state update (a no-op spread) so React
+                            // re-renders and pushes the retained sessionDate back into
+                            // this controlled input. Without it, the DOM value stays at
+                            // '' (the browser already cleared it) even though formData
+                            // and the store still hold the real date, until some
+                            // unrelated re-render happens to resync it.
+                            if (!val || Number.isNaN(new Date(val).getTime())) {
+                                setFormData(prev => ({ ...prev }));
+                                return;
+                            }
                             setFormData(prev => ({...prev, sessionDate: val}));
                             onUpdate(log.id, { sessionDate: val });
                         }}
@@ -449,7 +527,12 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
                         </div>
                     </div>
 
-                    <Button onClick={handleStartSession} className="bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/20">
+                    <Button
+                        onClick={handleStartSession}
+                        disabled={anotherSessionIsLive}
+                        title={anotherSessionIsLive ? 'A session is already live' : undefined}
+                        className="bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/20"
+                    >
                         <Icons.Play className="w-4 h-4 mr-2" /> Start Session
                     </Button>
                     {onGoLive && (
@@ -620,12 +703,21 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
                       <div className="relative h-full flex flex-col">
                         <textarea
                             name="runningNotes"
-                            value={formData.runningNotes + (liveTranscript ? `\n\n[Live Transcription]: ${liveTranscript}` : "")}
+                            value={formData.runningNotes}
                             onChange={handleChange}
                             onBlur={handleBlur}
-                            className="w-full h-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-amber-500 outline-none resize-none placeholder:text-slate-600 font-mono leading-relaxed pb-12"
+                            className="w-full flex-1 min-h-0 bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-amber-500 outline-none resize-none placeholder:text-slate-600 font-mono leading-relaxed pb-12"
                             placeholder="Freeform text area for quick, unstructured notes..."
                         />
+                        {liveTranscript && (
+                            <div
+                                ref={transcriptPreviewRef}
+                                className="mt-2 flex-shrink-0 text-xs text-slate-500 bg-slate-950/60 border border-slate-800 rounded-md px-3 py-2 max-h-24 overflow-y-auto custom-scrollbar"
+                            >
+                                <span className="text-slate-400 font-semibold">[Live Transcription]: </span>
+                                {liveTranscript}
+                            </div>
+                        )}
                         {isLiveConnected && (
                             <div className="absolute bottom-16 right-2 text-[10px] text-slate-500 bg-slate-900/80 px-2 py-1 rounded border border-slate-700">
                                 Transcribing...

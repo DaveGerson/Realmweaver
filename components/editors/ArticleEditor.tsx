@@ -13,6 +13,7 @@ import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
 import { BacklinksPanel } from '../common/BacklinksPanel';
+import { useDebouncedFieldCommit } from '../../hooks/useDebouncedFieldCommit';
 
 interface ArticleEditorProps {
   article: Article;
@@ -31,13 +32,13 @@ interface ArticleEditorProps {
 
 const categoryOptions: ArticleCategory[] = ['lore', 'history', 'cosmology'];
 
-export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticles, campaign, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
+export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticles, allNpcs: propAllNpcs, allLocations: propAllLocations, allFactions: propAllFactions, campaign, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(article);
   const { confirm } = useConfirmDialog();
 
-  const allNpcs = campaign?.npcs ?? [];
-  const allLocations = campaign?.locations ?? [];
-  const allFactions = campaign?.factions ?? [];
+  const allNpcs = propAllNpcs ?? campaign?.npcs ?? [];
+  const allLocations = propAllLocations ?? campaign?.locations ?? [];
+  const allFactions = propAllFactions ?? campaign?.factions ?? [];
 
   // Tracks the last `article` prop we've reconciled against, so incoming prop
   // updates can be merged field-by-field instead of overwriting formData wholesale.
@@ -86,10 +87,15 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
     }
   }
 
-  // Used by MentionInput fields (onChange receives string, not event)
+  // Store writes are debounced per field and keyed to the entity id by
+  // useDebouncedFieldCommit, which flushes pending edits when the edited
+  // entity changes under this same mounted editor or on unmount, so text
+  // typed inside the debounce window is committed to the entity it was
+  // typed against (finding #70).
+  const { commit: commitMentionField } = useDebouncedFieldCommit<Article>(article.id, onUpdate);
   const handleMentionFieldChange = (field: keyof Article) => (value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    onUpdate(article.id, { [field]: value });
+    commitMentionField(field, value);
   };
 
   // --- @-mention tracking across all MentionInput fields ---
@@ -99,18 +105,49 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
     () => resolveMentionCandidates(campaign, article.mentionedEntityIds),
     [campaign, article.mentionedEntityIds],
   );
-  const [mentionedIdsByField, setMentionedIdsByField] = useState<Record<string, string[]>>(() => ({
+  // Per-field mention ID sets. Kept in a ref, not state — nothing renders off
+  // of this value directly, it exists purely so handleMentionedIdsChange can
+  // compute the merged set without writing to the store from inside a
+  // setState updater (React invokes functional updaters during the render
+  // phase, and StrictMode intentionally double-invokes them — doing the
+  // store write there fired it twice).
+  const mentionedIdsByFieldRef = useRef<Record<string, string[]>>({
     content: findMentionedIdsInText(article.content, mentionCandidates),
-  }));
+  });
+  // Last merged id set actually written to the store. MentionInput reports
+  // its field's id set on every keystroke even when that set hasn't changed,
+  // so without this the store (and every useSyncExternalStore subscriber)
+  // would still churn once per character (finding #70).
+  const lastMergedIdsKeyRef = useRef<string>(
+    Array.from(new Set(Object.values(mentionedIdsByFieldRef.current).flat())).sort().join('\u0000'),
+  );
+  // Editors are not remounted when the GM navigates A -> B (ViewRouter renders
+  // this editor at a fixed position with no key), so the useRef initialisers
+  // above only ever ran for the FIRST entity. Rebuild both refs from the
+  // incoming entity on every id change, mirroring the mount-time seeding —
+  // otherwise B's first keystroke merges A's stale per-field sets into B's
+  // mentionedEntityIds (or A's stale merged key suppresses B's first
+  // legitimate write). Keyed on the id ONLY — resetting on every
+  // mentionCandidates recompute would discard in-session tracked mentions
+  // (same rationale as MentionInput's seedKey resync).
+  useEffect(() => {
+    mentionedIdsByFieldRef.current = {
+      content: findMentionedIdsInText(article.content, mentionCandidates),
+    };
+    lastMergedIdsKeyRef.current =
+      Array.from(new Set(Object.values(mentionedIdsByFieldRef.current).flat())).sort().join(String.fromCharCode(0));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [article.id]);
   // Reports the merged set of mentioned IDs (across every mention field) whenever any field changes.
   const handleMentionedIdsChange = (field: string) => (ids: string[]) => {
-    setMentionedIdsByField(prev => {
-      const next = { ...prev, [field]: ids };
-      const merged = Array.from(new Set(Object.values(next).flat()));
-      setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
-      onUpdate(article.id, { mentionedEntityIds: merged });
-      return next;
-    });
+    const next = { ...mentionedIdsByFieldRef.current, [field]: ids };
+    mentionedIdsByFieldRef.current = next;
+    const merged = Array.from(new Set(Object.values(next).flat()));
+    const mergedKey = merged.slice().sort().join('\u0000');
+    if (mergedKey === lastMergedIdsKeyRef.current) return;
+    lastMergedIdsKeyRef.current = mergedKey;
+    setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
+    onUpdate(article.id, { mentionedEntityIds: merged });
   };
 
   const handleFieldRegenerate = (field: 'content') => (newValue: string) => {
@@ -120,11 +157,17 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
 
   const articleEntityContext = `Article Title: ${formData.title}\nCategory: ${formData.category}\nContent summary: ${(formData.content || '').substring(0, 200)}...`;
 
+  // The ancestor walk tracks visited ids: imported or batch-generated data can carry a
+  // parent cycle (validation never checks referential cycles), and an unguarded walk
+  // would spin forever on the main thread during render.
   const possibleParents = allArticles.filter(a => {
     if (a.id === article.id) return false;
+    const visited = new Set<string>([a.id]);
     let current = a;
     while (current.parentArticleId) {
       if (current.parentArticleId === article.id) return false;
+      if (visited.has(current.parentArticleId)) break;
+      visited.add(current.parentArticleId);
       const parent = allArticles.find(p => p.id === current.parentArticleId);
       if (!parent) break;
       current = parent;

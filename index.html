@@ -3,38 +3,53 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>D&D Campaign Weaver</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,300;1,400;1,700;1,900&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reactflow@11.10.1/dist/style.css" />
+    <title>RealmWeaver</title>
+    <!--
+      SECURITY: script-src is restricted to 'self' — no remote host may execute
+      script in a page that holds campaign data and the user's gcpApiKey in
+      localStorage. 'unsafe-inline'/'unsafe-eval' stay in place because
+      @vitejs/plugin-react injects an inline react-refresh preamble in dev; they
+      do not weaken the "no remote script origin" guarantee. connect-src allows
+      ws:/wss: for the Vite HMR socket during development.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' ws: wss:;"
+    />
+    <link rel="stylesheet" href="/index.css" />
     <style>
+      /*
+       * Font stacks: the Google Fonts <link> that used to load Roboto/
+       * Merriweather was removed as part of the CDN-Tailwind security fix
+       * (finding #29) and the fonts were not self-hosted, so naming them
+       * here would just fall through to the next stack entry on every load.
+       * These are plain system-font stacks — no remote font request is made.
+       */
       body {
-        font-family: 'Roboto', sans-serif;
+        font-family: -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
       }
       h1, h2, h3, h4, .font-serif {
-        font-family: 'Merriweather', serif;
+        font-family: Georgia, 'Times New Roman', serif;
       }
 
       /* -------------------------------------------------------
-         Global scrollbar — stone-900 track, stone-600 thumb
+         Global scrollbar — slate-900 track, slate-600 thumb
       ------------------------------------------------------- */
       ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
       }
       ::-webkit-scrollbar-track {
-        background: #1c1917; /* stone-900 */
+        background: #0f172a; /* slate-900 */
       }
       ::-webkit-scrollbar-thumb {
-        background: #44403c; /* stone-600 */
+        background: #475569; /* slate-600 */
         border-radius: 4px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #57534e; /* stone-500 */
+        background: #64748b; /* slate-500 */
       }
 
       /* Legacy scoped scrollbar (kept for compatibility) */
@@ -43,14 +58,14 @@
         height: 8px;
       }
       .custom-scrollbar::-webkit-scrollbar-track {
-        background: #1c1917;
+        background: #0f172a;
       }
       .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: #44403c;
+        background: #475569;
         border-radius: 4px;
       }
       .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: #57534e;
+        background: #64748b;
       }
 
       /* -------------------------------------------------------
@@ -87,7 +102,7 @@
          Parchment-texture card background
       ------------------------------------------------------- */
       .card-parchment {
-        background: linear-gradient(135deg, #1c1917 0%, #292524 50%, #1c1917 100%);
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
         position: relative;
         overflow: hidden;
       }
@@ -101,7 +116,9 @@
 
       /* -------------------------------------------------------
          tailwindcss-animate polyfill — animate-in + modifiers
-         (Tailwind is loaded via CDN without the animate plugin)
+         (kept hand-rolled to avoid adding the tailwindcss-animate
+         plugin as a new dependency; see utils/demoTemplates.ts-adjacent
+         wp-i2 notes)
       ------------------------------------------------------- */
       @keyframes tw-fade-in   { from { opacity: 0; }             to { opacity: 1; }            }
       @keyframes tw-zoom-in   { from { transform: scale(0.95); } to { transform: scale(1); }   }
@@ -132,36 +149,8 @@
       .duration-200 { animation-duration: 200ms; }
       .duration-300 { animation-duration: 300ms; }
       .duration-500 { animation-duration: 500ms; }
-
-      /* React Flow Customizations */
-      .react-flow__node {
-        font-size: 12px;
-        font-weight: 500;
-        color: #e2e8f0;
-      }
-      .react-flow__attribution {
-        background: transparent !important;
-        color: #475569 !important;
-      }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.25.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0",
-    "tailwind-merge": "https://aistudiocdn.com/tailwind-merge@^3.3.1",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.546.0",
-    "immer": "https://aistudiocdn.com/immer@^10.1.3",
-    "reactflow": "https://esm.sh/reactflow@11.10.1?external=react,react-dom",
-    "dagre": "https://esm.sh/dagre@0.8.5",
-    "d3": "https://esm.sh/d3@7.8.5"
-  }
-}
-</script>
-</head>
+  </head>
   <body class="bg-slate-900">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>

@@ -18,6 +18,7 @@ import type { QuickCardEntityType } from '../common/EntityQuickCard';
 import { BacklinksPanel } from '../common/BacklinksPanel';
 import { TabLayout } from '../common/TabLayout';
 import type { TabDefinition } from '../common/TabLayout';
+import { useDebouncedFieldCommit } from '../../hooks/useDebouncedFieldCommit';
 
 interface LocationEditorProps {
   location: Location;
@@ -43,9 +44,16 @@ const LOCATION_TABS: TabDefinition[] = [
 export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLocations, allFactions = [], campaign, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(location);
   const [generatingPoiFor, setGeneratingPoiFor] = useState<string | null>(null);
+  const [poiGenerationError, setPoiGenerationError] = useState<string | null>(null);
   const [isGeneratingNpc, setIsGeneratingNpc] = useState(false);
+  const [npcGenerationError, setNpcGenerationError] = useState<string | null>(null);
+  const [npcGenerationSuccess, setNpcGenerationSuccess] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const { confirm } = useConfirmDialog();
+  // True when rendering LocationDashboard's unsaved chat-generator draft
+  // (synthetic id 'preview'), which must not fire "generate here" writes —
+  // the NPC would be committed against a location that doesn't exist yet.
+  const isDraftPreview = location.id === 'preview';
 
   // Tracks the last `location` prop we've reconciled against, so incoming prop
   // updates can be merged field-by-field instead of overwriting formData wholesale.
@@ -89,10 +97,15 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     onUpdate(location.id, { controllingFactionId: newFactionId });
   };
 
-  // Used by MentionInput fields (onChange receives string, not event)
+  // Store writes are debounced per field and keyed to the entity id by
+  // useDebouncedFieldCommit, which flushes pending edits when the edited
+  // entity changes under this same mounted editor or on unmount, so text
+  // typed inside the debounce window is committed to the entity it was
+  // typed against (finding #70).
+  const { commit: commitMentionField } = useDebouncedFieldCommit<Location>(location.id, onUpdate);
   const handleMentionFieldChange = (field: keyof Location) => (value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    onUpdate(location.id, { [field]: value });
+    commitMentionField(field, value);
   };
 
   // --- @-mention tracking across all MentionInput fields ---
@@ -102,19 +115,51 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     () => resolveMentionCandidates(campaign, location.mentionedEntityIds),
     [campaign, location.mentionedEntityIds],
   );
-  const [mentionedIdsByField, setMentionedIdsByField] = useState<Record<string, string[]>>(() => ({
+  // Per-field mention ID sets. Kept in a ref, not state — nothing renders off
+  // of this value directly, it exists purely so handleMentionedIdsChange can
+  // compute the merged set without writing to the store from inside a
+  // setState updater (React invokes functional updaters during the render
+  // phase, and StrictMode intentionally double-invokes them — doing the
+  // store write there fired it twice).
+  const mentionedIdsByFieldRef = useRef<Record<string, string[]>>({
     description: findMentionedIdsInText(location.description, mentionCandidates),
     secrets: findMentionedIdsInText(location.secrets, mentionCandidates),
-  }));
+  });
+  // Last merged id set actually written to the store. MentionInput reports
+  // its field's id set on every keystroke even when that set hasn't changed,
+  // so without this the store (and every useSyncExternalStore subscriber)
+  // would still churn once per character (finding #70).
+  const lastMergedIdsKeyRef = useRef<string>(
+    Array.from(new Set(Object.values(mentionedIdsByFieldRef.current).flat())).sort().join(String.fromCharCode(0)),
+  );
+  // Editors are not remounted when the GM navigates A -> B (ViewRouter renders
+  // this editor at a fixed position with no key), so the useRef initialisers
+  // above only ever ran for the FIRST entity. Rebuild both refs from the
+  // incoming entity on every id change, mirroring the mount-time seeding —
+  // otherwise B's first keystroke merges A's stale per-field sets into B's
+  // mentionedEntityIds (or A's stale merged key suppresses B's first
+  // legitimate write). Keyed on the id ONLY — resetting on every
+  // mentionCandidates recompute would discard in-session tracked mentions
+  // (same rationale as MentionInput's seedKey resync).
+  useEffect(() => {
+    mentionedIdsByFieldRef.current = {
+      description: findMentionedIdsInText(location.description, mentionCandidates),
+      secrets: findMentionedIdsInText(location.secrets, mentionCandidates),
+    };
+    lastMergedIdsKeyRef.current =
+      Array.from(new Set(Object.values(mentionedIdsByFieldRef.current).flat())).sort().join(String.fromCharCode(0));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.id]);
   // Reports the merged set of mentioned IDs (across every mention field) whenever any field changes.
   const handleMentionedIdsChange = (field: string) => (ids: string[]) => {
-    setMentionedIdsByField(prev => {
-      const next = { ...prev, [field]: ids };
-      const merged = Array.from(new Set(Object.values(next).flat()));
-      setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
-      onUpdate(location.id, { mentionedEntityIds: merged });
-      return next;
-    });
+    const next = { ...mentionedIdsByFieldRef.current, [field]: ids };
+    mentionedIdsByFieldRef.current = next;
+    const merged = Array.from(new Set(Object.values(next).flat()));
+    const mergedKey = merged.slice().sort().join(String.fromCharCode(0));
+    if (mergedKey === lastMergedIdsKeyRef.current) return;
+    lastMergedIdsKeyRef.current = mergedKey;
+    setFormData(fd => ({ ...fd, mentionedEntityIds: merged }));
+    onUpdate(location.id, { mentionedEntityIds: merged });
   };
 
   const handleFieldRegenerate = (field: 'description' | 'secrets') => (newValue: string) => {
@@ -241,6 +286,7 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
   const handleGeneratePoi = async (lootItem: LootItem) => {
     if (!lootItem.description) return;
     setGeneratingPoiFor(lootItem.id);
+    setPoiGenerationError(null);
     try {
         const poiData = await generatePoiFromLoot(lootItem.description, undefined, isMockMode);
         const newPoi: PointOfInterest = { ...poiData, id: crypto.randomUUID() };
@@ -256,6 +302,7 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
 
     } catch (err) {
         console.error("Failed to generate Point of Interest from loot", err);
+        setPoiGenerationError('Failed to generate Point of Interest. Please try again.');
     } finally {
         setGeneratingPoiFor(null);
     }
@@ -266,23 +313,35 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
 
   const handleGenerateNpcAtLocation = async (prompt: string) => {
     setIsGeneratingNpc(true);
+    setNpcGenerationError(null);
+    setNpcGenerationSuccess(null);
     const contextWithLocation = `${campaignContext || ''}\nCurrent Location: ${location.name}${location.description ? ` — ${location.description}` : ''}`.trim();
     try {
       const npcData = await generateNpc(prompt, isMockMode, contextWithLocation);
       campaignService.createNpc({ ...npcData, factionId: undefined, relationships: [], history: [] });
+      // The created NPC is not linked back into the Location model, so without
+      // this the button would be indistinguishable from a no-op on success.
+      setNpcGenerationSuccess(`Created ${npcData.name} — find them in the NPCs dashboard.`);
     } catch (error) {
       console.error('Failed to generate NPC at location:', error);
+      setNpcGenerationError('Failed to generate NPC. Please try again.');
     } finally {
       setIsGeneratingNpc(false);
     }
   };
 
-  // Filter out the current location and its own children from the list of possible parents
+  // Filter out the current location and its own children from the list of possible parents.
+  // The ancestor walk tracks visited ids: imported or batch-generated data can carry a
+  // parent cycle (validation never checks referential cycles), and an unguarded walk
+  // would spin forever on the main thread during render.
   const possibleParents = allLocations.filter(l => {
     if (l.id === location.id) return false;
+    const visited = new Set<string>([l.id]);
     let current = l;
     while(current.parentLocationId) {
         if(current.parentLocationId === location.id) return false;
+        if(visited.has(current.parentLocationId)) break;
+        visited.add(current.parentLocationId);
         const parent = allLocations.find(p => p.id === current.parentLocationId);
         if(!parent) break;
         current = parent;
@@ -290,7 +349,7 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     return true;
   });
 
-  const subLocations = allLocations.filter(l => location.subLocationIds.includes(l.id));
+  const subLocations = allLocations.filter(l => (location.subLocationIds || []).includes(l.id));
   const possibleConnectionTargets = allLocations.filter(l => l.id !== location.id);
   const inboundConnections = allLocations.filter(l => l.connections?.some(c => c.targetLocationId === location.id));
 
@@ -333,7 +392,15 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                     defaultPrompt={npcGenerationDefaultPrompt}
                     isGenerating={isGeneratingNpc}
                     onGenerate={handleGenerateNpcAtLocation}
+                    disabled={isDraftPreview}
+                    disabledReason={isDraftPreview ? 'Save this location before generating NPCs here.' : undefined}
                   />
+                  {npcGenerationError && (
+                    <p role="alert" className="text-xs text-red-400 mt-1.5">{npcGenerationError}</p>
+                  )}
+                  {npcGenerationSuccess && (
+                    <p role="status" className="text-xs text-green-400 mt-1.5">{npcGenerationSuccess}</p>
+                  )}
                 </div>
               </div>
 
@@ -394,6 +461,9 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                     <Icons.Plus className="w-3 h-3 mr-1.5" /> Add Loot
                   </Button>
                 </div>
+                {poiGenerationError && (
+                  <p role="alert" className="text-xs text-red-400 mb-1.5">{poiGenerationError}</p>
+                )}
                 <div className="space-y-2">
                   {(formData.loot || []).map(item => (
                     <div key={item.id} className="flex items-center gap-2 bg-slate-950/50 p-2 rounded-md border border-slate-800/50">

@@ -7,6 +7,7 @@ import { twMerge } from 'tailwind-merge';
 import { campaignService } from '../../services/campaignService';
 import { generateSessionRecap } from '../../services/aiService';
 import { DialogShell } from '../common/DialogShell';
+import { useToast } from '@/hooks/useToast';
 
 type WizardStep = 'recap' | 'plots' | 'loose-ends' | 'player-recap' | 'confirm';
 
@@ -34,6 +35,7 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
     onComplete,
     onCancel,
 }) => {
+    const { addToast } = useToast();
     const [currentStep, setCurrentStep] = useState<WizardStep>('recap');
     const [isGenerating, setIsGenerating] = useState(false);
     const [generateError, setGenerateError] = useState<string | null>(null);
@@ -52,7 +54,10 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
     const [manualLooseEnd, setManualLooseEnd] = useState('');
 
     // Player-facing recap state
-    const [playerRecap, setPlayerRecap] = useState('');
+    // Finding #25 regression fix: seed from the previously saved value, like
+    // its `recap`/`looseEnds` siblings, so re-opening the wizard on a log that
+    // already has a saved player recap doesn't blank it on the next save.
+    const [playerRecap, setPlayerRecap] = useState(sessionLog.playerRecap || '');
     const [showCopied, setShowCopied] = useState(false);
 
     // Get related plots
@@ -140,10 +145,19 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
 
     // Copy player recap
     const handleCopyPlayerRecap = useCallback(() => {
-        navigator.clipboard.writeText(playerRecap);
-        setShowCopied(true);
-        setTimeout(() => setShowCopied(false), 2000);
-    }, [playerRecap]);
+        if (!navigator.clipboard?.writeText) {
+            addToast('Copy failed — select the text and copy manually', 'error');
+            return;
+        }
+        navigator.clipboard.writeText(playerRecap)
+            .then(() => {
+                setShowCopied(true);
+                setTimeout(() => setShowCopied(false), 2000);
+            })
+            .catch(() => {
+                addToast('Copy failed — select the text and copy manually', 'error');
+            });
+    }, [playerRecap, addToast]);
 
     // Save and complete
     const handleSaveAndEnd = useCallback(() => {
@@ -153,13 +167,14 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
             recap,
             looseEnds,
             plotProgressions: plotStatuses,
+            playerRecap,
         });
 
         // End the session (archives encounter, marks completed, clears active state)
         campaignService.endSession();
 
         onComplete();
-    }, [recap, looseEnds, plotStatuses, sessionLog.id, onComplete]);
+    }, [recap, looseEnds, plotStatuses, playerRecap, sessionLog.id, onComplete]);
 
     // Navigation
     const currentIndex = STEP_ORDER.indexOf(currentStep);
@@ -386,14 +401,25 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
                                 <p className="text-xs text-slate-400">A spoiler-free version to share with your players. Edit or copy as needed.</p>
                             </div>
 
-                            {playerRecap ? (
-                                <div className="space-y-3">
-                                    <textarea
-                                        value={playerRecap}
-                                        onChange={(e) => setPlayerRecap(e.target.value)}
-                                        rows={8}
-                                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-sm text-white leading-relaxed focus:outline-none focus:border-amber-500 resize-y"
-                                    />
+                            {/* One textarea serves both the empty and filled states — only
+                                the helper text and Copy button around it vary. Splitting the
+                                states into different subtrees remounted the field on the
+                                first keystroke ('' → truthy), dropping focus mid-typing. */}
+                            <div className="space-y-3">
+                                {!playerRecap && (
+                                    <div className="text-center pt-2">
+                                        <p className="text-sm text-slate-500">Generate a recap first to get a player-facing version.</p>
+                                        <p className="text-xs text-slate-600 mt-1">Or write one manually below.</p>
+                                    </div>
+                                )}
+                                <textarea
+                                    value={playerRecap}
+                                    onChange={(e) => setPlayerRecap(e.target.value)}
+                                    rows={8}
+                                    placeholder="Write a player-facing recap..."
+                                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-sm text-white leading-relaxed focus:outline-none focus:border-amber-500 resize-y placeholder-slate-600"
+                                />
+                                {playerRecap && (
                                     <Button onClick={handleCopyPlayerRecap} variant="secondary">
                                         {showCopied ? (
                                             <><Icons.CheckCircle className="w-4 h-4 mr-2 text-green-400" />Copied!</>
@@ -401,20 +427,8 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
                                             <><Icons.Clipboard className="w-4 h-4 mr-2" />Copy to Clipboard</>
                                         )}
                                     </Button>
-                                </div>
-                            ) : (
-                                <div className="text-center py-8">
-                                    <p className="text-sm text-slate-500">Generate a recap first to get a player-facing version.</p>
-                                    <p className="text-xs text-slate-600 mt-1">Or write one manually below.</p>
-                                    <textarea
-                                        value={playerRecap}
-                                        onChange={(e) => setPlayerRecap(e.target.value)}
-                                        rows={6}
-                                        placeholder="Write a player-facing recap..."
-                                        className="w-full mt-4 bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-sm text-white leading-relaxed focus:outline-none focus:border-amber-500 resize-y placeholder-slate-600"
-                                    />
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
                     )}
 

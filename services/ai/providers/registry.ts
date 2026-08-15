@@ -13,6 +13,7 @@
 import type { AIProvider } from './types';
 import { ClaudeCliProvider } from './claude-cli';
 import { AnthropicApiProvider } from './anthropic-api';
+import { getActiveProvider as getConfiguredProviderType } from '../modelConfig';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -25,7 +26,16 @@ export type ProviderName = 'claude-cli' | 'anthropic-api' | 'gemini';
 // ---------------------------------------------------------------------------
 
 let activeProvider: AIProvider | null = null;
-let activeProviderName: ProviderName = 'claude-cli';
+// Lazily initialised from REALMWEAVER_AI_PROVIDER (via modelConfig.getActiveProvider())
+// on first read, rather than hard-coded, so the env var actually takes effect. `null`
+// means "not yet initialised from env"; `setProvider` can still override it explicitly.
+let activeProviderName: ProviderName | null = null;
+
+function resolveInitialProviderName(): ProviderName {
+  // modelConfig.getActiveProvider() already validates the env var and falls
+  // back to 'claude-cli' for anything unrecognised.
+  return getConfiguredProviderType();
+}
 
 /**
  * Factory map for lazy provider instantiation. Each entry returns a new
@@ -48,6 +58,9 @@ const providers: Record<ProviderName, () => AIProvider> = {
  * `setProvider` is called.
  */
 export function getActiveProvider(): AIProvider {
+  if (activeProviderName === null) {
+    activeProviderName = resolveInitialProviderName();
+  }
   if (!activeProvider) {
     activeProvider = providers[activeProviderName]();
   }
@@ -70,5 +83,8 @@ export function setProvider(name: ProviderName): void {
  * instantiated yet).
  */
 export function getProviderName(): ProviderName {
+  if (activeProviderName === null) {
+    activeProviderName = resolveInitialProviderName();
+  }
   return activeProviderName;
 }

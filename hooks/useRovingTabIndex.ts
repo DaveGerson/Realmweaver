@@ -79,22 +79,41 @@ export function useRovingTabIndex(
   const { direction = 'both', columns = 1 } = options;
   const itemsRef = useRef<(HTMLElement | null)[]>([]);
   const focusedIndexRef = useRef<number>(0);
+  // Finding #103: `setRef(index)` used to mint a brand-new closure on every
+  // render. Even though `setRef` itself was memoized, React treats a changed
+  // ref *callback identity* as "this ref changed" and detaches the old
+  // callback (calling it with null) before attaching the new one — for every
+  // item, on every commit, including unrelated re-renders (e.g. the two store
+  // notifications the autosave cycle emits per edit). The detach branch below
+  // trims trailing nulls from the registry; since ALL items get nulled during
+  // that detach pass, the registry was briefly emptied and focusedIndexRef
+  // got reset to 0. Caching one stable ref callback per index (created lazily,
+  // reused across renders) means React only calls it with null when an item
+  // actually unmounts (e.g. a search filter shrinking the list), not on every
+  // commit.
+  const refCallbacksRef = useRef<Map<number, (el: HTMLElement | null) => void>>(new Map());
 
-  const setRef = useCallback((index: number) => (el: HTMLElement | null) => {
-    itemsRef.current[index] = el;
-    if (el === null) {
-      // Item unmounted (e.g. a search filter shrank the list). Trim trailing
-      // empty slots and, if the tracked focus position fell off the end,
-      // clamp it and re-anchor tabIndex so the grid stays Tab-reachable
-      // (otherwise every remaining item would render with tabIndex -1).
-      const items = itemsRef.current;
-      while (items.length > 0 && items[items.length - 1] === null) items.pop();
-      if (focusedIndexRef.current >= items.length) {
-        focusedIndexRef.current = Math.max(0, items.length - 1);
-        const anchor = items[focusedIndexRef.current];
-        if (anchor) anchor.tabIndex = 0;
+  const setRef = useCallback((index: number) => {
+    const cached = refCallbacksRef.current.get(index);
+    if (cached) return cached;
+    const cb = (el: HTMLElement | null) => {
+      itemsRef.current[index] = el;
+      if (el === null) {
+        // Item unmounted (e.g. a search filter shrank the list). Trim trailing
+        // empty slots and, if the tracked focus position fell off the end,
+        // clamp it and re-anchor tabIndex so the grid stays Tab-reachable
+        // (otherwise every remaining item would render with tabIndex -1).
+        const items = itemsRef.current;
+        while (items.length > 0 && items[items.length - 1] === null) items.pop();
+        if (focusedIndexRef.current >= items.length) {
+          focusedIndexRef.current = Math.max(0, items.length - 1);
+          const anchor = items[focusedIndexRef.current];
+          if (anchor) anchor.tabIndex = 0;
+        }
       }
-    }
+    };
+    refCallbacksRef.current.set(index, cb);
+    return cb;
   }, []);
 
   const moveFocus = useCallback((newIndex: number) => {

@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
     ENTITY_TYPE_CONFIG,
-    buildCampaignContext,
     buildEntityContext,
     estimatePcHp,
     createDefaultNpc,
@@ -13,6 +12,8 @@ import {
     createDefaultScene,
     createDefaultSession,
     createDefaultPlot,
+    createDefaultPlayerCharacter,
+    normalizePlayerCharacter,
 } from '../utils/entityUtils';
 import type { Campaign } from '../types/Campaign';
 import type { PlayerCharacter } from '../types/PlayerCharacter';
@@ -126,120 +127,10 @@ describe('ENTITY_TYPE_CONFIG', () => {
 });
 
 // ---------------------------------------------------------------------------
-// buildCampaignContext
+// buildCampaignContext — REMOVED (finding #121): entityUtils no longer
+// exports a buildCampaignContext. The single implementation now lives in
+// services/contextBuilder.ts (see tests/ship/wp-j-types-utils.dead-context-builder.test.ts).
 // ---------------------------------------------------------------------------
-
-describe('buildCampaignContext', () => {
-    it('includes campaign title and setting', () => {
-        const campaign = makeMinimalCampaign();
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).toContain('Campaign: Test Campaign');
-        expect(ctx).toContain('Setting: A dark fantasy realm');
-    });
-
-    it('includes official setting when settingType is official', () => {
-        const campaign = makeMinimalCampaign({
-            settingType: 'official',
-            officialSetting: 'Forgotten Realms',
-        });
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).toContain('Official Setting: Forgotten Realms');
-    });
-
-    it('omits official setting line for custom campaigns', () => {
-        const campaign = makeMinimalCampaign({ settingType: 'custom' });
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).not.toContain('Official Setting');
-    });
-
-    it('lists NPC names when present', () => {
-        const campaign = makeMinimalCampaign({
-            npcs: [
-                { id: 'n1', name: 'Gandalf', description: '', traits: '', backstory: '', motivations: '', secrets: '', stats: '', exampleQuote: '', knowsPlayerHistory: [], relationships: [], history: [] },
-                { id: 'n2', name: 'Sauron', description: '', traits: '', backstory: '', motivations: '', secrets: '', stats: '', exampleQuote: '', knowsPlayerHistory: [], relationships: [], history: [] },
-            ],
-        });
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).toContain('Existing NPCs: Gandalf, Sauron');
-    });
-
-    it('lists location names when present', () => {
-        const campaign = makeMinimalCampaign({
-            locations: [
-                { id: 'l1', name: 'Rivendell', description: '', secrets: '', subLocationIds: [], history: [] },
-            ],
-        });
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).toContain('Existing Locations: Rivendell');
-    });
-
-    it('lists faction names when present', () => {
-        const campaign = makeMinimalCampaign({
-            factions: [
-                { id: 'f1', name: 'The Fellowship', description: '', goals: '', memberIds: [] },
-            ],
-        });
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).toContain('Existing Factions: The Fellowship');
-    });
-
-    it('lists item names when present', () => {
-        const campaign = makeMinimalCampaign({
-            items: [
-                { id: 'i1', name: 'Sting', description: '', rarity: 'rare', properties: '' },
-            ],
-        });
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).toContain('Existing Items: Sting');
-    });
-
-    it('lists adventure titles when present', () => {
-        const campaign = makeMinimalCampaign({
-            adventures: [
-                { id: 'a1', title: 'The Quest', level: 1, hook: '', theme: '', scenes: [] },
-            ],
-        });
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).toContain('Existing Adventures: The Quest');
-    });
-
-    it('lists article titles when present', () => {
-        const campaign = makeMinimalCampaign({
-            articles: [
-                { id: 'ar1', title: 'Creation Myth', category: 'lore', content: '', subArticleIds: [] },
-            ],
-        });
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).toContain('Lore Articles: Creation Myth');
-    });
-
-    it('lists only active plots', () => {
-        const campaign = makeMinimalCampaign({
-            plots: [
-                { id: 'p1', title: 'Save the World', description: '', status: 'active', relatedEntityIds: [] },
-                { id: 'p2', title: 'Old News', description: '', status: 'resolved', relatedEntityIds: [] },
-            ],
-        });
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).toContain('Active Plots: Save the World');
-        expect(ctx).not.toContain('Old News');
-    });
-
-    it('lists player character names', () => {
-        const pc = makePlayerCharacter();
-        const campaign = makeMinimalCampaign({ playerCharacters: [pc] });
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).toContain('Player Characters: Thorn');
-    });
-
-    it('omits empty categories', () => {
-        const campaign = makeMinimalCampaign();
-        const ctx = buildCampaignContext(campaign);
-        expect(ctx).not.toContain('Existing NPCs');
-        expect(ctx).not.toContain('Existing Locations');
-        expect(ctx).not.toContain('Active Plots');
-    });
-});
 
 // ---------------------------------------------------------------------------
 // buildEntityContext
@@ -539,6 +430,73 @@ describe('createDefaultPlot', () => {
         expect(plot.description).toBe('');
         expect(plot.status).toBe('active');
         expect(plot.relatedEntityIds).toEqual([]);
+    });
+});
+
+describe('normalizePlayerCharacter (finding #63)', () => {
+    it('backfills a PC missing characterStatistics entirely, preserving parsed fields', () => {
+        const malformed = {
+            id: 'pc-ghost',
+            playerName: 'Riley',
+            characterSocial: { characterName: 'Ghost' },
+        } as unknown as PlayerCharacter;
+
+        const normalized = normalizePlayerCharacter(malformed);
+
+        expect(normalized.id).toBe('pc-ghost');
+        expect(normalized.characterSocial.characterName).toBe('Ghost');
+        expect(normalized.characterSocial.species).toBe('');
+        expect(normalized.characterStatistics).toBeDefined();
+        expect(normalized.characterStatistics.classes).toEqual({ charClass: '', level: 1 });
+        expect(normalized.characterStatistics.attributes.strength).toBe(0);
+        expect(normalized.characterStatistics.skills.athletics).toBe('none');
+        expect(normalized.characterStatistics.actions).toEqual([]);
+        expect(normalized.characterStatistics.specialActions).toEqual([]);
+    });
+
+    it('preserves fully-populated parsed values verbatim, backfilling nothing', () => {
+        const full: PlayerCharacter = {
+            id: 'pc-1',
+            ...createDefaultPlayerCharacter(),
+            playerName: 'Dana',
+            characterSocial: {
+                characterName: 'Kaelen', background: 'Soldier', species: 'Human',
+                personality: 'Stoic', appearance: '', backstory: '', ideals: '', bonds: '', flaws: '',
+            },
+            characterStatistics: {
+                classes: { charClass: 'Fighter', subclass: 'Champion', level: 3 },
+                attributes: { strength: 16, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 11, charisma: 8 },
+                skills: { ...createDefaultPlayerCharacter().characterStatistics.skills, athletics: 'proficient' },
+                actions: ['Longsword'],
+                specialActions: ['Second Wind'],
+            },
+        };
+
+        const normalized = normalizePlayerCharacter(full);
+        expect(normalized).toEqual(full);
+    });
+
+    it('backfills only the missing nested sub-object, keeping siblings untouched', () => {
+        const partial = {
+            id: 'pc-2',
+            playerName: 'Sam',
+            characterSocial: {
+                characterName: 'Nameless Wanderer', background: '', species: '',
+                personality: '', appearance: '', backstory: '', ideals: '', bonds: '', flaws: '',
+            },
+            characterStatistics: {
+                classes: { charClass: 'Rogue', level: 5 },
+                attributes: { strength: 8, dexterity: 18, constitution: 12, intelligence: 14, wisdom: 10, charisma: 13 },
+                skills: {},
+                // actions/specialActions omitted
+            },
+        } as unknown as PlayerCharacter;
+
+        const normalized = normalizePlayerCharacter(partial);
+        expect(normalized.characterStatistics.classes).toEqual({ charClass: 'Rogue', level: 5 });
+        expect(normalized.characterStatistics.attributes.dexterity).toBe(18);
+        expect(normalized.characterStatistics.actions).toEqual([]);
+        expect(normalized.characterStatistics.specialActions).toEqual([]);
     });
 });
 

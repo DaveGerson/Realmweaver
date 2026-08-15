@@ -3,9 +3,9 @@
 > **Status:** Authoritative architecture reference. Supersedes the narrative parts of
 > `high-level-design.md` and `technical-design.md` as the entry point for understanding the
 > system; those documents remain for phase history and implementation planning notes.
-> **Verified against:** commit `a99c7ed` (tsc 0 errors, 516/516 Vitest tests passing,
-> production build succeeds).
-> **Last Updated:** 2026-07-17
+> **Verified against:** commit `f043509`, after the 124-finding ship-readiness remediation
+> (`docs/ship-readiness/remediation-plan.md`) — 990/990 Vitest tests across 143 files passing.
+> **Last Updated:** 2026-08-14
 
 ---
 
@@ -44,17 +44,20 @@ malicious web page cannot spend the user's Claude usage or exfiltrate campaign d
 | `@vitejs/plugin-react` | ^5.0.0 | React Fast Refresh / JSX transform for Vite |
 | `immer` | ^10.1.3 | Structural-sharing immutable updates inside `campaignService`'s `produce()` calls |
 | `tailwind-merge` | ^3.3.1 | Merges/overrides conflicting Tailwind class strings in shared components (`Button`, `MentionInput`, etc.) |
-| Tailwind CSS | via CDN (`index.html` `<script src="https://cdn.tailwindcss.com">`) | Utility-class styling — **not** the npm/PostCSS build, see §12 |
+| `tailwindcss` + `@tailwindcss/vite` | ^4.3.3 | Utility-class styling, compiled at **build time** from `index.css` — the CDN `<script>` JIT compiler was removed (see §12) |
 | `lucide-react` | ^0.546.0 | Icon source, re-exported exclusively through `components/common/Icons.tsx` |
 | `d3` | 7.8.5 | Force layout and rendering primitives for `RelationshipGraph` |
-| `reactflow` | 11.10.1 | (Declared dependency; graph rendering surface) |
-| `dagre` | 0.8.5 | Graph auto-layout, paired with `reactflow`/D3 for `RelationshipGraph` |
 | `@anthropic-ai/sdk` | ^0.39.0 | Anthropic Messages API client — wired into the still-stubbed `anthropic-api` provider |
-| `@google/genai` | ^1.25.0 | Legacy dependency from the pre-migration Gemini backend; no longer called from `services/ai/*` (see §7) |
-| `@types/react`, `@types/react-dom` | ^19.2.17 / ^19.2.3 | Type declarations for React 19 — added this session; their absence had let ~20 latent type errors (incl. a pre-existing `SessionPrepWizard` bug and a missing `'scene'` union member) go undetected by `tsc` |
-| Vitest | ^4.1.0 | Unit test runner (`tests/`), Node environment |
+| `@google/genai` | ^1.25.0 | Reached only by `services/ai/audioTranscription.ts`'s dynamic `import()`; no other `services/ai/*` module touches it, and `tests/migration-verification.test.ts` pins that as the single exception |
+| `@types/react`, `@types/react-dom` | ^19.2.17 / ^19.2.3 | Type declarations for React 19; their absence had let ~20 latent type errors (incl. a `SessionPrepWizard` bug and a missing `'scene'` union member) go undetected by `tsc` |
+| Vitest | ^4.1.0 | Unit/component test runner (`tests/`); `environment: 'node'` by default |
+| `@testing-library/react` + `@testing-library/dom` + `jsdom` | ^16.3.2 / ^10.4.1 / ^30.0.1 | Rendered-component tests, opted into per-file with `@vitest-environment jsdom` |
 | Playwright (`@playwright/test`, `@playwright/mcp`) | ^1.58.2 / ^0.0.68 | End-to-end browser test runner (`e2e/`) |
-| `typescript` | ~5.8.2 | Compiler; `npm run typecheck` runs `tsc --noEmit` as a standalone quality gate (added this session — see §11) |
+| `typescript` | ~5.8.2 | Compiler; `npm run typecheck` runs `tsc --noEmit` as a standalone gate — `npm run build` does not typecheck |
+
+`reactflow` and `dagre` were previously declared but never imported; both were removed, and
+`tests/ship/wp-i2-build-test-infra.package-deps.test.ts` fails if either is reintroduced without a
+real import.
 
 ---
 
@@ -73,7 +76,7 @@ flowchart LR
         Storage["storageService<br/>(localStorage / IndexedDB)"]
     end
 
-    subgraph ViteServer["Vite Dev Server (also the production runtime)"]
+    subgraph ViteServer["Vite dev OR preview server (also the production runtime)"]
         Proxy["vite-plugin-ai-proxy.ts<br/>POST /api/ai/generate<br/>GET /api/ai/health"]
     end
 
@@ -95,26 +98,68 @@ flowchart LR
     style API stroke-dasharray: 5 5
 ```
 
+**Both server modes carry the proxy.** `aiProxyPlugin()` registers the same routes through
+`configureServer` (`vite dev`) *and* `configurePreviewServer` (`vite preview`, serving the built
+`dist/`), so a previewed production build behaves identically instead of 404ing on every AI call.
+Neither hook helps a `dist/` served by something other than Vite — a plain static host has no Node
+process to run the plugin at all. `transformIndexHtml` (which injects the proxy token) runs only in serve
+mode — the plugin is `apply: 'serve'`, so `vite build` never bakes a stale token into `dist/`.
+
 **Security posture of the AI proxy** (`vite-plugin-ai-proxy.ts`):
 
-- **Localhost bind.** `vite.config.ts` binds the dev server to `127.0.0.1` by default
-  (`REALMWEAVER_DEV_HOST` env var can opt into a wider bind). This keeps `/api/ai/generate`
-  unreachable from other devices on the LAN.
-- **Origin validation.** Every POST to `/api/ai/generate` checks the `Origin` header (when
-  present) against `ALLOWED_ORIGIN_RE` (`localhost` / `127.0.0.1` / `[::1]`, any port) and
-  returns `403` otherwise. This blocks DNS-rebinding attacks and any other page the browser
-  happens to have open from silently spending the user's Claude usage.
+- **Localhost bind.** `vite.config.ts` binds the dev server to `127.0.0.1:4200` by default
+  (`REALMWEAVER_DEV_HOST` env var can opt into a wider bind) with `strictPort: true`, so a taken
+  port fails loudly rather than drifting to 4201 behind Playwright's hardcoded URL. This keeps
+  `/api/ai/generate` unreachable from other devices on the LAN by default.
+- **TCP peer address gate (mandatory).** Every request to `/api/ai/generate` and
+  `/api/ai/health` is first checked against `req.socket.remoteAddress` — it must be a loopback
+  address. Unlike every header below, this value is set by the kernel from the real TCP
+  connection and cannot be forged by a client that controls its own request headers (curl,
+  python, arbitrary scripts), which is what closes the LAN-bind exploit: forging `Origin` *and*
+  `Host` to read as `localhost` from a real LAN peer is rejected outright, because the peer
+  address itself isn't loopback.
+- **Origin + Host validation.** Both headers must resolve to a localhost interface
+  (`ALLOWED_ORIGIN_RE` / `ALLOWED_HOST_RE`) — a missing/empty Origin is rejected, not allowed
+  through. Origin cannot be forged by page JS in a browser (`fetch`/`XHR` don't let script
+  override it), so this is what blocks DNS-rebinding / any other page the browser happens to
+  have open; Host cross-checks that the connection didn't arrive over a LAN bind.
+- **Per-session proxy token (defense in depth, not yet enforced).** The plugin generates a
+  random token at process start and injects it into dev-served pages via `transformIndexHtml` (serve mode only — built `dist/` pages carry no token);
+  `X-Realmweaver-Token`, when present, is validated with a constant-time comparison and a
+  mismatch is always rejected. It is not yet *required* on every request — the browser client
+  doesn't send it yet (see the header comment in `vite-plugin-ai-proxy.ts` for the exact wiring
+  still needed) — so today it hardens the design without yet closing the "other local process on
+  the same machine" case (see §12).
 - **No shell.** CLI invocation uses `execFile`/`spawn` (never a shell string), so
   arbitrary prompt content cannot achieve command injection. Prompts over 100 KB switch
   from an argv-based invocation to writing to the child process's stdin, avoiding OS
   `ARG_MAX` limits without introducing a shell.
-- **Bounded resources.** Request bodies are capped at 4 MB; CLI invocation has a 120 s
-  timeout and a 1 MB stdout buffer cap (`MAX_BUFFER`) — output beyond that is **silently
-  truncated**, a known gap (see §12).
+- **Bounded resources.** Request bodies are capped at 4 MB — a request that exceeds it gets a
+  `413` (the request stream is paused, not immediately destroyed, so the response actually
+  reaches the client before the socket is torn down). CLI invocation has a 120 s timeout and a
+  1 MB stdout buffer cap (`MAX_BUFFER`); output beyond that now **kills the child and rejects
+  with `ENOBUFS`** (both the `execFile` and stdin-piped `spawn` paths) rather than silently
+  truncating — the previous "silently truncated" gap is fixed, not merely documented.
+  `outputFormat: 'json'` requests whose CLI output doesn't parse as the expected result envelope
+  get a `502` instead of the raw, possibly-mangled text.
 - **No client-side API key.** `ANTHROPIC_API_KEY` is intentionally *not* injected into the
   client bundle (`vite.config.ts`'s `define` block comments this explicitly) — the
   `claude-cli` provider doesn't need it, and the future `anthropic-api` provider would
-  consume it server-side only.
+  consume it server-side only. `GEMINI_API_KEY` is likewise excluded: `loadEnv(mode, '.', '')`
+  uses an empty prefix and so merges in every key already in `process.env`, meaning wiring one
+  into `define` would bake the secret into `dist/assets/*.js` as a literal.
+
+**Client-visible provider configuration.** The knobs that *are* declared in `define`
+(`REALMWEAVER_AI_PROVIDER`, `_DEFAULT_TIER`, `_MAX_RETRIES`, `_TIMEOUT_MS`, `_API_BASE_URL`) are
+substituted as literal `process.env.<KEY>` tokens. `services/ai/modelConfig.ts` reads them back
+through an `ENV` object of getters, each wrapping its read in `safeEnv()`. Getters, not a
+snapshot: Node-side callers (tests, middleware) mutate `process.env` at runtime and expect live
+reads. Two invariants hold this together — each getter must reference `process.env.<KEY>` as a
+literal member expression (a whole-object `typeof process !== 'undefined' ? process.env : {}` shim
+defeats Vite's substitution and silently disconnects every setting in the shipped app), and
+`safeEnv()` must swallow the `ReferenceError` a bare `process` read throws in the browser for the
+undeclared server-only keys so they fall back to documented defaults instead of crashing at module
+load.
 
 ---
 
@@ -167,9 +212,11 @@ flowchart TB
 
 **Layer rules enforced by convention** (see `CLAUDE.md`):
 
-- Components call **only** `aiService.ts` for AI — never `services/ai/*` modules directly.
-  `SessionLogEditor.tsx` importing `services/ai/audioTranscription.ts` directly is a known
-  violation of this rule (see §12).
+- Components call **only** `aiService.ts` for AI — never `services/ai/*` modules directly. The
+  last violation (`SessionLogEditor.tsx` importing `services/ai/audioTranscription.ts`) was
+  closed: the facade now exports `startAudioTranscription` plus the `AudioTranscriptionConfig` /
+  `AudioTranscriptionSession` types, and `mockService` provides a mock that emits canned
+  transcript chunks on a timer.
 - Components call `campaignService` methods for all state mutation; no direct mutation of
   `Campaign` objects. Immer inside the store is what makes this safe.
 - `types/index.ts` is the only import path components use for domain types (barrel export).
@@ -222,11 +269,11 @@ are included for completeness.
 | `CampaignSidebar.tsx` | Left navigation: view switcher, entity lists per section (via `sidebar/` sub-components), DM Style panel, drag-drop scene reordering |
 | `ContentWrapper.tsx` | Generic titled/icon'd content-area wrapper used by simpler views |
 | `Header.tsx` | Top bar: campaign title, mock-mode toggle, save status, tool/wizard launch buttons |
-| `ViewRouter.tsx` | Single large conditional that renders the active `EditorView`/selected entity/active generator — the extracted routing logic formerly inline in `App.tsx` |
+| `StatusBanners.tsx` | `ConflictBanner` (multi-tab write detected → `campaignService.resolveConflict('reload' \| 'overwrite')`, `role="alert"`) and `BackupRecoveryBanner` (`state.recoveredFromBackup` → `dismissBackupRecoveryNotice()`, `role="status"`). Rendered by `App.tsx` above the content area |
+| `ViewRouter.tsx` | Single large conditional that renders the active `EditorView`/selected entity/active generator — the extracted routing logic formerly inline in `App.tsx`. Statically imports every dashboard and editor; only `RelationshipGraph` is `React.lazy`-split here |
 | `sidebar/ArticleTreeItem.tsx` | Recursive tree-node renderer for the Lorebook's parent/child article hierarchy |
 | `sidebar/PinnedEntities.tsx` | Renders the campaign's pinned-entity shortcuts (`React.memo`) |
 | `sidebar/RecentItems.tsx` | Renders the last-10 recently-viewed entities (`React.memo`) |
-| `sidebar/SidebarEntityList.tsx` | Generic filtered entity list renderer shared across sidebar sections (`React.memo`) |
 | `sidebar/SidebarSearch.tsx` | Sidebar-local search input with clear button |
 | `sidebar/sidebarUtils.ts` | Shared filter/sort helpers for sidebar entity lists |
 
@@ -258,7 +305,7 @@ indicator (green/amber/red dot based on key-field population).
 | `FactionDashboard.tsx` | Factions |
 | `ItemDashboard.tsx` | Items |
 | `LocationDashboard.tsx` | Locations |
-| `NoteDashboard.tsx` | Notes — wired into `EditorView`/`ViewRouter`/`CampaignSidebar` this session; e2e coverage still `test.skip` with a stale "not routed" comment (see §11–12) |
+| `NoteDashboard.tsx` | Notes — fully wired into `EditorView`/`ViewRouter`/`CampaignSidebar`; e2e coverage is still `test.skip` behind a stale "not routed" comment (see §11–12) |
 | `NpcDashboard.tsx` | NPCs |
 | `PlayerCharacterDashboard.tsx` | Player Characters — completeness keys: name, species, class, background, player name |
 | `PlotDashboard.tsx` | Plots — lazy-loads a `PlotTimeline` panel; completeness keys: title, description, status progression |
@@ -301,7 +348,7 @@ AI-assist, and `EntityLink`/`onNavigate` cross-references.
 | `PlotEditor.tsx` | Plot (status, related entities, session progression) |
 | `PrepDocumentView.tsx` | Read-only printable/exportable session prep document assembled from an Adventure + Scenes |
 | `SceneEditor.tsx` | Scene (read-aloud text, GM notes, skill checks, NPC/location links) — hosts `SceneSmartLinkBar` |
-| `SessionLogEditor.tsx` | Session Log (prep notes, recap, beats) — the one component that imports `services/ai/audioTranscription.ts` directly, bypassing the `aiService` facade |
+| `SessionLogEditor.tsx` | Session Log (prep notes, recap, beats) — hosts the AI Scribe, calling `startAudioTranscription` through the `aiService` facade so mock mode works |
 
 ### 5.7 `components/dialogs/` — modals (all via `DialogShell`)
 
@@ -349,10 +396,10 @@ AI-assist, and `EntityLink`/`onNavigate` cross-references.
 | `realmChat.ts` | Conversational multi-entity chat (`chatWithRealmWeaver`) and NPC roleplay dialogue generation |
 | `worldSimulation.ts` | Generates world events given elapsed days for the World Simulation Wizard |
 | `styleMatching.ts` | Analyzes DM writing samples into a style-profile string used to steer future generations |
-| `audioTranscription.ts` | Browser speech-recognition-based session audio transcription — imported directly by `SessionLogEditor.tsx`, bypassing `aiService`, and has no mock implementation (see §12) |
+| `audioTranscription.ts` | Live session audio transcription (AI Scribe). Dynamically `import()`s `@google/genai` so it stays out of the initial bundle, keyed per-campaign from `campaign.gcpApiKey`. Reached through `aiService.startAudioTranscription`, with a `mockService` counterpart |
 | `mockService.ts` | Static/deterministic mock implementations of every `aiService` function, used when `isMockMode` is true and by unit tests |
 | `providers/types.ts` | `AIProvider` interface (`generateWithSchema`/`generateText`/`generateChatCompletion`) and option types both providers implement |
-| `providers/registry.ts` | Lazy-instantiated provider registry; default provider `claude-cli`; `setProvider()`/`getActiveProvider()` |
+| `providers/registry.ts` | Lazy-instantiated provider registry. The initial provider name is resolved from `modelConfig.getActiveProvider()` (i.e. `REALMWEAVER_AI_PROVIDER`) on first read rather than hard-coded, so the env var actually takes effect; `setProvider()` discards the cached instance |
 | `providers/claude-cli.ts` | Default provider: assembles system+user prompts, POSTs to `/api/ai/generate`, runs a JSON-recovery pipeline (strip markdown fences → find `{...}` boundaries → parse), flattens multi-turn history for the CLI's non-conversational `--print` mode |
 | `providers/anthropic-api.ts` | **Stub** — all three methods throw `"not yet implemented"`; TODO comments show the intended `@anthropic-ai/sdk` `tool_use` implementation shape |
 | `providers/retry.ts` | `withRetry()` — retries on timeout / JSON-parse / 5xx errors, fixed delay (not exponential backoff), used by the CLI provider |
@@ -373,6 +420,7 @@ AI-assist, and `EntityLink`/`onNavigate` cross-references.
 | `useModalState.ts` | Every top-level modal's open/close boolean plus `closeTopModal()` priority-ordered close (command palette > shortcuts help > continuity checker > coach > wizard > world-sim > export) |
 | `useConfirmDialog.ts` | Context provider exposing `confirm(title, message, options): Promise<boolean>`, backing `ConfirmDialog` |
 | `useToast.ts` | Context provider exposing `addToast(message, variant)`, capped at 3 concurrent toasts (oldest dropped first) |
+| `useDebouncedFieldCommit.ts` | Coalesces the per-keystroke `onUpdate(id, updates)` writes that `MentionInput`-backed editor fields produce (400 ms default). Editors are not remounted when the user switches between entities of the same type, so pending edits are flushed against the id they were typed under whenever `entityId` changes, and again on unmount. Used by the NPC/Location/Faction/Article/Plot editors |
 | `useEntitySearch.ts` | Case-insensitive multi-field substring search with `useDeferredValue` to keep keystrokes responsive on large entity lists |
 | `useRovingTabIndex.ts` | Roving-tabindex keyboard grid/list navigation; resolves a responsive column count per Tailwind breakpoint; re-anchors focus when the tracked item is unmounted (e.g. a search filter shrinks the list) |
 
@@ -380,11 +428,11 @@ AI-assist, and `EntityLink`/`onNavigate` cross-references.
 
 | File | Responsibility |
 |---|---|
-| `entityUtils.ts` | `ENTITY_TYPE_CONFIG` (icon/color/label per entity type — `Record<string, ...>`, not a closed union; no `secret` entry), `createDefaultX()` factories (missing for Secret/Note/PlayerCharacter), `buildCampaignContext()` (a flat legacy context builder now superseded by `contextBuilder.ts` but still exported), `buildEntityContext()` (implemented and unit-tested but not called from any editor — they duplicate the logic inline), `estimatePcHp()` |
+| `entityUtils.ts` | `ENTITY_TYPE_CONFIG` (icon/color/label per entity type — `Record<string, ...>`, not a closed union; has a `scene` entry (blue), still no `secret` entry), `createDefaultX()` factories (present for NPC/Location/Faction/Item/Article/Adventure/Scene/Session/Plot/PlayerCharacter; missing for Secret and Note), `buildCampaignContext()` (a flat legacy context builder now superseded by `contextBuilder.ts` but still exported), `buildEntityContext()` (implemented and unit-tested but not called from any editor — they duplicate the logic inline), `estimatePcHp()` |
 | `formReconciliation.ts` | `reconcileEntityFormData()` — merges a locally-edited form state with a freshly-arrived entity prop field-by-field, preserving in-progress edits while still picking up concurrent external changes (async AI generation, bidirectional relationship sync) that arrive mid-edit. Centralizes logic previously duplicated per-editor |
 | `backlinkUtils.ts` | `computeBacklinks()` — per-entity-type inbound-reference scanners (faction membership, scene appearances, NPC relationships, article/plot references, `@mention` backlinks), grouped and sorted |
 | `dmStyleUtils.ts` | `isFeatureVisible()` — resolves per-feature visibility from DM Style (guided/standard/power) defaults plus per-campaign manual overrides |
-| `demoTemplates.ts` | Starter campaign demo data structures — shadow interfaces have drifted from the real `types/` definitions (see §12) |
+| `demoTemplates.ts` | Just the Winter's Daughter world-description prose used to quick-fill `FirstCampaignWizard`. The inline entity payload (and its drifted shadow interfaces) was removed — it was not tree-shakeable and shipped in the entry chunk; a full demo campaign belongs under `data/templates/*.json` behind the existing dynamic import |
 | `diceUtils.ts` | Dice formula parsing (`XdY+Z` etc.) and rolling |
 | `keyboardShortcuts.ts` | Shortcut table (`Ctrl+K` search, `Ctrl+N` new entity, `Ctrl+S` save, `Escape` close, `?` help) and `matchShortcut()` dispatch, suppressing bare-key shortcuts while focus is in a text field |
 | `popoverPosition.ts` | Viewport-aware popover coordinate calculation (used by `EntityQuickCard`) |
@@ -408,10 +456,24 @@ without touching `localStorage`.
   (debounced auto-save). `_internalUpdate()` (private-ish, but exposed as `_updateState`
   for tests) mutates without scheduling a save — used for UI-only state like `appStatus`/
   `saveStatus` so that e.g. opening the campaign creator doesn't itself trigger a write.
-- **Debounced persistence.** `scheduleSave()` immediately flips `saveStatus` to `'saving'`,
-  then debounces the actual `persistToStorage()` call by 2000 ms (`AUTO_SAVE_DELAY_MS`),
-  coalescing rapid successive edits (e.g. keystrokes) into one write. `saveCampaign()`
-  (manual save / `Ctrl+S`) cancels the pending timer and forces an immediate write.
+- **Debounced persistence with a max wait.** `scheduleSave()` immediately flips `saveStatus` to
+  `'saving'`, then debounces the actual `persistToStorage()` call by 2000 ms
+  (`AUTO_SAVE_DELAY_MS`), coalescing rapid successive edits into one write. A second timer,
+  `AUTO_SAVE_MAX_WAIT_MS` (10 s), is armed only for the *first* pending change in a burst — so
+  continuous typing (which re-arms the debounce on every keystroke) still commits on a fixed
+  cadence rather than never. `saveCampaign()` (manual save / `Ctrl+S`) cancels both timers and
+  forces an immediate write.
+- **Teardown flush.** `init()` registers `pagehide`, `beforeunload` and
+  `visibilitychange → hidden` handlers that call `flushPendingSaveSync()`, so closing the tab
+  mid-burst does not discard the debounce window. The flush is a no-op unless a save is genuinely
+  pending — a real unload fires all three events in quick succession, and unguarded re-flushes
+  would rotate identical copies through the backup buffer and evict older, useful generations.
+  `campaignService.flushPendingSave()` exposes the same path (used by `ErrorBoundary` before a
+  reload); `campaignService.destroy()` removes these listeners and the conflict subscription.
+- **Honest save status.** `persistToStorage` awaits the `pending` promise a quota-fallback write
+  returns before stamping `lastSavedAt`, and a monotonically increasing `saveSequenceToken` means
+  only the newest in-flight write may update `saveStatus` — a slow write completing after a newer
+  one can no longer report stale information.
 - **`useSyncExternalStore` integration.** `App.tsx` subscribes via
   `useSyncExternalStore(campaignService.subscribe, campaignService.getState)` — the
   store's `listeners: Set<() => void>` plus `notify()` is the whole pub/sub mechanism.
@@ -430,11 +492,36 @@ without touching `localStorage`.
    not silently lost — this is why `init()` deliberately uses the async `load()` rather
    than a synchronous localStorage-only read.
 5. **Backup rotation**: before every write, up to 3 prior snapshots are rotated into
-   `CAMPAIGNS_BACKUP_1/2/3` (slot 1 = newest); `getBackups()`/`restoreFromBackup()` expose
-   manual recovery. This is a `localStorage`-only mechanism — it's a full
-   serialize-and-write on every save, a real (documented) perf cost (see §12).
+   `<primaryKey>__backup_1/2/3` (slot 1 = newest); `getBackups()`/`restoreFromBackup()` expose
+   manual recovery. Slots are namespaced **per primary key** — a single shared
+   `CAMPAIGNS_BACKUP_<n>` namespace previously let the tiny active-campaign-id write shift the
+   campaign JSON out of slot 1 on every save cycle. The id key now also passes
+   `{ skipBackup: true }`, and a rotation is skipped entirely when the incoming value is identical
+   to the stored one. This is a `localStorage`-only mechanism and still a full serialize-and-write
+   on every save, a real perf cost (see §12).
 6. **Cross-tab conflict detection**: `storageService.onConflict()` wires the `window`
-   `storage` event so that a write from another tab flips `conflictDetected` in state.
+   `storage` event so that a write from another tab flips `conflictDetected` in state (backup-slot
+   keys are filtered out, so a rotation in another tab doesn't raise a false conflict).
+
+**Conflict and recovery policy.** Detection alone was worse than nothing, so both flags now drive
+real behaviour:
+
+- While `conflictDetected` is set, `persistToStorage()` **refuses to write** — a stale tab can no
+  longer clobber the other tab's newer data, and nothing in memory is discarded either. An earlier
+  design reloaded the other tab's snapshot straight into `draft.campaigns`, silently throwing away
+  whatever this tab had typed but not yet saved. `ConflictBanner` surfaces the choice and
+  `resolveConflict('reload' | 'overwrite')` executes it: `'reload'` adopts the on-disk snapshot
+  (keeping the in-memory copy if that snapshot doesn't parse), `'overwrite'` force-saves this tab's
+  copy now. Either clears the flag and resumes autosave.
+- When `init()`'s `JSON.parse` of the primary payload throws, it walks the backup slots newest-first
+  and adopts the first that parses, setting `recoveredFromBackup` so `BackupRecoveryBanner` can tell
+  the GM they are continuing from a slightly older snapshot. The corrupt payload is deliberately
+  **not** removed — an earlier version called `remove()`, which also wipes the IndexedDB copy and
+  destroyed the entire campaign library irrecoverably. If no slot parses, the app falls back to the
+  welcome screen with the corrupt value still on disk for manual recovery.
+- The whole storage read in `init()` is wrapped in try/catch, so a browser that throws on
+  `localStorage` access (Firefox with cookies blocked, Safari private mode) resolves to a
+  renderable `appStatus` instead of stranding the app at `'loading'` forever.
 
 **Migration / backfill.** `init()` (async, fire-and-forget inside a `void (async () => ...)`
 block so the public `init()` signature stays synchronous for test stubs) parses saved JSON
@@ -453,8 +540,7 @@ which sweeps every known cross-entity reference array (NPC `relationships`/
 `relatedEntityIds`/`mentionedEntityIds`, SessionLog `relatedPlotIds`/`plotProgressions`)
 for the deleted ID and strips it. `deleteAdventure` additionally strips the adventure's
 (now-deleted) scene IDs out of every `SessionLog.plannedSceneIds` and clears
-`activeSceneId` if it pointed into the deleted adventure — a fix from this session's
-review.
+`activeSceneId` if it pointed into the deleted adventure.
 
 **Relationship syncing.** Three private bidirectional-sync helpers keep denormalized
 back-references consistent on every create/update/delete: `_synchronizeNpcFactionLink`
@@ -541,9 +627,9 @@ rather than a shared type (see §12).
 
 **Mock mode.** Every `aiService` function accepts `isMockMode: boolean`. `ai/mockService.ts`
 provides a full deterministic implementation of every function — this is what lets the
-entire app (including the dev-only `smokeTest.ts` that runs on every app load in `DEV`) be
-exercised with zero AI backend, and is the same code path the 516 Vitest unit tests assert
-against.
+entire app (including the dev-only, opt-in `smokeTest.ts` — runs only when
+`VITE_RUN_SMOKE_TESTS=true` is set alongside `DEV`) be exercised with zero AI backend, and
+is the same code path the 990 Vitest tests assert against.
 
 **Retry/timeout semantics.** `providers/retry.ts#withRetry()` retries once
 (`maxAttempts: 2`, fixed `delayMs: 1500` — no exponential backoff, reasoned as unnecessary
@@ -556,9 +642,13 @@ logic's timeout detection would never actually fire on a real CLI timeout. **No 
 exists anywhere in the AI layer — every call is a single request/response round trip, so a
 multi-entity batch generation blocks until the whole CLI invocation completes.
 
-**Context assembly** (`contextBuilder.ts#buildCampaignContext`). Token-budget-aware
+**Context assembly** (`contextBuilder.ts#buildCampaignContext`). Takes a single `ContextOptions`
+object — `{ variant, campaign, activeSceneId?, activeSessionId?, maxTokenEstimate?,
+focusEntityId?, focusEntityType?, focusSelection? }`, not positional arguments. Token-budget-aware
 (`maxTokenEstimate`, default 4000 tokens ≈ 16,000 chars, estimated as `chars/4`), built in
-three tiers that are added in priority order and stop once the budget is exhausted:
+three tiers that are added in priority order and stop once the budget is exhausted. List sections
+fill entry-by-entry rather than all-or-nothing, so a tight budget yields a partial roster instead
+of an empty one:
 
 - **Tier 1** (always, if budget allows): campaign title/setting, style profile, active
   session recap, active scene summary.
@@ -650,9 +740,11 @@ section on every editor.
   goes entirely un-Tab-reachable.
 - **Error boundaries.** `ErrorBoundary` (class component) wraps every lazy-loaded dialog
   and the `ViewRouter` output individually (keyed by `activeView`, so navigating away from
-  a crashed view clears the fallback instead of it sticking around) — a crash in one panel
-  does not take down the whole app or lose campaign data (which lives in `campaignService`,
-  outside the crashed subtree).
+  a crashed view clears the fallback instead of it sticking around), plus a `scope="root"`
+  boundary in `index.tsx` — a crash in one panel does not take down the whole app or lose
+  campaign data (which lives in `campaignService`, outside the crashed subtree). Its "reload"
+  recovery action calls `campaignService.flushPendingSave()` first, so a debounced write in
+  flight at crash time is committed synchronously before the page reloads.
 - **Accessibility state.** DM Style progressive disclosure (`dmStyleUtils.ts`) hides
   advanced surfaces (continuity checker, relationship graph, plot timeline, backlinks
   panel, secrets tracker, combat tracker, keyboard shortcuts, advanced context) by default
@@ -726,50 +818,51 @@ erDiagram
 
 ## 11. Testing & Quality
 
-| Layer | Framework | Count (verified this session) | Notes |
+| Layer | Framework | Count (verified against `f043509`) | Notes |
 |---|---|---|---|
-| Unit | Vitest (`tests/`, Node environment) | **516 tests / 34 files**, all passing | Covers `campaignService` (CRUD, cascade deletion, migration/backfill), `contextBuilder`, `continuityChecker`, `importExportService`, `storageService`, linking engine + `autoLinker`, `entityUtils`, `entityFieldSave`, `entityDetailExtractors`, `formReconciliation`, dice/keyboard/popover utils, AI service adapters + retry + Claude CLI provider, `MentionInput`, and five persona-driven "archetype" scenario tests (`archetype.new-dm`, `.lazy-dm`, `.forever-dm`, `.tactical-dm`, `.worldbuilder`) |
-| Component (render) | — | **None** | No `@testing-library/react` dependency; `tests/components/*.test.ts` test pure exported functions (`findUnlinkedEntities`, timeline sort, combatant-removal logic) extracted *from* components, not rendered component behavior |
-| E2E | Playwright (`e2e/`) | **118 tests across 13 spec files**, 6 `test.skip()` | Covers campaign CRUD/persistence, navigation, entity CRUD (core + extended), generators, dialogs, DM tools, session runner, visualizers, mobile responsiveness, RealmChat. Uses `waitForTimeout` hard waits in places (flake risk). The 2 skipped Notes tests in `entity-crud-extended.spec.ts` carry a **stale comment** ("NoteDashboard exists but is not routed") — Notes *is* now wired into `EditorView`/`ViewRouter`/`CampaignSidebar` as of this session's fixes; the tests were never re-enabled to match |
-| Smoke | `smokeTest.ts`, dev-only | ~20 checks | Runs on every app load when `import.meta.env.DEV`, guarded to never run against real API calls; exercises AI service function availability and basic entity CRUD against a real `createCampaignStore` instance |
-| Type check | `tsc --noEmit` via `npm run typecheck` | 0 errors | **Added this session** as a standalone script/quality gate. Adding `@types/react`/`@types/react-dom` in the same pass surfaced ~20 previously-invisible type errors, including a pre-existing `SessionPrepWizard` bug referencing `npc.race` (not a real `NPC` field) and a `DraftEntity` union missing `'scene'` |
-| Manual | Mock mode | — | The entire app is usable end-to-end with `isMockMode: true` and zero AI backend — this is also what CI-less local verification and the smoke test rely on |
+| Unit | Vitest (`tests/`, `environment: 'node'`) | **990 tests / 143 files**, all passing | Covers `campaignService` (CRUD, cascade deletion, migration/backfill, autosave durability, multi-tab, backup recovery), `storageService`, `contextBuilder`, `continuityChecker`, `importExportService`, linking engine + `autoLinker`, `entityUtils`, `entityFieldSave`, `entityDetailExtractors`, `formReconciliation`, dice/keyboard/popover utils, AI service adapters + retry + Claude CLI provider + audio transcription, `MentionInput`, five persona-driven "archetype" scenario tests, and one suite per ship-readiness finding under `tests/ship/` |
+| Component (render) | Vitest + `@testing-library/react` on jsdom | **~65 `.tsx` suites**, opted in per-file with `@vitest-environment jsdom` | Rendered behaviour for editors, dialogs, wizards, the command palette, `DialogShell`'s focus trap, `useDebouncedFieldCommit`, roving tabindex, and tool panels. `tests/components/*.test.ts` remain pure-function tests extracted *from* components |
+| E2E | Playwright (`e2e/`) | **114 tests across 14 spec files**, run against 2 projects (`chromium`, `mobile-chrome`); 2 permanently skipped, 4 runtime `test.skip()` guards | Covers campaign CRUD/persistence, navigation, entity CRUD (core + extended), generators, editors, dialogs, DM tools, session runner, visualizers, mobile responsiveness, RealmChat. `globalSetup` (`e2e/global-setup.ts`) verifies the reused/launched server really is Realmweaver before any spec runs; `baseURL` is `http://127.0.0.1:4200` because Vite binds to the IPv4 loopback and Node's resolver may prefer `::1`. Hard `waitForTimeout` waits are down to 2 occurrences. The 2 skipped Notes tests in `entity-crud-extended.spec.ts` still carry a **stale comment** ("NoteDashboard exists but is not routed") — Notes *is* wired into `EditorView`/`ViewRouter`/`CampaignSidebar` |
+| Smoke | `smokeTest.ts`, dev-only, opt-in | ~20 checks | Runs on app load only when `import.meta.env.DEV` AND `VITE_RUN_SMOKE_TESTS=true` are both set (off by default — see `.env.local.example`); with Mock Mode off it exercises real AI service calls, so it is not guarded against hitting the live provider; exercises AI service function availability and basic entity CRUD against a real `createCampaignStore` instance |
+| Type check | `tsc --noEmit` via `npm run typecheck` | 0 errors | Standalone gate. `npm run build` is `vite build` alone and does **not** typecheck, so this must run separately (CI does) |
+| CI | GitHub Actions (`.github/workflows/ci.yml`) | — | On push to `main` and every PR: `npm ci` → typecheck → unit tests → build → `playwright install chromium` → `test:e2e --project=chromium` |
+| Manual | Mock mode | — | The entire app is usable end-to-end with `isMockMode: true` and zero AI backend — this is what local verification and the smoke test rely on |
 
-**Known gaps:** no CI workflow exists (`.github/workflows` is absent) to run
-typecheck+test+build on push/PR — all of the above currently runs only on a developer's or
-agent's machine. Tailwind is loaded via CDN `<script>` in `index.html` rather than the
-PostCSS/CLI build, which is explicitly unsupported for production by Tailwind and carries
-a real (~100ms+) runtime JIT cost with no unused-class purging.
+**Known gaps:** the `mobile-chrome` Playwright project is excluded from CI. `Header.tsx` renders
+`relative z-[60]` while `DialogShell`'s overlay and the mobile sidebar render at `z-50`/`z-40`, so
+on narrow viewports the header can paint above modals and intercept the clicks `e2e/helpers.ts`
+makes; re-enable it once the stacking order is fixed to content < header < sidebar < modal.
 
 ---
 
 ## 12. Known Architectural Debt
 
-Carried forward from the pre-fix review (`review-results.json`) and the adversarial-review
-residuals; each item is unfixed as of this document and still real in the current code.
+Each item below was re-verified against the current code after the ship-readiness pass and is
+still real. Items that pass closed — Tailwind-via-CDN, the missing CI workflow, the absent
+component render tests, `audioTranscription` bypassing the facade, the missing `'scene'`
+`ENTITY_TYPE_CONFIG` entry, `createDefaultPlayerCharacter`, silent stdout truncation, and the
+`vite preview` 404 — have been removed rather than left as stale warnings.
 
 | Debt | Why it matters |
 |---|---|
-| No CI workflow | Typecheck/tests/build only run when someone remembers to run them locally; a regression can land on the default branch unnoticed |
-| Tailwind via CDN | Unsupported for production per Tailwind's own docs; no purge means shipping the entire utility set, and the CDN script adds real JIT compilation cost on every page load |
 | No list virtualization | Dashboard entity grids and `CommandPalette` render every result unbounded — a long-running "Forever DM" campaign with hundreds of NPCs will visibly degrade |
-| `campaignService` CRUD hand-duplicated ×12 | Each entity type's create/update/delete is written out by hand rather than through a generic factory — real but consistent duplication that makes the file ~1900 lines and means a cross-cutting fix (e.g. a new cascade rule) has to be applied 12 times by hand |
-| Two incompatible `ModelTier` types | `types/RealmChat.ts` and `services/ai/modelConfig.ts` each define their own `ModelTier`, bridged by hand-written mapping tables instead of one shared type — a drift risk every time a tier is added or renamed |
-| `audioTranscription.ts` bypasses `aiService` | `SessionLogEditor.tsx` imports it directly, violating the "components only import `aiService`" rule; it also has no mock implementation, so it cannot be exercised in mock mode or unit-tested the way every other AI function can |
-| No streaming; proxy silently truncates >1MB stdout | Every AI call is single-shot request/response with no progressive output, and a CLI response whose JSON envelope exceeds `MAX_BUFFER` (1 MB) is silently cut off rather than erroring, which could produce a truncated-but-parseable-looking partial JSON payload |
-| `_rotateBackups` cost on every autosave | Every 2-second debounced save does a full serialize plus 3 additional `localStorage` round-trips to rotate backup slots, on top of the primary write — real overhead that scales with campaign size and autosave frequency |
+| Per-view components not code-split | `ViewRouter.tsx` statically imports all 22 dashboards/editors, so the entry chunk stays over Rollup's 500 KB warning threshold; the vendor `manualChunks` split alone doesn't close it. Only `RelationshipGraph` and five `App.tsx` dialogs are `React.lazy` |
+| `campaignService` CRUD hand-duplicated ×12 | Each entity type's create/update/delete is written out by hand rather than through a generic factory — real but consistent duplication that makes the file ~2,700 lines and means a cross-cutting fix (e.g. a new cascade rule) has to be applied 12 times by hand |
+| Two incompatible `ModelTier` types | `types/RealmChat.ts` declares `'performance' \| 'medium' \| 'quality'` while `services/ai/modelConfig.ts` declares `'lite' \| 'standard' \| 'quality'`, bridged by hand-written mapping tables instead of one shared type — a drift risk every time a tier is added or renamed |
+| No streaming | Every AI call is single-shot request/response with no progressive output, so a multi-entity batch generation blocks until the whole CLI invocation completes |
+| Per-session proxy token generated but not yet required | `vite-plugin-ai-proxy.ts` injects `PROXY_TOKEN` via `transformIndexHtml` and validates `X-Realmweaver-Token` when present, but the browser client doesn't send it yet, so the mandatory gate against a same-machine-but-non-browser caller is the TCP-peer-loopback check only, not the token — see the header comment in `vite-plugin-ai-proxy.ts` for the exact client-side change that would complete this |
+| `_rotateBackups` cost on every autosave | Every debounced save does a full serialize plus additional `localStorage` round-trips to rotate backup slots, on top of the primary write — real overhead that scales with campaign size and autosave frequency. No-op and scalar-key saves are now skipped, which trims it but does not remove it |
 | `DialogShell` renders inline, no portal/`inert` | No React portal means dialog content participates in the surrounding DOM's stacking/layout context rather than a clean top-level layer, and the background app remains in the accessibility tree (no `aria-hidden`/`inert`) while a modal is open |
-| `ENTITY_TYPE_CONFIG` open `Record<string, ...>`, no `'secret'` entry | Not a closed union, so a typo'd entity-type key type-checks fine and silently falls through to no config anywhere it's looked up; `Secret` has no config entry at all, and `createDefaultSecret`/`createDefaultNote`/`createDefaultPlayerCharacter` factories don't exist alongside the other `createDefaultX()` functions in `entityUtils.ts` |
-| `demoTemplates.ts` shadow interfaces drifted | Its local type shapes for demo data have diverged from the real `types/` definitions, a latent source of runtime shape mismatches if demo data is ever loaded through a path that assumes real types |
-| `buildEntityContext()` unused | Implemented and unit-tested in `entityUtils.ts` but never called — every editor duplicates equivalent per-field context logic inline instead |
-| No component render tests | Editors/dialogs/hooks/visualizers have zero rendered-behavior test coverage; there is no `@testing-library/react` dependency in the project at all |
-| E2E hard waits; Notes e2e permanently skipped | `waitForTimeout` calls are flake-prone by nature; the 2 skipped Notes CRUD e2e tests carry a stale "not routed" comment even though Notes is now fully wired (fixed this session) — the tests were never updated to match |
-| Session running-notes rely solely on debounced autosave | A crash or tab close within the 2-second autosave window during a live session loses that window's notes — there is no more-aggressive save path for in-session data specifically |
+| `ENTITY_TYPE_CONFIG` open `Record<string, ...>`, no `'secret'` entry | Not a closed union, so a typo'd entity-type key type-checks fine and silently falls through to no config anywhere it's looked up. A `'scene'` entry (blue) was added; `Secret` still has none, and `createDefaultSecret`/`createDefaultNote` don't exist alongside the other `createDefaultX()` functions in `entityUtils.ts` |
+| Runtime-composed Tailwind classes need a manual safelist | Accent classes built from `ENTITY_TYPE_CONFIG[...].color` via template literals are invisible to the build-time scanner; `index.css`'s `@source inline(...)` directives keep them alive, so adding a color to the config without extending the safelist compiles to nothing |
+| `buildEntityContext()` unused | Implemented and unit-tested in `entityUtils.ts` but never called from a component — every editor duplicates equivalent per-field context logic inline instead |
+| Notes e2e permanently skipped | The 2 skipped Notes CRUD e2e tests carry a stale "not routed" comment even though Notes is fully wired into `EditorView`/`ViewRouter`/`CampaignSidebar` — the tests were never updated to match |
+| No in-session-specific save path | A hard crash inside the autosave window during a live session can still lose that window's notes. The 10 s max-wait and the `pagehide`/`beforeunload`/`visibilitychange` flush cover ordinary typing and tab-close, but there is no dedicated, more-aggressive write path for in-session data |
 | Combat encounter discarded on session end | Only a one-line summary is archived to `SessionLog.encounterLog`; the full combatant/HP/initiative state from `activeEncounter` is not preserved in reviewable detail |
-| `RelationshipGraph` has no keyboard/ARIA path | The D3 force-directed graph is mouse/touch-only; there is no way to reach or operate it via keyboard |
+| `RelationshipGraph` has no keyboard path | The SVG carries an `aria-label`, but the D3 force-directed graph itself is mouse/touch-only — no node is focusable and there is no keyboard way to operate it |
 | `FirstCampaignWizard` batch save not atomic | A mid-loop failure while saving the wizard's generated starter entities can leave a partially-populated campaign with no rollback |
 | Reconciliation: array fields stay "dirty" until remount | `formReconciliation.ts`'s field-level merge treats a changed-reference array field as user-edited even after a commit, so it won't pick up a concurrent external update to that specific field until the editor next remounts — considered benign since the array itself did just get the user's intended value |
-| Pre-existing `@ts-ignore`/`as any` | Two `@ts-ignore` in `EvocationWizard` plus scattered `as any` casts elsewhere predate this session's fixes and remain |
+| Pre-existing `@ts-ignore`/`as any` | Two `@ts-ignore` in `EvocationWizard` plus scattered `as any` casts elsewhere remain |
 
 ---
 

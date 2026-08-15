@@ -9,6 +9,12 @@ import { createDefaultSession } from '../../utils/entityUtils';
 const SessionPrepWizard = React.lazy(() => import('../dialogs/SessionPrepWizard').then(m => ({ default: m.SessionPrepWizard })));
 import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
 
+/** Parses a sessionDate defensively — a corrupted/empty stored value must not produce NaN and scramble sort order. */
+function safeSessionTime(sessionDate: string): number {
+  const t = new Date(sessionDate).getTime();
+  return Number.isNaN(t) ? 0 : t;
+}
+
 /** Returns a Tailwind color class for a completeness dot given a percentage 0-100. */
 function completenessColor(pct: number): string {
   if (pct >= 67) return 'bg-green-500';
@@ -59,9 +65,11 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
     return sessionLogs.filter(s => ids.has(s.id));
   }, [filteredNormalized, sessionLogs]);
 
-  const activeSession = filteredSessionLogs.find(s => s.status === 'active');
-  const plannedSessions = filteredSessionLogs.filter(s => s.status === 'planned').sort((a, b) => new Date(a.sessionDate).getTime() - new Date(b.sessionDate).getTime());
-  const pastSessions = filteredSessionLogs.filter(s => s.status === 'completed').sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime());
+  // The live-session guard must reflect reality regardless of the search term —
+  // only the rendered planned/past lists should use the filtered array.
+  const activeSession = sessionLogs.find(s => s.status === 'active');
+  const plannedSessions = filteredSessionLogs.filter(s => s.status === 'planned').sort((a, b) => safeSessionTime(a.sessionDate) - safeSessionTime(b.sessionDate));
+  const pastSessions = filteredSessionLogs.filter(s => s.status === 'completed').sort((a, b) => safeSessionTime(b.sessionDate) - safeSessionTime(a.sessionDate));
 
   const handleCreate = () => {
       const def = createDefaultSession();
@@ -97,8 +105,8 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
                 <Button
                     onClick={() => setIsPrepWizardOpen(true)}
                     className="bg-amber-600 hover:bg-amber-500 shadow-lg shadow-amber-500/20"
-                    disabled={!!filteredSessionLogs.find(s => s.status === 'active')}
-                    title={filteredSessionLogs.find(s => s.status === 'active') ? 'A session is already live' : 'Open the Session Prep Wizard'}
+                    disabled={!!activeSession}
+                    title={activeSession ? 'A session is already live' : 'Open the Session Prep Wizard'}
                 >
                     <Icons.Play className="w-4 h-4 mr-2" /> Prepare Session
                 </Button>

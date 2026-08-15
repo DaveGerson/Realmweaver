@@ -239,12 +239,19 @@ const adventureConfig: EntityGenerationConfig = {
 - **scenes:** Generate 2-3 interconnected scenes. Each scene must be fully fleshed out as per the scene generation guidelines: include high-quality read-aloud text, comprehensive GM notes (goals, setup, antagonists), clear skill checks, and defined rewards.`,
   postProcess: (data) => {
     if (data.scenes && Array.isArray(data.scenes)) {
-      data.scenes.forEach((scene: { skillChecks: Omit<SkillCheck, 'id'>[] }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      data.scenes.forEach((scene: any) => {
         if (scene.skillChecks && Array.isArray(scene.skillChecks)) {
           scene.skillChecks = addSkillCheckIds(scene.skillChecks);
         } else {
           scene.skillChecks = [];
         }
+        // FIX: sceneSchema never returns npcIds/status (finding #7) — the
+        // real-provider path only supplies title/type/readAloudText/gmNotes/
+        // skillChecks/rewards, so default both here before the data reaches
+        // campaignService.createFullAdventure.
+        scene.npcIds = scene.npcIds ?? [];
+        scene.status = scene.status ?? 'planned';
       });
     } else {
       data.scenes = [];

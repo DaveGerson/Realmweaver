@@ -239,7 +239,12 @@ describe('buildCampaignContext', () => {
     expect(ctx).toContain('Ironforge');
   });
 
-  it('respects maxTokenEstimate of 100 by only emitting Tier 1 basics', () => {
+  it('truncates the NPC roster entry-by-entry (rather than dropping it) under a tight maxTokenEstimate of 100', () => {
+    // Finding #15: `tryAdd` used to be all-or-nothing, so a list section that
+    // didn't fit whole was discarded entirely. The fix fills list sections
+    // one entry at a time until the budget runs out, so a tight budget now
+    // yields a truncated roster (first entries present, later ones cut) with
+    // an "…and N more" marker, instead of the section vanishing outright.
     const campaign = makeCampaign({
       npcs: Array.from({ length: 20 }, (_, i) => ({
         id: `n${i}`, name: `NPC ${i}`, description: 'desc', traits: '', backstory: '', motivations: '', secrets: '', stats: '', exampleQuote: '', knowsPlayerHistory: [], relationships: [], history: [],
@@ -252,7 +257,10 @@ describe('buildCampaignContext', () => {
     expect(ctx.length).toBeLessThanOrEqual(500);
     // Must still have campaign title
     expect(ctx).toContain('Campaign: Test Campaign');
-    // Should NOT include NPC overview (too big)
-    expect(ctx).not.toContain('NPCs:');
+    // The roster is truncated, not dropped: earlier entries survive...
+    expect(ctx).toContain('NPCs:');
+    expect(ctx).toContain('NPC 0');
+    // ...but the tail doesn't fit within a 100-token budget.
+    expect(ctx).not.toContain('NPC 19');
   });
 });

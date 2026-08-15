@@ -267,6 +267,14 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
     const canGoNext = displayIndex < activeSteps.length - 1;
 
     // ── Go Live ───────────────────────────────────────────────────────────────
+    // CROSS-PACKAGE CONTRACT (verifier problem 3 / finding #26): plannedNpcIds
+    // and plannedLocationIds below are the curated result of step 3 (extra +
+    // auto-linked NPCs/locations minus anything the DM removed), persisted
+    // onto the SessionLog. SessionRunner.tsx is the consumer: it prefers
+    // these fields when present (arrays, possibly empty for a deliberate
+    // all-removed curation) and falls back to the scene-derived sets only
+    // when the fields are absent (`undefined`, for session logs created
+    // before the fields existed) so older logs are unaffected.
     const handleGoLive = useCallback(() => {
         const sessionData: Omit<SessionLog, 'id'> = {
             title: effectiveTitle,
@@ -275,6 +283,8 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
             adventureId: selectedAdventureId ?? undefined,
             plannedSceneIds: Array.from(selectedSceneIds),
             prepNotes: prepNotes.trim(),
+            plannedNpcIds: Array.from(activeNpcIds),
+            plannedLocationIds: Array.from(activeLocationIds),
             runningNotes: '',
             structuredNotes: [],
             relatedPlotIds: Array.from(selectedPlotIds),
@@ -287,7 +297,7 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
         const newId = campaignService.createSessionLog(sessionData);
         campaignService.goLive(newId);
         onComplete(newId);
-    }, [effectiveTitle, selectedAdventureId, selectedSceneIds, selectedPlotIds, prepNotes, onComplete]);
+    }, [effectiveTitle, selectedAdventureId, selectedSceneIds, selectedPlotIds, prepNotes, activeNpcIds, activeLocationIds, onComplete]);
 
     // ── Status badge colour ───────────────────────────────────────────────────
     const sceneStatusBadge = (status: Scene['status']) => {

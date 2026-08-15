@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react';
 import type { Adventure, Campaign } from '../../types/index';
 import { Button } from '../common/Button';
 import { Icons } from '../common/Icons';
+import { useToast } from '@/hooks/useToast';
 
 interface PrepDocumentViewProps {
   adventure: Adventure;
@@ -96,13 +97,25 @@ const generateMarkdown = (adventure: Adventure, campaign: Campaign): string => {
 
 export const PrepDocumentView: React.FC<PrepDocumentViewProps> = ({ adventure, campaign }) => {
   const [hasCopied, setHasCopied] = useState(false);
-  
+  const { addToast } = useToast();
+
   const markdownContent = useMemo(() => generateMarkdown(adventure, campaign), [adventure, campaign]);
-  
+
   const handleCopy = () => {
-    navigator.clipboard.writeText(markdownContent);
-    setHasCopied(true);
-    setTimeout(() => setHasCopied(false), 2000);
+    // In a non-secure context (e.g. plain http), `navigator.clipboard` is
+    // undefined entirely, so calling `.writeText` would throw synchronously
+    // before any .then/.catch runs — guard first (finding #107).
+    if (!navigator.clipboard?.writeText) {
+      addToast('Could not copy to clipboard', 'error');
+      return;
+    }
+    navigator.clipboard.writeText(markdownContent).then(() => {
+      setHasCopied(true);
+      setTimeout(() => setHasCopied(false), 2000);
+    }).catch(err => {
+      console.error('Failed to copy prep document to clipboard', err);
+      addToast('Could not copy to clipboard', 'error');
+    });
   };
 
   return (

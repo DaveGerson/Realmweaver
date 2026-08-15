@@ -5,8 +5,9 @@
 import React, { useState } from 'react';
 import { Icons } from './Icons';
 import { Button } from './Button';
+import { DialogShell } from './DialogShell';
 import type { DmStyle } from '../../types/index';
-import { isFeatureVisible, OVERRIDEABLE_FEATURES, FEATURE_LABELS } from '../../utils/dmStyleUtils';
+import { isFeatureVisible, OVERRIDEABLE_FEATURES, FEATURE_LABELS, GUIDED_HIDDEN } from '../../utils/dmStyleUtils';
 
 interface DmStylePanelProps {
   dmStyle: DmStyle;
@@ -34,11 +35,15 @@ export const DmStylePanel: React.FC<DmStylePanelProps> = ({
   const [showOverrides, setShowOverrides] = useState(false);
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="DM Style Settings">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-
-      <div className="relative w-full max-w-sm bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-10 animate-in fade-in slide-in-from-bottom-4 duration-200">
+    <DialogShell isOpen onClose={onClose} ariaLabel="DM Style Settings" className="relative w-full max-w-sm mx-4">
+      {/* Finding #73 residual: DialogShell centers the panel (items-center) at
+          every breakpoint, unlike the old hand-rolled wrapper's mobile bottom
+          sheet (`items-end sm:items-center`). `slide-in-from-bottom-4` was
+          written for that bottom-sheet placement and reads as a mismatched
+          entrance animation now that the panel is always centered, so it's
+          dropped in favor of a plain fade-in that suits the centered layout
+          at all viewport widths. */}
+      <div className="w-full bg-slate-900 border border-slate-700 rounded-xl shadow-2xl animate-in fade-in duration-200">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-800">
           <div className="flex items-center gap-2">
@@ -83,7 +88,10 @@ export const DmStylePanel: React.FC<DmStylePanelProps> = ({
 
           {/* Effective visibility summary */}
           <div className="text-xs text-slate-500 bg-slate-800/60 rounded-md p-2">
-            {dmStyle === 'guided' && 'Hides: continuity checker, world graph, secrets tracker, combat tracker, backlinks panel, and keyboard shortcuts.'}
+            {/* Derived from the real gate set so this copy can't drift from
+                what guided mode actually hides (it previously still listed
+                the removed 'backlinks-panel' entry). */}
+            {dmStyle === 'guided' && `Hides: ${[...GUIDED_HIDDEN].map(k => FEATURE_LABELS[k] ?? k).join(', ')}.`}
             {dmStyle === 'standard' && 'Shows all core tools. Advanced analysis tools are available.'}
             {dmStyle === 'power' && 'All features visible. Nothing is hidden by default.'}
           </div>
@@ -181,6 +189,6 @@ export const DmStylePanel: React.FC<DmStylePanelProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </DialogShell>
   );
 };

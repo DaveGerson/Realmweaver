@@ -110,9 +110,9 @@ export const DiceRoller: React.FC<DiceRollerProps> = ({ onLogRoll }) => {
     const handleLogRoll = useCallback((roll: RollResult) => {
         if (!onLogRoll) return;
         const diceRoll: DiceRoll = {
-            id: roll.id,
+            id: crypto.randomUUID(),
             formula: roll.formula,
-            results: roll.results,
+            results: roll.hasKeep ? roll.keptResults : roll.results,
             total: roll.total,
             timestamp: roll.timestamp,
             note: noteInput.trim() || undefined,
@@ -242,9 +242,10 @@ export const DiceRoller: React.FC<DiceRollerProps> = ({ onLogRoll }) => {
                         <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">History</h3>
                         <div className="space-y-1 max-h-32 overflow-y-auto">
                             {history.map(roll => (
-                                <div
+                                <button
+                                    type="button"
                                     key={roll.id}
-                                    className="flex items-center justify-between text-xs px-2 py-1 rounded hover:bg-slate-700/50 cursor-pointer"
+                                    className="w-full flex items-center justify-between text-xs px-2 py-1 rounded hover:bg-slate-700/50 cursor-pointer"
                                     onClick={() => handleLogRoll(roll)}
                                     title="Click to log to session"
                                 >
@@ -253,7 +254,7 @@ export const DiceRoller: React.FC<DiceRollerProps> = ({ onLogRoll }) => {
                                         <span className="text-slate-500 font-mono">[{roll.results.join(',')}]</span>
                                         <span className="text-white font-bold">= {roll.total}</span>
                                     </div>
-                                </div>
+                                </button>
                             ))}
                         </div>
                     </div>

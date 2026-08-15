@@ -87,6 +87,7 @@ export const LocationGenerator: React.FC<LocationGeneratorProps> = ({
       setPrompt('');
       setBiome('');
     } catch (err) {
+      console.error('[LocationGenerator] generation failed', err);
       if (isMountedRef.current) {
         setError('Failed to generate location. Please check your API key and try again.');
       }

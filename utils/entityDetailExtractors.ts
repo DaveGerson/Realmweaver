@@ -272,7 +272,7 @@ export function getArticleExpandedDetails(article: Article, campaign: ReturnType
   const details: ExpandedDetail[] = [];
   details.push({ label: 'Title', value: article.title, fieldKey: 'title', editable: true, multiline: false });
   details.push({ label: 'Category', value: article.category, editable: false });
-  details.push({ label: 'Content', value: (article.content ?? '').slice(0, 500), fieldKey: 'content', editable: true, multiline: true });
+  details.push({ label: 'Content', value: article.content ?? '', fieldKey: 'content', editable: true, multiline: true });
   if (article.parentArticleId && campaign) {
     const parent = campaign.articles.find(a => a.id === article.parentArticleId);
     if (parent) details.push({ label: 'Under', value: parent.title, editable: false });

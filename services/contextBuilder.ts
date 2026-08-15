@@ -106,6 +106,121 @@ export function buildCampaignContext(options: ContextOptions): string {
     return true;
   };
 
+  /**
+   * Add a list section (header + one entry per line) by filling entries one
+   * at a time until the remaining budget is exhausted, rather than dropping
+   * the whole section when the full list doesn't fit (finding #15). Once the
+   * budget runs out, appends an "…and N more" marker (if it fits) so callers
+   * know the list was truncated instead of silently missing entries.
+   *
+   * `cap`, when provided, additionally bounds THIS call to at most `cap`
+   * characters beyond the current `usedChars` — a fair per-section share of
+   * the remaining budget (see `nextTier3Quota` below), so a single roster
+   * filling greedily to the byte can no longer starve every Tier-3 section
+   * that follows it. Falls back to the full remaining budget when omitted.
+   *
+   * Note: this checks against the effective limit directly on every entry
+   * rather than `hasBudget()`, since `hasBudget()`'s ~100-char slack would
+   * either stop short of the true limit or (worse) let one entry overshoot it.
+   */
+  const tryAddList = (header: string, entries: string[], cap?: number): boolean => {
+    if (entries.length === 0) return false;
+
+    const limit = cap !== undefined ? Math.min(maxChars, usedChars + cap) : maxChars;
+
+    const lines: string[] = [header];
+    let runningLen = header.length;
+    let addedCount = 0;
+
+    for (const entry of entries) {
+      const newLen = runningLen + 1 + entry.length; // +1 for the joining newline
+      if (usedChars + newLen > limit) break;
+      lines.push(entry);
+      runningLen = newLen;
+      addedCount++;
+    }
+
+    if (addedCount === 0) {
+      // The section's quota was too small for even one full entry. Emit a
+      // header + "…and N more" marker (if it fits) rather than dropping the
+      // whole section silently — a truncated-to-zero roster still tells the
+      // model the entity type exists, which a fully-absent section does not.
+      const marker = `  …and ${entries.length} more`;
+      const zeroLen = header.length + 1 + marker.length;
+      if (usedChars + zeroLen <= limit) {
+        const text = `${header}\n${marker}`;
+        sections.push(text);
+        usedChars += text.length + 1;
+        return true;
+      }
+      return false;
+    }
+
+    const remaining = entries.length - addedCount;
+    if (remaining > 0) {
+      const marker = `  …and ${remaining} more`;
+      const newLen = runningLen + 1 + marker.length;
+      if (usedChars + newLen <= limit) {
+        lines.push(marker);
+        runningLen = newLen;
+      }
+    }
+
+    const text = lines.join('\n');
+    sections.push(text);
+    usedChars += text.length + 1; // +1 for the newline separator between sections
+    return true;
+  };
+
+  /**
+   * Add a single-line "Header: value, value, …" section, truncating to as
+   * many comma-joined values as fit within budget instead of dropping the
+   * whole joined string when it doesn't fit whole (finding #15's sibling
+   * defect on Lore Articles / Adventures / Notable Items / Player Characters
+   * / the coach variant's NPC & Location name lists — these were still
+   * whole-string `tryAdd` calls). Appends "…and N more" when truncated, and
+   * — like `tryAddList` — still emits a marker rather than nothing at all
+   * when the quota is too small for even one value.
+   *
+   * `cap` behaves identically to `tryAddList`'s per-section budget share.
+   */
+  const tryAddJoined = (header: string, values: string[], cap?: number): boolean => {
+    if (values.length === 0) return false;
+
+    const limit = cap !== undefined ? Math.min(maxChars, usedChars + cap) : maxChars;
+
+    let text = '';
+    let addedCount = 0;
+    for (const v of values) {
+      const candidate = addedCount === 0 ? `${header} ${v}` : `${text}, ${v}`;
+      if (usedChars + candidate.length > limit) break;
+      text = candidate;
+      addedCount++;
+    }
+
+    if (addedCount === 0) {
+      const marker = `${header} …and ${values.length} more`;
+      if (usedChars + marker.length <= limit) {
+        sections.push(marker);
+        usedChars += marker.length + 1;
+        return true;
+      }
+      return false;
+    }
+
+    const remaining = values.length - addedCount;
+    if (remaining > 0) {
+      const withMarker = `${text} …and ${remaining} more`;
+      if (usedChars + withMarker.length <= limit) {
+        text = withMarker;
+      }
+    }
+
+    sections.push(text);
+    usedChars += text.length + 1;
+    return true;
+  };
+
   /** Truncate a string to at most `limit` characters, appending '…' if cut. */
   const trunc = (s: string, limit: number): string => {
     if (!s) return '';
@@ -330,63 +445,92 @@ export function buildCampaignContext(options: ContextOptions): string {
   // when the DM needs fast in-session assistance.
   // =========================================================================
 
+  // Fair per-section budget share for Tier 3 (finding #15 follow-up): a
+  // single roster (e.g. 200 NPCs) filling `tryAddList`/`tryAddJoined`
+  // greedily to within a byte of `maxChars` used to starve every Tier-3
+  // section that came after it — NPCs would be full while Locations,
+  // Factions, Lore Articles, Adventures and Items vanished with no marker.
+  // `nextTier3Quota` hands out `remaining budget / sections not yet
+  // attempted` before each section, counting only sections that actually
+  // have data to show (so campaigns with, say, no Factions don't rob a
+  // slice from Items). A section that uses less than its quota leaves the
+  // surplus for the next one; a section that fills its quota still leaves
+  // every later roster a fair, non-zero shot at appearing (truncated, with
+  // an "…and N more" marker) rather than being silently dropped whole.
+  const hasNpcs = campaign.npcs.length > 0;
+  const hasLocations = campaign.locations.length > 0;
+  const hasFactions = campaign.factions.length > 0;
+  const hasArticles = campaign.articles.length > 0;
+  const hasAdventures = campaign.adventures.length > 0;
+  const hasItems = campaign.items.length > 0;
+  const hasPlayerCharacters = !!campaign.playerCharacters && campaign.playerCharacters.length > 0;
+
+  let tier3SectionsLeft = variant !== 'coach'
+    ? [hasNpcs, hasLocations, hasFactions, hasArticles, hasAdventures, hasItems, hasPlayerCharacters].filter(Boolean).length
+    : [hasNpcs, hasLocations].filter(Boolean).length;
+
+  const nextTier3Quota = (): number => {
+    const remainingBudget = Math.max(0, maxChars - usedChars);
+    const quota = tier3SectionsLeft > 0 ? Math.floor(remainingBudget / tier3SectionsLeft) : remainingBudget;
+    tier3SectionsLeft = Math.max(0, tier3SectionsLeft - 1);
+    return quota;
+  };
+
   if (variant !== 'coach') {
     // NPC overview
-    if (campaign.npcs.length > 0 && hasBudget()) {
+    if (hasNpcs && hasBudget()) {
       const npcOverview = campaign.npcs.map(n => {
         const oneLiner = n.description ? trunc(firstSentences(n.description, 1), 80) : '';
         return `  - ${n.name}${oneLiner ? ': ' + oneLiner : ''}`;
       });
-      tryAdd(['NPCs:', ...npcOverview].join('\n'));
+      tryAddList('NPCs:', npcOverview, nextTier3Quota());
     }
 
     // Location overview
-    if (campaign.locations.length > 0 && hasBudget()) {
+    if (hasLocations && hasBudget()) {
       const locOverview = campaign.locations.map(l => {
         const oneLiner = l.description ? trunc(firstSentences(l.description, 1), 80) : '';
         return `  - ${l.name}${oneLiner ? ': ' + oneLiner : ''}`;
       });
-      tryAdd(['Locations:', ...locOverview].join('\n'));
+      tryAddList('Locations:', locOverview, nextTier3Quota());
     }
 
     // Faction overview
-    if (campaign.factions.length > 0 && hasBudget()) {
+    if (hasFactions && hasBudget()) {
       const facOverview = campaign.factions.map(f => {
         const goal = f.goals ? trunc(f.goals, 80) : '';
         return `  - ${f.name}${goal ? ': ' + goal : ''}`;
       });
-      tryAdd(['Factions:', ...facOverview].join('\n'));
+      tryAddList('Factions:', facOverview, nextTier3Quota());
     }
 
     // Lore article titles
-    if (campaign.articles.length > 0 && hasBudget()) {
-      tryAdd(`Lore Articles: ${campaign.articles.map(a => a.title).join(', ')}`);
+    if (hasArticles && hasBudget()) {
+      tryAddJoined('Lore Articles:', campaign.articles.map(a => a.title), nextTier3Quota());
     }
 
     // Adventure titles
-    if (campaign.adventures.length > 0 && hasBudget()) {
-      tryAdd(`Adventures: ${campaign.adventures.map(a => a.title).join(', ')}`);
+    if (hasAdventures && hasBudget()) {
+      tryAddJoined('Adventures:', campaign.adventures.map(a => a.title), nextTier3Quota());
     }
 
     // Item names
-    if (campaign.items.length > 0 && hasBudget()) {
-      tryAdd(`Notable Items: ${campaign.items.map(i => i.name).join(', ')}`);
+    if (hasItems && hasBudget()) {
+      tryAddJoined('Notable Items:', campaign.items.map(i => i.name), nextTier3Quota());
     }
 
     // Player characters
-    if (campaign.playerCharacters && campaign.playerCharacters.length > 0 && hasBudget()) {
-      const pcNames = campaign.playerCharacters
-        .map(pc => pc.characterSocial?.characterName ?? '?')
-        .join(', ');
-      tryAdd(`Player Characters: ${pcNames}`);
+    if (hasPlayerCharacters && hasBudget()) {
+      const pcNames = campaign.playerCharacters!.map(pc => pc.characterSocial?.characterName ?? '?');
+      tryAddJoined('Player Characters:', pcNames, nextTier3Quota());
     }
   } else {
     // Coach variant: still include NPC names for quick reference but skip full overviews
-    if (campaign.npcs.length > 0 && hasBudget()) {
-      tryAdd(`Campaign NPCs: ${campaign.npcs.map(n => n.name).join(', ')}`);
+    if (hasNpcs && hasBudget()) {
+      tryAddJoined('Campaign NPCs:', campaign.npcs.map(n => n.name), nextTier3Quota());
     }
-    if (campaign.locations.length > 0 && hasBudget()) {
-      tryAdd(`Campaign Locations: ${campaign.locations.map(l => l.name).join(', ')}`);
+    if (hasLocations && hasBudget()) {
+      tryAddJoined('Campaign Locations:', campaign.locations.map(l => l.name), nextTier3Quota());
     }
   }
 

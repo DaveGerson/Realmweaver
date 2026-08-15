@@ -1,8 +1,9 @@
 
 # Technical Design Document: RealmWeaver
 
-> **Last Updated:** 2026-03-26
+> **Last Updated:** 2026-08-14
 > **Audience:** Developers contributing to the RealmWeaver codebase
+> **See also:** `system-architecture.md` for runtime topology, the AI-proxy threat model, and the full component catalog.
 
 ---
 
@@ -21,11 +22,13 @@ RealmWeaver is a single-page application (SPA) for tabletop RPG Game Masters to 
 | **Build** | Vite 6.2.0 | Dev server, HMR, production bundling |
 | **AI** | Claude Code CLI / `@anthropic-ai/sdk` 0.39.0 | Local Claude CLI (default) or Anthropic REST API |
 | **State** | Immer 10.1.3 | Immutable state updates with mutable syntax |
-| **Styling** | Tailwind CSS (CDN) | Utility-first CSS via `<script>` in index.html |
+| **Styling** | Tailwind CSS 4.3.3 (build-time) | Utility-first CSS via `@tailwindcss/vite` + `index.css` |
 | **Icons** | Lucide React 0.546.0 | SVG icon library, centralized through `Icons.tsx` |
-| **Graphs** | React Flow 11.10.1 + Dagre 0.8.5 + D3 7.8.5 | Entity relationship visualization |
+| **Graphs** | D3 7.8.5 | Entity relationship visualization |
 | **Utilities** | tailwind-merge 3.3.1 | Conditional className composition without conflicts |
-| **Testing** | Vitest 4.1.0 + Playwright 1.58.2 | Unit tests and E2E tests |
+| **Testing** | Vitest 4.1.0 + Playwright 1.58.2 | Unit/component tests and E2E tests |
+| **Test DOM** | `@testing-library/react` 16.3.2 + jsdom 30 | Render tests, opted into per-file with `@vitest-environment jsdom` |
+| **CI** | GitHub Actions (`.github/workflows/ci.yml`) | typecheck → unit → build → Chromium E2E |
 
 ### TypeScript Configuration
 
@@ -45,11 +48,13 @@ All code lives at the **project root** — there is no `src/` directory.
 
 ```
 Realmweaver/
-├── App.tsx                     # Root component (~564L after decomposition)
-├── index.tsx                   # React 19 createRoot entry; mounts ToastProvider, ConfirmDialogProvider
-├── index.html                  # Tailwind CDN, Google Fonts, favicon
-├── vite.config.ts              # Dev server (port 3000), path alias, env injection
-├── vite-plugin-ai-proxy.ts     # Vite middleware: POST /api/ai/generate -> claude CLI binary
+├── App.tsx                     # Root component (~751L after decomposition)
+├── index.tsx                   # React 19 createRoot entry; mounts ErrorBoundary, ToastProvider, ConfirmDialogProvider
+├── index.html                  # CSP meta, system font stacks, local animation/scrollbar CSS, favicon
+├── index.css                   # Tailwind build-time entry: `@import "tailwindcss"` + @source safelists
+├── vite.config.ts              # Dev server (127.0.0.1:4200, strictPort), Tailwind + AI-proxy plugins, path alias, env define, vendor chunking
+├── vite-plugin-ai-proxy.ts     # Vite dev + preview middleware: POST /api/ai/generate -> claude CLI binary
+├── .github/workflows/ci.yml    # typecheck -> unit -> build -> Chromium E2E
 │
 ├── hooks/                      # Custom React hooks (UX refactoring sprint extractions)
 │   ├── useEntitySelection.ts   # Selected entity IDs, nav stack, breadcrumbs, recent items
@@ -57,11 +62,12 @@ Realmweaver/
 │   ├── useConfirmDialog.ts     # Context-provider confirm dialog (replaces window.confirm)
 │   ├── useToast.ts             # Context-provider toast queue (replaces window.alert)
 │   ├── useEntitySearch.ts      # Multi-field case-insensitive filter for entity lists
+│   ├── useDebouncedFieldCommit.ts # Coalesced per-field store writes for MentionInput-backed fields
 │   └── useRovingTabIndex.ts    # Roving tabindex for keyboard grid/list navigation
 │
 ├── components/                 # UI layer (organized by role)
-│   ├── common/                 # Shared primitives (20+ components)
-│   ├── layout/                 # App shell: Header, CampaignSidebar, ViewRouter
+│   ├── common/                 # Shared primitives (25+ components)
+│   ├── layout/                 # App shell: Header, CampaignSidebar, ViewRouter, StatusBanners
 │   │   └── sidebar/            # 5 sidebar sub-components + sidebarUtils.ts
 │   ├── views/                  # Top-level screens: Welcome, Creator, SessionRunner, etc.
 │   │   └── session/            # 5 SessionRunner sub-components
@@ -69,16 +75,20 @@ Realmweaver/
 │   ├── generators/             # AI creation forms (8 generators + EntityChatGenerator)
 │   ├── editors/                # Detail editing views (12 editors + PrepDocumentView)
 │   ├── dialogs/                # Modal tools (7 dialogs, all use DialogShell)
+│   │                           #   ContinuityChecker, DmCoach, EvocationWizard, ExportModal,
+│   │                           #   SessionEndWizard, SessionPrepWizard, WorldSimulationWizard
 │   ├── tools/                  # Gameplay tools: CombatTracker, DiceRoller, SecretsTracker
 │   ├── visualizers/            # Data viz: RelationshipGraph (D3), PlotTimeline
 │   └── RealmChat/              # Floating chat widget (indigo accent only)
 │
 ├── services/                   # Business logic layer
 │   ├── campaignService.ts      # Central state store
+│   ├── storageService.ts       # Persistence ladder: localStorage -> IndexedDB, backups, conflict events
 │   ├── aiService.ts            # AI service facade (the ONLY AI import for components)
 │   ├── contextBuilder.ts       # Tiered token-budget-aware context assembly
 │   ├── continuityChecker.ts    # 8 rule-based consistency checks (pure function, no AI)
 │   ├── importExportService.ts  # JSON/Obsidian import-export
+│   ├── linking/                # matchingEngine.ts, engineRegistry.ts, autoLinker.ts
 │   └── ai/                     # AI implementation modules
 │       ├── core.ts             # Backward-compat adapter (3 function signatures preserved)
 │       ├── modelConfig.ts      # ModelTier type + tier-to-model mappings + provider config
@@ -88,6 +98,7 @@ Realmweaver/
 │       ├── evocationWizard.ts  # Batch generation & parsing
 │       ├── worldSimulation.ts  # World event simulation
 │       ├── styleMatching.ts    # DM writing style analysis
+│       ├── audioTranscription.ts # AI Scribe live transcription (reached via the facade)
 │       ├── mockService.ts      # Static mock data for offline dev
 │       └── providers/          # AI provider backends
 │           ├── types.ts        # AIProvider interface + option types
@@ -97,7 +108,7 @@ Realmweaver/
 │           └── retry.ts        # Transient failure retry logic
 │
 ├── types/                      # TypeScript type definitions (24 files, barrel via index.ts)
-└── utils/                      # Utility functions (9 files)
+└── utils/                      # Utility functions (10 files)
 ```
 
 ### 3.2 Layer Diagram
@@ -144,14 +155,16 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         campaigns: Campaign[],
         activeCampaignId: string | null,
         appStatus: 'loading' | 'welcome' | 'selecting' | 'creating' | 'editing',
-        saveStatus: 'idle' | 'saved' | 'saving' | 'error',
+        saveStatus: 'idle' | 'saved' | 'saving' | 'error' | 'quota-warning',
         lastSavedAt: string | null,
+        conflictDetected: boolean,      // another tab wrote fresher data
+        recoveredFromBackup: boolean,   // init() fell back to a backup slot
     };
 
     const updateState = (updater) => {
         state = produce(state, updater);  // Immer immutable update
         notify();                          // Notify React subscribers
-        scheduleSave();                    // Debounced localStorage write (2s)
+        scheduleSave();                    // Debounced write (2s, 10s max wait)
     };
 
     const _internalUpdate = (updater) => {
@@ -163,14 +176,23 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
     return { getState, subscribe, getActiveCampaign, /* CRUD methods */ };
 }
 
-export const campaignService = createCampaignStore(); // Singleton
+export const campaignService = createCampaignStore({ persist: true }); // Singleton
 ```
 
 **Design decisions:**
 - **Factory pattern** — `createCampaignStore({ persist: false })` enables isolated test instances
 - **Two update paths** — `updateState()` triggers persistence; `_internalUpdate()` doesn't
-- **Debounced save** — 2-second delay prevents excessive localStorage writes during rapid edits
+- **Debounced save** — `AUTO_SAVE_DELAY_MS = 2000` coalesces rapid edits; `AUTO_SAVE_MAX_WAIT_MS = 10000` is armed on the *first* pending change in a burst so continuous typing still commits
 - **`useSyncExternalStore`** — React 18+ API for subscribing to external state without Context
+
+**Lifecycle API added by the ship-readiness pass:**
+
+| Method | Purpose |
+|--------|---------|
+| `flushPendingSave()` | Synchronously commits any pending debounced write (no-op when nothing is pending). Used by `ErrorBoundary` before a reload and by the page-teardown handlers. |
+| `resolveConflict('reload' \| 'overwrite')` | Ends a cross-tab conflict: adopt the other tab's on-disk snapshot, or force-save this tab's in-memory copy. Clears `conflictDetected` either way. |
+| `dismissBackupRecoveryNotice()` | Clears `recoveredFromBackup` after the banner is acknowledged. |
+| `destroy()` | Removes the `storage`-conflict subscription and the `pagehide`/`beforeunload`/`visibilitychange` listeners `init()` registered. Tests that build multiple persisting stores in one jsdom environment must call it in `afterEach`. |
 
 ### 4.2 React Binding
 
@@ -186,16 +208,56 @@ UI-only state (selected entity IDs, active view, modal states, `isMockMode`) liv
 
 ### 4.3 Persistence
 
+`services/storageService.ts` owns every browser-storage interaction; `campaignService` never
+touches `localStorage` directly.
+
 - **Storage keys:** `realmweaver-campaigns` and `realmweaver-active-campaign-id`
 - **Format:** JSON serialization of the full campaigns array
-- **Timing:** Debounced 2-second auto-save after any `updateState()` call
-- **Loading:** On mount, the store reads from localStorage and sets `appStatus`
+- **Timing:** Debounced 2-second auto-save after any `updateState()` call, forced after 10s of
+  continuous activity, and flushed synchronously on `pagehide` / `beforeunload` /
+  `visibilitychange → hidden`
+- **Write ladder:** `localStorage.setItem()` first; on `QuotaExceededError` the value is written
+  to IndexedDB instead (`realmweaver-db` / `campaigns` store), the stale localStorage copy is
+  removed so `load()` cannot shadow the fresher one, and `saveStatus` becomes `'quota-warning'`
+  rather than `'error'`. The IndexedDB write is awaited before `lastSavedAt` is stamped.
+- **Backups:** before each write the previous value rotates through three slots named
+  `<primaryKey>__backup_1..3` (slot 1 = newest). `getBackups()` / `restoreFromBackup()` expose
+  manual recovery. Slots are namespaced per primary key, and the tiny active-campaign-id write
+  opts out entirely via `{ skipBackup: true }`, so it can never evict the campaign snapshot.
+- **Honest status reporting:** `persistToStorage` awaits the `pending` promise a quota-fallback
+  save returns before stamping `lastSavedAt`, and a monotonic save-sequence token ensures only
+  the newest in-flight write may update `saveStatus`.
+- **Loading:** `init()` uses the async, IndexedDB-aware `load()` so data that only reached
+  IndexedDB survives a restart. If the primary payload fails `JSON.parse`, `init()` walks the
+  backup slots newest-first and sets `recoveredFromBackup` on the first that parses — the corrupt
+  payload is deliberately **not** deleted. A throwing `localStorage` (Firefox with cookies
+  blocked, Safari private mode) is caught so `appStatus` always resolves to something renderable.
+- **Migration:** `migrateCampaignsData()` backfills array fields missing from older saves
+  (`plots`, `notes`, `secrets`, `playerCharacters`, `relationships`, `history`, `memberIds`,
+  `scenes[].npcIds`, `sessionLogs[].plannedSceneIds` / `encounterLog`, `activeEncounter`) so
+  downstream CRUD never meets an `undefined` array.
+- **Cross-tab conflicts:** `storageService.onConflict()` wires the `window` `storage` event. A
+  write from another tab sets `conflictDetected`; `persistToStorage` refuses to write while the
+  flag is set, so no tab silently clobbers another. `components/layout/StatusBanners.tsx` renders
+  the choice and calls `resolveConflict()`.
 
 ### 4.4 Relationship Management
 
-- **Bidirectional sync:** `linkNpcToFaction()` updates both the NPC's `factionId` and the Faction's member list
-- **Cascade deletion:** Deleting a faction removes `factionId` from all linked NPCs
-- **Cycle detection:** `setLocationParent()` validates no circular parent-child chains
+There are no dedicated `link*` / `set*Parent` methods. A relationship is edited by writing its
+field through the ordinary updater — `updateNpc(id, { factionId })`,
+`updateLocation(id, { parentLocationId })`, `updateArticle(id, { parentArticleId })`,
+`updateScene(adventureId, sceneId, { locationId, npcIds })` — and the store enforces the invariants
+internally:
+
+- **Bidirectional sync:** `_synchronizeNpcFactionLink()` runs inside `createNpc`/`updateNpc`/`deleteNpc`
+  and keeps the NPC's `factionId` and the Faction's `memberIds` in step. `_synchronizeLocationHierarchy()`
+  and `_synchronizeArticleHierarchy()` do the same for `parentLocationId` ↔ `subLocationIds` and
+  `parentArticleId` ↔ `subArticleIds`.
+- **Cascade deletion:** Deleting a faction removes `factionId` from all linked NPCs; every delete path
+  also calls `_purgeEntityReferences`.
+- **Cycle detection:** `updateLocation`/`updateArticle` check `_isLocationParentingAllowed()` /
+  `_isArticleParentingAllowed()` *before* applying the patch and abort the whole update (logging an
+  error, leaving state untouched) if the new parent would close a cycle.
 - **Scene linking:** Scenes reference NPCs and locations; deletion cascades to these references
 
 ### 4.5 deleteAdventure Cascade
@@ -270,16 +332,42 @@ type ModelTier = 'lite' | 'standard' | 'quality';
 - The `vite-plugin-ai-proxy.ts` middleware handles the request by spawning the `claude` binary
 - Security: uses `execFile` (no shell injection) for prompts under 100KB; temp file approach for larger prompts
 
-**Environment variables** for provider configuration:
+**Environment variables** for provider configuration, read by `modelConfig.getProviderConfig()`:
 
-| Variable | Purpose | Default |
-|----------|---------|---------|
-| `REALMWEAVER_AI_PROVIDER` | Active provider (`claude-cli` or `anthropic-api`) | `claude-cli` |
-| `CLAUDE_CLI_PATH` | Path to the `claude` binary | `claude` (on $PATH) |
-| `ANTHROPIC_API_KEY` | API key for `anthropic-api` provider | — |
-| `REALMWEAVER_DEFAULT_TIER` | Default model tier | `standard` |
-| `REALMWEAVER_MAX_RETRIES` | Max retry attempts on transient errors | `3` |
-| `REALMWEAVER_TIMEOUT_MS` | Request timeout | `120000` (2 minutes) |
+| Variable | Purpose | Default | Reaches the browser |
+|----------|---------|---------|---------------------|
+| `REALMWEAVER_AI_PROVIDER` | Active provider (`claude-cli` or `anthropic-api`) | `claude-cli` | Yes |
+| `REALMWEAVER_DEFAULT_TIER` | Default model tier | `standard` | Yes |
+| `REALMWEAVER_MAX_RETRIES` | Max retry attempts on transient errors (minimum 1) | `3` | Yes |
+| `REALMWEAVER_TIMEOUT_MS` | Request timeout | `120000` (2 minutes) | Yes |
+| `REALMWEAVER_API_BASE_URL` | Custom Anthropic base URL (`anthropic-api` only) | — | Yes |
+| `CLAUDE_CLI_PATH` | Path to the `claude` binary | `claude` (on $PATH) | No |
+| `ANTHROPIC_API_KEY` | API key for `anthropic-api` provider | — | No |
+
+**How the values travel.** `vite.config.ts` calls `loadEnv(mode, '.', '')` and lists each
+client-visible key in `define` as a literal `process.env.<KEY>` token. `modelConfig.ts` reads
+them through an `ENV` object of **getters**, each wrapping its read in `safeEnv()`:
+
+```typescript
+const ENV = {
+  get REALMWEAVER_MAX_RETRIES() { return safeEnv(() => process.env.REALMWEAVER_MAX_RETRIES); },
+  // ...
+};
+```
+
+Two constraints follow from this shape and must not be "simplified" away:
+
+1. Each callback must reference `process.env.<KEY>` as a **literal member expression** — a
+   whole-object shim (`typeof process !== 'undefined' ? process.env : {}`) defeats Vite's token
+   substitution and silently disconnects every `REALMWEAVER_*` setting in the shipped app.
+2. `safeEnv()` swallows the `ReferenceError: process is not defined` that a bare `process` read
+   throws in the browser for keys `define` does not declare (the server-only secrets), so those
+   resolve to their documented defaults instead of crashing at module load.
+
+Getters rather than a snapshot: Node-side callers (tests, the Vite middleware) legitimately mutate
+`process.env` at runtime and expect live reads. `providers/registry.ts` lazily resolves the initial
+provider name from `modelConfig.getActiveProvider()` on first use, so the env var actually takes
+effect; `setProvider()` discards the cached instance.
 
 ### 5.3 Core Adapter Functions (`ai/core.ts`)
 
@@ -306,6 +394,7 @@ The adapter forwards calls to the active provider after mapping legacy model nam
 | `evocationWizard.ts` | `generateCampaignFill`, `parseDocumentForEntities`, `generateChatResponse`, `parseCharacterSheetPdf`, `generateStarterNpcs`, `generateStarterLocations`, `generateStarterAdventure` | Batch entity arrays |
 | `worldSimulation.ts` | `generateWorldEvent` | `WorldEvent` |
 | `styleMatching.ts` | `analyzeWritingStyle` | 200-word style guide string |
+| `audioTranscription.ts` | `startAudioTranscription` | `AudioTranscriptionSession` (live AI Scribe) |
 
 ### 5.5 Service Facade (`aiService.ts`)
 
@@ -317,6 +406,11 @@ export const generateNpc = (prompt: string, isMockMode = false, campaignContext?
     return aiRealmWeaver.generateNpc(prompt, campaignContext);
 };
 ```
+
+Audio transcription follows the same rule: `SessionLogEditor` imports `startAudioTranscription`
+(and the `AudioTranscriptionConfig` / `AudioTranscriptionSession` types) from `aiService.ts`, which
+dispatches to `mockService.startAudioTranscription` in mock mode. Nothing outside `services/`
+imports `ai/audioTranscription` directly.
 
 ### 5.6 Mock Service (`ai/mockService.ts`)
 
@@ -330,12 +424,28 @@ Mirrors the facade API with hardcoded sample data, simulated async delays, and n
 - **Variant `'coach'`** — current session: active scene, combat, recent events first
 - **Variant `'chat'`** — balanced: entity names + current context
 
+It takes a single `ContextOptions` object (**not** positional arguments):
+
 ```typescript
 import { buildCampaignContext } from '@/services/contextBuilder';
-const campaignContext = buildCampaignContext(campaign, 'generation', 4000);
+
+const campaignContext = buildCampaignContext({
+    variant: 'generation',        // 'generation' | 'coach' | 'chat'
+    campaign,
+    maxTokenEstimate: 4000,       // default; ~4 chars per token
+    activeSceneId,                // optional
+    activeSessionId,              // optional
+    focusEntityId, focusEntityType, // optional — pulls full details for edit continuity
+    focusSelection,               // optional — "USER IS VIEWING..." block for the DM Coach
+});
 ```
 
-A simpler version in `utils/entityUtils.ts` builds a flat string with entity names only.
+Sections are added tier by tier and stop once the character budget
+(`maxTokenEstimate * 4`) is exhausted; list sections fill entry-by-entry rather than
+all-or-nothing, so a tight budget degrades to a partial roster instead of an empty one.
+
+A separate, simpler `buildCampaignContext()` in `utils/entityUtils.ts` builds a flat string with
+entity names only — same name, different module. Do not confuse the two.
 
 ---
 
@@ -396,8 +506,17 @@ export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items'
 | `useModalState` | Open/close state for all app-level modals; `closeTopModal()` priority logic | `ModalState` |
 | `useConfirmDialog` | Programmatic confirm dialog via context provider | `{ confirm }` |
 | `useToast` | Toast notification queue via context provider | `{ addToast }` |
-| `useEntitySearch` | Multi-field case-insensitive filter for entity arrays | `{ filteredEntities, searchTerm, setSearchTerm }` |
+| `useEntitySearch` | Multi-field case-insensitive filter for entity arrays (`useDeferredValue`-backed) | `{ filteredEntities, searchTerm, setSearchTerm }` |
 | `useRovingTabIndex` | Roving tabindex for keyboard grid/list navigation | `{ getRovingProps }` |
+| `useDebouncedFieldCommit` | Coalesces per-keystroke `onUpdate(id, updates)` writes from `MentionInput`-backed editor fields | `{ commit, flush }` |
+
+**`useDebouncedFieldCommit(entityId, onUpdate, delayMs = 400)`** exists because editors are *not*
+remounted when the user navigates between entities of the same type — the same mounted editor
+simply receives a new entity prop. A naive field-keyed debounce therefore either fires with the
+previous entity's id closed over, or is cancelled by the first keystroke into the new one. The
+hook flushes pending edits against the id they were typed under whenever `entityId` changes, and
+again on unmount. Used by `NpcEditor`, `LocationEditor`, `FactionEditor`, `ArticleEditor`, and
+`PlotEditor`.
 
 ### 6.5 Dialog System
 
@@ -501,10 +620,18 @@ export const ENTITY_TYPE_CONFIG: Record<string, { icon: string; color: string; l
   'player-character': { icon: 'PlayerCharacters', color: 'teal', label: 'Player Characters' },
   plot:             { icon: 'Plot',             color: 'yellow',  label: 'Plots' },
   note:             { icon: 'FileText',         color: 'slate',   label: 'Notes' },
+  scene:            { icon: 'Scenes',           color: 'blue',    label: 'Scenes' },
 };
 ```
 
 Derive color shades: `` `text-${config.color}-400` ``, `` `bg-${config.color}-900/60` ``.
+Because those strings are composed at runtime, Tailwind's build-time scanner cannot see them —
+`index.css` keeps them alive with `@source inline(...)` safelists covering every color in this map
+(plus `blue`). Adding a new color here means extending that safelist, or the classes compile to
+nothing.
+
+Known gap: the map is an open `Record<string, ...>` rather than a closed union, so a typo'd key
+type-checks and silently resolves to `undefined`. There is still no `secret` entry.
 
 ### 7.4 Adding a New Entity Type
 
@@ -527,7 +654,8 @@ Derive color shades: `` `text-${config.color}-400` ``, `` `bg-${config.color}-90
 
 | Utility | Purpose |
 |---------|---------|
-| `entityUtils.ts` | Default entity factories (`createDefaultNpc()`, etc.), `ENTITY_TYPE_CONFIG`, `buildCampaignContext()` |
+| `entityUtils.ts` | Default entity factories (`createDefaultNpc()`, etc.), `ENTITY_TYPE_CONFIG`, the legacy flat `buildCampaignContext()`, `estimatePcHp()` |
+| `formReconciliation.ts` | `reconcileEntityFormData()` — merges in-progress editor form state with a freshly-arrived entity prop field-by-field, so a concurrent external change (async AI generation, bidirectional relationship sync) lands without discarding the user's edits |
 | `entityDetailExtractors.ts` | Extract display strings and edit details from entity fields; defines `QuickCardEntityType` |
 | `entityFieldSave.ts` | Dispatch field-level saves to the correct `campaignService.update*()` method by entity type |
 | `backlinkUtils.ts` | `computeBacklinks(campaign, entityId, entityType)` — compute all inbound cross-references |
@@ -541,13 +669,28 @@ Derive color shades: `` `text-${config.color}-400` ``, `` `bg-${config.color}-90
 
 ## 9. Styling Architecture
 
-### 9.1 Tailwind CSS via CDN
+### 9.1 Tailwind CSS at build time
 
-Tailwind is loaded via a CDN `<script>` tag in `index.html`, not as a build dependency. This means:
-- No `tailwind.config.js`
-- No PostCSS processing
-- Classes applied inline
-- `tailwind-merge` resolves conflicting classes at runtime
+Tailwind 4 is compiled by the `@tailwindcss/vite` plugin (registered in `vite.config.ts`) from
+`index.css`, which `index.html` loads as a plain stylesheet. The old
+`<script src="https://cdn.tailwindcss.com">` runtime JIT compiler is gone, along with the Google
+Fonts `<link>` that accompanied it — `index.html` now declares system font stacks and a strict
+`Content-Security-Policy` meta (`script-src 'self'`), so no remote origin can execute script in a
+page holding campaign data and `gcpApiKey` in localStorage.
+
+- No `tailwind.config.js` — configuration is CSS-first (`@import "tailwindcss"`)
+- No PostCSS pipeline of our own; the Vite plugin owns compilation
+- `tailwind-merge` still resolves conflicting classes at runtime in `Button` and friends
+- Non-Tailwind CSS (scrollbar theming, `animate-quill`, `animate-fade-in`, `.card-parchment`, and a
+  hand-rolled `animate-in` polyfill) lives in a `<style>` block in `index.html`
+
+**Runtime-composed classes must be safelisted.** The scanner only emits CSS for literal strings it
+finds in source, but several components build accent classes from `ENTITY_TYPE_CONFIG[...].color`
+via template literals. `index.css` therefore ends with two `@source inline(...)` directives
+covering `{text,bg,border,border-l}` × every config color (plus `blue`) × the shades and opacity
+steps in use. Known template-literal call sites are listed in the comment above those directives;
+converting one to a static class map is the more self-documenting fix, but the safelist is
+deliberately broad so a newly added color cannot silently regress to unstyled output.
 
 ### 9.2 Design Tokens
 
@@ -608,16 +751,23 @@ Use these for all text input and textarea elements.
 ### 10.1 Vitest Unit Tests (`tests/`)
 
 ```bash
-npm test          # Run once
+npm test            # Run once  (990 tests / 143 files)
 npm run test:watch  # Watch mode
 ```
 
+The Vitest `environment` default is `node` (set in `vite.config.ts`); render tests opt into jsdom
+per-file with a `@vitest-environment jsdom` docblock and use `@testing-library/react`.
+
 Test files cover:
-- `campaignService.sprint1.test.ts` — entity CRUD, relationships, cascade delete
-- `contextBuilder.test.ts` — tiered context assembly
+- `campaignService.sprint1.test.ts`, `.cascadeDeletion`, `.initMigration` — entity CRUD, relationships, reference purging, migration/backfill
+- `storageService.test.ts` — persistence ladder, backup rotation, conflict events
+- `contextBuilder.test.ts` — tiered context assembly and budget behaviour
 - `diceUtils.test.ts` — formula parsing and rolling
+- `aiServiceAdapters` / `claudeCliProvider` / `retryProvider` — facade, provider and retry semantics
+- `tests/services/linking/` — matching engine and auto-linker
 - `archetype.*.test.ts` — 5 DM archetype scenario tests (forever-dm, lazy-dm, new-dm, tactical-dm, worldbuilder)
-- `migration-verification.test.ts` — AI migration correctness
+- `migration-verification.test.ts` — AI migration correctness (asserts nothing under `services/ai/` still imports `@google/genai`, except `audioTranscription.ts`'s dynamic import)
+- `tests/ship/` — one suite per ship-readiness finding, including the jsdom render tests for editors, dialogs and hooks
 
 ### 10.2 Playwright E2E Tests (`e2e/`)
 
@@ -627,15 +777,30 @@ npm run test:e2e:headed   # Visible browser
 npm run test:e2e:ui       # Interactive UI
 ```
 
-Covers: campaign creation lifecycle, entity CRUD, navigation (EntityLink, back stack), session runner flow, DM coach tools.
+114 tests across 14 spec files, run against two projects (`chromium`, `mobile-chrome`); 6 are
+skipped. `playwright.config.ts` targets `http://127.0.0.1:4200` — not `localhost`, because Vite
+binds to `127.0.0.1` and Node's resolver may prefer `::1`. A `globalSetup` (`e2e/global-setup.ts`)
+verifies the reused or launched server really is Realmweaver before any spec runs.
+
+Covers: campaign creation lifecycle, entity CRUD (core + extended), generators, dialogs, editors,
+navigation (EntityLink, back stack), session runner flow, DM tools, visualizers, mobile layout,
+RealmChat.
 
 ### 10.3 Smoke Tests (`smokeTest.ts`)
 
-Runs automatically on app startup in development mode. Tests service function availability and a full entity CRUD session. Console reports pass/fail.
+Opt-in only: runs on app startup in development mode when `VITE_RUN_SMOKE_TESTS=true` is set (see `.env.local.example`) — it no longer runs automatically, since the suite wipes the `realmweaver-campaigns` / `realmweaver-active-campaign-id` storage keys and, with Mock Mode off, fires live AI calls against the real provider. Tests service function availability and a full entity CRUD session. Console reports pass/fail.
 
 ### 10.4 Manual Testing
 
 Toggle mock mode in the app header for full feature testing without any AI API key or network access.
+
+### 10.5 CI
+
+`.github/workflows/ci.yml` runs on push to `main` and every pull request: `npm ci` →
+`npm run typecheck` → `npm test` → `npm run build` → `npx playwright install --with-deps chromium`
+→ `npm run test:e2e -- --project=chromium`. The `mobile-chrome` project is temporarily excluded
+there: `Header.tsx` renders at `z-[60]` while `DialogShell`'s overlay and the mobile sidebar sit at
+`z-50`/`z-40`, so on narrow viewports the header can intercept the clicks `e2e/helpers.ts` makes.
 
 ---
 
@@ -646,50 +811,111 @@ Toggle mock mode in the app header for full feature testing without any AI API k
 ```typescript
 // vite.config.ts highlights
 {
-    plugins: [react(), aiProxyPlugin()],  // aiProxyPlugin adds /api/ai/generate endpoint
-    server: { port: 3000, host: '0.0.0.0' },
+    plugins: [react(), tailwindcss(), aiProxyPlugin()],
+    server: {
+        port: 4200,
+        // Localhost-only by default; REALMWEAVER_DEV_HOST opts into a wider bind.
+        host: env.REALMWEAVER_DEV_HOST || '127.0.0.1',
+        // A taken port must fail loudly — playwright.config.ts hardcodes 4200.
+        strictPort: true,
+    },
+    build: {
+        rollupOptions: { output: { manualChunks(id) { /* react, lucide-react */ } } },
+    },
     resolve: { alias: { '@': path.resolve(__dirname, '.') } },
     define: {
         'process.env.REALMWEAVER_AI_PROVIDER': JSON.stringify(env.REALMWEAVER_AI_PROVIDER || 'claude-cli'),
-        'process.env.AI_PROVIDER': JSON.stringify(env.AI_PROVIDER || 'claude-cli'),
-        // SECURITY: ANTHROPIC_API_KEY is intentionally NOT injected into the client bundle.
-    }
+        'process.env.REALMWEAVER_DEFAULT_TIER': JSON.stringify(env.REALMWEAVER_DEFAULT_TIER || ''),
+        // ...MAX_RETRIES, TIMEOUT_MS, API_BASE_URL
+        // SECURITY: ANTHROPIC_API_KEY and GEMINI_API_KEY are intentionally NOT injected
+        // into the client bundle. loadEnv(mode, '.', '') uses an empty prefix, so it merges
+        // in every key already present in process.env — wiring one into `define` would bake
+        // that secret into dist/assets/*.js as a literal.
+    },
+    test: { globals: true, environment: 'node', exclude: ['e2e/**', 'node_modules/**'] },
 }
 ```
 
+`manualChunks` splits React and `lucide-react` out of the entry chunk. It does not by itself clear
+the 500 KB entry-chunk warning: the bulk of the weight is the app's own component tree, since
+`ViewRouter.tsx` statically imports every dashboard and editor. Only `RelationshipGraph` (in
+`ViewRouter`) and five dialogs (in `App.tsx`) are `React.lazy`-split today.
+
 ### 11.2 Environment Variables
+
+See §5.2 for the provider knobs and how `define` + `modelConfig`'s getters carry them. Two more
+variables affect the server process only:
 
 | Variable | Source | Injected to Browser | Purpose |
 |----------|--------|---------------------|---------|
-| `REALMWEAVER_AI_PROVIDER` | `.env.local` | Yes | Active provider name |
-| `ANTHROPIC_API_KEY` | `.env.local` | **No** | Used server-side in Vite middleware only |
-| `CLAUDE_CLI_PATH` | `.env.local` | No | Path to `claude` binary (Vite middleware) |
-| `GEMINI_API_KEY` | `.env.local` | Yes (legacy compat) | Unused; kept for legacy code paths |
+| `REALMWEAVER_DEV_HOST` | `.env.local` | **No** | Overrides the default `127.0.0.1` dev-server bind. Widening it exposes `/api/ai/generate` to the LAN; the proxy's loopback peer check still rejects those callers |
+| `VITE_RUN_SMOKE_TESTS` | `.env.local` | Yes | Opts `smokeTest.ts` into running on startup in dev |
+| `GEMINI_API_KEY` | `.env.local` | **No** | Deliberately not wired into `define`. Nothing reads `process.env.GEMINI_API_KEY` — the Gemini key used by audio transcription is sourced per-campaign from `campaign.gcpApiKey` |
 
-### 11.3 Production Build
+### 11.3 Production Build & Runtime
 
 ```bash
-npm run build    # Outputs to dist/
-npm run preview  # Serves dist/ for verification
+npm run typecheck  # tsc --noEmit — `npm run build` does NOT typecheck
+npm run build      # Outputs to dist/
+npm run preview    # Serves dist/ AND the /api/ai/* proxy
 ```
 
-The build produces a static SPA bundle. No server-side rendering. The Vite proxy middleware is a development-time tool only — it is not part of the production bundle.
+The build produces a static SPA bundle with no server-side rendering — but `dist/` is not a
+self-contained deployable. `aiProxyPlugin()` registers its routes through **both**
+`configureServer` (dev) and `configurePreviewServer` (preview), so `npm run dev` or
+`npm run preview` *is* the supported runtime. A `dist/` served by anything else (a plain static
+host or CDN, with no Node process behind it) has no AI backend at all: every `/api/ai/*` call
+404s and every AI feature fails.
 
 ---
 
 ## 12. Security Considerations
 
 - **API key handling:** `ANTHROPIC_API_KEY` is NOT injected into the client bundle. It is consumed server-side in the Vite proxy middleware. The `claude-cli` provider has no API key at all — authentication is handled by the Claude Code CLI binary's own session.
-- **Data storage:** All campaign data is stored in browser localStorage. No server-side persistence.
+- **Data storage:** All campaign data is stored in browser localStorage (IndexedDB on quota overflow). No server-side persistence.
 - **No authentication:** The app is single-user, local-only.
-- **CLI invocation:** Uses `execFile` (not `exec`) to prevent shell injection. Large prompts use a temp file approach.
+- **Content Security Policy:** `index.html` declares `default-src 'self'` with `script-src 'self'`. `'unsafe-inline'`/`'unsafe-eval'` remain only for the react-refresh preamble in dev; no remote origin may execute script. `connect-src` additionally allows `ws:`/`wss:` for the HMR socket.
 - **Input sanitization:** AI-generated content is rendered as text/markdown, not raw HTML.
+
+### 12.1 AI Proxy Request Authentication
+
+`/api/ai/generate` and `/api/ai/health` shell out to a local binary on behalf of client-supplied
+input, so `vite-plugin-ai-proxy.ts` gates both with layered checks, most authoritative first:
+
+1. **TCP peer address (mandatory).** `req.socket.remoteAddress` must be loopback. The kernel sets
+   this from the real connection, so unlike every header below it cannot be forged — this is what
+   closes the LAN exploit of spoofing `Origin` *and* `Host` from a real remote peer.
+2. **`Origin` + `Host` allowlist.** Both must resolve to a localhost interface
+   (`ALLOWED_ORIGIN_RE` / `ALLOWED_HOST_RE`). A missing or empty `Origin` is rejected, not waved
+   through. Browsers do not let page script override `Origin`, so this blocks DNS rebinding; the
+   `Host` cross-check catches a request that arrived over a widened bind. `extractHostname()`
+   strips ports bracket-aware, handling the bare `::1` form that `new URL()` rejects.
+3. **Per-session proxy token (defense in depth, not yet required).** A fresh 32-byte token is
+   generated per server process and injected into the page via `transformIndexHtml`. When the
+   `x-realmweaver-token` header is present it is compared with `timingSafeEqual` and a mismatch is
+   always rejected — but `services/ai/providers/claude-cli.ts` does not yet send it, so the token
+   does not currently close the "another local process on this machine" case.
+
+Resource bounds: request bodies cap at 4 MB (a 413 is flushed *before* the request stream is
+destroyed, so the client sees the status rather than `ECONNRESET`); the CLI runs under a 120 s
+timeout with a 1 MB stdout cap, and output beyond it kills the child and rejects with `ENOBUFS`
+rather than truncating silently. A `--output-format json` run whose envelope will not parse
+returns 502. Invocation uses `execFile`/`spawn` — never a shell string; prompts over 100 KB are
+piped to the child's stdin instead of argv to stay under `ARG_MAX`.
 
 ---
 
 ## 13. Known Limitations & Technical Debt
 
-1. **No server-side persistence** — localStorage only; data is browser-specific
-2. **Anthropic API provider is a stub** — production path exists but is not yet implemented
-3. **`@google/genai` still listed as dependency** — present for legacy compatibility; not used in active code paths
+1. **No server-side persistence** — localStorage (with IndexedDB overflow) only; data is browser-specific
+2. **Anthropic API provider is a stub** — every method of `providers/anthropic-api.ts` throws "not yet implemented"
+3. **`@google/genai` still listed as dependency** — reached only by `services/ai/audioTranscription.ts`'s dynamic import; `tests/migration-verification.test.ts` pins that as the sole exception
 4. **Smoke tests lack TypeScript compilation** — `smokeTest.ts` runs directly in-browser, not via Vitest
+5. **No streaming** — every AI call is a single request/response round trip, so batch generation blocks until the whole CLI invocation returns
+6. **Proxy token generated but not required** — the client does not yet send `x-realmweaver-token` (see §12.1)
+7. **Per-view code is not lazy-split** — `ViewRouter.tsx` statically imports every dashboard and editor (22 modules), keeping the entry chunk over the 500 KB warning threshold
+8. **Two incompatible `ModelTier` types** — `types/RealmChat.ts` declares `'performance' | 'medium' | 'quality'`, bridged to `modelConfig.ts`'s `'lite' | 'standard' | 'quality'` by hand-written mapping rather than a shared type
+9. **`DialogShell` renders inline** — no React portal, and the background app is not marked `inert`/`aria-hidden` while a modal is open
+10. **Backup rotation costs on every autosave** — each debounced save serializes the campaigns array and performs additional `localStorage` round trips to rotate slots
+
+The fuller, continuously maintained list lives in `system-architecture.md` §12.

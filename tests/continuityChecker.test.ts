@@ -382,13 +382,18 @@ describe('checkContinuity — orphaned entities', () => {
         expect(orphan).toBeUndefined();
     });
 
-    it('detects an orphaned item', () => {
+    it('does not flag items as orphaned (rule removed — see finding #97)', () => {
+        // The orphaned-item rule was removed: nothing in types/ can reference
+        // an Item other than an Article's relatedEntityIds, so the rule was
+        // 100% noise for any campaign without lore articles, and its
+        // suggested fix ("assign it as scene loot") described an action the
+        // app cannot perform.
         const campaign = makeCampaign({
             items: [makeItem()],
         });
         const issues = checkContinuity(campaign);
         const orphan = issues.find(i => i.ruleId === 'orphan' && i.title === 'Orphaned item');
-        expect(orphan).toBeDefined();
+        expect(orphan).toBeUndefined();
     });
 
     it('does not flag item referenced in an article', () => {

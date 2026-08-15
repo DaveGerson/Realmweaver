@@ -74,7 +74,12 @@ interface DmCoachProps {
   /** IDs of NPCs in the currently active scene, used to group the NPC selector. */
   activeSceneNpcIds?: string[];
   onClose: () => void;
-  onSendToNotes?: (content: string) => void;
+  /**
+   * Returns whether the note actually landed in a live session's log —
+   * campaignService.addAutoEvent no-ops without an active session, and the
+   * send buttons below only show their sent-confirmation on `true`.
+   */
+  onSendToNotes?: (content: string) => boolean;
   onResultGenerated?: (content: string) => void;
   isMockMode: boolean;
   onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
@@ -97,14 +102,47 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
     const [roleplayError, setRoleplayError] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    // H15: Escape key dismisses the coach panel
+    // Finding #77: guards against a generation resolving after the DM has
+    // switched to a different tool — bumped on every switch so stale
+    // resolve/catch/finally handlers can detect and discard themselves.
+    const generationIdRef = useRef(0);
+
+    // H15 / Finding #76: Escape dismisses the coach panel, scoped to the panel
+    // itself (via onKeyDown below) rather than a document-level listener, so
+    // Escape pressed elsewhere on the page (e.g. dismissing an unrelated
+    // popover) doesn't tear down the panel.
+    //
+    // Regression fix: the panel is opened from a toolbar button OUTSIDE the
+    // <aside> subtree and nothing ever moved focus into the panel, so
+    // document.activeElement stayed on that trigger — a plain Escape press
+    // never bubbled through the scoped onKeyDown handler and did nothing.
+    // Move focus into the panel on mount (first focusable control, falling
+    // back to the panel itself) and restore it to whatever was focused
+    // before the panel opened when it unmounts, mirroring DialogShell's
+    // focus dance without adopting its centered-backdrop layout.
+    const asideRef = useRef<HTMLElement>(null);
+    const previousFocusRef = useRef<Element | null>(null);
+
     useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose();
+        previousFocusRef.current = document.activeElement;
+        const frame = requestAnimationFrame(() => {
+            if (!asideRef.current) return;
+            const focusable = asideRef.current.querySelector<HTMLElement>(
+                'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            );
+            if (focusable) {
+                focusable.focus();
+            } else {
+                asideRef.current.focus();
+            }
+        });
+        return () => {
+            cancelAnimationFrame(frame);
+            if (previousFocusRef.current && 'focus' in previousFocusRef.current) {
+                (previousFocusRef.current as HTMLElement).focus();
+            }
         };
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [onClose]);
+    }, []);
 
     useEffect(() => {
         if (activeTool === 'roleplay' && messagesEndRef.current) {
@@ -148,6 +186,9 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
             setError('Please enter a prompt.');
             return;
         }
+        // Snapshot the generation id so we can tell, once the async call
+        // settles, whether the DM has since switched tools (finding #77).
+        const generationId = ++generationIdRef.current;
         setIsLoading(true);
         setError(null);
         setResult(null);
@@ -166,6 +207,7 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
 
         try {
             const resultData = await currentTool!.action(prompt, campaignContext, useLiteModel, isMockMode);
+            if (generationId !== generationIdRef.current) return; // stale — tool switched mid-flight
             setResult(resultData);
             if (onResultGenerated) {
                 const textContent = typeof resultData === 'string'
@@ -174,19 +216,26 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
                 onResultGenerated(textContent);
             }
         } catch (err) {
+            if (generationId !== generationIdRef.current) return; // stale — tool switched mid-flight
             setError('Failed to get a response from the AI. Please try again.');
             console.error(err);
         } finally {
-            setIsLoading(false);
+            if (generationId === generationIdRef.current) {
+                setIsLoading(false);
+            }
         }
     };
 
     const handleSwitchTool = (tool: CoachTool) => {
+        // Invalidate any in-flight generation from the previous tool so its
+        // resolve/catch/finally handlers become no-ops (finding #77).
+        generationIdRef.current++;
         setActiveTool(tool);
         setPrompt('');
         setMentionedEntityIds([]);
         setResult(null);
         setError(null);
+        setIsLoading(false);
     }
 
     // --- Roleplay handlers ---
@@ -288,9 +337,11 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
 
     return (
         <aside
+            ref={asideRef}
             role="dialog"
-            aria-modal="true"
             aria-label="DM Coach"
+            tabIndex={-1}
+            onKeyDown={(e) => { if (e.key === 'Escape' && !e.defaultPrevented) onClose(); }}
             className={[
                 // Mobile: half-height bottom sheet anchored to bottom of parent
                 "absolute bottom-0 left-0 right-0 h-[60vh]",
@@ -298,6 +349,7 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
                 "md:inset-y-0 md:left-auto md:right-0 md:w-full md:max-w-md md:h-auto",
                 "bg-slate-900/95 backdrop-blur-md border-t md:border-t-0 md:border-l border-slate-800 z-10 flex flex-col shadow-2xl",
                 "animate-in slide-in-from-bottom md:slide-in-from-right duration-300",
+                "outline-none",
             ].join(' ')}
         >
             <header className="flex items-center justify-between p-4 border-b border-slate-800 flex-shrink-0">
@@ -723,20 +775,31 @@ const RoleplayPanel: React.FC<RoleplayPanelProps> = ({
 
 // --- Sub-components for DMCoach ---
 
-const TextResultDisplay = ({ text, onSendToNotes, toolLabel, onNavigate }: { text: string; onSendToNotes?: (content: string) => void; toolLabel?: string; onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void }) => {
+const TextResultDisplay = ({ text, onSendToNotes, toolLabel, onNavigate }: { text: string; onSendToNotes?: (content: string) => boolean; toolLabel?: string; onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void }) => {
     const [hasCopied, setHasCopied] = useState(false);
     const [hasSent, setHasSent] = useState(false);
+    const [sendNotice, setSendNotice] = useState<string | null>(null);
 
     const handleCopyToClipboard = () => {
-        navigator.clipboard.writeText(text);
-        setHasCopied(true);
-        setTimeout(() => setHasCopied(false), 2000);
+        if (!navigator.clipboard?.writeText) return;
+        navigator.clipboard.writeText(text)
+            .then(() => {
+                setHasCopied(true);
+                setTimeout(() => setHasCopied(false), 2000);
+            })
+            .catch(() => { /* copy failed silently; no success state shown */ });
     };
 
     const handleSendToNotes = () => {
         if (!onSendToNotes) return;
         const prefix = toolLabel ? `[${toolLabel}] ` : '[Coach] ';
-        onSendToNotes(prefix + text);
+        // The write no-ops without a live session — never show the sent
+        // checkmark for a note that went nowhere.
+        if (!onSendToNotes(prefix + text)) {
+            setSendNotice('No live session — start a session to log notes.');
+            return;
+        }
+        setSendNotice(null);
         setHasSent(true);
         setTimeout(() => setHasSent(false), 2000);
     };
@@ -771,13 +834,17 @@ const TextResultDisplay = ({ text, onSendToNotes, toolLabel, onNavigate }: { tex
             ) : (
                 <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{text}</p>
             )}
+            {sendNotice && (
+                <p role="status" className="mt-3 text-xs text-amber-400">{sendNotice}</p>
+            )}
         </div>
     );
 };
 
-const RollableTableDisplay = ({ table, onSendToNotes }: { table: RollableTable; onSendToNotes?: (content: string) => void }) => {
+const RollableTableDisplay = ({ table, onSendToNotes }: { table: RollableTable; onSendToNotes?: (content: string) => boolean }) => {
     const [rollResult, setRollResult] = useState<{ roll: number; result: string } | null>(null);
     const [hasSent, setHasSent] = useState(false);
+    const [sendNotice, setSendNotice] = useState<string | null>(null);
 
     const handleRoll = () => {
         const die = table.dieType.toLowerCase();
@@ -789,10 +856,17 @@ const RollableTableDisplay = ({ table, onSendToNotes }: { table: RollableTable; 
         const roll = Math.floor(Math.random() * maxRoll) + 1;
 
         const findResult = (r: number, entries: RollableTableEntry[]): string => {
-            for (const entry of entries) {
-                const parts = entry.range.split('-').map(p => parseInt(p.trim(), 10));
-                if (parts.length === 1 && r === parts[0]) return entry.result;
-                if (parts.length === 2 && r >= parts[0] && r <= parts[1]) return entry.result;
+            for (const [i, entry] of entries.entries()) {
+                // AI-generated ranges routinely use an en dash / em dash / minus
+                // sign / fullwidth hyphen instead of the ASCII hyphen (finding #78).
+                const normalizedRange = entry.range.replace(/[‐-―−－]/g, '-');
+                const parts = normalizedRange.split('-').map(p => parseInt(p.trim(), 10));
+                if (parts.length === 1 && !isNaN(parts[0]) && r === parts[0]) return entry.result;
+                if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1]) && r >= parts[0] && r <= parts[1]) return entry.result;
+                // Fall back to matching by row index when the range text doesn't
+                // parse as a number/range at all — the roll still needs to land
+                // on the entry that visually corresponds to it in the table.
+                if (parts.some(isNaN) && r === i + 1) return entry.result;
             }
             return "No result found for this roll.";
         }
@@ -829,7 +903,14 @@ const RollableTableDisplay = ({ table, onSendToNotes }: { table: RollableTable; 
                         variant="secondary"
                         onClick={() => {
                             const tableText = `[Table] ${table.title} (${table.dieType}): ${table.entries.map(e => `${e.range}. ${e.result}`).join('; ')}`;
-                            onSendToNotes(tableText);
+                            // The write no-ops without a live session — never
+                            // show the sent checkmark for a note that went
+                            // nowhere.
+                            if (!onSendToNotes(tableText)) {
+                                setSendNotice('No live session — start a session to log notes.');
+                                return;
+                            }
+                            setSendNotice(null);
                             setHasSent(true);
                             setTimeout(() => setHasSent(false), 2000);
                         }}
@@ -839,6 +920,9 @@ const RollableTableDisplay = ({ table, onSendToNotes }: { table: RollableTable; 
                     </Button>
                 )}
             </div>
+            {sendNotice && (
+                <p role="status" className="text-xs text-amber-400">{sendNotice}</p>
+            )}
             {rollResult && (
                 <div className="mt-4 p-3 bg-amber-900/30 border border-amber-500/30 rounded-lg text-center animate-fade-in">
                     <p className="text-sm text-slate-400">You rolled a <span className="font-bold text-2xl text-white mx-1">{rollResult.roll}</span></p>

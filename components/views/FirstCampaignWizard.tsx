@@ -268,7 +268,9 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
     };
 
     const handleStep2Next = async () => {
-        if (npcDrafts.length === 0) return;
+        // No guard on an emptied npcDrafts list: the empty-state copy promises
+        // "click Next to skip", and both the location/adventure generators and
+        // the step-4 save loops handle empty arrays.
 
         // If step 3 already has data, ask before regenerating
         if (locationDrafts.length > 0) {
@@ -298,7 +300,8 @@ export const FirstCampaignWizard: React.FC<FirstCampaignWizardProps> = ({
     };
 
     const handleStep3Next = async () => {
-        if (locationDrafts.length === 0) return;
+        // No guard on an emptied locationDrafts list — same "click Next to
+        // skip" contract as step 2.
 
         // If step 4 already has adventure data, ask before regenerating
         if (adventureDraft !== null) {

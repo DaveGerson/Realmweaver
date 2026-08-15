@@ -1,5 +1,8 @@
 # Realmweaver — Sequenced Implementation Plan
 
+> **Status:** Historical planning record — kept for provenance, not maintained as a description of
+> the current codebase. For current architecture see `system-architecture.md`; for the most recent
+> hardening pass see `docs/ship-readiness/remediation-plan.md`.
 > **Created:** 2026-03-20
 > **Last Updated:** 2026-03-26
 > **Supersedes:** `TODO.md` (items either absorbed here or cut), UX_OVERHAUL_PLAN.md Sprint numbering

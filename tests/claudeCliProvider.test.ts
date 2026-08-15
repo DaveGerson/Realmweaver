@@ -110,6 +110,9 @@ describe('ClaudeCliProvider — generateWithSchema retries on malformed JSON', (
                 model: 'standard',
             })
         ).rejects.toThrow('Received an invalid JSON response');
-        expect(fetchMock).toHaveBeenCalledTimes(2);
-    });
+        // ClaudeCliProvider now reads maxAttempts from
+        // getProviderConfig().maxRetries (finding #39) instead of a
+        // hardcoded 2, whose documented default (no env var set) is 3.
+        expect(fetchMock).toHaveBeenCalledTimes(3);
+    }, 20000);
 });

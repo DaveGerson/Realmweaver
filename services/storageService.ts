@@ -23,17 +23,6 @@
 
 export type StorageBackend = 'localStorage' | 'indexedDB';
 
-export interface StorageInfo {
-  /** Which backend is currently being used for writes. */
-  activeBackend: StorageBackend;
-  /** Estimated bytes used (localStorage only; undefined if unavailable). */
-  estimatedUsedBytes?: number;
-  /** Estimated bytes available (navigator.storage.estimate if available). */
-  estimatedAvailableBytes?: number;
-  /** True when the last save triggered a quota warning. */
-  quotaWarning: boolean;
-}
-
 export interface BackupEntry {
   /** 1-based slot index (1 = newest). */
   index: number;
@@ -48,6 +37,27 @@ export interface SaveResult {
   backend: StorageBackend;
   quotaWarning: boolean;
   error?: string;
+  /**
+   * Resolves once the write is durably confirmed (immediately for a
+   * successful localStorage write; the underlying IndexedDB write promise
+   * for a quota-fallback write). Rejects if the write never durably lands.
+   * Callers that need to know whether a save was ACTUALLY persisted (not
+   * just synchronously accepted) should await this before trusting
+   * `success`/`quotaWarning`.
+   */
+  pending?: Promise<void>;
+}
+
+export interface SaveOptions {
+  /**
+   * Skip the rotating-backup buffer for this write entirely (finding #0
+   * refinement). Intended for small scalar keys — e.g. the
+   * active-campaign-id — where a 3-slot backup history is pure overhead:
+   * it doubles up as noise in the buffer meant to hold recoverable
+   * *campaign* generations, and every no-op write to it hollows out that
+   * buffer's effective depth without protecting anything worth restoring.
+   */
+  skipBackup?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -163,22 +173,52 @@ export function createStorageService() {
   // Backup helpers (5.6)
   // ---------------------------------------------------------------------------
 
-  function _backupKey(index: number): string {
-    return `CAMPAIGNS_BACKUP_${index}`;
+  function _backupKey(primaryKey: string, index: number): string {
+    return `${primaryKey}__backup_${index}`;
   }
 
-  /**
-   * Before overwriting the primary key, rotate backups:
-   *   _3 is discarded, _2 → _3, _1 → _2, current → _1
-   */
-  function _rotateBackups(primaryKey: string): void {
+  // One-time migration: the pre-namespacing scheme wrote every backup under
+  // a single fixed `CAMPAIGNS_BACKUP_<n>` key regardless of which primary
+  // key was being saved (finding #0). Those keys are orphaned dead weight
+  // under the namespaced scheme — nothing reads them and they are never
+  // reused — so remove them the first time this service instance saves
+  // anything, rather than carrying an extra stale campaign copy forever for
+  // any user who saved under the old code.
+  let _legacyBackupKeysCleaned = false;
+  function _cleanupLegacyBackupKeys(): void {
+    if (_legacyBackupKeysCleaned) return;
+    _legacyBackupKeysCleaned = true;
     const ls = _ls();
     if (!ls) return;
     try {
+      for (let i = 1; i <= MAX_BACKUPS; i++) {
+        ls.removeItem(`CAMPAIGNS_BACKUP_${i}`);
+      }
+    } catch {
+      // best-effort cleanup only
+    }
+  }
+
+  /**
+   * Before overwriting the primary key, rotate backups (namespaced per
+   * primaryKey so unrelated keys — e.g. the scalar active-campaign-id — never
+   * share a slot buffer with the campaigns JSON):
+   *   _3 is discarded, _2 → _3, _1 → _2, previous-value → _1
+   *
+   * Takes the value that is ABOUT to be overwritten (captured by the caller
+   * before the primary write) so rotation never has to re-read a stale
+   * primary value, and can safely run AFTER the primary write succeeds —
+   * meaning it never competes with the primary write for quota headroom.
+   */
+  function _rotateBackups(primaryKey: string, previousValue: string | null): void {
+    const ls = _ls();
+    if (!ls) return;
+    if (previousValue === null) return; // nothing to back up on first-ever save
+    try {
       // Shift existing backups down one slot (oldest first to avoid overwrite)
       for (let i = MAX_BACKUPS; i >= 2; i--) {
-        const olderSlot = _backupKey(i);
-        const newerSlot = _backupKey(i - 1);
+        const olderSlot = _backupKey(primaryKey, i);
+        const newerSlot = _backupKey(primaryKey, i - 1);
         const newerRaw = ls.getItem(newerSlot);
         if (newerRaw !== null) {
           ls.setItem(olderSlot, newerRaw);
@@ -186,53 +226,29 @@ export function createStorageService() {
           ls.removeItem(olderSlot);
         }
       }
-      // Capture current primary data into slot 1
-      const current = ls.getItem(primaryKey);
-      if (current !== null) {
-        const slot1 = JSON.stringify({
-          timestamp: new Date().toISOString(),
-          data: current,
-        });
-        ls.setItem(_backupKey(1), slot1);
-      }
+      // Capture the previous primary value into slot 1
+      const slot1 = JSON.stringify({
+        timestamp: new Date().toISOString(),
+        data: previousValue,
+      });
+      ls.setItem(_backupKey(primaryKey, 1), slot1);
     } catch {
       // Backup rotation is best-effort; never block the primary save.
     }
   }
 
   // ---------------------------------------------------------------------------
-  // Quota estimation (5.3)
-  // ---------------------------------------------------------------------------
-
-  async function _estimateQuota(): Promise<{ used?: number; available?: number }> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const nav = (globalThis as any).navigator;
-    if (nav?.storage?.estimate) {
-      try {
-        const estimate = await nav.storage.estimate();
-        return {
-          used: estimate.usage,
-          available: estimate.quota != null && estimate.usage != null
-            ? estimate.quota - estimate.usage
-            : undefined,
-        };
-      } catch {
-        // ignore
-      }
-    }
-    return {};
-  }
-
-  // ---------------------------------------------------------------------------
   // Multi-tab conflict detection setup (5.5)
   // ---------------------------------------------------------------------------
+
+  const BACKUP_KEY_PATTERN = /__backup_\d+$/;
 
   function _initConflictDetection(): void {
     const win = _win();
     if (!win) return;
     win.addEventListener('storage', (event: StorageEvent) => {
       // Only care about keys we own (primary campaign data, not backups)
-      if (event.key && !event.key.startsWith('CAMPAIGNS_BACKUP_')) {
+      if (event.key && !BACKUP_KEY_PATTERN.test(event.key)) {
         _conflictListeners.forEach((cb) => cb(event.key!));
       }
     });
@@ -246,16 +262,16 @@ export function createStorageService() {
    * Save `value` under `key`.
    *
    * Flow:
-   *  1. Rotate backups (captures current value before overwrite).
-   *  2. Try localStorage.setItem.
-   *  3. On QuotaExceededError, fall back to IndexedDB (fire-and-forget async).
+   *  1. Try localStorage.setItem.
+   *  2. On success, rotate backups using the value that was just overwritten
+   *     (runs AFTER the primary write so it never competes with it for quota
+   *     headroom).
+   *  3. On QuotaExceededError, fall back to IndexedDB (async; tracked via the
+   *     returned `pending` promise so callers can await durable confirmation).
    *  4. Return a SaveResult describing what happened.
    */
-  function save(key: string, value: string): SaveResult {
+  function save(key: string, value: string, options?: SaveOptions): SaveResult {
     const ls = _ls();
-
-    // Rotate backups before every write (5.6)
-    _rotateBackups(key);
 
     if (!ls) {
       // No localStorage available (e.g. SSR context with no injected mock)
@@ -267,11 +283,27 @@ export function createStorageService() {
       };
     }
 
+    _cleanupLegacyBackupKeys();
+
+    // Capture the value about to be overwritten, for backup rotation.
+    const previousValue = ls.getItem(key);
+
     try {
       ls.setItem(key, value);
       _usingIdbFallback = false;
       _quotaWarning = false;
-      return { success: true, backend: 'localStorage', quotaWarning: false };
+      // Finding #0 refinement: don't rotate a fresh copy through the buffer
+      // for a no-op save (previousValue === value — e.g. a page navigation
+      // that flushes with nothing actually changed), and let callers opt
+      // small scalar keys (e.g. the active-campaign-id) out of the backup
+      // buffer entirely, since a rotating history of a bare id string
+      // protects nothing while still consuming a slot buffer and evicting
+      // older, actually-useful generations of other keys is never at risk
+      // here — but every no-op/scalar rotation is still wasted writes.
+      if (!options?.skipBackup && previousValue !== value) {
+        _rotateBackups(key, previousValue);
+      }
+      return { success: true, backend: 'localStorage', quotaWarning: false, pending: Promise.resolve() };
     } catch (e) {
       const isQuota =
         e instanceof DOMException &&
@@ -283,39 +315,60 @@ export function createStorageService() {
         _quotaWarning = true;
         _usingIdbFallback = true;
 
-        // Fall back to IndexedDB (async; we don't await here to keep the
-        // calling save path synchronous, but we track the pending write).
-        // Once the IDB write succeeds, drop the stale localStorage copy:
-        // `load()` prefers localStorage, so leaving the old value there would
-        // shadow the fresher IndexedDB data on the next startup (and removing
-        // it also frees quota for future saves).
-        idbSet(key, value)
+        // Fall back to IndexedDB. We don't await here to keep the calling
+        // save path synchronous, but the returned `pending` promise lets
+        // callers (campaignService.persistToStorage) wait for durable
+        // confirmation before reporting success. Once the IDB write
+        // succeeds, drop the stale localStorage copy: `load()` prefers
+        // localStorage, so leaving the old value there would shadow the
+        // fresher IndexedDB data on the next startup (and removing it also
+        // frees quota for future saves).
+        const pending = idbSet(key, value)
           .then(() => {
             try {
               _ls()?.removeItem(key);
+              // The pre-quota generation just left localStorage — capture it
+              // into the backup buffer so recovery depth isn't lost exactly
+              // on the path where saves start failing. Rotation runs AFTER
+              // removeItem so the freed primary-copy space funds the backup
+              // write; if even that overflows, _rotateBackups' own guards
+              // degrade gracefully.
+              if (!options?.skipBackup && previousValue !== null && previousValue !== value) {
+                _rotateBackups(key, previousValue);
+              }
             } catch {
               // ignore — worst case load() returns the stale localStorage copy
             }
           })
           .catch((idbErr) => {
             console.error('[storageService] IndexedDB fallback write failed:', idbErr);
+            throw idbErr;
           });
+        // Prevent a false-positive "unhandled rejection" report when a caller
+        // doesn't await `pending` (e.g. fire-and-forget callers) — attaching
+        // a handler here marks `pending` itself as handled without altering
+        // what it resolves/rejects with for callers who DO await it.
+        pending.catch(() => {});
 
         console.warn('[storageService] localStorage quota exceeded — falling back to IndexedDB for key:', key);
         return {
           success: true,
           backend: 'indexedDB',
           quotaWarning: true,
+          pending,
         };
       }
 
       // Unknown error
       console.error('[storageService] Unexpected save error:', e);
+      const failedPending = Promise.reject(e instanceof Error ? e : new Error(String(e)));
+      failedPending.catch(() => {}); // see comment above — avoid a false-positive unhandled-rejection report
       return {
         success: false,
         backend: _usingIdbFallback ? 'indexedDB' : 'localStorage',
         quotaWarning: _quotaWarning,
         error: e instanceof Error ? e.message : String(e),
+        pending: failedPending,
       };
     }
   }
@@ -358,19 +411,6 @@ export function createStorageService() {
   }
 
   /**
-   * Returns storage diagnostics (5.3).
-   */
-  async function getStorageInfo(): Promise<StorageInfo> {
-    const quota = await _estimateQuota();
-    return {
-      activeBackend: _usingIdbFallback ? 'indexedDB' : 'localStorage',
-      estimatedUsedBytes: quota.used,
-      estimatedAvailableBytes: quota.available,
-      quotaWarning: _quotaWarning,
-    };
-  }
-
-  /**
    * Subscribe to cross-tab modification events (5.5).
    * The callback receives the storage key that was modified in another tab.
    * Returns an unsubscribe function.
@@ -381,15 +421,24 @@ export function createStorageService() {
   }
 
   /**
-   * Returns available backup entries (5.6).
+   * Returns available backup entries (5.6) for `primaryKey`.
    * Slot 1 = most recent, slot 3 = oldest.
+   *
+   * `primaryKey` is required (finding idx5): backups are namespaced per
+   * primary key, so a caller that omits it has no principled key to default
+   * to — a "last rotated key" fallback silently returns whichever key
+   * happened to save most recently (in the real app, almost always the
+   * scalar active-campaign-id, not the campaigns JSON callers actually want),
+   * which is the exact class of cross-key confusion finding #0 was about.
    */
-  function getBackups(): BackupEntry[] {
+  function getBackups(primaryKey: string): BackupEntry[] {
     const ls = _ls();
     if (!ls) return [];
+    const key = primaryKey;
+    if (!key) return [];
     const results: BackupEntry[] = [];
     for (let i = 1; i <= MAX_BACKUPS; i++) {
-      const raw = ls.getItem(_backupKey(i));
+      const raw = ls.getItem(_backupKey(key, i));
       if (raw !== null) {
         try {
           const parsed = JSON.parse(raw) as { timestamp: string; data: string };
@@ -411,7 +460,7 @@ export function createStorageService() {
   function restoreFromBackup(primaryKey: string, index: number): boolean {
     const ls = _ls();
     if (!ls) return false;
-    const raw = ls.getItem(_backupKey(index));
+    const raw = ls.getItem(_backupKey(primaryKey, index));
     if (!raw) return false;
     try {
       const parsed = JSON.parse(raw) as { timestamp: string; data: string };
@@ -430,7 +479,6 @@ export function createStorageService() {
     loadSync,
     load,
     remove,
-    getStorageInfo,
     onConflict,
     getBackups,
     restoreFromBackup,

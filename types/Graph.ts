@@ -2,10 +2,8 @@
 export enum EntityType {
   LOCATION = 'LOCATION',
   NPC = 'NPC',
-  QUEST = 'QUEST',
   ITEM = 'ITEM',
   FACTION = 'FACTION',
-  EVENT = 'EVENT',
   ADVENTURE = 'ADVENTURE',
   SCENE = 'SCENE',
   ARTICLE = 'ARTICLE'

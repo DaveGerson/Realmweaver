@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, useId } from 'react';
 import { Icons } from '@/components/common/Icons';
 import { DialogShell } from '@/components/common/DialogShell';
-import type { NPC, Location, Faction, Item, Adventure, Article, SessionLog, Plot, PlayerCharacter } from '@/types/index';
+import type { NPC, Location, Faction, Item, Adventure, Article, SessionLog, Plot, PlayerCharacter, Note } from '@/types/index';
 import { ENTITY_TYPE_CONFIG } from '@/utils/entityUtils';
 
 // Scene result type for palette (scenes are derived from adventures, not passed as a separate prop)
@@ -69,6 +69,7 @@ interface CommandPaletteProps {
   sessionLogs: SessionLog[];
   plots: Plot[];
   playerCharacters: PlayerCharacter[];
+  notes: Note[];
   // Recent items (session-level, maintained by App.tsx)
   recentItems: RecentItem[];
   // Navigation callbacks
@@ -81,6 +82,8 @@ interface CommandPaletteProps {
   onSelectSessionLog: (id: string) => void;
   onSelectPlot: (id: string) => void;
   onSelectPlayerCharacter: (id: string) => void;
+  onSelectScene: (id: string) => void;
+  onSelectNote: (id: string) => void;
   // Action callbacks
   onNavigateTo: (view: string) => void;
   onOpenCoach: () => void;
@@ -114,7 +117,9 @@ const ENTITY_CONFIG: Record<CommandPaletteEntityType, { label: string; colorClas
   'session-log':    { ...makePaletteConfig('session-log'), label: 'Session' },
   plot:             makePaletteConfig('plot'),
   'player-character': { ...makePaletteConfig('player-character'), label: 'Character' },
-  scene: { label: 'Scene', colorClass: 'bg-red-500/10 border-red-500/30', textClass: 'text-red-400', icon: 'Scenes' },
+  // Derived from ENTITY_TYPE_CONFIG.scene (color: 'blue') like every other
+  // entry — no more hardcoded literal here (finding #99).
+  scene:            makePaletteConfig('scene'),
   note:             makePaletteConfig('note'),
 };
 
@@ -130,7 +135,7 @@ function fuzzyMatch(haystack: string, needle: string): boolean {
   return h.includes(n);
 }
 
-function getEntityName(type: CommandPaletteEntityType, entity: NPC | Location | Faction | Item | Adventure | Article | SessionLog | Plot | PlayerCharacter): string {
+function getEntityName(type: CommandPaletteEntityType, entity: NPC | Location | Faction | Item | Adventure | Article | SessionLog | Plot | PlayerCharacter | Note): string {
   if (type === 'player-character') {
     return (entity as PlayerCharacter).characterSocial?.characterName || (entity as any).name || 'Unknown Character';
   }
@@ -146,10 +151,15 @@ function getEntityName(type: CommandPaletteEntityType, entity: NPC | Location | 
   if (type === 'plot') {
     return (entity as Plot).title;
   }
+  if (type === 'note') {
+    // Note is title-keyed (types/Note.ts has no `name`), so the default
+    // `.name` fallback below would index every note as an empty string.
+    return (entity as Note).title;
+  }
   return (entity as any).name || '';
 }
 
-function getEntitySubtitle(type: CommandPaletteEntityType, entity: NPC | Location | Faction | Item | Adventure | Article | SessionLog | Plot | PlayerCharacter): string | undefined {
+function getEntitySubtitle(type: CommandPaletteEntityType, entity: NPC | Location | Faction | Item | Adventure | Article | SessionLog | Plot | PlayerCharacter | Note): string | undefined {
   switch (type) {
     case 'npc': return (entity as NPC).description?.slice(0, 80) || undefined;
     case 'location': return (entity as Location).description?.slice(0, 80) || undefined;
@@ -159,6 +169,7 @@ function getEntitySubtitle(type: CommandPaletteEntityType, entity: NPC | Locatio
     case 'article': return (entity as Article).content?.slice(0, 80) || undefined;
     case 'session-log': return (entity as SessionLog).recap?.slice(0, 80) || undefined;
     case 'plot': return (entity as Plot).description?.slice(0, 80) || undefined;
+    case 'note': return (entity as Note).content?.slice(0, 80) || undefined;
     case 'player-character': {
       const pc = entity as PlayerCharacter;
       const cls = pc.characterStatistics?.classes;
@@ -168,7 +179,7 @@ function getEntitySubtitle(type: CommandPaletteEntityType, entity: NPC | Locatio
   }
 }
 
-function getEntitySearchText(type: CommandPaletteEntityType, entity: NPC | Location | Faction | Item | Adventure | Article | SessionLog | Plot | PlayerCharacter): string {
+function getEntitySearchText(type: CommandPaletteEntityType, entity: NPC | Location | Faction | Item | Adventure | Article | SessionLog | Plot | PlayerCharacter | Note): string {
   const name = getEntityName(type, entity);
   const subtitle = getEntitySubtitle(type, entity) || '';
   return `${name} ${subtitle}`;
@@ -178,19 +189,26 @@ function getEntitySearchText(type: CommandPaletteEntityType, entity: NPC | Locat
 // Sub-components
 // ---------------------------------------------------------------------------
 
+/** Stable per-result id used for both the `option` element and `aria-activedescendant`. */
+function resultOptionId(listboxId: string, result: PaletteResult): string {
+  const key = result.kind === 'entity' ? `${result.data.type}-${result.data.id}` : `action-${result.data.id}`;
+  return `${listboxId}-opt-${key}`;
+}
+
 interface ResultItemProps {
   result: PaletteResult;
   isActive: boolean;
+  optionId: string;
   onSelect: (result: PaletteResult) => void;
   onMouseEnter: () => void;
 }
 
-const ResultItem: React.FC<ResultItemProps> = ({ result, isActive, onSelect, onMouseEnter }) => {
+const ResultItem: React.FC<ResultItemProps> = ({ result, isActive, optionId, onSelect, onMouseEnter }) => {
   const ref = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (isActive && ref.current) {
-      ref.current.scrollIntoView({ block: 'nearest' });
+      ref.current.scrollIntoView?.({ block: 'nearest' });
     }
   }, [isActive]);
 
@@ -199,6 +217,9 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, isActive, onSelect, onM
     return (
       <button
         ref={ref}
+        id={optionId}
+        role="option"
+        aria-selected={isActive}
         className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors min-h-[44px] ${
           isActive ? 'bg-amber-600/20 text-slate-100' : 'text-slate-300 hover:bg-slate-700/50'
         }`}
@@ -225,6 +246,9 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, isActive, onSelect, onM
   return (
     <button
       ref={ref}
+      id={optionId}
+      role="option"
+      aria-selected={isActive}
       className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors min-h-[44px] ${
         isActive ? 'bg-amber-600/20 text-slate-100' : 'text-slate-300 hover:bg-slate-700/50'
       }`}
@@ -251,15 +275,16 @@ interface ResultGroupProps {
   results: PaletteResult[];
   activeIndex: number;
   globalOffset: number;
+  listboxId: string;
   onSelect: (result: PaletteResult) => void;
   onSetActive: (index: number) => void;
 }
 
-const ResultGroup: React.FC<ResultGroupProps> = ({ label, results, activeIndex, globalOffset, onSelect, onSetActive }) => {
+const ResultGroup: React.FC<ResultGroupProps> = ({ label, results, activeIndex, globalOffset, listboxId, onSelect, onSetActive }) => {
   if (results.length === 0) return null;
   return (
-    <div>
-      <div className="px-4 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-900/50">
+    <div role="group" aria-label={label}>
+      <div aria-hidden="true" className="px-4 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-900/50">
         {label}
       </div>
       {results.map((result, localIdx) => {
@@ -267,6 +292,7 @@ const ResultGroup: React.FC<ResultGroupProps> = ({ label, results, activeIndex, 
         return (
           <ResultItem
             key={result.kind === 'entity' ? `${result.data.type}-${result.data.id}` : result.data.id}
+            optionId={resultOptionId(listboxId, result)}
             result={result}
             isActive={activeIndex === globalIdx}
             onSelect={onSelect}
@@ -294,6 +320,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   sessionLogs,
   plots,
   playerCharacters,
+  // Runtime default: older prop spreads (e.g. test scaffolding) predate notes
+  // support and may omit the list.
+  notes = [],
   recentItems,
   onSelectNpc,
   onSelectLocation,
@@ -304,12 +333,15 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   onSelectSessionLog,
   onSelectPlot,
   onSelectPlayerCharacter,
+  onSelectScene,
+  onSelectNote,
   onNavigateTo,
   onOpenCoach,
 }) => {
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listboxId = useId();
 
   // Focus input when opened
   useEffect(() => {
@@ -335,22 +367,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     { id: 'view-combat', label: 'Combat Tracker', description: 'Open the combat tracker', onSelect: () => { onNavigateTo('combat'); onClose(); } },
   ], [onNavigateTo, onOpenCoach, onClose]);
 
-  // Build map from scene ID -> parent adventure ID for scene navigation
-  const sceneAdventureMap = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const adv of adventures) {
-      for (const scene of adv.scenes ?? []) {
-        map.set(scene.id, adv.id);
-      }
-    }
-    return map;
-  }, [adventures]);
-
   // Build all searchable entities
   const allEntities: EntityResult[] = useMemo(() => {
     const results: EntityResult[] = [];
 
-    const push = (type: CommandPaletteEntityType, entities: (NPC | Location | Faction | Item | Adventure | Article | SessionLog | Plot | PlayerCharacter)[]) => {
+    const push = (type: CommandPaletteEntityType, entities: (NPC | Location | Faction | Item | Adventure | Article | SessionLog | Plot | PlayerCharacter | Note)[]) => {
       for (const entity of entities) {
         results.push({
           type,
@@ -370,6 +391,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     push('session-log', sessionLogs);
     push('plot', plots);
     push('player-character', playerCharacters);
+    push('note', notes);
 
     // Scenes are derived from adventures, not passed as a separate prop
     for (const adv of adventures) {
@@ -384,7 +406,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     }
 
     return results;
-  }, [npcs, locations, factions, items, adventures, articles, sessionLogs, plots, playerCharacters]);
+  }, [npcs, locations, factions, items, adventures, articles, sessionLogs, plots, playerCharacters, notes]);
 
   // Filter results based on query
   const { recentResults, entityResults, actionResults } = useMemo(() => {
@@ -394,15 +416,18 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       // No query: show recents + quick actions
       const recentResults: PaletteResult[] = recentItems
         .slice(0, 8)
-        .map(r => {
-          // Find the full entity to get subtitle
+        .map((r): PaletteResult | null => {
+          // Find the full entity to get its CURRENT name/subtitle — the
+          // snapshot in `r` was captured at visit time and goes stale on
+          // rename, and stays around forever on delete (finding #49).
           const found = allEntities.find(e => e.type === r.type && e.id === r.id);
+          if (!found) return null;
           return {
-            kind: 'entity' as const,
-            data: { type: r.type, id: r.id, name: r.name, subtitle: found?.subtitle },
+            kind: 'entity',
+            data: { type: r.type, id: r.id, name: found.name, subtitle: found.subtitle },
           };
         })
-        .filter(r => r.data.name); // filter out stale items where entity was deleted
+        .filter((r): r is PaletteResult => r !== null); // drop deleted entities
 
       const actionResults: PaletteResult[] = actions.map(a => ({ kind: 'action' as const, data: a }));
       return { recentResults, entityResults: [], actionResults };
@@ -449,16 +474,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         case 'session-log': onSelectSessionLog(id); break;
         case 'plot': onSelectPlot(id); break;
         case 'player-character': onSelectPlayerCharacter(id); break;
-        case 'scene': {
-          // Navigate to the parent adventure
-          const advId = sceneAdventureMap.get(id);
-          if (advId) onSelectAdventure(advId);
-          break;
-        }
+        case 'scene': onSelectScene(id); break;
+        case 'note': onSelectNote(id); break;
       }
       onClose();
     }
-  }, [onSelectNpc, onSelectLocation, onSelectFaction, onSelectItem, onSelectAdventure, onSelectArticle, onSelectSessionLog, onSelectPlot, onSelectPlayerCharacter, onClose, sceneAdventureMap]);
+  }, [onSelectNpc, onSelectLocation, onSelectFaction, onSelectItem, onSelectAdventure, onSelectArticle, onSelectSessionLog, onSelectPlot, onSelectPlayerCharacter, onSelectScene, onSelectNote, onClose]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     switch (e.key) {
@@ -528,6 +549,13 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
   const isEmpty = flatResults.length === 0;
   const hasQuery = query.trim().length > 0;
+  // The quick-action shortcuts are always present when there's no query, so
+  // `isEmpty` alone can never reflect an empty Recent list. Track that
+  // separately so a campaign with no (surviving) recent visits still tells
+  // the user, instead of just silently showing the shortcuts (finding #49).
+  const showNoRecentItems = !hasQuery && recentResults.length === 0;
+  const activeResult = flatResults[activeIndex];
+  const activeOptionId = activeResult ? resultOptionId(listboxId, activeResult) : undefined;
 
   return (
     <DialogShell
@@ -547,6 +575,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           <input
             ref={inputRef}
             type="text"
+            role="combobox"
+            aria-expanded={!isEmpty}
+            aria-controls={listboxId}
+            aria-activedescendant={activeOptionId}
+            aria-autocomplete="list"
+            aria-haspopup="listbox"
             value={query}
             onChange={e => { setQuery(e.target.value); setActiveIndex(0); }}
             onKeyDown={handleKeyDown}
@@ -572,11 +606,24 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           </div>
         </div>
 
+        {/* Screen-reader announcement of the result count (finding #98) */}
+        <div aria-live="polite" className="sr-only">
+          {hasQuery
+            ? `${flatResults.length} results for "${query}"`
+            : `${flatResults.length} results`}
+        </div>
+
         {/* Results */}
-        <div className="overflow-y-auto flex-1">
+        <div id={listboxId} role="listbox" aria-label="Command palette results" className="overflow-y-auto flex-1">
           {isEmpty && (
-            <div className="px-4 py-8 text-center text-slate-500 text-sm">
+            <div role="presentation" className="px-4 py-8 text-center text-slate-500 text-sm">
               {hasQuery ? `No results for "${query}"` : 'No recent items. Start typing to search.'}
+            </div>
+          )}
+
+          {!isEmpty && showNoRecentItems && (
+            <div role="presentation" className="px-4 py-3 text-center text-slate-500 text-sm">
+              No recent items. Start typing to search.
             </div>
           )}
 
@@ -587,6 +634,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
               results={results}
               activeIndex={activeIndex}
               globalOffset={offset}
+              listboxId={listboxId}
               onSelect={handleSelect}
               onSetActive={setActiveIndex}
             />

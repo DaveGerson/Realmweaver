@@ -9,6 +9,7 @@ import { BacklinksPanel } from '../common/BacklinksPanel';
 import { inputBaseClasses, textareaBaseClasses } from '../common/Textarea';
 import { campaignService } from '@/services/campaignService';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
+import { normalizePlayerCharacter } from '../../utils/entityUtils';
 
 // ─── Save Status Indicator ────────────────────────────────────────────────────
 
@@ -56,24 +57,32 @@ interface PlayerCharacterEditorProps {
 // ─── Editor ───────────────────────────────────────────────────────────────────
 
 export const PlayerCharacterEditor: React.FC<PlayerCharacterEditorProps> = ({ pc, onUpdate, onDelete, onNavigate }) => {
-  const [formData, setFormData] = useState(pc);
+  // `pc` may be an already-persisted PC that predates defensive normalization
+  // (e.g. an AI-parsed sheet whose model response omitted required nested
+  // fields — see finding #63/#34). Normalize once here so every read below
+  // (classes/attributes/skills/characterSocial) can assume the full shape.
+  const [formData, setFormData] = useState(() => normalizePlayerCharacter(pc));
   const [showEditStats, setShowEditStats] = useState(false);
   const { confirm } = useConfirmDialog();
 
-  // Tracks the last `pc` prop we've reconciled against, so incoming prop
-  // updates can be merged field-by-field instead of overwriting formData wholesale.
+  // Tracks the last raw `pc` prop AND the normalized value we reconciled
+  // against, so incoming prop updates can be merged field-by-field instead of
+  // overwriting formData wholesale (see reconcileEntityFormData's docstring).
   const prevPcRef = useRef(pc);
+  const prevNormalizedRef = useRef(formData);
 
   useEffect(() => {
     const prevPc = prevPcRef.current;
     if (prevPc !== pc) {
-      setFormData(prev => reconcileEntityFormData(prev, prevPc, pc));
+      const normalizedIncoming = normalizePlayerCharacter(pc);
+      setFormData(prev => reconcileEntityFormData(prev, prevNormalizedRef.current, normalizedIncoming));
+      prevNormalizedRef.current = normalizedIncoming;
     }
     prevPcRef.current = pc;
   }, [pc]);
 
   const handleDelete = async () => {
-    const confirmed = await confirm('Delete Character', `Are you sure you want to delete ${pc.characterSocial.characterName}?`, { variant: 'danger' });
+    const confirmed = await confirm('Delete Character', `Are you sure you want to delete ${formData.characterSocial.characterName || pc.playerName || 'this character'}?`, { variant: 'danger' });
     if (confirmed) {
       onDelete(pc.id);
     }
@@ -92,7 +101,7 @@ export const PlayerCharacterEditor: React.FC<PlayerCharacterEditorProps> = ({ pc
   const handleSocialBlur = (e: React.FocusEvent<HTMLTextAreaElement | HTMLInputElement>) => {
     const { name } = e.target;
     if (formData.characterSocial[name as keyof typeof formData.characterSocial] !==
-        pc.characterSocial[name as keyof typeof pc.characterSocial]) {
+        pc.characterSocial?.[name as keyof typeof pc.characterSocial]) {
       onUpdate(pc.id, { characterSocial: formData.characterSocial });
     }
   };
@@ -238,8 +247,8 @@ export const PlayerCharacterEditor: React.FC<PlayerCharacterEditorProps> = ({ pc
           <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800/50">
             <h3 className="font-semibold text-slate-200 mb-2">Actions & Features</h3>
             <div className="text-sm text-slate-300 space-y-1 list-disc list-inside">
-              {formData.characterStatistics.actions.map((action, i) => <li key={i}>{action}</li>)}
-              {formData.characterStatistics.specialActions.map((action, i) => <li key={i}>{action}</li>)}
+              {(formData.characterStatistics.actions ?? []).map((action, i) => <li key={i}>{action}</li>)}
+              {(formData.characterStatistics.specialActions ?? []).map((action, i) => <li key={i}>{action}</li>)}
             </div>
           </div>
         </div>

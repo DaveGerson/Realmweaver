@@ -143,6 +143,8 @@ export const AdventureDashboard: React.FC<AdventureDashboardProps> = ({ adventur
                 adventure={{ ...data, id: 'preview' }}
                 campaign={previewCampaign}
                 onUpdate={(_, updates) => onUpdate(updates)}
+                isMockMode={isMockMode}
+                campaignContext={campaignContext}
               />
             )}
           />

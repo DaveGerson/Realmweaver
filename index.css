@@ -1,0 +1,39 @@
+/**
+ * index.css — Tailwind CSS build-time entry point.
+ *
+ * Replaces the old `<script src="https://cdn.tailwindcss.com">` runtime JIT
+ * compiler (see index.html) with a real compiled stylesheet: the
+ * `@tailwindcss/vite` plugin (registered in vite.config.ts) scans the project
+ * for utility classes and generates a local CSS file instead of shipping a
+ * compiler to the browser.
+ */
+@import "tailwindcss";
+
+/*
+ * Safelist for runtime-composed entity-accent utilities.
+ *
+ * Build-time Tailwind only emits CSS for class names it can find as literal
+ * strings in source. Several components compose their accent classes from
+ * `ENTITY_TYPE_CONFIG[...].color` (or an equivalent runtime color variable)
+ * at runtime via template literals — e.g. `text-${color}-400`,
+ * `` `bg-${c}-900/50 text-${c}-300 border-${c}-700/50` `` — so the resulting
+ * strings never appear literally in source and the scanner would otherwise
+ * drop them. See utils/entityUtils.ts's ENTITY_TYPE_CONFIG for the full set
+ * of color names in play (amber, emerald, violet, sky, orange, cyan, rose,
+ * teal, yellow, slate) plus `blue` (scene) and `blue`/`slate` odds used by a
+ * few call sites directly.
+ *
+ * Known call sites as of this writing: components/layout/sidebar/sidebarUtils.ts,
+ * components/common/CommandPalette.tsx, components/common/EntityQuickCard.tsx,
+ * components/common/LinkSuggestionsPanel.tsx, components/views/CrossCampaignDashboard.tsx,
+ * components/tools/SecretsTracker.tsx, components/dashboards/PlayerCharacterDashboard.tsx.
+ *
+ * If a call site is converted to a static class map (the more self-documenting
+ * fix — see the CLAUDE.md-mandated per-file owners), its entries can be
+ * dropped from here once verified against the built CSS, but the safelist is
+ * intentionally kept broad so a color/shade added to ENTITY_TYPE_CONFIG (or a
+ * new template-literal call site using the same palette) doesn't silently
+ * regress into unstyled output again.
+ */
+@source inline("{text,bg,border,border-l}-{amber,emerald,violet,sky,orange,cyan,rose,teal,yellow,slate,blue}-{300,400,500,700,900}");
+@source inline("{bg,border}-{amber,emerald,violet,sky,orange,cyan,rose,teal,yellow,slate,blue}-{500,700,900}/{10,20,30,40,50,60}");
