@@ -10,7 +10,7 @@ as arguments and are safe to call inside `useMemo`.
 | `backlinkUtils.ts` | `computeBacklinks`, `BacklinkEntry`, `GroupedBacklinks`. |
 | `entityDetailExtractors.ts` | `QuickCardEntityType`, `EntityDetail`, `ExpandedDetail`, `get*Details` / `get*ExpandedDetails`, `getExpandedDetails`, `lookupEntity`, `truncate`. |
 | `entityFieldSave.ts` | `saveEntityField(entityType, entityId, fieldKey, value)` — inline quick-card edit dispatcher. |
-| `dmStyleUtils.ts` | `isFeatureVisible`, `FEATURE_LABELS`, `OVERRIDEABLE_FEATURES`. |
+| `dmStyleUtils.ts` | `isFeatureVisible`, `FEATURE_LABELS`, `OVERRIDEABLE_FEATURES`, `GUIDED_HIDDEN` (consumed by `DmStylePanel` to derive its "Hides:" copy). |
 | `diceUtils.ts` | `parseFormula`, `rollDice`, `formatFormula`, `ParsedFormula`, `RollResult`. |
 | `keyboardShortcuts.ts` | `SHORTCUTS`, `matchShortcut`, `formatShortcut`, `getModifierSymbol`, `KeyboardShortcut`. |
 | `formReconciliation.ts` | `reconcileEntityFormData(prev, prevSeen, incoming)`. |

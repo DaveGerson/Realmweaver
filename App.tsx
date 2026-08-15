@@ -181,6 +181,10 @@ const App: FC = () => {
   // Global keyboard shortcut handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // A handler closer to the target that already consumed the keystroke
+      // (e.g. RunningLog claiming "/" to focus its note field) wins —
+      // mirrors the DialogShell Escape contract in components/CLAUDE.md.
+      if (e.defaultPrevented) return;
       const action = matchShortcut(e);
       if (!action) return;
       e.preventDefault();
@@ -207,9 +211,15 @@ const App: FC = () => {
   }, [isCommandPaletteOpen, isShortcutsHelpOpen, isContinuityCheckerOpen, isCoachOpen, isWizardOpen, isWorldSimOpen, isExportModalOpen]);
 
   // Auto-generate style profile once entity count crosses 5 and no profile exists yet.
+  const styleAnalysisInFlightRef = useRef(false);
   useEffect(() => {
     if (!activeCampaign) return;
     if (activeCampaign.styleProfile) return;
+    // Only a real analysis may set the profile: mock mode returns a canned
+    // text that ignores the samples, and since the effect never re-runs once
+    // styleProfile is set, persisting it would silently steer every later
+    // real-mode generation with a voice the GM never wrote.
+    if (isMockMode) return;
     const totalEntities =
       activeCampaign.npcs.length + activeCampaign.locations.length +
       activeCampaign.factions.length + activeCampaign.items.length +
@@ -221,13 +231,19 @@ const App: FC = () => {
       ...activeCampaign.adventures.slice(0, 3).map(a => a.hook).filter(Boolean),
     ] as string[];
     if (samples.length === 0) return;
+    // One analysis at a time — creating entities while a request is pending
+    // re-fires this effect and would stack duplicate live AI calls.
+    if (styleAnalysisInFlightRef.current) return;
+    styleAnalysisInFlightRef.current = true;
     analyzeWritingStyle(samples, isMockMode, campaignContext)
       .then(profile => { if (profile) campaignService.setStyleProfile(profile); })
-      .catch(err => console.warn('[StyleMatching] Auto-analysis failed:', err));
+      .catch(err => console.warn('[StyleMatching] Auto-analysis failed:', err))
+      .finally(() => { styleAnalysisInFlightRef.current = false; });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     activeCampaign?.id,
     activeCampaign?.styleProfile,
+    isMockMode,
     (activeCampaign?.npcs.length ?? 0) +
       (activeCampaign?.locations.length ?? 0) +
       (activeCampaign?.factions.length ?? 0) +
@@ -387,6 +403,13 @@ const App: FC = () => {
     selectedPlayerCharacterId, selectedPlotId, selectedNoteId,
   ]);
 
+  // Compact signature of the active entity selection, part of the view
+  // ErrorBoundary's key below — see the comment at its render site.
+  const selectionSignature = useMemo(
+    () => Object.values(sidebarSelectedIds).filter(Boolean).join(':'),
+    [sidebarSelectedIds]
+  );
+
   const handleSelectRecent = useCallback(
     (type: CommandPaletteEntityType, id: string) => handleSelect(type as Parameters<typeof handleSelect>[0], id),
     [handleSelect]
@@ -475,14 +498,6 @@ const App: FC = () => {
                 saveStatus={saveStatus}
                 lastSavedAt={lastSavedAt}
               />
-              <ConflictBanner
-                isOpen={conflictDetected}
-                onResolve={(choice) => campaignService.resolveConflict(choice)}
-              />
-              <BackupRecoveryBanner
-                isOpen={recoveredFromBackup}
-                onDismiss={() => campaignService.dismissBackupRecoveryNotice()}
-              />
               <div className="flex-1 flex overflow-hidden relative">
                 {/* Mobile Sidebar Overlay */}
                 {isSidebarOpen && (
@@ -527,12 +542,15 @@ const App: FC = () => {
                     />
                   )}
                   {/*
-                    key={activeView} forces the boundary to remount (clearing any
-                    caught error) when the sidebar navigates to a different view,
-                    instead of leaving the previous view's error fallback stuck on
-                    screen.
+                    The key forces the boundary to remount (clearing any caught
+                    error) when the sidebar navigates to a different view — or
+                    to a different entity within the same view. Without the
+                    selection signature, an editor throwing for entity A left
+                    the fallback stuck on screen while the GM clicked sibling
+                    entity B (same view, same key, no remount), making every
+                    sidebar click look dead.
                   */}
-                  <ErrorBoundary key={activeView}>
+                  <ErrorBoundary key={`${activeView}:${selectionSignature}`}>
                     <ViewRouter
                       campaign={activeCampaign}
                       activeView={activeView}
@@ -605,13 +623,21 @@ const App: FC = () => {
                 {isCoachOpen && (
                   <ErrorBoundary>
                     <Suspense fallback={null}>
+                      {/*
+                        Coach results reach the session log only through the
+                        explicit "Send to notes" action. Auto-logging every
+                        generation via onResultGenerated wrote the same
+                        addAutoEvent entry, so a result the DM then sent was
+                        recorded twice. addAutoEvent returns whether a live
+                        session actually received the note, which drives the
+                        coach's sent/no-session feedback.
+                      */}
                       <DmCoach
                         campaign={activeCampaign}
                         activeContext={coachContext}
                         activeSceneNpcIds={activeSceneNpcIds}
                         onClose={() => setIsCoachOpen(false)}
                         onSendToNotes={(content) => campaignService.addAutoEvent('coach-used', content)}
-                        onResultGenerated={(content) => campaignService.addAutoEvent('coach-used', content)}
                         isMockMode={isMockMode}
                         onNavigate={handleEntityNavigate}
                       />
@@ -708,6 +734,7 @@ const App: FC = () => {
                   sessionLogs={activeCampaign.sessionLogs || []}
                   plots={activeCampaign.plots || []}
                   playerCharacters={activeCampaign.playerCharacters || []}
+                  notes={activeCampaign.notes || []}
                   recentItems={recentItems}
                   onSelectNpc={(id) => handleSelect('npc', id)}
                   onSelectLocation={(id) => handleSelect('location', id)}
@@ -719,6 +746,7 @@ const App: FC = () => {
                   onSelectPlot={(id) => handleSelect('plot', id)}
                   onSelectPlayerCharacter={(id) => handleSelect('player-character', id)}
                   onSelectScene={(id) => handleSelect('scene', id)}
+                  onSelectNote={(id) => handleSelect('note', id)}
                   onNavigateTo={(view) => { handleSelectView(view as EditorView); }}
                   onOpenCoach={() => setIsCoachOpen(true)}
                 />
@@ -743,6 +771,21 @@ const App: FC = () => {
 
   return (
     <div className="h-screen w-screen bg-slate-950 text-slate-100 flex flex-col font-sans antialiased">
+      {/*
+        The conflict/recovery banners live at the root, not inside the
+        'editing' branch: both flags are raised regardless of appStatus (the
+        cross-tab `storage` listener, init()'s backup recovery), and while
+        conflictDetected is set every save is silently dropped — so the banner
+        must be visible and resolvable on the selector/welcome screens too.
+      */}
+      <ConflictBanner
+        isOpen={conflictDetected}
+        onResolve={(choice) => campaignService.resolveConflict(choice)}
+      />
+      <BackupRecoveryBanner
+        isOpen={recoveredFromBackup}
+        onDismiss={() => campaignService.dismissBackupRecoveryNotice()}
+      />
       {appContent()}
     </div>
   );

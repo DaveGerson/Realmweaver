@@ -45,13 +45,15 @@ Tests use `{ persist: false }` (init then just sets `appStatus: 'welcome'`).
 ### Cascade deletion
 
 `_purgeEntityReferences(draftCampaign, entityId)` sweeps NPC relationships/mentions, location
-connections/mentions, faction `leaderId`/`headquartersLocationId`/mentions, scene mentions, plot and article
+connections/mentions, NPC/location `history[].referenceId` (nulled + `referenceType: 'manual'` — the timeline row
+itself stays), faction `leaderId`/`headquartersLocationId`/mentions, scene mentions, plot and article
 `relatedEntityIds`/mentions, session-log `relatedPlotIds`/`plotProgressions`/`structuredNotes[].taggedEntityIds`/
 `plannedNpcIds`/`plannedLocationIds`, secret `linkedEntityIds`/`revealedInSessionId`, and `campaign.pinnedEntities`.
 
 All twelve entity deletes call it: `deleteNpc`, `deleteLocation`, `deleteFaction`, `deleteItem`, `deleteArticle`,
 `deleteAdventure`, `deleteScene`, `deleteSessionLog`, `deletePlayerCharacter`, `deletePlot`, `deleteNote`,
-`deleteSecret`. `deleteCampaign` does not (the whole container goes). **A new entity type's delete method must call
+`deleteSecret`. `deleteCampaign` does not (the whole container goes). `deleteAdventure` also runs the sweep for
+each scene the adventure contains (mirroring `deleteScene`). **A new entity type's delete method must call
 it, and a new id-bearing field must be added to the sweep** — otherwise dangling ids survive forever.
 
 - `duplicateCampaign` / `importTemplateData` use a **two-pass id remap**: pre-register every id an entity actually

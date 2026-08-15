@@ -13,7 +13,7 @@ Every React component in the app. Hooks live in `hooks/` (see `hooks/CLAUDE.md`)
 | `dialogs/` | Multi-step / long-running modals: `DmCoach`, `EvocationWizard`, `WorldSimulationWizard`, `ContinuityChecker`, `SessionPrepWizard`, `SessionEndWizard`, `ExportModal`. |
 | `views/` | Top-level screens: `WelcomeScreen`, `CampaignCreator`, `FirstCampaignWizard`, `CrossCampaignDashboard`, `SessionRunner` (+ `session/`). |
 | `tools/` | `CombatTracker`, `DiceRoller`, `SecretsTracker`. |
-| `visualizers/` | `RelationshipGraph`, `PlotTimeline` — heavy deps (React Flow, dagre, D3); `RelationshipGraph` is `React.lazy`-loaded from `ViewRouter`. |
+| `visualizers/` | `RelationshipGraph`, `PlotTimeline` — heavy dep (D3); `RelationshipGraph` is `React.lazy`-loaded from `ViewRouter`. |
 | `RealmChat/` | `RealmChatWidget` — the only place indigo is allowed. |
 
 ## Three-tier hierarchy
@@ -137,7 +137,7 @@ conditionally hidden.
 | `TabLayout` | `tabs: TabDefinition[]`, `activeTab`, `onTabChange`; renders `role="tablist"` / `role="tab"` / `role="tabpanel"`. The caller renders the active panel's children. |
 | `Textarea` | `inputBaseClasses` / `textareaBaseClasses` (use these for form fields) + `AiTextarea`, which slots a `RegenerateButton` into the label row. |
 | `RegenerateButton` | Per-field AI regeneration with tweak → preview → accept/reject. A monotonic `requestIdRef` discards results from a superseded or dismissed panel. Uses `generateEnhancedText` from `aiService`. |
-| `ErrorBoundary` | `scope`: `'view'` (default, used per-view in `App.tsx` with `key={activeView}`) or `'root'` (`index.tsx`) — the copy differs because a root throw is not isolated. "Reload App" calls `campaignService.flushPendingSave()` before `location.reload()`. |
+| `ErrorBoundary` | `scope`: `'view'` (default, used per-view in `App.tsx` with `key={`${activeView}:${selectionSignature}`}` so navigating to a sibling entity clears a stale fallback) or `'root'` (`index.tsx`) — the copy differs because a root throw is not isolated. "Reload App" calls `campaignService.flushPendingSave()` before `location.reload()`. |
 | `ToastContainer` | Presentational; `useToast`'s provider owns the queue. Each toast auto-dismisses after 4 s and is `role="alert" aria-live="polite"`. |
 | `CommandPalette` | Global entity/action search; `RecentItem` / `CommandPaletteEntityType` are exported from here and consumed by `useEntitySelection`. |
 | `SkeletonCard` | `SkeletonCard`, `SkeletonCardGrid`, `SkeletonGeneratorOverlay` — loading placeholders for dashboards and generators. |

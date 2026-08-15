@@ -243,9 +243,21 @@ touches `localStorage` directly.
 
 ### 4.4 Relationship Management
 
-- **Bidirectional sync:** `linkNpcToFaction()` updates both the NPC's `factionId` and the Faction's member list
-- **Cascade deletion:** Deleting a faction removes `factionId` from all linked NPCs
-- **Cycle detection:** `setLocationParent()` validates no circular parent-child chains
+There are no dedicated `link*` / `set*Parent` methods. A relationship is edited by writing its
+field through the ordinary updater — `updateNpc(id, { factionId })`,
+`updateLocation(id, { parentLocationId })`, `updateArticle(id, { parentArticleId })`,
+`updateScene(adventureId, sceneId, { locationId, npcIds })` — and the store enforces the invariants
+internally:
+
+- **Bidirectional sync:** `_synchronizeNpcFactionLink()` runs inside `createNpc`/`updateNpc`/`deleteNpc`
+  and keeps the NPC's `factionId` and the Faction's `memberIds` in step. `_synchronizeLocationHierarchy()`
+  and `_synchronizeArticleHierarchy()` do the same for `parentLocationId` ↔ `subLocationIds` and
+  `parentArticleId` ↔ `subArticleIds`.
+- **Cascade deletion:** Deleting a faction removes `factionId` from all linked NPCs; every delete path
+  also calls `_purgeEntityReferences`.
+- **Cycle detection:** `updateLocation`/`updateArticle` check `_isLocationParentingAllowed()` /
+  `_isArticleParentingAllowed()` *before* applying the patch and abort the whole update (logging an
+  error, leaving state untouched) if the new parent would close a cycle.
 - **Scene linking:** Scenes reference NPCs and locations; deletion cascades to these references
 
 ### 4.5 deleteAdventure Cascade

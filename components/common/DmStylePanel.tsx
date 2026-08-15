@@ -7,7 +7,7 @@ import { Icons } from './Icons';
 import { Button } from './Button';
 import { DialogShell } from './DialogShell';
 import type { DmStyle } from '../../types/index';
-import { isFeatureVisible, OVERRIDEABLE_FEATURES, FEATURE_LABELS } from '../../utils/dmStyleUtils';
+import { isFeatureVisible, OVERRIDEABLE_FEATURES, FEATURE_LABELS, GUIDED_HIDDEN } from '../../utils/dmStyleUtils';
 
 interface DmStylePanelProps {
   dmStyle: DmStyle;
@@ -88,7 +88,10 @@ export const DmStylePanel: React.FC<DmStylePanelProps> = ({
 
           {/* Effective visibility summary */}
           <div className="text-xs text-slate-500 bg-slate-800/60 rounded-md p-2">
-            {dmStyle === 'guided' && 'Hides: continuity checker, world graph, secrets tracker, combat tracker, backlinks panel, and keyboard shortcuts.'}
+            {/* Derived from the real gate set so this copy can't drift from
+                what guided mode actually hides (it previously still listed
+                the removed 'backlinks-panel' entry). */}
+            {dmStyle === 'guided' && `Hides: ${[...GUIDED_HIDDEN].map(k => FEATURE_LABELS[k] ?? k).join(', ')}.`}
             {dmStyle === 'standard' && 'Shows all core tools. Advanced analysis tools are available.'}
             {dmStyle === 'power' && 'All features visible. Nothing is hidden by default.'}
           </div>

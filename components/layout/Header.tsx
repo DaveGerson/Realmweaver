@@ -183,6 +183,8 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={onToggleSidebar}
               className="md:hidden p-1 text-slate-400 hover:text-white transition-colors"
+              aria-label="Toggle campaign navigation"
+              title="Toggle campaign navigation"
             >
               <Icons.Menu className="w-6 h-6" />
             </button>

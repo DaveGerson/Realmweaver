@@ -152,17 +152,25 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
         return adventure.scenes.find(s => s.id === campaign.activeSceneId) || null;
     }, [campaign.activeSceneId, adventure]);
 
+    // Finding #26: the prep wizard's step-3 curation is persisted as
+    // plannedNpcIds / plannedLocationIds on the session log. When present
+    // (arrays — an empty one is a deliberate all-removed curation) they are
+    // the session cast and win over the scene-linked sets; logs created
+    // before these fields existed leave them undefined and keep the pure
+    // scene-derived behavior.
     const activeSceneLocation = useMemo(() => {
         if (!activeScene?.locationId) return null;
+        if (sessionLog.plannedLocationIds && !sessionLog.plannedLocationIds.includes(activeScene.locationId)) return null;
         return campaign.locations.find(l => l.id === activeScene.locationId) || null;
-    }, [activeScene, campaign.locations]);
+    }, [activeScene, campaign.locations, sessionLog.plannedLocationIds]);
 
     const activeSceneNpcs = useMemo(() => {
         if (!activeScene) return [];
-        return activeScene.npcIds
+        const castIds = sessionLog.plannedNpcIds ?? activeScene.npcIds;
+        return castIds
             .map(id => campaign.npcs.find(n => n.id === id))
             .filter((n): n is NPC => !!n);
-    }, [activeScene, campaign.npcs]);
+    }, [activeScene, campaign.npcs, sessionLog.plannedNpcIds]);
 
     const sceneNpcRelationshipMap = useMemo(() => {
         const sceneNpcIds = new Set(activeSceneNpcs.map(n => n.id));

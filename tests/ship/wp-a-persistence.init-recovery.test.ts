@@ -13,7 +13,7 @@
  *     a guard by goLive(), advanceScene(), SessionLogDashboard and SessionRunner.
  */
 
-import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 
 const store: Record<string, string> = {};
 
@@ -28,6 +28,15 @@ vi.stubGlobal('localStorage', {
 
 let createCampaignStore: typeof import('../../services/campaignService').createCampaignStore;
 let storageService: typeof import('../../services/storageService').storageService;
+
+// tests/CLAUDE.md: every `{ persist: true }` store must be destroyed in
+// afterEach — init() registers real page-lifecycle listeners plus a
+// storageService conflict subscription, and this file builds four of them.
+const liveStores: Array<{ destroy: () => void }> = [];
+const trackStore = <T extends { destroy: () => void }>(service: T): T => {
+    liveStores.push(service);
+    return service;
+};
 
 const CAMPAIGNS_KEY = 'realmweaver-campaigns';
 const ACTIVE_ID_KEY = 'realmweaver-active-campaign-id';
@@ -55,6 +64,10 @@ beforeEach(() => {
     for (const k in store) delete store[k];
 });
 
+afterEach(() => {
+    liveStores.splice(0).forEach(service => service.destroy());
+});
+
 describe('campaignService.init(): corrupt payload recovery (finding #1)', () => {
     it('recovers campaigns from the rotating backup buffer instead of deleting the key', async () => {
         const goodJson = JSON.stringify(makeCampaignJson());
@@ -72,7 +85,7 @@ describe('campaignService.init(): corrupt payload recovery (finding #1)', () => 
         // Now the primary payload gets truncated / hand-mangled.
         store[CAMPAIGNS_KEY] = '[{"id":"camp-1","title":"Irrepla';
 
-        const service = createCampaignStore({ persist: true });
+        const service = trackStore(createCampaignStore({ persist: true }));
         await flushMicrotasks();
 
         const state = service.getState();
@@ -86,7 +99,7 @@ describe('campaignService.init(): corrupt payload recovery (finding #1)', () => 
         store[CAMPAIGNS_KEY] = corrupt;
         store[ACTIVE_ID_KEY] = 'camp-1';
 
-        const service = createCampaignStore({ persist: true });
+        const service = trackStore(createCampaignStore({ persist: true }));
         await flushMicrotasks();
 
         // The unparseable bytes must be preserved somewhere (either left in
@@ -118,7 +131,7 @@ describe('campaignService.init(): session log migration backfill (finding #35)',
         }));
         store[ACTIVE_ID_KEY] = 'camp-1';
 
-        const service = createCampaignStore({ persist: true });
+        const service = trackStore(createCampaignStore({ persist: true }));
         await flushMicrotasks();
 
         const log = service.getState().campaigns[0].sessionLogs[0];
@@ -148,7 +161,7 @@ describe('campaignService.init(): session log migration backfill (finding #35)',
         }));
         store[ACTIVE_ID_KEY] = 'camp-1';
 
-        const service = createCampaignStore({ persist: true });
+        const service = trackStore(createCampaignStore({ persist: true }));
         await flushMicrotasks();
 
         expect(() => service.goLive('log-1')).not.toThrow();

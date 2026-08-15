@@ -102,8 +102,8 @@ flowchart LR
 `configureServer` (`vite dev`) *and* `configurePreviewServer` (`vite preview`, serving the built
 `dist/`), so a previewed production build behaves identically instead of 404ing on every AI call.
 Neither hook helps a `dist/` served by something other than Vite — a plain static host has no Node
-process to run the plugin at all. `transformIndexHtml` (which injects the proxy token) is not tied
-to either hook and runs in both modes.
+process to run the plugin at all. `transformIndexHtml` (which injects the proxy token) runs only in serve
+mode — the plugin is `apply: 'serve'`, so `vite build` never bakes a stale token into `dist/`.
 
 **Security posture of the AI proxy** (`vite-plugin-ai-proxy.ts`):
 
@@ -124,7 +124,7 @@ to either hook and runs in both modes.
   override it), so this is what blocks DNS-rebinding / any other page the browser happens to
   have open; Host cross-checks that the connection didn't arrive over a LAN bind.
 - **Per-session proxy token (defense in depth, not yet enforced).** The plugin generates a
-  random token at process start and injects it into the served page via `transformIndexHtml`;
+  random token at process start and injects it into dev-served pages via `transformIndexHtml` (serve mode only — built `dist/` pages carry no token);
   `X-Realmweaver-Token`, when present, is validated with a constant-time comparison and a
   mismatch is always rejected. It is not yet *required* on every request — the browser client
   doesn't send it yet (see the header comment in `vite-plugin-ai-proxy.ts` for the exact wiring
@@ -274,7 +274,6 @@ are included for completeness.
 | `sidebar/ArticleTreeItem.tsx` | Recursive tree-node renderer for the Lorebook's parent/child article hierarchy |
 | `sidebar/PinnedEntities.tsx` | Renders the campaign's pinned-entity shortcuts (`React.memo`) |
 | `sidebar/RecentItems.tsx` | Renders the last-10 recently-viewed entities (`React.memo`) |
-| `sidebar/SidebarEntityList.tsx` | Generic filtered entity list renderer shared across sidebar sections (`React.memo`) |
 | `sidebar/SidebarSearch.tsx` | Sidebar-local search input with clear button |
 | `sidebar/sidebarUtils.ts` | Shared filter/sort helpers for sidebar entity lists |
 

@@ -11,7 +11,7 @@
  * flushed synchronously before the handler returns.
  */
 
-import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 
 const store: Record<string, string> = {};
 
@@ -26,6 +26,15 @@ vi.stubGlobal('localStorage', {
 
 let createCampaignStore: typeof import('../../services/campaignService').createCampaignStore;
 
+// tests/CLAUDE.md: every `{ persist: true }` store must be destroyed in
+// afterEach — the pagehide/beforeunload/visibilitychange listeners this suite
+// depends on are exactly the ones that would otherwise leak into later tests.
+const liveStores: Array<{ destroy: () => void }> = [];
+const trackStore = <T extends { destroy: () => void }>(service: T): T => {
+    liveStores.push(service);
+    return service;
+};
+
 const CAMPAIGNS_KEY = 'realmweaver-campaigns';
 
 const flushMicrotasks = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -37,6 +46,10 @@ beforeAll(async () => {
 
 beforeEach(() => {
     for (const k in store) delete store[k];
+});
+
+afterEach(() => {
+    liveStores.splice(0).forEach(service => service.destroy());
 });
 
 /** Simulates the browser tearing the page down. */
@@ -56,7 +69,7 @@ function simulatePageTeardown() {
 
 describe('campaignService autosave: flush on page teardown (finding #8)', () => {
     it('persists pending edits synchronously when the page is hidden/unloaded before the debounce elapses', async () => {
-        const service = createCampaignStore({ persist: true });
+        const service = trackStore(createCampaignStore({ persist: true }));
         await flushMicrotasks();
 
         service.createCampaign('Unsaved Session Prep', 'A fantasy world');

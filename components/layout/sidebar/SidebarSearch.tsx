@@ -23,6 +23,8 @@ export const SidebarSearch: React.FC<SidebarSearchProps> = ({ filterText, onFilt
         {filterText && (
           <button
             onClick={onClear}
+            title="Clear filter"
+            aria-label="Clear filter"
             className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
           >
             <Icons.X className="w-3.5 h-3.5" />

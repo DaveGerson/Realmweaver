@@ -1,11 +1,10 @@
 
 import React, { useState, useCallback } from 'react';
 import type { Campaign } from '../../types/index';
-import type { WorldEvent } from '../../services/ai/worldSimulation';
 // AI facade rule (CLAUDE.md): components import ONLY from aiService.ts, never
-// from services/ai/* directly. isValidSuggestedUpdate is a pure validation
-// predicate (no mock-mode branch), so aiService.ts re-exports it as-is.
-import { generateWorldEvents, isValidSuggestedUpdate } from '../../services/aiService';
+// from services/ai/* directly — the type included, so a grep for that rule
+// stays clean.
+import { generateWorldEvents, isValidSuggestedUpdate, type WorldEvent } from '../../services/aiService';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { campaignService } from '../../services/campaignService';

@@ -33,6 +33,17 @@ vi.stubGlobal('localStorage', {
 
 let createCampaignStore: typeof import('../../services/campaignService').createCampaignStore;
 
+// tests/CLAUDE.md: every `{ persist: true }` store must be destroyed in
+// afterEach — init() registers real pagehide/beforeunload/visibilitychange
+// listeners plus a storageService conflict subscription. Untorn-down stores in
+// this file are especially harmful: each one keeps answering the shared
+// `storage` event dispatched by later tests.
+const liveStores: Array<{ destroy: () => void }> = [];
+const trackStore = <T extends { destroy: () => void }>(service: T): T => {
+    liveStores.push(service);
+    return service;
+};
+
 const CAMPAIGNS_KEY = 'realmweaver-campaigns';
 const ACTIVE_ID_KEY = 'realmweaver-active-campaign-id';
 
@@ -55,6 +66,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    liveStores.splice(0).forEach(service => service.destroy());
     vi.useRealTimers();
 });
 
@@ -64,7 +76,7 @@ describe('campaignService: cross-tab conflict must not silently clobber (finding
         store[ACTIVE_ID_KEY] = 'camp-a';
 
         vi.useFakeTimers();
-        const service = createCampaignStore({ persist: true });
+        const service = trackStore(createCampaignStore({ persist: true }));
         await vi.advanceTimersByTimeAsync(1);
 
         expect(service.getState().campaigns.map(c => c.id)).toEqual(['camp-a']);
@@ -102,7 +114,7 @@ describe('campaignService: cross-tab conflict must not silently clobber (finding
         store[ACTIVE_ID_KEY] = 'camp-a';
 
         vi.useFakeTimers();
-        const service = createCampaignStore({ persist: true });
+        const service = trackStore(createCampaignStore({ persist: true }));
         await vi.advanceTimersByTimeAsync(1);
 
         // This tab makes an edit that is still sitting inside the 2s debounce
@@ -135,7 +147,7 @@ describe('campaignService: cross-tab conflict must not silently clobber (finding
             store[ACTIVE_ID_KEY] = 'camp-a';
 
             vi.useFakeTimers();
-            const service = createCampaignStore({ persist: true });
+            const service = trackStore(createCampaignStore({ persist: true }));
             await vi.advanceTimersByTimeAsync(1);
 
             service.updateCampaign({ setting: 'Local tab wins' });
@@ -163,7 +175,7 @@ describe('campaignService: cross-tab conflict must not silently clobber (finding
             store[ACTIVE_ID_KEY] = 'camp-a';
 
             vi.useFakeTimers();
-            const service = createCampaignStore({ persist: true });
+            const service = trackStore(createCampaignStore({ persist: true }));
             await vi.advanceTimersByTimeAsync(1);
 
             service.updateCampaign({ setting: 'Local tab loses' });

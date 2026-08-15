@@ -47,8 +47,13 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
   const [poiGenerationError, setPoiGenerationError] = useState<string | null>(null);
   const [isGeneratingNpc, setIsGeneratingNpc] = useState(false);
   const [npcGenerationError, setNpcGenerationError] = useState<string | null>(null);
+  const [npcGenerationSuccess, setNpcGenerationSuccess] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const { confirm } = useConfirmDialog();
+  // True when rendering LocationDashboard's unsaved chat-generator draft
+  // (synthetic id 'preview'), which must not fire "generate here" writes —
+  // the NPC would be committed against a location that doesn't exist yet.
+  const isDraftPreview = location.id === 'preview';
 
   // Tracks the last `location` prop we've reconciled against, so incoming prop
   // updates can be merged field-by-field instead of overwriting formData wholesale.
@@ -127,6 +132,24 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
   const lastMergedIdsKeyRef = useRef<string>(
     Array.from(new Set(Object.values(mentionedIdsByFieldRef.current).flat())).sort().join(String.fromCharCode(0)),
   );
+  // Editors are not remounted when the GM navigates A -> B (ViewRouter renders
+  // this editor at a fixed position with no key), so the useRef initialisers
+  // above only ever ran for the FIRST entity. Rebuild both refs from the
+  // incoming entity on every id change, mirroring the mount-time seeding —
+  // otherwise B's first keystroke merges A's stale per-field sets into B's
+  // mentionedEntityIds (or A's stale merged key suppresses B's first
+  // legitimate write). Keyed on the id ONLY — resetting on every
+  // mentionCandidates recompute would discard in-session tracked mentions
+  // (same rationale as MentionInput's seedKey resync).
+  useEffect(() => {
+    mentionedIdsByFieldRef.current = {
+      description: findMentionedIdsInText(location.description, mentionCandidates),
+      secrets: findMentionedIdsInText(location.secrets, mentionCandidates),
+    };
+    lastMergedIdsKeyRef.current =
+      Array.from(new Set(Object.values(mentionedIdsByFieldRef.current).flat())).sort().join(String.fromCharCode(0));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.id]);
   // Reports the merged set of mentioned IDs (across every mention field) whenever any field changes.
   const handleMentionedIdsChange = (field: string) => (ids: string[]) => {
     const next = { ...mentionedIdsByFieldRef.current, [field]: ids };
@@ -291,10 +314,14 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
   const handleGenerateNpcAtLocation = async (prompt: string) => {
     setIsGeneratingNpc(true);
     setNpcGenerationError(null);
+    setNpcGenerationSuccess(null);
     const contextWithLocation = `${campaignContext || ''}\nCurrent Location: ${location.name}${location.description ? ` — ${location.description}` : ''}`.trim();
     try {
       const npcData = await generateNpc(prompt, isMockMode, contextWithLocation);
       campaignService.createNpc({ ...npcData, factionId: undefined, relationships: [], history: [] });
+      // The created NPC is not linked back into the Location model, so without
+      // this the button would be indistinguishable from a no-op on success.
+      setNpcGenerationSuccess(`Created ${npcData.name} — find them in the NPCs dashboard.`);
     } catch (error) {
       console.error('Failed to generate NPC at location:', error);
       setNpcGenerationError('Failed to generate NPC. Please try again.');
@@ -303,12 +330,18 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     }
   };
 
-  // Filter out the current location and its own children from the list of possible parents
+  // Filter out the current location and its own children from the list of possible parents.
+  // The ancestor walk tracks visited ids: imported or batch-generated data can carry a
+  // parent cycle (validation never checks referential cycles), and an unguarded walk
+  // would spin forever on the main thread during render.
   const possibleParents = allLocations.filter(l => {
     if (l.id === location.id) return false;
+    const visited = new Set<string>([l.id]);
     let current = l;
     while(current.parentLocationId) {
         if(current.parentLocationId === location.id) return false;
+        if(visited.has(current.parentLocationId)) break;
+        visited.add(current.parentLocationId);
         const parent = allLocations.find(p => p.id === current.parentLocationId);
         if(!parent) break;
         current = parent;
@@ -359,9 +392,14 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                     defaultPrompt={npcGenerationDefaultPrompt}
                     isGenerating={isGeneratingNpc}
                     onGenerate={handleGenerateNpcAtLocation}
+                    disabled={isDraftPreview}
+                    disabledReason={isDraftPreview ? 'Save this location before generating NPCs here.' : undefined}
                   />
                   {npcGenerationError && (
                     <p role="alert" className="text-xs text-red-400 mt-1.5">{npcGenerationError}</p>
+                  )}
+                  {npcGenerationSuccess && (
+                    <p role="status" className="text-xs text-green-400 mt-1.5">{npcGenerationSuccess}</p>
                   )}
                 </div>
               </div>

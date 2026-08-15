@@ -34,7 +34,7 @@ import { CombatTracker } from '@/components/tools/CombatTracker';
 import { SecretsTracker } from '@/components/tools/SecretsTracker';
 import { Icons } from '@/components/common/Icons';
 
-// Lazy-loaded visualizers — contain heavy dependencies (D3, dagre, React Flow)
+// Lazy-loaded RelationshipGraph — pulls in D3
 const RelationshipGraph = React.lazy(() => import('@/components/visualizers/RelationshipGraph').then(m => ({ default: m.RelationshipGraph })));
 
 const VisualizerFallback = () => (

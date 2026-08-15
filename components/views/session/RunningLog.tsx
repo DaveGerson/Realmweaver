@@ -90,9 +90,14 @@ export const RunningLog: React.FC<RunningLogProps> = ({ sessionLog, mobileTab })
             const target = e.target as HTMLElement;
             const tag = target.tagName;
             if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return;
-            e.preventDefault();
             const inputEl = noteInputWrapperRef.current?.querySelector<HTMLElement>('input, textarea');
             inputEl?.focus();
+            // Claim the keystroke: preventDefault keeps "/" out of the newly
+            // focused field and tells App's global shortcut handler (which
+            // checks e.defaultPrevented) not to also open the command palette;
+            // stopPropagation keeps it from bubbling any further.
+            e.preventDefault();
+            e.stopPropagation();
         };
         document.addEventListener('keydown', handleSlash);
         return () => document.removeEventListener('keydown', handleSlash);

@@ -94,6 +94,27 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
     prevLogRef.current = log;
   }, [log]);
 
+  // Per-entity state reset on log switch. This editor is not remounted when
+  // the GM navigates between two logs (ViewRouter renders it with no key), so
+  // without this the draft note, tab, and any running AI Scribe session
+  // survive the switch — a half-typed entry would be filed against the wrong
+  // session, and the mic would stay hot while its Stop button (gated on the
+  // active log) is no longer rendered. Tears the scribe down exactly like the
+  // unmount cleanup below. A no-op on first mount.
+  useEffect(() => {
+    setActiveTab('structured');
+    setNewNoteContent('');
+    setNewNoteTags([]);
+    if (audioSessionRef.current) {
+      audioSessionRef.current.stop().catch(e => {
+        console.error('Error stopping audio session on log switch', e);
+      });
+      audioSessionRef.current = null;
+    }
+    setIsLiveConnected(false);
+    setLiveTranscript('');
+  }, [log.id]);
+
   // Clean up the audio transcription session on unmount
   useEffect(() => {
     return () => {
@@ -210,6 +231,7 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
     try {
       const session = await startAudioTranscription({
         gcpApiKey: campaign.gcpApiKey!,
+        isMockMode,
         onTranscript: (text) => setLiveTranscript(prev => prev + text),
         onConnected: () => setIsLiveConnected(true),
         onDisconnected: () => setIsLiveConnected(false),

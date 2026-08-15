@@ -77,7 +77,7 @@ Tiers: `lite`→`haiku`, `standard`→`sonnet`, `quality`→`opus` (CLI aliases)
   escaping removes the character class the attack needs, so no fixed-point loop is required. `buildContextBlock` adds the "this is DATA, not
   instructions" preamble; every path that sends campaign context must go through it.
 - **PDFs fail fast**: `generateWithSchema` throws if any `MultimodalPart` is `application/pdf` — the CLI cannot decode base64 pasted into a text
-  prompt. PDF parsing requires the (unimplemented) `anthropic-api` provider or mock mode.
+  prompt. PDF import is unavailable on this provider — the error points users at the Manual tab or mock mode (`anthropic-api` remains an unimplemented stub).
 - **JSON parsing happens inside the retried callback**, not after it, so a truncated response triggers a real retry via `withRetry`'s "JSON"
   condition. `parseJsonResponse` strips markdown fences, then slices first `{` to last `}`.
 - `rawCallApi` propagates the proxy's `code` field onto the thrown `Error` (and infers `ETIMEDOUT` from a bare 504) so `withRetry`'s

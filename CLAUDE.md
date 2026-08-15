@@ -42,17 +42,22 @@ Create `.env.local` (all read via `loadEnv(mode, '.', '')`, so plain `process.en
 
 ```env
 # Client-visible (injected by vite.config.ts `define`, consumed by services/ai/modelConfig.ts)
-REALMWEAVER_AI_PROVIDER=claude-cli   # 'claude-cli' (default) | 'anthropic-api'
+REALMWEAVER_AI_PROVIDER=claude-cli   # 'claude-cli' (default) | 'anthropic-api' (stub — see below)
 REALMWEAVER_DEFAULT_TIER=standard    # 'lite' | 'standard' (default) | 'quality'
 REALMWEAVER_MAX_RETRIES=3            # total ATTEMPTS, min 1 (default 3)
 REALMWEAVER_TIMEOUT_MS=120000        # request timeout ms (default 120000)
 REALMWEAVER_API_BASE_URL=            # anthropic-api only; proxy / self-hosted base URL
 
 # Server-only — deliberately NOT injected into the client bundle
-ANTHROPIC_API_KEY=your_key_here      # only if anthropic-api
+ANTHROPIC_API_KEY=your_key_here      # only if anthropic-api (stub — see below)
 CLAUDE_CLI_PATH=claude               # path to the `claude` binary (default: on $PATH)
 REALMWEAVER_DEV_HOST=127.0.0.1       # widen the dev-server bind at your own risk
 ```
+
+`anthropic-api` is a **stub** — `services/ai/providers/anthropic-api.ts` throws
+`'Anthropic API provider not yet implemented'` from all three methods, so selecting it breaks
+every AI feature. `claude-cli` is the only working provider; mock mode is the only other
+working path.
 
 `GEMINI_API_KEY` is **not** wired into `define` — the Gemini key is sourced per-campaign from
 `campaign.gcpApiKey`.
@@ -155,7 +160,8 @@ Component → aiService.ts (facade) → ai/core.ts (adapter) → providers/regis
 including `audioTranscription` (use `startAudioTranscription({ ...config, isMockMode })`).
 
 - Registry default provider is `claude-cli`; anything unrecognised falls back to it. `gemini` is
-  a removed provider name that throws if selected.
+  a removed provider name that throws if selected. `anthropic-api` is registered but unimplemented
+  — every method throws, so never route a user to it as a workaround.
 - Model tiers: `lite` (haiku), `standard` (sonnet), `quality` (opus). `core.ts` maps legacy
   Gemini model names to tiers automatically; `modelConfig.resolveModelName()` maps a tier or
   legacy name to the active provider's model id (CLI alias vs. API model id).
@@ -203,8 +209,13 @@ campaignService.createNpc(data) / updateNpc(id, updates) / deleteNpc(id)
 // e.g. deleteAdventure(id) — deletion cascades to clean up all related references
 ```
 
-Relationship methods: `linkNpcToFaction`, `linkSceneToLocation`, `linkSceneToNpcs`,
-`setLocationParent`, etc.
+**Relationships have no dedicated link methods.** Edit the relationship field through the normal
+updater — `updateNpc(id, { factionId })`, `updateLocation(id, { parentLocationId })`,
+`updateArticle(id, { parentArticleId })`, `updateScene(adventureId, sceneId, { locationId, npcIds })` — and the store
+applies bidirectional sync and cycle validation internally via the private
+`_synchronizeNpcFactionLink` / `_synchronizeLocationHierarchy` / `_synchronizeArticleHierarchy`
+helpers and the `_isLocationParentingAllowed` / `_isArticleParentingAllowed` guards (an update that
+would create a parent cycle is rejected, leaving state unchanged).
 
 Lifecycle methods: `init`, `destroy`, `saveCampaign`, `flushPendingSave`, `resolveConflict`,
 `dismissBackupRecoveryNotice`.
@@ -215,7 +226,7 @@ Lifecycle methods: `init`, `destroy`, `saveCampaign`, `flushPendingSave`, `resol
 
 ### Three-Tier Hierarchy
 
-1. **Dashboards** — Entity list + `EntityCreationPanel` (chat/form toggle) + `useEntitySearch`. All dashboards use `useEntitySearch` for search/filter and `useRovingTabIndex` for keyboard grid navigation. Dashboard cards display entity completeness indicators (green/amber/red dots).
+1. **Dashboards** — Entity list + a creation UI. `useEntitySearch` (search/filter) and `useRovingTabIndex` (keyboard grid navigation) are universal. `EntityCreationPanel` (chat/form toggle) covers the six AI-generated types — NPC, location, faction, item, adventure, article — and is required for any *new* AI-generated type; plot and note use local title-only creators, player character uses `PlayerCharacterImporter`, and session log creates from `createDefaultSession()`. Completeness indicators (green/amber/red dots) are on 6 of 10 dashboards — adventure, article, note, player character, plot, session log — not the NPC/location/faction/item grids. See `components/CLAUDE.md` for the per-dashboard detail.
 2. **Generators** — AI creation forms. Accept `isMockMode`, `campaignContext`. Call `aiService` functions.
 3. **Editors** — Detail views with tabs and inline AI-assist. Accept `onNavigate` for EntityLink clicks. Editors are **not** remounted when navigating between entities of the same type — use `useDebouncedFieldCommit` for debounced field writes so pending edits commit against the id they were typed against.
 

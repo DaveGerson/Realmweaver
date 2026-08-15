@@ -23,17 +23,6 @@
 
 export type StorageBackend = 'localStorage' | 'indexedDB';
 
-export interface StorageInfo {
-  /** Which backend is currently being used for writes. */
-  activeBackend: StorageBackend;
-  /** Estimated bytes used (localStorage only; undefined if unavailable). */
-  estimatedUsedBytes?: number;
-  /** Estimated bytes available (navigator.storage.estimate if available). */
-  estimatedAvailableBytes?: number;
-  /** True when the last save triggered a quota warning. */
-  quotaWarning: boolean;
-}
-
 export interface BackupEntry {
   /** 1-based slot index (1 = newest). */
   index: number;
@@ -249,29 +238,6 @@ export function createStorageService() {
   }
 
   // ---------------------------------------------------------------------------
-  // Quota estimation (5.3)
-  // ---------------------------------------------------------------------------
-
-  async function _estimateQuota(): Promise<{ used?: number; available?: number }> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const nav = (globalThis as any).navigator;
-    if (nav?.storage?.estimate) {
-      try {
-        const estimate = await nav.storage.estimate();
-        return {
-          used: estimate.usage,
-          available: estimate.quota != null && estimate.usage != null
-            ? estimate.quota - estimate.usage
-            : undefined,
-        };
-      } catch {
-        // ignore
-      }
-    }
-    return {};
-  }
-
-  // ---------------------------------------------------------------------------
   // Multi-tab conflict detection setup (5.5)
   // ---------------------------------------------------------------------------
 
@@ -445,19 +411,6 @@ export function createStorageService() {
   }
 
   /**
-   * Returns storage diagnostics (5.3).
-   */
-  async function getStorageInfo(): Promise<StorageInfo> {
-    const quota = await _estimateQuota();
-    return {
-      activeBackend: _usingIdbFallback ? 'indexedDB' : 'localStorage',
-      estimatedUsedBytes: quota.used,
-      estimatedAvailableBytes: quota.available,
-      quotaWarning: _quotaWarning,
-    };
-  }
-
-  /**
    * Subscribe to cross-tab modification events (5.5).
    * The callback receives the storage key that was modified in another tab.
    * Returns an unsubscribe function.
@@ -526,7 +479,6 @@ export function createStorageService() {
     loadSync,
     load,
     remove,
-    getStorageInfo,
     onConflict,
     getBackups,
     restoreFromBackup,

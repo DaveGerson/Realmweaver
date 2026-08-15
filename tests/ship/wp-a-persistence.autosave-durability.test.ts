@@ -36,6 +36,16 @@ vi.stubGlobal('localStorage', {
 
 let createCampaignStore: typeof import('../../services/campaignService').createCampaignStore;
 
+// tests/CLAUDE.md: every `{ persist: true }` store must be destroyed in
+// afterEach — init() registers real pagehide/beforeunload/visibilitychange
+// listeners plus a storageService conflict subscription that otherwise keep
+// firing against the shared localStorage stub for the rest of the file.
+const liveStores: Array<{ destroy: () => void }> = [];
+const trackStore = <T extends { destroy: () => void }>(service: T): T => {
+    liveStores.push(service);
+    return service;
+};
+
 const CAMPAIGNS_KEY = 'realmweaver-campaigns';
 
 beforeAll(async () => {
@@ -49,6 +59,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    liveStores.splice(0).forEach(service => service.destroy());
     vi.useRealTimers();
 });
 
@@ -56,7 +67,7 @@ describe('campaignService autosave: bounded max-wait (finding #8)', () => {
     it('flushes to storage during a long burst of edits that never pauses for the full debounce', async () => {
         vi.useFakeTimers();
 
-        const service = createCampaignStore({ persist: true });
+        const service = trackStore(createCampaignStore({ persist: true }));
         // Let init()'s fire-and-forget async block settle.
         await vi.advanceTimersByTimeAsync(1);
         expect(service.getState().appStatus).toBe('welcome');
@@ -85,7 +96,7 @@ describe('campaignService autosave: honest reporting when the write is not durab
 
         vi.useFakeTimers();
 
-        const service = createCampaignStore({ persist: true });
+        const service = trackStore(createCampaignStore({ persist: true }));
         await vi.advanceTimersByTimeAsync(1);
 
         quotaExceededKeys = [CAMPAIGNS_KEY];

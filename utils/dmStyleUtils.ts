@@ -11,8 +11,11 @@ import type { DmStyle } from '@/types/index';
  * is an inert switch: it moves in the settings panel, persists an override,
  * and changes nothing on screen. 'plot-timeline', 'backlinks-panel' and
  * 'advanced-context' were removed for this reason (see FEATURE_LABELS).
+ *
+ * Exported so DmStylePanel can derive its guided-mode "Hides: ..." summary
+ * from this set + FEATURE_LABELS instead of a hard-coded copy that drifts.
  */
-const GUIDED_HIDDEN = new Set([
+export const GUIDED_HIDDEN = new Set([
   'continuity-checker',
   'relationship-graph',
   'secrets-tracker',

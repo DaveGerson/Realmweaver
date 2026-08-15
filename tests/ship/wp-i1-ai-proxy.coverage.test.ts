@@ -15,6 +15,22 @@
  * The oversized-stdout and oversized-body assertions the finding also asks for
  * live in wp-i1-ai-proxy.stdout-limit.test.ts and
  * wp-i1-ai-proxy.body-limit.test.ts, since those are red today.
+ *
+ * Contract changes since, pinned here (finding C1 + P5):
+ *   - C1: the argv shape this file originally pinned (`... -p <prompt>`) was
+ *     itself the defect — `-p` is an alias of `--print` (a boolean flag, not
+ *     a prompt flag), so the prompt was a bare positional and any prompt
+ *     starting with `-` (bulleted session notes, `---` YAML front matter)
+ *     aborted the CLI with `error: unknown option`. The prompt now travels
+ *     after a `--` separator on both the execFile and spawn paths.
+ *   - C1 (error hygiene): a non-zero execFile exit rejects with Node's
+ *     `Command failed: <full argv>\n<stderr>` — the argv embeds the whole
+ *     --system-prompt (campaign context) and prompt, which must never be
+ *     echoed back to the client; only the CLI's stderr tail may be.
+ *   - P5: REALMWEAVER_TIMEOUT_MS was parsed but never consumed — the real
+ *     deadline was a hardcoded 120s. The proxy now resolves it live from
+ *     process.env for the execFile/spawn timeouts and derives the
+ *     "timed out after N seconds" copy from the same value.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -152,9 +168,26 @@ describe('AI proxy — subprocess invocation', () => {
       'You are a GM assistant.',
       '--max-turns',
       '3',
-      '-p',
+      '--',
       'Describe a tavern',
     ]);
+  });
+
+  it('passes a dash-leading prompt as the operand after `--`, never as an option (C1)', async () => {
+    h.state.execResult = { stdout: 'ok', stderr: '' };
+    const prompt = '- bullet notes\n- found a map to the crypt';
+    const res = post({ prompt, model: 'sonnet' });
+    await waitFor(() => res.ended);
+
+    expect(h.state.execArgs).toHaveLength(1);
+    const [, args] = h.state.execArgs[0];
+    // The `--` terminator must sit immediately before the prompt, so the
+    // CLI's option parser can never read `- bullet notes…` as an option.
+    expect(args[args.length - 2]).toBe('--');
+    expect(args[args.length - 1]).toBe(prompt);
+    // `-p` is an alias of `--print` (already emitted), not a prompt flag.
+    expect(args).not.toContain('-p');
+    expect(res.statusCode).toBe(200);
   });
 
   it('pipes prompts over 100KB through stdin instead of argv', async () => {
@@ -166,7 +199,9 @@ describe('AI proxy — subprocess invocation', () => {
     await waitFor(() => h.state.spawnArgs.length > 0);
 
     const [, args] = h.state.spawnArgs[0];
-    expect(args).toContain('-p');
+    // The stdin placeholder `-` is an operand either way, but it rides after
+    // the same `--` separator as the direct path for symmetry (C1).
+    expect(args[args.length - 2]).toBe('--');
     expect(args[args.length - 1]).toBe('-');
     expect(args).not.toContain(huge);
 
@@ -238,6 +273,85 @@ describe('AI proxy — error mapping', () => {
 
     expect(res.statusCode).toBe(500);
     expect(res.json().error).toMatch(/CLAUDE_CLI_PATH/);
+  });
+
+  it('never echoes the execFile argv (system prompt + prompt) back to the client — C1 hygiene', async () => {
+    const systemPrompt = 'CAMPAIGN-CONTEXT-MUST-NOT-LEAK';
+    // Node's execFile rejection for a non-zero exit: `Command failed: <full
+    // argv>\n<stderr>`, with the raw stderr also attached as a property.
+    h.state.execError = Object.assign(
+      new Error(
+        `Command failed: claude --print --system-prompt ${systemPrompt} -- a prompt\nInvalid API key`
+      ),
+      { code: 1, stderr: 'Invalid API key' }
+    );
+    const res = post({ prompt: 'a prompt', systemPrompt });
+    await waitFor(() => res.ended);
+
+    expect(res.statusCode).toBe(500);
+    const message = String(res.json().error);
+    expect(message).not.toContain(systemPrompt);
+    expect(message).not.toContain('Command failed');
+    expect(message).toContain('Invalid API key');
+  });
+
+  it('falls back to a generic message when a Command-failed error carries no stderr', async () => {
+    h.state.execError = Object.assign(
+      new Error('Command failed: claude --print --system-prompt SECRET -- p'),
+      { code: 1, stderr: '' }
+    );
+    const res = post({ prompt: 'p' });
+    await waitFor(() => res.ended);
+
+    expect(res.statusCode).toBe(500);
+    const message = String(res.json().error);
+    expect(message).not.toContain('SECRET');
+    expect(message).toMatch(/exited with an error/i);
+  });
+});
+
+describe('AI proxy — REALMWEAVER_TIMEOUT_MS wiring (P5)', () => {
+  const ORIGINAL_TIMEOUT = process.env.REALMWEAVER_TIMEOUT_MS;
+
+  afterEach(() => {
+    if (ORIGINAL_TIMEOUT === undefined) delete process.env.REALMWEAVER_TIMEOUT_MS;
+    else process.env.REALMWEAVER_TIMEOUT_MS = ORIGINAL_TIMEOUT;
+  });
+
+  it('defaults the execFile timeout to 120000ms when the env var is unset', async () => {
+    delete process.env.REALMWEAVER_TIMEOUT_MS;
+    const res = post({ prompt: 'tavern' });
+    await waitFor(() => res.ended);
+
+    const [, , opts] = h.state.execArgs[0];
+    expect((opts as { timeout?: number }).timeout).toBe(120_000);
+  });
+
+  it('uses the configured timeout for execFile and derives the timed-out copy from it', async () => {
+    process.env.REALMWEAVER_TIMEOUT_MS = '300000';
+    h.state.execError = Object.assign(new Error('Command failed'), { killed: true });
+    const res = post({ prompt: 'tavern' });
+    await waitFor(() => res.ended);
+
+    const [, , opts] = h.state.execArgs[0];
+    expect((opts as { timeout?: number }).timeout).toBe(300_000);
+    expect(res.statusCode).toBe(504);
+    expect(res.json().error).toMatch(/timed out after 300 seconds/);
+  });
+
+  it('passes the configured timeout to the spawn path too', async () => {
+    process.env.REALMWEAVER_TIMEOUT_MS = '45000';
+    const child = new FakeChild();
+    h.state.child = child;
+    const res = post({ prompt: 'A'.repeat(120_000) });
+    await waitFor(() => h.state.spawnArgs.length > 0);
+
+    const [, , opts] = h.state.spawnArgs[0];
+    expect((opts as { timeout?: number }).timeout).toBe(45_000);
+    // Settle the in-flight request so nothing leaks into the next test.
+    child.stdout.emit('data', Buffer.from('done'));
+    child.emit('close', 0, null);
+    await waitFor(() => res.ended);
   });
 });
 

@@ -283,3 +283,59 @@ describe('Cascade deletion: the five delete paths the ship suite never exercised
         expect(serialized).not.toContain(secretId);
     });
 });
+
+/**
+ * Ship-review follow-up (finding C2): deleteAdventure deletes an adventure AND
+ * all of its scenes, but ran `_purgeEntityReferences` for the adventure id only
+ * — never per contained scene, unlike deleteScene (covered above). A scene
+ * pinned from its EntityQuickCard and then deleted via its parent adventure
+ * therefore survived in `campaign.pinnedEntities` forever: the sidebar resolves
+ * its name to null and renders no row (so no unpin button), and the invisible
+ * ghost permanently consumed one of the 15 capped pin slots.
+ */
+describe('Cascade deletion: deleteAdventure must sweep its contained scenes\' ids too (review finding C2)', () => {
+    function buildAdventureWithLinkedScene(service: ReturnType<CreateCampaignStoreFn>) {
+        const advId = service.createFullAdventure({ title: 'The Siege', hook: '', theme: '', level: 1, scenes: [] });
+        const sceneId = service.createScene(advId, {
+            title: 'The Gatehouse', type: 'combat', status: 'planned', readAloudText: '', gmNotes: '',
+            skillChecks: [], rewards: '', npcIds: [],
+        });
+        const npcId = service.createNpc({
+            name: 'Watch Captain', description: '', traits: '', backstory: '', motivations: '',
+            secrets: '', stats: '', exampleQuote: '', knowsPlayerHistory: [], relationships: [], history: [],
+            mentionedEntityIds: [sceneId],
+        });
+        const sessionId = service.createSessionLog({
+            title: 'Assault Prep', status: 'planned', sessionDate: '', plannedSceneIds: [sceneId], prepNotes: '',
+            relatedPlotIds: [], runningNotes: '', encounterLog: [], recap: '', notableEvents: '', looseEnds: '',
+            structuredNotes: [],
+        });
+        service.pinEntity('scene', sceneId);
+        return { advId, sceneId, npcId, sessionId };
+    }
+
+    it('deleteAdventure purges each deleted scene id from mentionedEntityIds and pinnedEntities (mirroring deleteScene)', () => {
+        const { service, campaign } = makeTestStore(createCampaignStore);
+        const { advId, sceneId, npcId, sessionId } = buildAdventureWithLinkedScene(service);
+
+        service.deleteAdventure(advId);
+
+        const npc = campaign().npcs.find(n => n.id === npcId)!;
+        expect(npc.mentionedEntityIds ?? []).not.toContain(sceneId);
+        expect(campaign().pinnedEntities!.some(p => p.id === sceneId)).toBe(false);
+        // The pre-existing hand-rolled plannedSceneIds cleanup must survive the fix.
+        const session = campaign().sessionLogs.find(l => l.id === sessionId)!;
+        expect(session.plannedSceneIds).not.toContain(sceneId);
+    });
+
+    it('leaves no trace of the adventure id or its scene ids anywhere in the campaign (deep sweep)', () => {
+        const { service, campaign } = makeTestStore(createCampaignStore);
+        const { advId, sceneId } = buildAdventureWithLinkedScene(service);
+
+        service.deleteAdventure(advId);
+
+        const serialized = JSON.stringify(campaign());
+        expect(serialized).not.toContain(sceneId);
+        expect(serialized).not.toContain(advId);
+    });
+});

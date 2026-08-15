@@ -22,7 +22,8 @@ import type {
     PlotSessionStatus,
     Secret,
     Beat,
-    DmStyle
+    DmStyle,
+    HistoryEntry
 } from '../types/index';
 import { importCampaignFromJsonValidated } from './importExportService';
 import { parseCharacterSheetPdf } from './aiService';
@@ -72,6 +73,9 @@ function migrateCampaignsData(campaignsData: any[]): Campaign[] {
             encounterLog: l.encounterLog || [],
         })),
         playerCharacters: c.playerCharacters || [],
+        // Backfilled in lockstep with importExportService.normaliseRequiredArrays —
+        // ItemDashboard/createItem/duplicateCampaign dereference `items` unconditionally.
+        items: c.items || [],
         npcs: (c.npcs || []).map((n: any) => ({ ...n, relationships: n.relationships || [], history: n.history || [] })),
         locations: (c.locations || []).map((l: any) => ({ ...l, history: l.history || [] })),
         // Ensure required array fields exist on factions/adventures too — older or
@@ -324,8 +328,11 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         }
         if (quotaWarning) {
             console.warn('[campaignService] Save succeeded via IndexedDB fallback — localStorage quota exceeded.');
-        } else {
-            console.log('Campaign auto-saved successfully.');
+        } else if (import.meta.env.DEV) {
+            // Success-path logging is dev-only — autosave fires every few seconds
+            // of typing, and the saveStatus/lastSavedAt state stamped above
+            // already drives the user-facing indicator.
+            console.debug('[campaignService] autosaved');
         }
     };
 
@@ -424,9 +431,16 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
     };
 
     const _isLocationParentingAllowed = (draftCampaign: Campaign, childId: string, newParentId: string): boolean => {
+        // Visited guard: a PRE-EXISTING parent cycle (importable — the import
+        // validator checks ids, not referential integrity) must not turn this
+        // walk into an infinite loop. Such a cycle cannot include childId (that
+        // returns false first), so attaching under it creates no NEW cycle.
+        const visited = new Set<string>();
         let currentId: string | undefined = newParentId;
         while (currentId) {
             if (currentId === childId) return false; // Cycle detected
+            if (visited.has(currentId)) return true;
+            visited.add(currentId);
             const current = draftCampaign.locations.find(l => l.id === currentId);
             if (!current) return true;
             currentId = current.parentLocationId;
@@ -448,9 +462,13 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
     };
     
     const _isArticleParentingAllowed = (draftCampaign: Campaign, childId: string, newParentId: string): boolean => {
+        // Visited guard mirrors _isLocationParentingAllowed — see the comment there.
+        const visited = new Set<string>();
         let currentId: string | undefined = newParentId;
         while (currentId) {
             if (currentId === childId) return false; // Cycle detected
+            if (visited.has(currentId)) return true;
+            visited.add(currentId);
             const current = draftCampaign.articles.find(a => a.id === currentId);
             if (!current) return true;
             currentId = current.parentArticleId;
@@ -484,7 +502,9 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
      * the deleted id are left untouched.
      *
      * Covers: NPC relationships + mentionedEntityIds, Location/Faction/Scene
-     * mentionedEntityIds, Plot relatedEntityIds + mentionedEntityIds, Article
+     * mentionedEntityIds, NPC/Location history[].referenceId (nulled to a
+     * 'manual' entry rather than filtered — the timeline row itself stays),
+     * Plot relatedEntityIds + mentionedEntityIds, Article
      * relatedEntityIds + mentionedEntityIds, SessionLog relatedPlotIds +
      * plotProgressions (for when the deleted entity is a Plot), Faction
      * leaderId/headquartersLocationId, Location.connections, Secret
@@ -501,6 +521,18 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
      * id survived in pinnedEntities forever).
      */
     const _purgeEntityReferences = (draftCampaign: Campaign, entityId: string) => {
+        // History rows keep their summary but drop the dangling pointer —
+        // EntityHistoryManager would otherwise render a permanent
+        // 'Unknown Session'/'Unknown' link to a target that no longer exists.
+        const purgeHistoryRefs = (history?: HistoryEntry[]) => {
+            (history || []).forEach(h => {
+                if (h.referenceId === entityId) {
+                    h.referenceId = undefined;
+                    h.referenceType = 'manual';
+                }
+            });
+        };
+
         draftCampaign.npcs.forEach(npc => {
             if (npc.relationships) {
                 npc.relationships = npc.relationships.filter(r => r.targetId !== entityId);
@@ -508,6 +540,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             if (npc.mentionedEntityIds) {
                 npc.mentionedEntityIds = npc.mentionedEntityIds.filter(id => id !== entityId);
             }
+            purgeHistoryRefs(npc.history);
         });
 
         draftCampaign.locations.forEach(loc => {
@@ -517,6 +550,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             if (loc.connections) {
                 loc.connections = loc.connections.filter(c => c.targetLocationId !== entityId);
             }
+            purgeHistoryRefs(loc.history);
         });
 
         draftCampaign.factions.forEach(faction => {
@@ -1915,6 +1949,13 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 }
 
                 // Cleanup all cross-entity references (e.g. @-mentions of this adventure)
+                // AND of every scene it contains — deleteScene runs the sweep per
+                // scene, so deleting the whole adventure must too, or the scene ids
+                // survive in pinnedEntities/mentionedEntityIds/etc. forever
+                // (invisible, unremovable ghost pins). The hand-rolled
+                // activeSceneId/plannedSceneIds cleanups above stay: the sweep
+                // does not cover those fields.
+                adventure.scenes.forEach(s => _purgeEntityReferences(campaign, s.id));
                 _purgeEntityReferences(campaign, id);
 
                 campaign.adventures = campaign.adventures.filter(a => a.id !== id);
@@ -2419,8 +2460,12 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
 
         /**
          * Adds an auto-generated event entry to the active session's running log.
+         * Returns true when the entry was written, false when there is no live
+         * session to write to (no active campaign/session) — callers must not
+         * report success on a false return.
          */
-        addAutoEvent(type: SessionLogEntryType, content: string) {
+        addAutoEvent(type: SessionLogEntryType, content: string): boolean {
+            let written = false;
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
                 if (!campaign || !campaign.activeSessionId) return;
@@ -2435,7 +2480,9 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     type: type || 'manual',
                     isImportant: false,
                 });
+                written = true;
             });
+            return written;
         },
 
         /**
@@ -2645,7 +2692,12 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     if (!parentRef) return;
                     const resolvedParentId = locationNameMap.get(parentRef.toLowerCase())
                         ?? (allLocationsInDraft.some(l => l.id === parentRef) ? parentRef : undefined);
-                    if (resolvedParentId && resolvedParentId !== loc.id) {
+                    // Guard the full ancestor chain, not just direct self-parenting —
+                    // two batched locations naming each other as parents would
+                    // otherwise commit a hierarchy cycle that hangs every
+                    // unguarded ancestor walk in the UI.
+                    if (resolvedParentId && resolvedParentId !== loc.id
+                        && _isLocationParentingAllowed(campaign, loc.id, resolvedParentId)) {
                         const parent = allLocationsInDraft.find(p => p.id === resolvedParentId);
                         if (parent && !parent.subLocationIds.includes(loc.id)) parent.subLocationIds.push(loc.id);
                         loc.parentLocationId = resolvedParentId;

@@ -11,24 +11,30 @@
  *   GET  /api/ai/health    - Health check
  *
  * Security: Uses `execFile` (no shell) for CLI invocation to prevent
- * command injection. For prompts exceeding 100KB, falls back to a temp
- * file approach with shell invocation (necessary to bypass ARG_MAX).
+ * command injection; prompts exceeding 100KB are piped over stdin to a
+ * spawned process (still no shell) to stay clear of ARG_MAX. Either way the
+ * prompt travels after a `--` separator so the CLI can never parse it as an
+ * option (see invokeClaudeCli).
  *
  * Request authentication (see isLocalRequest below for the full rationale):
  * a TCP-peer-address loopback check (mandatory, unforgeable) layered with an
  * Origin+Host localhost allowlist (blocks DNS-rebinding), plus a per-session
- * PROXY_TOKEN injected into the page via transformIndexHtml and validated
- * when present on the X-Realmweaver-Token header. The token is not yet
- * REQUIRED: the browser client that would send it
- * (services/ai/providers/claude-cli.ts, rawCallApi's fetch call) is owned by
- * a different work package and was already modified this remediation round
- * (`git log -- services/ai/providers/claude-cli.ts`), so it was left
- * unedited here per the file-ownership rule for this round rather than risk
- * clobbering a concurrent change. To complete the rollout: read
+ * PROXY_TOKEN validated when present on the X-Realmweaver-Token header. The
+ * token is not yet REQUIRED, and it is injected into the page via
+ * transformIndexHtml under `vite dev` only: `apply: 'serve'` keeps `vite
+ * build` from baking one build process's token into the static
+ * dist/index.html, and `vite preview` serves that prebuilt HTML
+ * untransformed, so a previewed page carries NO token meta and authenticates
+ * through the peer-address and Origin/Host layers alone. To complete the
+ * client rollout: in services/ai/providers/claude-cli.ts (since edited by
+ * wp-c), read
  * `document.querySelector('meta[name="realmweaver-proxy-token"]')?.content`
- * once in claude-cli.ts and add `headers: { ..., 'x-realmweaver-token':
- * token }` to the fetch() call in rawCallApi -- no server-side change
- * needed, hasValidToken() already accepts it.
+ * once and, when the meta tag exists, echo it as `headers: { ...,
+ * 'x-realmweaver-token': token }` on rawCallApi's fetch() call --
+ * hasValidToken() already accepts it. Making the token MANDATORY
+ * server-side additionally needs a way for a previewed page to learn the
+ * live token (e.g. a gated GET /api/ai/token); until then a required token
+ * would 403 every AI call under `npm run preview`.
  */
 
 import type { Plugin, ViteDevServer } from 'vite';
@@ -44,9 +50,25 @@ const execFileAsync = promisify(execFile);
 // ---------------------------------------------------------------------------
 
 const CLAUDE_CLI_PATH = process.env.CLAUDE_CLI_PATH || 'claude';
-const TIMEOUT_MS = 120_000;
+const DEFAULT_TIMEOUT_MS = 120_000;
+// Floor for a configured REALMWEAVER_TIMEOUT_MS: below ~1s the CLI cannot
+// even start, so a sub-second value is a unit mistake, not a real budget.
+const MIN_TIMEOUT_MS = 1_000;
 const MAX_BUFFER = 1024 * 1024; // 1MB output buffer
-const DIRECT_PROMPT_LIMIT = 100_000; // 100KB -- above this, use temp file
+const DIRECT_PROMPT_LIMIT = 100_000; // 100KB -- above this, pipe via stdin
+
+/**
+ * Request deadline for one CLI invocation, from REALMWEAVER_TIMEOUT_MS
+ * (documented in README.md / CLAUDE.md; default 120000). Read live from
+ * process.env on every call rather than snapshotted at import time --
+ * vite.config.ts bridges a .env.local-only value into process.env when the
+ * config factory runs, which is AFTER this module has been imported.
+ */
+function resolveTimeoutMs(): number {
+  const raw = Number.parseInt(process.env.REALMWEAVER_TIMEOUT_MS || '', 10);
+  if (!Number.isFinite(raw) || raw <= 0) return DEFAULT_TIMEOUT_MS;
+  return Math.max(raw, MIN_TIMEOUT_MS);
+}
 
 // Same-origin allowlist for the local dev/runtime server. Only requests whose
 // Origin resolves to localhost/127.0.0.1/[::1] are allowed to invoke the CLI
@@ -95,8 +117,10 @@ function isLoopbackAddress(remoteAddress: string | undefined): boolean {
 }
 
 // Per-server-session secret, generated fresh each time the plugin is
-// instantiated (i.e. on every `vite dev`/`vite preview` process start) and
-// injected into the served page via `transformIndexHtml`. Origin and Host
+// instantiated (i.e. on every `vite dev`/`vite preview` process start).
+// Under `vite dev` it is injected into the served page via
+// `transformIndexHtml`; a previewed page never carries one (see the
+// transformIndexHtml comment below). Origin and Host
 // are both attacker-controlled strings for any non-browser client (curl,
 // python, arbitrary scripts) -- reproducibly so even when both are forged to
 // read as localhost -- so neither is sufficient authentication on its own.
@@ -143,10 +167,10 @@ function hasValidToken(headers: Record<string, string | string[] | undefined>): 
  *
  * PROXY_TOKEN (X-Realmweaver-Token) is deliberately NOT required here yet:
  * the legitimate client (services/ai/providers/claude-cli.ts's rawCallApi)
- * does not send it, and that file is owned by another work package this
- * round (see the git-log note in this file's header comment) -- making the
- * token mandatory today would 403 every real AI call. hasValidToken() is
- * exported/used so a token that IS present must still be correct, and so
+ * does not send it, and a page served by `vite preview` has no way to learn
+ * it at all (see the rollout note in this file's header comment) -- making
+ * the token mandatory today would 403 every real AI call. hasValidToken()
+ * is exported/used so a token that IS present must still be correct, and so
  * wiring the client header later requires no further server change.
  */
 function isLocalRequest(req: {
@@ -357,6 +381,14 @@ function registerAiRoutes(server: MiddlewareServer) {
 export function aiProxyPlugin(): Plugin {
   return {
     name: 'realmweaver-ai-proxy',
+    // `vite dev` and `vite preview` both resolve plugins with command
+    // 'serve', so the route hooks below still run for preview; `vite build`
+    // (command 'build') excludes the plugin entirely -- which is the point:
+    // transformIndexHtml must never bake one build process's PROXY_TOKEN
+    // into the static dist/index.html, where it would shadow the live
+    // server's token and (once the client echoes it) 403 every AI call
+    // under `npm run preview`.
+    apply: 'serve',
     configureServer(server: ViteDevServer) {
       registerAiRoutes(server);
     },
@@ -376,9 +408,11 @@ export function aiProxyPlugin(): Plugin {
     // Injects the per-session proxy token (see PROXY_TOKEN above) into the
     // served page so a legitimate same-origin script -- and only a
     // same-origin script, per the browser's same-origin policy -- can read
-    // it back out and echo it on the X-Realmweaver-Token header. Runs under
-    // both `vite dev` and `vite preview` (transformIndexHtml is not tied to
-    // configureServer/configurePreviewServer the way route registration is).
+    // it back out and echo it on the X-Realmweaver-Token header. With
+    // `apply: 'serve'` this only ever runs for dev-served HTML; `vite
+    // preview` serves the prebuilt dist/index.html untransformed, so a
+    // previewed page has no token meta and relies on the peer-address +
+    // Origin/Host layers (the token is optional -- see isLocalRequest).
     transformIndexHtml() {
       return [
         {
@@ -398,29 +432,37 @@ export function aiProxyPlugin(): Plugin {
 /**
  * Invokes the Claude CLI binary with the given request parameters.
  *
- * For prompts under DIRECT_PROMPT_LIMIT (100KB), the prompt is passed
- * directly via the `-p` argument to `execFile` (no shell, safe from injection).
+ * For prompts under DIRECT_PROMPT_LIMIT (100KB), the prompt is passed to
+ * `execFile` as the positional [prompt] operand after a `--` separator (no
+ * shell, safe from injection). The `--` is load-bearing: `-p` is an alias of
+ * `--print` (a boolean flag, already emitted by buildCliArgs), NOT a prompt
+ * flag, and without the separator the CLI's option parser treats any prompt
+ * whose text starts with `-` (bulleted session notes, `---` YAML front
+ * matter) as an unknown option and aborts.
  *
  * For larger prompts, the prompt is piped via stdin to avoid ARG_MAX limits.
  * Both paths use execFile/spawn (no shell) to prevent command injection.
  */
 async function invokeClaudeCli(request: CliRequest): Promise<string> {
   const args = buildCliArgs(request);
+  const timeoutMs = resolveTimeoutMs();
 
   if (request.prompt.length <= DIRECT_PROMPT_LIMIT) {
     // Direct invocation: no shell, safe from injection
-    args.push('-p', request.prompt);
+    args.push('--', request.prompt);
     const { stdout } = await execFileAsync(CLAUDE_CLI_PATH, args, {
-      timeout: TIMEOUT_MS,
+      timeout: timeoutMs,
       maxBuffer: MAX_BUFFER,
     });
     return stdout;
   } else {
-    // Large prompt: pipe via stdin using spawn (no shell, no temp file)
+    // Large prompt: pipe via stdin using spawn (no shell, no temp file).
+    // A lone `-` already parses as an operand; the `--` is symmetry with the
+    // direct path, defending against the CLI ever growing a `-` option.
     return new Promise<string>((resolve, reject) => {
-      const child = spawn(CLAUDE_CLI_PATH, [...args, '-p', '-'], {
+      const child = spawn(CLAUDE_CLI_PATH, [...args, '--', '-'], {
         stdio: ['pipe', 'pipe', 'pipe'],
-        timeout: TIMEOUT_MS,
+        timeout: timeoutMs,
       });
 
       const stdoutChunks: Buffer[] = [];
@@ -476,11 +518,11 @@ async function invokeClaudeCli(request: CliRequest): Promise<string> {
           settleResolve(stdout);
         } else if (signal === 'SIGTERM' && code === null) {
           // spawn's `timeout` option kills the child with SIGTERM (the
-          // default killSignal) once TIMEOUT_MS elapses, leaving `code`
+          // default killSignal) once the timeout elapses, leaving `code`
           // null. Mark this distinctly so callers can detect a real timeout
           // instead of a generic non-zero exit.
           const timeoutErr = new Error(
-            `claude CLI timed out after ${TIMEOUT_MS}ms`
+            `claude CLI timed out after ${timeoutMs}ms`
           ) as Error & { code?: string; killed?: boolean };
           timeoutErr.code = 'ETIMEDOUT';
           timeoutErr.killed = true;
@@ -512,7 +554,7 @@ async function invokeClaudeCli(request: CliRequest): Promise<string> {
         }
       } else {
         // Settle immediately instead of leaving the request hanging on
-        // 'close' / child 'error' / the 120s spawn timeout -- a destroyed
+        // 'close' / child 'error' / the spawn timeout -- a destroyed
         // stdin almost always means the child already died, so the client
         // should get an immediate error rather than wait out the timeout.
         settleReject(new Error('claude CLI stdin closed before the prompt could be written'));
@@ -607,16 +649,31 @@ function readBody(req: {
 
 /**
  * Formats CLI errors into user-friendly messages based on known error codes.
+ *
+ * A non-zero execFile exit rejects with Node's
+ * `Command failed: <full argv>\n<stderr>` message -- and the argv embeds the
+ * entire --system-prompt (the campaign context) plus the prompt. That
+ * multi-KB blob must never be echoed back to the client, so such messages
+ * are replaced by the CLI's own stderr tail (the actual error is printed
+ * last) before any substring classification runs on them.
  */
+const STDERR_TAIL_CHARS = 500;
+
 function formatErrorMessage(error: Error, code?: string): string {
   if (code === 'ENOENT') {
     return `Claude CLI not found at '${CLAUDE_CLI_PATH}'. Install Claude Code or set CLAUDE_CLI_PATH in your .env file.`;
   }
-  if (code === 'ETIMEDOUT' || error.message.includes('timeout')) {
-    return 'AI request timed out after 120 seconds. Try simplifying your prompt or using a faster model.';
+  let message = error.message;
+  if (message.startsWith('Command failed:')) {
+    const stderr = (error as Error & { stderr?: string | Buffer }).stderr;
+    const stderrText = String(stderr ?? '').trim();
+    message = stderrText.slice(-STDERR_TAIL_CHARS) || 'Claude CLI exited with an error.';
   }
-  if (error.message.includes('SIGKILL') || error.message.includes('SIGTERM')) {
+  if (code === 'ETIMEDOUT' || message.includes('timeout')) {
+    return `AI request timed out after ${Math.round(resolveTimeoutMs() / 1000)} seconds. Try simplifying your prompt or using a faster model.`;
+  }
+  if (message.includes('SIGKILL') || message.includes('SIGTERM')) {
     return 'AI process terminated unexpectedly. This may indicate insufficient memory.';
   }
-  return error.message || 'CLI invocation failed';
+  return message || 'CLI invocation failed';
 }

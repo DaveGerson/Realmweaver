@@ -77,6 +77,9 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
       if (filters[EntityType.FACTION]) {
           campaign.factions.forEach(f => {
               nodes.push({ id: f.id, group: EntityType.FACTION, name: f.name });
+              if (filters[EntityType.LOCATION] && f.headquartersLocationId) {
+                  links.push({ source: f.id, target: f.headquartersLocationId, label: 'hq-at' });
+              }
           });
       }
 
@@ -93,6 +96,14 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
                   const label = factionLeaderIds.has(n.id) ? 'leads' : 'member-of';
                   links.push({ source: n.id, target: n.factionId, label });
               }
+              // Guarded — older saves predate the array. Targets that are player
+              // characters or deleted entities are dropped by the dangling-id
+              // filter below, since they are never pushed as nodes.
+              (n.relationships || []).forEach(r => {
+                  if (r.targetId) {
+                      links.push({ source: n.id, target: r.targetId, label: r.relationType || 'related-to' });
+                  }
+              });
           });
       }
 
@@ -187,6 +198,11 @@ export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ campaign, 
       .style("background-color", "#020617"); // slate-950
 
     const g = svg.append("g");
+
+    // d3-zoom stores the current transform on the <svg> node itself, so it survives
+    // the wipe above while the freshly appended <g> starts at identity. Re-apply it
+    // or every filter toggle silently resets pan/zoom and desyncs the zoom behavior.
+    g.attr("transform", d3.zoomTransform(svgRef.current).toString());
 
     const zoom = d3.zoom<SVGSVGElement, unknown>()
         .scaleExtent([0.1, 4])

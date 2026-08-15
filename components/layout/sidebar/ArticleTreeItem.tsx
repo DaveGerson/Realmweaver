@@ -28,7 +28,12 @@ export const ArticleTreeItem: React.FC<ArticleTreeItemProps> = ({
     <div>
       <div className="flex items-center group">
         {childArticles.length > 0 ? (
-          <button onClick={() => toggleArticle(article.id)} className="p-1 mr-1 text-slate-500 hover:text-slate-300">
+          <button
+            onClick={() => toggleArticle(article.id)}
+            aria-expanded={isExpanded}
+            aria-label={`${isExpanded ? 'Collapse' : 'Expand'} sub-articles of ${article.title}`}
+            className="p-1 mr-1 text-slate-500 hover:text-slate-300"
+          >
             <Icons.ChevronDown className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
           </button>
         ) : (

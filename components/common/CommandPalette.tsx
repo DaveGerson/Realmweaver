@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, useId } from 'react';
 import { Icons } from '@/components/common/Icons';
 import { DialogShell } from '@/components/common/DialogShell';
-import type { NPC, Location, Faction, Item, Adventure, Article, SessionLog, Plot, PlayerCharacter } from '@/types/index';
+import type { NPC, Location, Faction, Item, Adventure, Article, SessionLog, Plot, PlayerCharacter, Note } from '@/types/index';
 import { ENTITY_TYPE_CONFIG } from '@/utils/entityUtils';
 
 // Scene result type for palette (scenes are derived from adventures, not passed as a separate prop)
@@ -69,6 +69,7 @@ interface CommandPaletteProps {
   sessionLogs: SessionLog[];
   plots: Plot[];
   playerCharacters: PlayerCharacter[];
+  notes: Note[];
   // Recent items (session-level, maintained by App.tsx)
   recentItems: RecentItem[];
   // Navigation callbacks
@@ -82,6 +83,7 @@ interface CommandPaletteProps {
   onSelectPlot: (id: string) => void;
   onSelectPlayerCharacter: (id: string) => void;
   onSelectScene: (id: string) => void;
+  onSelectNote: (id: string) => void;
   // Action callbacks
   onNavigateTo: (view: string) => void;
   onOpenCoach: () => void;
@@ -133,7 +135,7 @@ function fuzzyMatch(haystack: string, needle: string): boolean {
   return h.includes(n);
 }
 
-function getEntityName(type: CommandPaletteEntityType, entity: NPC | Location | Faction | Item | Adventure | Article | SessionLog | Plot | PlayerCharacter): string {
+function getEntityName(type: CommandPaletteEntityType, entity: NPC | Location | Faction | Item | Adventure | Article | SessionLog | Plot | PlayerCharacter | Note): string {
   if (type === 'player-character') {
     return (entity as PlayerCharacter).characterSocial?.characterName || (entity as any).name || 'Unknown Character';
   }
@@ -149,10 +151,15 @@ function getEntityName(type: CommandPaletteEntityType, entity: NPC | Location | 
   if (type === 'plot') {
     return (entity as Plot).title;
   }
+  if (type === 'note') {
+    // Note is title-keyed (types/Note.ts has no `name`), so the default
+    // `.name` fallback below would index every note as an empty string.
+    return (entity as Note).title;
+  }
   return (entity as any).name || '';
 }
 
-function getEntitySubtitle(type: CommandPaletteEntityType, entity: NPC | Location | Faction | Item | Adventure | Article | SessionLog | Plot | PlayerCharacter): string | undefined {
+function getEntitySubtitle(type: CommandPaletteEntityType, entity: NPC | Location | Faction | Item | Adventure | Article | SessionLog | Plot | PlayerCharacter | Note): string | undefined {
   switch (type) {
     case 'npc': return (entity as NPC).description?.slice(0, 80) || undefined;
     case 'location': return (entity as Location).description?.slice(0, 80) || undefined;
@@ -162,6 +169,7 @@ function getEntitySubtitle(type: CommandPaletteEntityType, entity: NPC | Locatio
     case 'article': return (entity as Article).content?.slice(0, 80) || undefined;
     case 'session-log': return (entity as SessionLog).recap?.slice(0, 80) || undefined;
     case 'plot': return (entity as Plot).description?.slice(0, 80) || undefined;
+    case 'note': return (entity as Note).content?.slice(0, 80) || undefined;
     case 'player-character': {
       const pc = entity as PlayerCharacter;
       const cls = pc.characterStatistics?.classes;
@@ -171,7 +179,7 @@ function getEntitySubtitle(type: CommandPaletteEntityType, entity: NPC | Locatio
   }
 }
 
-function getEntitySearchText(type: CommandPaletteEntityType, entity: NPC | Location | Faction | Item | Adventure | Article | SessionLog | Plot | PlayerCharacter): string {
+function getEntitySearchText(type: CommandPaletteEntityType, entity: NPC | Location | Faction | Item | Adventure | Article | SessionLog | Plot | PlayerCharacter | Note): string {
   const name = getEntityName(type, entity);
   const subtitle = getEntitySubtitle(type, entity) || '';
   return `${name} ${subtitle}`;
@@ -312,6 +320,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   sessionLogs,
   plots,
   playerCharacters,
+  // Runtime default: older prop spreads (e.g. test scaffolding) predate notes
+  // support and may omit the list.
+  notes = [],
   recentItems,
   onSelectNpc,
   onSelectLocation,
@@ -323,6 +334,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   onSelectPlot,
   onSelectPlayerCharacter,
   onSelectScene,
+  onSelectNote,
   onNavigateTo,
   onOpenCoach,
 }) => {
@@ -359,7 +371,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   const allEntities: EntityResult[] = useMemo(() => {
     const results: EntityResult[] = [];
 
-    const push = (type: CommandPaletteEntityType, entities: (NPC | Location | Faction | Item | Adventure | Article | SessionLog | Plot | PlayerCharacter)[]) => {
+    const push = (type: CommandPaletteEntityType, entities: (NPC | Location | Faction | Item | Adventure | Article | SessionLog | Plot | PlayerCharacter | Note)[]) => {
       for (const entity of entities) {
         results.push({
           type,
@@ -379,6 +391,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     push('session-log', sessionLogs);
     push('plot', plots);
     push('player-character', playerCharacters);
+    push('note', notes);
 
     // Scenes are derived from adventures, not passed as a separate prop
     for (const adv of adventures) {
@@ -393,7 +406,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     }
 
     return results;
-  }, [npcs, locations, factions, items, adventures, articles, sessionLogs, plots, playerCharacters]);
+  }, [npcs, locations, factions, items, adventures, articles, sessionLogs, plots, playerCharacters, notes]);
 
   // Filter results based on query
   const { recentResults, entityResults, actionResults } = useMemo(() => {
@@ -462,10 +475,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         case 'plot': onSelectPlot(id); break;
         case 'player-character': onSelectPlayerCharacter(id); break;
         case 'scene': onSelectScene(id); break;
+        case 'note': onSelectNote(id); break;
       }
       onClose();
     }
-  }, [onSelectNpc, onSelectLocation, onSelectFaction, onSelectItem, onSelectAdventure, onSelectArticle, onSelectSessionLog, onSelectPlot, onSelectPlayerCharacter, onSelectScene, onClose]);
+  }, [onSelectNpc, onSelectLocation, onSelectFaction, onSelectItem, onSelectAdventure, onSelectArticle, onSelectSessionLog, onSelectPlot, onSelectPlayerCharacter, onSelectScene, onSelectNote, onClose]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     switch (e.key) {

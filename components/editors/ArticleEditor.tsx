@@ -121,6 +121,23 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
   const lastMergedIdsKeyRef = useRef<string>(
     Array.from(new Set(Object.values(mentionedIdsByFieldRef.current).flat())).sort().join('\u0000'),
   );
+  // Editors are not remounted when the GM navigates A -> B (ViewRouter renders
+  // this editor at a fixed position with no key), so the useRef initialisers
+  // above only ever ran for the FIRST entity. Rebuild both refs from the
+  // incoming entity on every id change, mirroring the mount-time seeding —
+  // otherwise B's first keystroke merges A's stale per-field sets into B's
+  // mentionedEntityIds (or A's stale merged key suppresses B's first
+  // legitimate write). Keyed on the id ONLY — resetting on every
+  // mentionCandidates recompute would discard in-session tracked mentions
+  // (same rationale as MentionInput's seedKey resync).
+  useEffect(() => {
+    mentionedIdsByFieldRef.current = {
+      content: findMentionedIdsInText(article.content, mentionCandidates),
+    };
+    lastMergedIdsKeyRef.current =
+      Array.from(new Set(Object.values(mentionedIdsByFieldRef.current).flat())).sort().join(String.fromCharCode(0));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [article.id]);
   // Reports the merged set of mentioned IDs (across every mention field) whenever any field changes.
   const handleMentionedIdsChange = (field: string) => (ids: string[]) => {
     const next = { ...mentionedIdsByFieldRef.current, [field]: ids };
@@ -140,11 +157,17 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
 
   const articleEntityContext = `Article Title: ${formData.title}\nCategory: ${formData.category}\nContent summary: ${(formData.content || '').substring(0, 200)}...`;
 
+  // The ancestor walk tracks visited ids: imported or batch-generated data can carry a
+  // parent cycle (validation never checks referential cycles), and an unguarded walk
+  // would spin forever on the main thread during render.
   const possibleParents = allArticles.filter(a => {
     if (a.id === article.id) return false;
+    const visited = new Set<string>([a.id]);
     let current = a;
     while (current.parentArticleId) {
       if (current.parentArticleId === article.id) return false;
+      if (visited.has(current.parentArticleId)) break;
+      visited.add(current.parentArticleId);
       const parent = allArticles.find(p => p.id === current.parentArticleId);
       if (!parent) break;
       current = parent;

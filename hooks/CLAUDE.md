@@ -41,10 +41,11 @@ new entity. The hook keys everything to `idRef`:
   nothing is pending. It is also returned for callers that need an explicit flush point.
 - `onUpdate` is held in a ref, so passing an inline callback does not re-arm anything.
 
-Adopted by `NpcEditor`, `LocationEditor`, `FactionEditor`, `ArticleEditor`, `PlotEditor`. **Any editor that gains a
-`MentionInput` (or any other keystroke-level store write) must use it.** Contract test:
+Adopted by `NpcEditor`, `LocationEditor`, `FactionEditor`, `ArticleEditor`, `PlotEditor`, `SceneEditor`. **Any editor
+that gains a `MentionInput` (or any other keystroke-level store write) must use it.** Contract test:
 `tests/ship/wp-review.debounced-field-commit.test.tsx`, plus
-`tests/ship/wp-f2-entity-editors.mention-field-commits.test.tsx`.
+`tests/ship/wp-f2-entity-editors.mention-field-commits.test.tsx` and
+`tests/ship/wp-review.scene-editor-mention-migration.test.tsx`.
 
 ## useConfirmDialog
 

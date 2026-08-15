@@ -17,6 +17,14 @@ interface LinkableNpc {
   backstory?: string;
 }
 
+interface LinkableFaction {
+  id: string;
+  name: string;
+  /** Mutated in place: a linked NPC's id is pushed here so the
+   * NPC↔Faction bidirectional invariant holds (see services/CLAUDE.md). */
+  memberIds?: string[];
+}
+
 export function autoLinkScenes(
   scenes: LinkableScene[],
   npcs: Array<{ id: string; name: string }>,
@@ -82,7 +90,7 @@ export function autoLinkScenes(
 
 export function autoLinkNpcFactions(
   npcs: LinkableNpc[],
-  factions: Array<{ id: string; name: string }>,
+  factions: LinkableFaction[],
   minConfidence = 0.9,
 ): { npcsUpdated: number } {
   const engine = getMatchingEngine();
@@ -109,6 +117,13 @@ export function autoLinkNpcFactions(
     // Only link when exactly one faction was mentioned
     if (uniqueIds.length === 1) {
       npc.factionId = uniqueIds[0];
+      // Maintain the reverse half of the link — FactionEditor's member roster
+      // and deleteFaction's member unlinking both walk memberIds only.
+      const faction = factions.find(f => f.id === uniqueIds[0]);
+      if (faction) {
+        if (!faction.memberIds) faction.memberIds = [];
+        if (!faction.memberIds.includes(npc.id)) faction.memberIds.push(npc.id);
+      }
       npcsUpdated++;
     }
   }

@@ -16,6 +16,13 @@
  * of the textarea's value (or the known suffix must be stripped in onChange).
  * Typing while transcription is running must persist ONLY the user's own text.
  * The transcript must still be visible somewhere while recording.
+ *
+ * Also pinned here (the call-site follow-up documented in
+ * wp-c-ai-services.audio-transcription.test.ts, finding #42): the AI Scribe
+ * call site must forward the component's `isMockMode` prop into
+ * startAudioTranscription's config. Without it the facade's mock branch is
+ * never taken from the UI, so Mock Mode opened a real microphone and a
+ * billed Gemini Live websocket.
  */
 
 import React from 'react';
@@ -25,6 +32,7 @@ import type { Campaign, SessionLog } from '../../types/index';
 
 type TranscriptOptions = {
   gcpApiKey: string;
+  isMockMode?: boolean;
   onTranscript: (text: string) => void;
   onConnected: () => void;
   onDisconnected: () => void;
@@ -130,6 +138,13 @@ async function renderWithLiveTranscript() {
 }
 
 describe('wp-f1-session-editors #67 — typing during AI Scribe', () => {
+  it('forwards isMockMode to startAudioTranscription so Mock Mode never opens a real mic (finding #42)', async () => {
+    await renderWithLiveTranscript();
+    // The editor was rendered with isMockMode={true}; the facade branches on
+    // config.isMockMode, so the call site must pass it through.
+    expect(captured!.isMockMode).toBe(true);
+  });
+
   it('persists only the GM\'s own text, not the live transcript preview', async () => {
     const { container, textarea, onUpdate } = await renderWithLiveTranscript();
 

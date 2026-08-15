@@ -98,13 +98,15 @@ export class ClaudeCliProvider implements AIProvider {
     const { prompt, schema, instructions, model, campaignContext, multimodalParts } = options;
 
     // A PDF cannot be decoded by the CLI when pasted into a text prompt as
-    // base64 — see finding #16. Fail fast with a clear, actionable error
-    // before any network call is made.
+    // base64 — see finding #16. Fail fast before any network call, and point
+    // at the paths that actually work today: the anthropic-api provider is
+    // still a stub, so it is deliberately NOT offered as the fallback.
     const pdfPart = multimodalParts?.find(part => part.mediaType === 'application/pdf');
     if (pdfPart) {
       throw new Error(
-        'PDF parsing requires the anthropic-api provider. The Claude CLI provider cannot ' +
-        'decode a base64-encoded PDF pasted into a text prompt.'
+        'PDF import is not available with the Claude CLI provider — the CLI cannot decode a ' +
+        'base64-encoded PDF pasted into a text prompt. Use the "Quick Add" tab to enter the ' +
+        'character directly, or switch on Mock Mode to walk through the flow.'
       );
     }
 

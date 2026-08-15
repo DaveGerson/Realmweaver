@@ -74,7 +74,12 @@ interface DmCoachProps {
   /** IDs of NPCs in the currently active scene, used to group the NPC selector. */
   activeSceneNpcIds?: string[];
   onClose: () => void;
-  onSendToNotes?: (content: string) => void;
+  /**
+   * Returns whether the note actually landed in a live session's log —
+   * campaignService.addAutoEvent no-ops without an active session, and the
+   * send buttons below only show their sent-confirmation on `true`.
+   */
+  onSendToNotes?: (content: string) => boolean;
   onResultGenerated?: (content: string) => void;
   isMockMode: boolean;
   onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void;
@@ -770,9 +775,10 @@ const RoleplayPanel: React.FC<RoleplayPanelProps> = ({
 
 // --- Sub-components for DMCoach ---
 
-const TextResultDisplay = ({ text, onSendToNotes, toolLabel, onNavigate }: { text: string; onSendToNotes?: (content: string) => void; toolLabel?: string; onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void }) => {
+const TextResultDisplay = ({ text, onSendToNotes, toolLabel, onNavigate }: { text: string; onSendToNotes?: (content: string) => boolean; toolLabel?: string; onNavigate?: (entityType: QuickCardEntityType, entityId: string) => void }) => {
     const [hasCopied, setHasCopied] = useState(false);
     const [hasSent, setHasSent] = useState(false);
+    const [sendNotice, setSendNotice] = useState<string | null>(null);
 
     const handleCopyToClipboard = () => {
         if (!navigator.clipboard?.writeText) return;
@@ -787,7 +793,13 @@ const TextResultDisplay = ({ text, onSendToNotes, toolLabel, onNavigate }: { tex
     const handleSendToNotes = () => {
         if (!onSendToNotes) return;
         const prefix = toolLabel ? `[${toolLabel}] ` : '[Coach] ';
-        onSendToNotes(prefix + text);
+        // The write no-ops without a live session — never show the sent
+        // checkmark for a note that went nowhere.
+        if (!onSendToNotes(prefix + text)) {
+            setSendNotice('No live session — start a session to log notes.');
+            return;
+        }
+        setSendNotice(null);
         setHasSent(true);
         setTimeout(() => setHasSent(false), 2000);
     };
@@ -822,13 +834,17 @@ const TextResultDisplay = ({ text, onSendToNotes, toolLabel, onNavigate }: { tex
             ) : (
                 <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{text}</p>
             )}
+            {sendNotice && (
+                <p role="status" className="mt-3 text-xs text-amber-400">{sendNotice}</p>
+            )}
         </div>
     );
 };
 
-const RollableTableDisplay = ({ table, onSendToNotes }: { table: RollableTable; onSendToNotes?: (content: string) => void }) => {
+const RollableTableDisplay = ({ table, onSendToNotes }: { table: RollableTable; onSendToNotes?: (content: string) => boolean }) => {
     const [rollResult, setRollResult] = useState<{ roll: number; result: string } | null>(null);
     const [hasSent, setHasSent] = useState(false);
+    const [sendNotice, setSendNotice] = useState<string | null>(null);
 
     const handleRoll = () => {
         const die = table.dieType.toLowerCase();
@@ -887,7 +903,14 @@ const RollableTableDisplay = ({ table, onSendToNotes }: { table: RollableTable; 
                         variant="secondary"
                         onClick={() => {
                             const tableText = `[Table] ${table.title} (${table.dieType}): ${table.entries.map(e => `${e.range}. ${e.result}`).join('; ')}`;
-                            onSendToNotes(tableText);
+                            // The write no-ops without a live session — never
+                            // show the sent checkmark for a note that went
+                            // nowhere.
+                            if (!onSendToNotes(tableText)) {
+                                setSendNotice('No live session — start a session to log notes.');
+                                return;
+                            }
+                            setSendNotice(null);
                             setHasSent(true);
                             setTimeout(() => setHasSent(false), 2000);
                         }}
@@ -897,6 +920,9 @@ const RollableTableDisplay = ({ table, onSendToNotes }: { table: RollableTable; 
                     </Button>
                 )}
             </div>
+            {sendNotice && (
+                <p role="status" className="text-xs text-amber-400">{sendNotice}</p>
+            )}
             {rollResult && (
                 <div className="mt-4 p-3 bg-amber-900/30 border border-amber-500/30 rounded-lg text-center animate-fade-in">
                     <p className="text-sm text-slate-400">You rolled a <span className="font-bold text-2xl text-white mx-1">{rollResult.roll}</span></p>

@@ -273,7 +273,6 @@ Realmweaver/
 │   │   ├── StatusBanners.tsx        # ConflictBanner (multi-tab) + BackupRecoveryBanner
 │   │   ├── ViewRouter.tsx           # Renders active EditorView (extracted from App.tsx)
 │   │   └── sidebar/                 # Sidebar sub-components
-│   │       ├── SidebarEntityList.tsx
 │   │       ├── SidebarSearch.tsx
 │   │       ├── PinnedEntities.tsx
 │   │       ├── RecentItems.tsx

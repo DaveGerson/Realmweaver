@@ -18,7 +18,10 @@
  *     PC       -> "Elowyn" (from mock PDF parser)
  * - Articles use `title` not `name`, and the dashboard heading is "Lorebook Articles (N)".
  * - Plots dashboard heading section shows "Active Arcs" / "Dormant" / "Resolved".
- * - Notes dashboard heading is "Campaign Notes".
+ * - Notes dashboard heading is "Campaign Notes", and so is its sidebar entry, so
+ *   navigateToView(page, 'Notes') reaches it. Creating a note also selects it, and
+ *   ViewRouter gives a selected entity priority over the dashboard — navigate back
+ *   to the Notes view before asserting on the card list.
  */
 
 import { test, expect, type Page } from '@playwright/test';
@@ -264,27 +267,33 @@ test.describe('Extended Entity CRUD', () => {
   // =========================================================================
 
   test.describe('Notes', () => {
-    // Notes do not have their own sidebar entry or EditorView — the NoteDashboard
-    // component exists but is not routed in the current app. These tests are skipped
-    // until a Notes view is added to the sidebar and ViewRouter.
-    test.skip('create Note appears in the Campaign Notes list', async ({ page }) => {
+    async function createNote(page: Page, title: string): Promise<void> {
       await navigateToView(page, 'Notes');
       const titleInput = page.getByPlaceholder(/the villain.*secret plan/i);
       await expect(titleInput).toBeVisible({ timeout: 5000 });
-      await titleInput.fill('Remember to add traps');
-      await page.getByRole('button', { name: /create note/i }).click();
+      await titleInput.fill(title);
+      await page.locator('main').getByRole('button', { name: /create note/i }).click();
+    }
+
+    test('create Note appears in the Campaign Notes list', async ({ page }) => {
+      await createNote(page, 'Remember to add traps');
+
+      // Creating a note selects it, so ViewRouter renders NoteEditor. Go back to
+      // the dashboard to assert the note is in the list.
+      await navigateToView(page, 'Notes');
       await expect(
-        page.locator('main').getByText('Remember to add traps')
+        page.locator('main h3').filter({ hasText: 'Remember to add traps' })
       ).toBeVisible({ timeout: 5000 });
     });
 
-    test.skip('click Note card opens the editor', async ({ page }) => {
+    test('click Note card opens the editor', async ({ page }) => {
+      await createNote(page, 'Secret passage locations');
+
       await navigateToView(page, 'Notes');
-      const titleInput = page.getByPlaceholder(/the villain.*secret plan/i);
-      await expect(titleInput).toBeVisible({ timeout: 5000 });
-      await titleInput.fill('Secret passage locations');
-      await page.getByRole('button', { name: /create note/i }).click();
-      await page.locator('main').getByText('Secret passage locations').click();
+      const card = page.locator('main h3').filter({ hasText: 'Secret passage locations' });
+      await expect(card).toBeVisible({ timeout: 5000 });
+      await card.click();
+
       const noteTitleInput = page.locator('input[name="title"]');
       await expect(noteTitleInput).toBeVisible({ timeout: 5000 });
       await expect(noteTitleInput).toHaveValue('Secret passage locations');

@@ -193,16 +193,17 @@ const CampaignSidebarComponent: React.FC<CampaignSidebarProps> = ({
     // entity list in the sidebar.
     const entityGroups: {
         label: string,
+        addLabel: string,
         icon: keyof typeof Icons,
         view: 'npcs' | 'locations' | 'factions' | 'items',
         generatorType: 'npc' | 'location' | 'faction' | 'item',
         items: { id: string, name: string }[],
         selectedId: string | null
     }[] = useMemo(() => [
-        { label: "NPCs", icon: 'NPCs', view: 'npcs', generatorType: 'npc', items: campaign.npcs, selectedId: selectedIds.npc },
-        { label: "Locations", icon: 'Locations', view: 'locations', generatorType: 'location', items: campaign.locations, selectedId: selectedIds.location },
-        { label: "Factions", icon: 'Factions', view: 'factions', generatorType: 'faction', items: campaign.factions, selectedId: selectedIds.faction },
-        { label: "Items", icon: 'Items', view: 'items', generatorType: 'item', items: campaign.items, selectedId: selectedIds.item },
+        { label: "NPCs", addLabel: "New NPC", icon: 'NPCs', view: 'npcs', generatorType: 'npc', items: campaign.npcs, selectedId: selectedIds.npc },
+        { label: "Locations", addLabel: "New location", icon: 'Locations', view: 'locations', generatorType: 'location', items: campaign.locations, selectedId: selectedIds.location },
+        { label: "Factions", addLabel: "New faction", icon: 'Factions', view: 'factions', generatorType: 'faction', items: campaign.factions, selectedId: selectedIds.faction },
+        { label: "Items", addLabel: "New item", icon: 'Items', view: 'items', generatorType: 'item', items: campaign.items, selectedId: selectedIds.item },
     ], [campaign.npcs, campaign.locations, campaign.factions, campaign.items, selectedIds.npc, selectedIds.location, selectedIds.faction, selectedIds.item]);
 
     const topLevelArticles = useMemo(
@@ -388,7 +389,8 @@ const CampaignSidebarComponent: React.FC<CampaignSidebarProps> = ({
                             <button
                                 onClick={() => { onSelectView('player-characters'); }}
                                 title="Import a character sheet"
-                                className="text-slate-400 hover:text-amber-400 transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100"
+                                aria-label="Import a character sheet"
+                                className="text-slate-400 hover:text-amber-400 transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100 focus-visible:opacity-100 group-focus-within:opacity-100"
                             >
                                 <Icons.Plus className="w-4 h-4" />
                             </button>
@@ -438,7 +440,8 @@ const CampaignSidebarComponent: React.FC<CampaignSidebarProps> = ({
                             <button
                                 onClick={() => { onSelectView('plots'); }}
                                 title="Create a new plot arc"
-                                className="text-slate-400 hover:text-amber-400 transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100"
+                                aria-label="Create a new plot arc"
+                                className="text-slate-400 hover:text-amber-400 transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100 focus-visible:opacity-100 group-focus-within:opacity-100"
                             >
                                 <Icons.Plus className="w-4 h-4" />
                             </button>
@@ -503,7 +506,12 @@ const CampaignSidebarComponent: React.FC<CampaignSidebarProps> = ({
                             <Icons.Adventures className="w-4 h-4" />
                             <span>Adventures</span>
                             </button>
-                            <button onClick={() => onSelectView('adventures')} className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100">
+                            <button
+                                onClick={() => onSelectView('adventures')}
+                                title="New adventure"
+                                aria-label="New adventure"
+                                className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100 focus-visible:opacity-100 group-focus-within:opacity-100"
+                            >
                                 <Icons.Plus className="w-4 h-4" />
                             </button>
                         </div>
@@ -511,7 +519,12 @@ const CampaignSidebarComponent: React.FC<CampaignSidebarProps> = ({
                             {filteredAdventures.map(adventure => (
                                 <div key={adventure.id}>
                                     <div className="flex items-center justify-between group">
-                                        <button onClick={() => toggleAdventure(adventure.id)} className="p-1 -ml-3 mr-1 text-slate-500 hover:text-slate-300">
+                                        <button
+                                            onClick={() => toggleAdventure(adventure.id)}
+                                            aria-expanded={!!expandedAdventures[adventure.id]}
+                                            aria-label={`${expandedAdventures[adventure.id] ? 'Collapse' : 'Expand'} scenes of ${adventure.title}`}
+                                            className="p-1 -ml-3 mr-1 text-slate-500 hover:text-slate-300"
+                                        >
                                             <Icons.ChevronDown className={`w-3.5 h-3.5 transition-transform ${expandedAdventures[adventure.id] ? 'rotate-0' : '-rotate-90'}`} />
                                         </button>
                                         <button
@@ -524,7 +537,12 @@ const CampaignSidebarComponent: React.FC<CampaignSidebarProps> = ({
                                         >
                                             {adventure.title}
                                         </button>
-                                        <button onClick={() => { onSelect('adventure', adventure.id); onShowGenerator('scene');}} className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100">
+                                        <button
+                                            onClick={() => { onSelect('adventure', adventure.id); onShowGenerator('scene');}}
+                                            title={`Add a scene to ${adventure.title}`}
+                                            aria-label={`Add a scene to ${adventure.title}`}
+                                            className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100 focus-visible:opacity-100 group-focus-within:opacity-100"
+                                        >
                                             <Icons.Plus className="w-4 h-4" />
                                         </button>
                                     </div>
@@ -589,7 +607,12 @@ const CampaignSidebarComponent: React.FC<CampaignSidebarProps> = ({
                                 <Icons.FileCode className="w-4 h-4" />
                                 <span>Lorebook</span>
                             </button>
-                            <button onClick={() => onSelectView('lorebook')} className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100">
+                            <button
+                                onClick={() => onSelectView('lorebook')}
+                                title="New article"
+                                aria-label="New article"
+                                className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100 focus-visible:opacity-100 group-focus-within:opacity-100"
+                            >
                                 <Icons.Plus className="w-4 h-4" />
                             </button>
                         </div>
@@ -641,7 +664,8 @@ const CampaignSidebarComponent: React.FC<CampaignSidebarProps> = ({
                             <button
                                 onClick={() => { onSelectView('notes'); }}
                                 title="Create a new note"
-                                className="text-slate-400 hover:text-amber-400 transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100"
+                                aria-label="Create a new note"
+                                className="text-slate-400 hover:text-amber-400 transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100 focus-visible:opacity-100 group-focus-within:opacity-100"
                             >
                                 <Icons.Plus className="w-4 h-4" />
                             </button>
@@ -679,6 +703,7 @@ const CampaignSidebarComponent: React.FC<CampaignSidebarProps> = ({
                                 <div className="flex items-center justify-between group">
                                     <button
                                         onClick={() => { onSelectView(group.view); toggleView(group.view); }}
+                                        aria-current={activeView === group.view ? 'page' : undefined}
                                         className={twMerge(
                                             'w-full flex items-center gap-3 px-3 py-2 min-h-[44px] md:min-h-0 text-sm rounded-md transition-colors',
                                             activeView === group.view ? 'bg-amber-600/20 text-amber-300' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
@@ -687,7 +712,12 @@ const CampaignSidebarComponent: React.FC<CampaignSidebarProps> = ({
                                         <Icon className="w-4 h-4" /> <span>{group.label}</span>
                                         <Icons.ChevronDown className={`w-3.5 h-3.5 ml-auto transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
                                     </button>
-                                    <button onClick={() => onSelectView(group.view)} className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100 mr-2">
+                                    <button
+                                        onClick={() => onSelectView(group.view)}
+                                        title={group.addLabel}
+                                        aria-label={group.addLabel}
+                                        className="text-slate-400 hover:text-white transition-colors p-1 -m-1 rounded-md opacity-0 group-hover:opacity-100 focus-visible:opacity-100 group-focus-within:opacity-100 mr-2"
+                                    >
                                         <Icons.Plus className="w-4 h-4" />
                                     </button>
                                 </div>
@@ -730,7 +760,7 @@ const NavHeader = ({ label }: { label: string }) => <h3 className="px-3 pt-4 pb-
 const NavItem = ({ icon, label, active, onClick }: { icon: keyof typeof Icons, label: string, active: boolean, onClick: () => void }) => {
   const Icon = Icons[icon];
   return (
-    <button onClick={onClick} className={`w-full flex items-center gap-3 px-3 py-2 min-h-[44px] md:min-h-0 md:py-2 text-sm rounded-md transition-colors ${active ? 'bg-amber-600/20 text-amber-300' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}>
+    <button onClick={onClick} aria-current={active ? 'page' : undefined} className={`w-full flex items-center gap-3 px-3 py-2 min-h-[44px] md:min-h-0 md:py-2 text-sm rounded-md transition-colors ${active ? 'bg-amber-600/20 text-amber-300' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}>
       <Icon className="w-4 h-4" /> <span>{label}</span>
     </button>
   );

@@ -6,6 +6,15 @@ import { aiProxyPlugin } from './vite-plugin-ai-proxy';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
+    // REALMWEAVER_TIMEOUT_MS is also consumed server-side: vite-plugin-ai-proxy.ts
+    // reads it live from process.env for the CLI execFile/spawn timeout. loadEnv()
+    // only RETURNS .env* values -- it never writes them back into process.env --
+    // so bridge this one key here or a .env.local-only setting would silently
+    // keep the 120s default. When the key came from the real environment,
+    // loadEnv's process.env-wins merge makes this assignment a no-op.
+    if (env.REALMWEAVER_TIMEOUT_MS !== undefined) {
+      process.env.REALMWEAVER_TIMEOUT_MS = env.REALMWEAVER_TIMEOUT_MS;
+    }
     // SECURITY: This dev server IS the production runtime (see CLAUDE.md) and
     // exposes /api/ai/generate, which shells out to the local Claude CLI with
     // client-supplied prompt/model/systemPrompt. Bind to localhost only by

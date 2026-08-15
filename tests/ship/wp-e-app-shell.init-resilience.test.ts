@@ -28,17 +28,27 @@ const hostileStorage = {
     key: () => null,
 };
 
+// tests/CLAUDE.md: every `{ persist: true }` store must be destroyed in
+// afterEach — init() registers real page-lifecycle listeners plus a
+// storageService conflict subscription that would otherwise outlive the test.
+const liveStores: Array<{ destroy: () => void }> = [];
+const trackStore = <T extends { destroy: () => void }>(service: T): T => {
+    liveStores.push(service);
+    return service;
+};
+
 beforeEach(() => {
     vi.stubGlobal('localStorage', hostileStorage);
 });
 
 afterEach(() => {
+    liveStores.splice(0).forEach(service => service.destroy());
     vi.unstubAllGlobals();
 });
 
 describe('wp-e-app-shell #3 — init() must not strand the app in appStatus "loading"', () => {
     it('falls back out of "loading" when localStorage access throws', async () => {
-        const service = createCampaignStore({ persist: true });
+        const service = trackStore(createCampaignStore({ persist: true }));
 
         await flush();
 
