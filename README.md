@@ -133,6 +133,8 @@ All code at **project root** (no `src/` directory). Import alias `@/` maps to ro
 |----------|-------------|
 | [`docs/architecture/system-architecture.md`](docs/architecture/system-architecture.md) | **Start here.** Authoritative reference: runtime topology, AI-proxy security posture, component catalog, state deep-dive, known debt |
 | [`docs/architecture/semantic-model.html`](docs/architecture/semantic-model.html) | Full semantic model and taxonomy: every entity, every edge, integrity machinery, vocabulary systems (open in a browser) |
+| [`docs/architecture/ontology-tracker.md`](docs/architecture/ontology-tracker.md) | Tracker for ontological-model elements **not in use today**: adopted-but-unimplemented extensions (E1–E11) and dormant shipped elements |
+| [`docs/architecture/ontology-proposal-evaluation.md`](docs/architecture/ontology-proposal-evaluation.md) | Evaluation of the external DDAO & ADRAS ontology proposals: what was adopted into the model, what was rejected, and why |
 | [`docs/architecture/high-level-design.md`](docs/architecture/high-level-design.md) | System overview, architecture diagram, data model, feature map, project structure |
 | [`docs/architecture/technical-design.md`](docs/architecture/technical-design.md) | Detailed technical design: state management, AI integration, hooks, dialog system, styling, build |
 | [`docs/architecture/implementation-plan.md`](docs/architecture/implementation-plan.md) | Phased implementation plan (Phases A-F) with work packages |

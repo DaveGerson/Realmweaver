@@ -127,6 +127,7 @@
     <li><a href="#operations">Derived operations</a></li>
     <li><a href="#vocab">Vocabulary systems</a></li>
     <li><a href="#wire">AI wire shapes</a></li>
+    <li><a href="#extensions">Adopted extensions</a></li>
   </ul>
 </header>
 
@@ -630,8 +631,33 @@
   </ul>
 </section>
 
+<hr class="rule">
+
+<section id="extensions">
+  <p class="eyebrow">Section 11</p>
+  <h2>Adopted extensions — in the model, not yet in the code</h2>
+  <p>Everything above documents the model <em>as shipped</em>. This section is the one deliberate exception: extensions adopted into the ontological model on 2026-08-25 after evaluating two external ontology proposals (DDAO, a large OWL-style class taxonomy, and ADRAS, a design-plane/runtime-plane schema). Full rationale, coverage analysis, and the rejected remainder live in <a href="ontology-proposal-evaluation.md">ontology-proposal-evaluation.md</a>; per-element implementation status is tracked in <a href="ontology-tracker.md">ontology-tracker.md</a>, which is canonical — an element listed here is <strong>not in use today</strong> unless the tracker says otherwise.</p>
+  <div class="scroll-x"><table>
+    <thead><tr><th>ID</th><th>Extension</th><th>Lands in</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>E1</td><td><code>Secret.revealsSecretId?</code> (clue→revelation FK) + <code>Secret.isVital?</code></td><td><code>types/Secret.ts</code> · purge sweep · SecretsTracker</td><td>not implemented</td></tr>
+      <tr><td>E2</td><td>Mystery lints: Three-Clue Rule · unreachable revelation · undeliverable secret · revealed-without-revealed-clues</td><td><code>continuityChecker.ts</code> (needs E1)</td><td>not implemented</td></tr>
+      <tr><td>E3</td><td>Party-knowledge AI wiring: secrets reveal-state in GM context; hard revealed-only rule + <code>'player-safe'</code> variant for player-facing output</td><td><code>contextBuilder.ts</code> · <code>ai/dmCoach.ts</code></td><td>not implemented</td></tr>
+      <tr><td>E4</td><td><code>Plot.escalation?</code> — Front/threat-clock track (<code>doom</code>, ordered <code>steps[]</code>)</td><td><code>types/Plot.ts</code> · SessionEndWizard · <code>ai/worldSimulation.ts</code> · purge sweep</td><td>not implemented</td></tr>
+      <tr><td>E5</td><td>Principle: GM craft lands as warning-severity lint, never schema-level cardinality constraints</td><td>all future rules</td><td>standing</td></tr>
+      <tr><td>E6</td><td><code>SessionLog.sceneOutcomes?</code> — per-scene <code>as-planned | diverged | skipped</code> + note (mirrors <code>plotProgressions</code>)</td><td><code>types/SessionLog.ts</code> · session wizards · <code>contextBuilder.ts</code> · purge sweep</td><td>not implemented</td></tr>
+      <tr><td>E7</td><td><code>Campaign.safety?</code> — lines &amp; veils, injected Tier-1 into every context variant</td><td><code>types/Campaign.ts</code> · CampaignSettingEditor · <code>contextBuilder.ts</code></td><td>not implemented</td></tr>
+      <tr><td>E8</td><td><code>Secret.knownByEntityIds?</code> — "who knows it", split from <code>linkedEntityIds</code> ("about")</td><td><code>types/Secret.ts</code> · purge sweep · backlink scan</td><td>not implemented</td></tr>
+      <tr><td>E9</td><td><code>PlotStatus</code> widened with <code>'abandoned'</code></td><td><code>types/Plot.ts</code> · status pickers</td><td>not implemented</td></tr>
+      <tr><td>E10</td><td>Context derivations: location ancestor chain · faction-control-in-scene</td><td><code>contextBuilder.ts</code></td><td>not implemented</td></tr>
+      <tr><td>E11</td><td>Craft lints: unreachable plot · hook naming no entity · empty faction <code>goals</code></td><td><code>continuityChecker.ts</code> · <code>linking/matchingEngine.ts</code></td><td>not implemented</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout"><p><strong>Implementation reminder:</strong> every id-bearing field above (E1, E4's <code>triggeredInSessionId</code>, E6's keys, E8) joins the hand-maintained N-place integrity contract from Section 7 — purge sweep, both id-remap passes, backlink scanner, continuity checker — before it can ship. The tracker lists the suggested implementation order.</p></div>
+</section>
+
 <footer>
-  <p>Generated from the shipped code on <code>main</code> (post ship-readiness merge, 2026-08-15). Primary sources: <code>types/*.ts</code>, <code>services/campaignService.ts</code>, <code>utils/backlinkUtils.ts</code>, <code>utils/entityUtils.ts</code>, <code>services/contextBuilder.ts</code>, <code>services/continuityChecker.ts</code>, <code>services/linking/*</code>, <code>components/visualizers/RelationshipGraph.tsx</code>. Companion documents: <a href="system-architecture.md">system-architecture.md</a> (runtime topology), <a href="high-level-design.md">high-level-design.md</a>, <a href="technical-design.md">technical-design.md</a>, and <code>types/CLAUDE.md</code> for the working-agreement view of the same model.</p>
+  <p>Generated from the shipped code on <code>main</code> (post ship-readiness merge, 2026-08-15); Section 11 added 2026-08-25 and maintained against <a href="ontology-tracker.md">ontology-tracker.md</a>. Primary sources: <code>types/*.ts</code>, <code>services/campaignService.ts</code>, <code>utils/backlinkUtils.ts</code>, <code>utils/entityUtils.ts</code>, <code>services/contextBuilder.ts</code>, <code>services/continuityChecker.ts</code>, <code>services/linking/*</code>, <code>components/visualizers/RelationshipGraph.tsx</code>. Companion documents: <a href="system-architecture.md">system-architecture.md</a> (runtime topology), <a href="high-level-design.md">high-level-design.md</a>, <a href="technical-design.md">technical-design.md</a>, <a href="ontology-proposal-evaluation.md">ontology-proposal-evaluation.md</a>, <a href="ontology-tracker.md">ontology-tracker.md</a>, and <code>types/CLAUDE.md</code> for the working-agreement view of the same model.</p>
 </footer>
 
 </div>
