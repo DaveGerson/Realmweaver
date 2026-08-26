@@ -133,12 +133,17 @@ All code at **project root** (no `src/` directory). Import alias `@/` maps to ro
 |----------|-------------|
 | [`docs/architecture/system-architecture.md`](docs/architecture/system-architecture.md) | **Start here.** Authoritative reference: runtime topology, AI-proxy security posture, component catalog, state deep-dive, known debt |
 | [`docs/architecture/semantic-model.html`](docs/architecture/semantic-model.html) | Full semantic model and taxonomy: every entity, every edge, integrity machinery, vocabulary systems (open in a browser) |
+| [`docs/architecture/campaign-model-walkthrough.html`](docs/architecture/campaign-model-walkthrough.html) | Visual, exploratory walkthrough of the campaign model for DMs — three depth levels, an interactive map, one worked example story (open in a browser) |
+| [`docs/architecture/ontology-tracker.md`](docs/architecture/ontology-tracker.md) | Tracker for ontological-model elements **not in use today**: adopted-but-unimplemented extensions (E1–E11) and dormant shipped elements |
+| [`docs/architecture/ontology-proposal-evaluation.md`](docs/architecture/ontology-proposal-evaluation.md) | Evaluation of the external DDAO & ADRAS ontology proposals: what was adopted into the model, what was rejected, and why |
 | [`docs/architecture/high-level-design.md`](docs/architecture/high-level-design.md) | System overview, architecture diagram, data model, feature map, project structure |
 | [`docs/architecture/technical-design.md`](docs/architecture/technical-design.md) | Detailed technical design: state management, AI integration, hooks, dialog system, styling, build |
 | [`docs/architecture/implementation-plan.md`](docs/architecture/implementation-plan.md) | Phased implementation plan (Phases A-F) with work packages |
 | [`docs/ship-readiness/remediation-plan.md`](docs/ship-readiness/remediation-plan.md) | The 124-finding ship-readiness review and its 13 work packages |
 | [`docs/roadmap.md`](docs/roadmap.md) | Forward-looking feature roadmap |
 | [`docs/design/dm-archetypes.md`](docs/design/dm-archetypes.md) | 5 DM personas driving feature prioritization |
+| [`docs/design/schema-presentation-guide.md`](docs/design/schema-presentation-guide.md) | Style guide for presenting the data model to DMs — the consistency contract across docs, the walkthrough, and future in-app help |
+| [`docs/design/storyteller-first-design.md`](docs/design/storyteller-first-design.md) | Proposed storyteller-first elements (P1–P8): story-first home, improv support, story health, campaign endings |
 | [`docs/design/session-cockpit-review.md`](docs/design/session-cockpit-review.md) | 67 user stories and priority matrix |
 | [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) | End-user guide |
 | [`CLAUDE.md`](CLAUDE.md) | Developer conventions for AI-assisted development (plus per-directory `CLAUDE.md` files) |

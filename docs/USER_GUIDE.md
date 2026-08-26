@@ -122,6 +122,74 @@ Neither choice merges the two copies. If you are unsure which is newer, export a
 
 ## Building Your World
 
+### How a Campaign Fits Together
+
+You don't need to know anything about data modeling to use RealmWeaver — the app thinks about your campaign the same way you already talk about it. Everything you create lives in one of three layers:
+
+- **The world** — the setting you build: characters, places, organizations, objects, and lore.
+- **The story** — what you plan to happen: adventures broken into scenes, ongoing plot threads, and the secrets you're waiting to reveal.
+- **The table** — what actually happens: session plans and logs, your players' characters, live combat, and quick notes.
+
+Every connection in RealmWeaver reads as a plain sentence — *a scene takes place at a location; a faction is led by an NPC*. Here is each layer in those terms. Every one of these connections is optional: a lone NPC with no faction is perfectly valid, and nothing breaks if you skip a link. One more thing worth knowing before you read: every type keeps one accent color everywhere in the app — dashboards, search results, the relationship graph — so once you know that NPCs are amber and locations are emerald, you can read any screen at a glance.
+
+**The world — the setting you build**
+
+- **NPCs** *(amber)* — everyone your players might meet. Find them under **NPCs** in the sidebar.
+  - An NPC *belongs to* a faction.
+  - An NPC *has named relationships* with other NPCs and player characters — "rival", "mentor", "family".
+  - An NPC *keeps a history* of what has happened to them, session by session.
+- **Locations** *(emerald)* — the places. Find them under **Locations**.
+  - A location *sits inside* a bigger location — "The Crypt" inside "The Ruined Monastery" inside "The Ashen Vale".
+  - A location *connects to* other locations, and *is controlled by* a faction.
+  - A location *holds* points of interest and hidden loot.
+- **Factions** *(violet)* — organizations with shared goals. Find them under **Factions**.
+  - A faction *has members* and *is led by* an NPC.
+  - A faction *keeps its headquarters at* a location, and *controls* territory.
+- **Items** *(sky)* — treasures, artifacts, and key props, under **Items**. An item points at nothing — the rest of your world points at it: mention an item in lore, a plot, or a secret to weave it into the story.
+- **Lorebook Articles** *(cyan)* — your world encyclopedia: lore, history, cosmology. Find them under **Lorebook**.
+  - An article *nests under* a parent article, building a tree.
+  - An article *can reference* anything else in your campaign.
+
+**The story — what you plan to happen**
+
+- **Adventures** *(orange)* — story arcs with a hook, a theme, and a level. Find them under **Adventures**.
+  - An adventure *contains* an ordered list of scenes.
+- **Scenes** *(blue)* — your prep unit for one moment of play: combat, social, exploration, or puzzle. They live inside their adventure in the sidebar.
+  - A scene *takes place at* a location and *features* NPCs.
+  - A scene *carries* read-aloud text, private GM notes, skill checks, and rewards.
+- **Plots** *(yellow)* — ongoing storyline threads, tracked as active, dormant, or resolved across sessions. Find them under **Plots**.
+  - A plot *involves* anything in your world — NPCs, locations, factions, items.
+- **Secrets** — what the players don't know yet: secrets, clues, revelations, and rumors. They live in the [Secrets & Clues Tracker](#secrets-and-clues-tracker).
+  - A secret *concerns* the entities it is linked to — the NPC who holds it, the place where it is buried.
+  - A secret *is marked revealed* when the moment comes, and *remembers which session* revealed it.
+
+**The table — what actually happened**
+
+- **Session Logs** *(rose)* — one per game night. Find them under **Session Logs**; the [Session Prep Wizard](#session-prep-wizard) builds one, and the Session Runner runs it.
+  - Before play, a session *plans* the scenes, NPCs, and locations you expect to use.
+  - During play, its running log *records* events as they happen.
+  - After play, it *keeps* the recap and loose ends, and *records how each plot moved* — advanced, stalled, or unchanged.
+- **Player Characters** *(teal)* — your players' heroes, under **Player Characters**. Like items, they point at nothing — the rest of the world *points at them*: NPC relationships, session plans, mentions.
+- **Live combat** — initiative and HP for the current fight, in the [Combat Tracker](#combat-tracker). A combat *scene* is your prep; the live fight is its own thing at the table, and when the session ends it *is archived into* that session's log.
+- **Notes** *(slate)* — quick freeform thoughts, under **Notes**. Deliberately connected to nothing, so you can jot without filing.
+
+Two things are worth knowing about how the layers behave:
+
+- **Connections maintain themselves.** Assign an NPC to a faction and the faction's member list updates too; type an `@`-mention in any description and both entities remember it; delete anything and every reference to it is cleaned up automatically (see [Linking Entities](#linking-entities)).
+- **Player choices aren't pre-scripted.** RealmWeaver doesn't ask you to author branching decision trees. You prep scenes and secrets, your players do something unexpected at the table, and the running log and Session End Wizard *record* what actually happened — the world updates to match reality, not the other way around.
+
+**A build order that works** (start anywhere — this is a well-worn path, not a rule):
+
+1. **Set the stage** — create the campaign and write a world synopsis in the Campaign Setting Editor.
+2. **Sketch the world** — a handful of NPCs, locations, and factions; link them as you go.
+3. **Plan the story** — create an Adventure, then break it into ordered Scenes.
+4. **Open plot threads** — add Plots for the storylines you want to track, linked to the entities they involve.
+5. **Plant secrets and clues** — in the Secrets & Clues Tracker, write down what's hidden and connect each entry to who or where it lives.
+6. **Prep the session** — the Session Prep Wizard turns your scenes, cast, and plots into a plan.
+7. **Play, then close the loop** — run the session with the Session Runner, and let the Session End Wizard capture the recap, loose ends, and plot progress that feed your next prep.
+
+Prefer a visual tour? The [campaign model walkthrough](architecture/campaign-model-walkthrough.html) covers this same picture as an interactive page — a clickable map of all twelve types with one example story running through it (open it in a browser).
+
 ### Entity Types
 
 RealmWeaver organizes campaign content into these entity types, all accessible from the sidebar:
