@@ -105,7 +105,7 @@ All data lives in a single `Campaign` object with arrays of typed entities:
 
 ```
 Campaign
-├── npcs: NPC[]                # Characters with personality, faction links, relationships
+├── npcs: NPC[]                # Characters with personality, faction links, relationships, optional voiceNotes, and a quote ledger kept in history[] (`Said: "…"` rows)
 ├── locations: Location[]      # Places with hierarchy, connections, points of interest
 ├── factions: Faction[]        # Organizations with goals, members, headquarters
 ├── items: Item[]              # Artifacts, equipment, treasures
@@ -115,7 +115,7 @@ Campaign
 ├── playerCharacters: PC[]     # Imported from PDF or manual entry
 ├── plots: Plot[]              # Cross-session storyline threads
 ├── notes: Note[]              # Quick freeform notes
-├── secrets?: Secret[]         # DM secrets/clues with reveal tracking
+├── secrets?: Secret[]         # DM secrets/clues with reveal tracking + the E1 mystery edge (revealsSecretId/isVital/cluesNeeded)
 ├── activeEncounter?: Encounter # Live combat state
 ├── activeSceneId?: string     # Scene currently being played
 ├── activeSessionId?: string   # Session Runner active session
@@ -145,6 +145,7 @@ Scene.npcIds[]                   -> NPC        (features)
 Article.relatedEntityIds[]       -> Any entity (references)
 Plot.relatedEntityIds[]          -> Any entity (involves)
 Secret.linkedEntityIds[]         -> Any entity (concerns)
+Secret.revealsSecretId           -> Secret     (E1 clue -> revelation, optional)
 *.mentionedEntityIds[]           -> Any entity (@mention backlinks)
 ```
 
@@ -166,7 +167,7 @@ Every `deleteX()` does two things: type-specific relationship unwinding, plus a 
 `Faction.leaderId` / `headquartersLocationId`, `Location.connections[].targetLocationId`,
 `Plot`/`Article.relatedEntityIds`, `SessionLog.relatedPlotIds` / `plotProgressions` /
 `structuredNotes[].taggedEntityIds` / `plannedNpcIds` / `plannedLocationIds`,
-`Secret.linkedEntityIds` / `revealedInSessionId`, `Campaign.pinnedEntities`, and
+`Secret.linkedEntityIds` / `revealedInSessionId` / `revealsSecretId`, `Campaign.pinnedEntities`, and
 `mentionedEntityIds` on every entity type that carries it.
 
 ---
@@ -187,7 +188,7 @@ Every `deleteX()` does two things: type-specific relationship unwinding, plus a 
 | Session End | `dialogs/SessionEndWizard.tsx` | `aiService` -> `ai/dmCoach` |
 | Combat Tracker | `tools/CombatTracker.tsx` | `campaignService` |
 | Dice Roller | `tools/DiceRoller.tsx` | `utils/diceUtils` |
-| Secrets Tracker | `tools/SecretsTracker.tsx` | `campaignService` |
+| Secrets Tracker | `tools/SecretsTracker.tsx` | `campaignService`; `aiService.generateSecretBatch` -> `ai/realmWeaver` for R2 "Generate ten" |
 | Continuity Check | `dialogs/ContinuityChecker.tsx` | `continuityChecker.ts` (pure, no AI) |
 | Plot Timeline | `visualizers/PlotTimeline.tsx` | Pure component |
 | Relationship Graph | `visualizers/RelationshipGraph.tsx` | Pure component (D3) |
@@ -201,6 +202,7 @@ Every `deleteX()` does two things: type-specific relationship unwinding, plus a 
 | Cross-Campaign | `views/CrossCampaignDashboard.tsx` (with search/filter) | `campaignService` |
 | Tonight's Table | `views/TonightsTable.tsx` (story-first campaign home: previously on, open threads, offstage cast, loaded guns) | `utils/storyDerivations.ts` |
 | Callback Machine | `views/session/QuickToolsPanel.tsx` ("Complicate This" — zero-prompt reincorporation of dormant campaign material, logged as a `coach-used` entry) | `utils/dormantMaterial.ts` (over `storyDerivations`) -> `aiService.generateCallbackComplication` -> `ai/dmCoach` |
+| Engraved moments & cold open | `views/TonightsTable.tsx` (Moments reel over starred `structuredNotes`, zero schema) + `dialogs/SessionPrepWizard.tsx` ("Draft it from last session", folded into `prepNotes` via `utils/strongStartFormat.ts`) | `aiService.generateColdOpen` / `hasColdOpenMaterial` -> `ai/dmCoach` |
 | DM Style Settings | `common/DmStylePanel.tsx` | `utils/dmStyleUtils` |
 
 ---
@@ -307,8 +309,8 @@ Realmweaver/
 │   ├── storageService.ts            # Persistence ladder: localStorage -> IndexedDB, backups, conflict events
 │   ├── aiService.ts                 # AI facade -- the ONLY import for AI in components
 │   ├── contextBuilder.ts            # Tiered token-budget-aware context assembly
-│   ├── continuityChecker.ts         # 8 rule-based consistency checks (pure function)
-│   ├── importExportService.ts       # JSON/Obsidian import-export with validation warnings
+│   ├── continuityChecker.ts         # 12 rule-based consistency checks, incl. the E2 mystery lints (pure function)
+│   ├── importExportService.ts       # JSON/Obsidian import-export with validation warnings; generateSessionPrepSheetMarkdown/exportSessionPrepSheet (R3 one-page session prep sheet)
 │   ├── linking/                     # Smart linking: matchingEngine, engineRegistry, autoLinker
 │   └── ai/                          # AI implementation layer
 │       ├── core.ts                  # Backward-compat adapter (preserves 3 func signatures)
@@ -335,7 +337,7 @@ Realmweaver/
 │   ├── formReconciliation.ts        # Merge in-progress editor form state with incoming entity prop updates
 │   ├── entityDetailExtractors.ts    # Extract display strings from entity fields
 │   ├── entityFieldSave.ts           # Dispatch field saves by entity type
-│   ├── backlinkUtils.ts             # Compute inbound cross-references
+│   ├── backlinkUtils.ts             # Compute inbound cross-references (incl. the E1 clue -> revelation edge)
 │   ├── dmStyleUtils.ts              # Feature visibility per DM Style mode
 │   ├── demoTemplates.ts             # Starter campaign demo data
 │   ├── diceUtils.ts                 # Dice formula parsing and rolling

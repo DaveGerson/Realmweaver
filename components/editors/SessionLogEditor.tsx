@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { reconcileEntityFormData } from '../../utils/formReconciliation';
 import type { SessionLog, SessionLogEntry, Campaign } from '../../types';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
@@ -11,6 +11,7 @@ import { EntityLink } from '../common/EntityLink';
 import { campaignService } from '../../services/campaignService';
 import { AiTextarea } from '../common/Textarea';
 import { generateEnhancedText, analyzeSessionNotes, startAudioTranscription } from '../../services/aiService';
+import { generateSessionPrepSheetMarkdown, exportSessionPrepSheet } from '../../services/importExportService';
 import { twMerge } from 'tailwind-merge';
 import type { AudioTranscriptionSession } from '../../services/aiService';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
@@ -53,9 +54,10 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
   const formDataRef = useRef(formData);
   formDataRef.current = formData;
   const [isGenerating, setIsGenerating] = useState(false);
-  const [activeTab, setActiveTab] = useState<'structured' | 'scratchpad'>('structured');
+  const [activeTab, setActiveTab] = useState<'structured' | 'scratchpad' | 'prep-sheet'>('structured');
   const [newNoteContent, setNewNoteContent] = useState('');
   const [newNoteTags, setNewNoteTags] = useState<string[]>([]);
+  const [hasCopiedPrepSheet, setHasCopiedPrepSheet] = useState(false);
   const { confirm } = useConfirmDialog();
   const { addToast } = useToast();
 
@@ -81,6 +83,40 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
   }, [liveTranscript]);
 
   const activePlots = campaign.plots.filter(p => p.status === 'active');
+
+  // --- Prep Sheet (R3 — lazy-dm-lens.md) ---
+  // A read-only, one-page compile of this session's prep. Assembled from the
+  // committed `log` (not the live `formData`) — the same pattern
+  // `PrepDocumentView` uses for the adventure-level precedent. Only offered
+  // for a session that hasn't been run yet; a completed session's prep is
+  // spent, so the tab (and any open sheet) falls back automatically.
+  const showPrepSheetTab = formData.status === 'planned' || formData.status === 'active';
+  const effectiveTab = activeTab === 'prep-sheet' && !showPrepSheetTab ? 'structured' : activeTab;
+  const prepSheetMarkdown = useMemo(
+    () => generateSessionPrepSheetMarkdown(log, campaign),
+    [log, campaign],
+  );
+
+  const handleCopyPrepSheet = () => {
+    // In a non-secure context `navigator.clipboard` is undefined entirely, so
+    // calling `.writeText` would throw synchronously before any .then/.catch
+    // runs — guard first (the PrepDocumentView precedent, finding #107).
+    if (!navigator.clipboard?.writeText) {
+      addToast('Could not copy to clipboard', 'error');
+      return;
+    }
+    navigator.clipboard.writeText(prepSheetMarkdown).then(() => {
+      setHasCopiedPrepSheet(true);
+      setTimeout(() => setHasCopiedPrepSheet(false), 2000);
+    }).catch(err => {
+      console.error('Failed to copy prep sheet to clipboard', err);
+      addToast('Could not copy to clipboard', 'error');
+    });
+  };
+
+  const handleDownloadPrepSheet = () => {
+    exportSessionPrepSheet(log, campaign);
+  };
 
   // Tracks the last `log` prop we've reconciled against, so incoming prop
   // updates can be merged field-by-field instead of overwriting formData wholesale.
@@ -683,23 +719,51 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
               <div className={`flex-grow flex flex-col transition-all ${formData.status === 'active' ? 'bg-amber-900/10 border-amber-500/30' : 'bg-slate-900/50 border-slate-800/50'} p-4 rounded-xl border h-[500px]`}>
                   <div className="flex justify-between items-center mb-4">
                       <div className="flex space-x-4">
-                          <button 
+                          <button
                             onClick={() => setActiveTab('structured')}
-                            className={twMerge("text-sm font-bold pb-1 border-b-2 transition-colors", activeTab === 'structured' ? "border-amber-500 text-amber-300" : "border-transparent text-slate-500 hover:text-slate-300")}
+                            className={twMerge("text-sm font-bold pb-1 border-b-2 transition-colors", effectiveTab === 'structured' ? "border-amber-500 text-amber-300" : "border-transparent text-slate-500 hover:text-slate-300")}
                           >
                               Log Entries
                           </button>
-                          <button 
+                          <button
                             onClick={() => setActiveTab('scratchpad')}
-                            className={twMerge("text-sm font-bold pb-1 border-b-2 transition-colors", activeTab === 'scratchpad' ? "border-amber-500 text-amber-300" : "border-transparent text-slate-500 hover:text-slate-300")}
+                            className={twMerge("text-sm font-bold pb-1 border-b-2 transition-colors", effectiveTab === 'scratchpad' ? "border-amber-500 text-amber-300" : "border-transparent text-slate-500 hover:text-slate-300")}
                           >
                               Scratchpad
                           </button>
+                          {showPrepSheetTab && (
+                              <button
+                                onClick={() => setActiveTab('prep-sheet')}
+                                className={twMerge("text-sm font-bold pb-1 border-b-2 transition-colors", effectiveTab === 'prep-sheet' ? "border-amber-500 text-amber-300" : "border-transparent text-slate-500 hover:text-slate-300")}
+                              >
+                                  Prep Sheet
+                              </button>
+                          )}
                       </div>
                       {isLiveConnected && <span className="text-xs text-red-400 animate-pulse flex items-center gap-1">● AI Listening...</span>}
                   </div>
 
-                  {activeTab === 'scratchpad' ? (
+                  {effectiveTab === 'prep-sheet' ? (
+                      <div className="flex flex-col h-full min-h-0">
+                          <div className="flex justify-between items-center mb-3 flex-shrink-0 gap-2">
+                              <p className="text-xs text-slate-500">
+                                  One page for tonight's table — read it, copy it, or print it.
+                              </p>
+                              <div className="flex gap-2 flex-shrink-0">
+                                  <Button onClick={handleCopyPrepSheet} variant="secondary" size="sm">
+                                      {hasCopiedPrepSheet ? <Icons.Check className="w-4 h-4 mr-1.5 text-green-400" /> : <Icons.Clipboard className="w-4 h-4 mr-1.5" />}
+                                      {hasCopiedPrepSheet ? 'Copied!' : 'Copy'}
+                                  </Button>
+                                  <Button onClick={handleDownloadPrepSheet} variant="secondary" size="sm">
+                                      <Icons.FileDown className="w-4 h-4 mr-1.5" /> Download
+                                  </Button>
+                              </div>
+                          </div>
+                          <pre className="flex-grow min-h-0 overflow-auto custom-scrollbar bg-slate-950 p-4 rounded-md text-sm whitespace-pre-wrap text-slate-300 border border-slate-700/50">
+                              <code>{prepSheetMarkdown}</code>
+                          </pre>
+                      </div>
+                  ) : effectiveTab === 'scratchpad' ? (
                       <div className="relative h-full flex flex-col">
                         <textarea
                             name="runningNotes"

@@ -640,8 +640,8 @@
   <div class="scroll-x"><table>
     <thead><tr><th>ID</th><th>Extension</th><th>Lands in</th><th>Status</th></tr></thead>
     <tbody>
-      <tr><td>E1</td><td><code>Secret.revealsSecretId?</code> (clue→revelation FK) + <code>Secret.isVital?</code></td><td><code>types/Secret.ts</code> · purge sweep · SecretsTracker</td><td>not implemented</td></tr>
-      <tr><td>E2</td><td>Mystery lints: Three-Clue Rule · unreachable revelation · undeliverable secret · revealed-without-revealed-clues (threshold per-revelation overridable via <code>Secret.cluesNeeded?</code>)</td><td><code>continuityChecker.ts</code> (needs E1)</td><td>not implemented</td></tr>
+      <tr><td>E1</td><td><code>Secret.revealsSecretId?</code> (clue→revelation FK) + <code>Secret.isVital?</code></td><td><code>types/Secret.ts</code> · full N-place contract · SecretsTracker</td><td><strong>implemented</strong> (2026-08-26)</td></tr>
+      <tr><td>E2</td><td>Mystery lints: Three-Clue Rule · unreachable revelation · undeliverable secret · revealed-without-revealed-clues (threshold per-revelation overridable via <code>Secret.cluesNeeded?</code>)</td><td><code>continuityChecker.ts</code></td><td><strong>implemented</strong> (2026-08-26)</td></tr>
       <tr><td>E3</td><td>Party-knowledge AI wiring: secrets reveal-state in GM context; hard revealed-only rule + <code>'player-safe'</code> variant for player-facing output</td><td><code>contextBuilder.ts</code> · <code>ai/dmCoach.ts</code></td><td><strong>implemented</strong> (2026-08-26)</td></tr>
       <tr><td>E4</td><td><code>Plot.escalation?</code> — Front/threat-clock track (<code>doom</code>, ordered <code>steps[]</code>)</td><td><code>types/Plot.ts</code> · SessionEndWizard · <code>ai/worldSimulation.ts</code> · purge sweep</td><td>not implemented</td></tr>
       <tr><td>E5</td><td>Principle: GM craft lands as warning-severity lint, never schema-level cardinality constraints</td><td>all future rules</td><td>standing</td></tr>

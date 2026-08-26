@@ -2,7 +2,9 @@
 import type { NPC, Location, Faction, RollableTable, Item, Scene, SceneType, AdventureForBatchAdd, Article, PointOfInterest, PlayerCharacter, RealmChatResponse, ChatMessage, DraftEntity, ModelTier, Campaign } from '../../types/index';
 import type { BatchAddData } from '../../types/index';
 import type { WorldEvent } from './worldSimulation';
-import type { CallbackComplicationRequest } from './dmCoach';
+import type { CallbackComplicationRequest, ColdOpenRequest } from './dmCoach';
+import { hasColdOpenMaterial } from './dmCoach';
+import type { SecretDraft } from './realmWeaver';
 import type { AudioTranscriptionConfig, AudioTranscriptionSession } from './audioTranscription';
 
 // --- Mock Data ---
@@ -244,6 +246,19 @@ export const generateCallbackComplication = async (request: CallbackComplication
     await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
     return `This is a mock complication reincorporating ${names}: it ties them back into the current scene.`;
 }
+
+/** P4 — mock parity for the cold open. Same empty-campaign refusal as the real path. */
+export const generateColdOpen = async (request: ColdOpenRequest): Promise<string> => {
+    const { campaign } = request;
+    if (!hasColdOpenMaterial(campaign)) {
+        throw new Error(
+            'There is nothing to draft a cold open from yet — write a recap, a loose end, or star a moment first.'
+        );
+    }
+    console.log(`[MOCK MODE] Called generateColdOpen for campaign: "${campaign.title}"`);
+    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    return `Previously on ${campaign.title}: the party's choices from last session are still echoing, and the table is about to find out what they cost.`;
+};
 
 export const generateRollableTable = async (prompt: string, campaignContext?: string, useLiteModel: boolean = false, isMockMode: boolean = true): Promise<RollableTable> => {
   console.log(`[MOCK MODE] Called generateRollableTable with prompt: "${prompt}"`);
@@ -770,4 +785,31 @@ export const startAudioTranscription = (
     };
 
     return Promise.resolve({ stop });
+};
+
+/// --- R2: "Generate ten, keep what you like" (Secrets Tracker) ---------------
+
+const MOCK_SECRET_DRAFTS: SecretDraft[] = [
+    { title: 'The mayor pays the smugglers to look the other way', content: 'A cut of every "confiscated" crate ends up in the mayoral coffers, laundered through the harbor tax.', category: 'secret' },
+    { title: 'Salt on the doorstep', content: 'Someone has been tracing a warding sigil in salt outside the old chapel every new moon.', category: 'clue' },
+    { title: 'The count never left the crypt', content: "The man ruling from the manor is a doppelganger; the real count has been dead for three years.", category: 'revelation' },
+    { title: "They say the well water turned red last spring", content: 'True or not, half the town still refuses to drink from it.', category: 'rumor' },
+    { title: 'The missing ledger page', content: "A single page has been razored out of the harbormaster's ledger, right where last month's shipment would be listed.", category: 'clue' },
+    { title: 'The blacksmith owes a debt he cannot repay', content: 'He forges weapons for the thieves\' guild at cost, working off a debt from a bad winter three years back.', category: 'secret' },
+    { title: 'A second set of footprints', content: 'Whoever robbed the shrine wore boots two sizes too small for the story they told about it.', category: 'clue' },
+    { title: 'The plague was never natural', content: "It was seeded in the granary by agents of a rival house, timed to break the town's will before the siege.", category: 'revelation' },
+    { title: "Folk swear the lighthouse keeper hasn't aged a day in twenty years", content: 'Most laugh it off as a tall tale from sailors with too much grog in them.', category: 'rumor' },
+    { title: 'The locked drawer in the vicar\'s study', content: 'It rattles like coin when the wagon rolls by outside, though the vicar claims it holds only old sermons.', category: 'clue' },
+];
+
+/**
+ * Mock counterpart of `realmWeaver.generateSecretBatch`. Mock parity is
+ * mandatory for every facade function (services/ai/CLAUDE.md) — this never
+ * touches the provider stack, resolving instead to a fixed, well-formed
+ * roster of distinct drafts after the standard mock delay.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const generateSecretBatch = async (prompt: string, campaignContext?: string): Promise<SecretDraft[]> => {
+    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    return MOCK_SECRET_DRAFTS.map(d => ({ ...d }));
 };

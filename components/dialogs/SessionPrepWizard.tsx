@@ -8,6 +8,8 @@ import { campaignService } from '../../services/campaignService';
 import { DialogShell } from '../common/DialogShell';
 import { textareaBaseClasses } from '../common/Textarea';
 import { useEntitySearch } from '@/hooks/useEntitySearch';
+import { generateColdOpen, hasColdOpenMaterial } from '@/services/aiService';
+import { buildCampaignContext } from '@/services/contextBuilder';
 
 type WizardStep = 'adventure' | 'scenes' | 'entities' | 'plots' | 'strongStart' | 'beats' | 'secretsCheck' | 'review';
 
@@ -41,12 +43,21 @@ export interface SessionPrepWizardProps {
     campaign: Campaign;
     onComplete: (sessionLogId: string) => void;
     onClose: () => void;
+    /**
+     * P4 (cold open): routes the one AI action this wizard offers through the
+     * facade's mock switch. Threaded from both call sites (`SessionLogDashboard`,
+     * `TonightsTable`); kept optional (default `false`, the real provider path)
+     * so a caller that legitimately has no mock-mode concept of its own still
+     * compiles.
+     */
+    isMockMode?: boolean;
 }
 
 export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
     campaign,
     onComplete,
     onClose,
+    isMockMode = false,
 }) => {
     // ── Step tracking ─────────────────────────────────────────────────────────
     const [currentStep, setCurrentStep] = useState<WizardStep>('adventure');
@@ -247,6 +258,44 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
     // ── Lazy path: Strong Start ───────────────────────────────────────────────
     const [strongStart, setStrongStart] = useState('');
 
+    // ── P4: the cold open (docs/design/storyteller-first-design.md P4) ────────
+    // "Draft it from last session" surfaces wherever the wizard is already
+    // asking "what are you opening with tonight?" — the lazy path's Strong
+    // Start step fills `strongStart` above; with lazy prep off, the same
+    // action fills a Go Live-step field of its own (`goLiveColdOpen`), which
+    // Go Live later folds into `prepNotes` with the exact same encoding. Never
+    // both — whichever step is asking the question owns the button. The DM
+    // types nothing: the request is the campaign, nothing else.
+    const canDraftColdOpen = useMemo(() => hasColdOpenMaterial(campaign), [campaign]);
+    const [goLiveColdOpen, setGoLiveColdOpen] = useState<string | null>(null);
+    const [coldOpenPhase, setColdOpenPhase] = useState<'idle' | 'loading' | 'error'>('idle');
+    // Synchronous in-flight latch — same idiom as QuickToolsPanel's Callback
+    // Machine (`callbackInFlightRef`): a state-based guard alone reads a
+    // render closure, so two clicks landing before React commits would both
+    // pass it and fire two generations.
+    const coldOpenInFlightRef = useRef(false);
+
+    const handleDraftColdOpen = useCallback((applyDraft: (text: string) => void) => {
+        if (coldOpenInFlightRef.current) return;
+        coldOpenInFlightRef.current = true;
+        setColdOpenPhase('loading');
+        const campaignContext = buildCampaignContext({ variant: 'generation', campaign });
+        generateColdOpen({ campaign, campaignContext }, isMockMode)
+            .then(text => {
+                applyDraft(text);
+                setColdOpenPhase('idle');
+            })
+            .catch(() => {
+                // Quiet failure: no throw, no state torn down — what was
+                // already in the field (if anything) is left untouched and
+                // the button stays pressable.
+                setColdOpenPhase('error');
+            })
+            .finally(() => {
+                coldOpenInFlightRef.current = false;
+            });
+    }, [campaign, isMockMode]);
+
     // ── Lazy path: Beats ──────────────────────────────────────────────────────
     // Local title-only list; turned into real Beat[] (unique ids, isCompleted:
     // false, trimmed, blanks dropped) at Go Live and attached to the created
@@ -361,9 +410,15 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
         // into prepNotes as a leading delimited section (see
         // composeStrongStartPrepNotes above); with it off, neither the strong
         // start nor the beats ship, even if the fields were filled in earlier.
+        // The Go Live step's own cold open (P4) follows the identical rule in
+        // the other direction: it folds in via the SAME encoding when lazy
+        // prep is off, and is dropped exactly as the strong start is dropped
+        // when lazy prep is on — `composeStrongStartPrepNotes('', prepNotes)`
+        // is just `prepNotes.trim()`, so a `null`/blank draft here already
+        // ships no markers at all.
         const finalPrepNotes = lazyPrepOn
             ? composeStrongStartPrepNotes(strongStart, prepNotes)
-            : prepNotes.trim();
+            : composeStrongStartPrepNotes(goLiveColdOpen ?? '', prepNotes);
         const finalBeats: Beat[] = lazyPrepOn
             ? lazyBeats
                 .map(b => ({ id: b.id, title: b.title.trim(), isCompleted: false }))
@@ -396,7 +451,7 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
         hasGoneLiveRef.current = true;
         campaignService.goLive(newId);
         onComplete(newId);
-    }, [effectiveTitle, selectedAdventureId, selectedSceneIds, selectedPlotIds, prepNotes, activeNpcIds, activeLocationIds, lazyPrepOn, strongStart, lazyBeats, onComplete]);
+    }, [effectiveTitle, selectedAdventureId, selectedSceneIds, selectedPlotIds, prepNotes, activeNpcIds, activeLocationIds, lazyPrepOn, strongStart, goLiveColdOpen, lazyBeats, onComplete]);
 
     // ── Status badge colour ───────────────────────────────────────────────────
     const sceneStatusBadge = (status: Scene['status']) => {
@@ -596,6 +651,30 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
                                     className={`${textareaBaseClasses} w-full px-3 py-2 text-sm`}
                                 />
                             </div>
+
+                            {/* P4: draft it instead of staring at the blank field. */}
+                            {canDraftColdOpen ? (
+                                <div>
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() => handleDraftColdOpen(setStrongStart)}
+                                        disabled={coldOpenPhase === 'loading'}
+                                    >
+                                        <Icons.Sparkles className="w-4 h-4 mr-1.5" />
+                                        Draft it from last session
+                                    </Button>
+                                    {coldOpenPhase === 'error' && (
+                                        <p role="status" className="text-xs text-red-400 mt-2">
+                                            That didn't come through. Try it again in a moment.
+                                        </p>
+                                    )}
+                                </div>
+                            ) : (
+                                <p className="text-xs text-slate-500 italic">
+                                    Star a moment at the table or write a recap when the session ends, and this drafts itself.
+                                </p>
+                            )}
                         </div>
                     )}
 
@@ -1137,6 +1216,52 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
                                     </div>
                                 )}
                             </div>
+
+                            {/* P4: the cold open — off the lazy path, this step owns the question
+                                instead of the Strong Start step. Never both at once. */}
+                            {!lazyPrepOn && (
+                                <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 space-y-3">
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                                        <Icons.Sparkles className="w-3.5 h-3.5" /> Cold open
+                                    </h4>
+                                    {canDraftColdOpen ? (
+                                        <>
+                                            <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                onClick={() => handleDraftColdOpen(setGoLiveColdOpen)}
+                                                disabled={coldOpenPhase === 'loading'}
+                                            >
+                                                <Icons.Sparkles className="w-4 h-4 mr-1.5" />
+                                                Draft it from last session
+                                            </Button>
+                                            {coldOpenPhase === 'error' && (
+                                                <p role="status" className="text-xs text-red-400">
+                                                    That didn't come through. Try it again in a moment.
+                                                </p>
+                                            )}
+                                            {goLiveColdOpen !== null && (
+                                                <div>
+                                                    <label htmlFor="cold-open-field" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                                                        Read this to open the session
+                                                    </label>
+                                                    <textarea
+                                                        id="cold-open-field"
+                                                        value={goLiveColdOpen}
+                                                        onChange={e => setGoLiveColdOpen(e.target.value)}
+                                                        rows={4}
+                                                        className={`${textareaBaseClasses} w-full px-3 py-2 text-sm`}
+                                                    />
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <p className="text-xs text-slate-500 italic">
+                                            Star a moment at the table or write a recap when the session ends, and this drafts itself.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
 
                             {/* Prep Notes */}
                             <div>

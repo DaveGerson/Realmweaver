@@ -342,6 +342,7 @@ export const QuickToolsPanel: React.FC<QuickToolsPanelProps> = ({
                     <SecretsTracker
                         campaign={campaign}
                         activeSessionId={campaign.activeSessionId}
+                        isMockMode={isMockMode}
                     />
                 </div>
             )}

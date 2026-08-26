@@ -5,6 +5,11 @@ import type { WorldEvent } from './ai/worldSimulation';
 import type { AudioTranscriptionConfig, AudioTranscriptionSession } from './ai/audioTranscription';
 
 import * as aiRealmWeaver from './ai/realmWeaver';
+// R2 ("Generate ten") — the proposal wire shape. Nothing is persisted until the
+// GM keeps a card, so it is not a `types/` entity; re-exported here so
+// components never reach into `services/ai/*` (CLAUDE.md).
+import type { SecretDraft } from './ai/realmWeaver';
+export type { SecretDraft } from './ai/realmWeaver';
 import * as aiDmCoach from './ai/dmCoach';
 // Re-exported so callers can build the E3 player-safe recap context without
 // reaching past this facade (CLAUDE.md) — see `generateSessionRecap` below.
@@ -12,6 +17,12 @@ export type { PlayerSafeRecapContext } from './ai/dmCoach';
 // P2 (Callback Machine): callers assemble the request shape, so the facade
 // re-exports it rather than making them reach into `services/ai/*`.
 export type { CallbackComplicationRequest } from './ai/dmCoach';
+// P4 (cold open): same reason — the caller assembles the request.
+export type { ColdOpenRequest } from './ai/dmCoach';
+// Re-exported as-is rather than wrapped: a pure predicate over the campaign
+// with no mock-mode branch, so the Session Prep Wizard can ask whether a cold
+// open has anything to draw on without importing `services/ai/*` (CLAUDE.md).
+export { hasColdOpenMaterial } from './ai/dmCoach';
 import * as aiEvocationWizard from './ai/evocationWizard';
 import * as aiRealmChat from './ai/realmChat';
 import * as aiWorldSimulation from './ai/worldSimulation';
@@ -70,6 +81,18 @@ export const generateAdventure = (prompt: string, isMockMode: boolean = false, c
     return aiRealmWeaver.generateAdventure(prompt, campaignContext);
 };
 
+/**
+ * R2 — "Generate ten, keep what you like" for the Secrets Tracker. One model
+ * call proposes roughly ten secrets/clues from the campaign context; the caller
+ * shows them as checkable preview cards and only creates the checked ones.
+ */
+export const generateSecretBatch = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<SecretDraft[]> => {
+    if (isMockMode) {
+        return mockService.generateSecretBatch(prompt, campaignContext);
+    }
+    return aiRealmWeaver.generateSecretBatch(prompt, campaignContext);
+};
+
 export const generateArticle = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds'>> => {
     if (isMockMode) {
         return mockService.generateArticle(prompt, campaignContext);
@@ -105,6 +128,22 @@ export const generateCallbackComplication = (
         return mockService.generateCallbackComplication(request);
     }
     return aiDmCoach.generateCallbackComplication(request);
+};
+
+/**
+ * P4 — the "Previously on…" cold open. Zero-prompt: the caller hands over the
+ * campaign (and, optionally, a context string it built) and the draft is
+ * composed from the last completed session's recap + loose ends + the most
+ * recent engraved moments, in the campaign's styleProfile voice.
+ */
+export const generateColdOpen = (
+    request: aiDmCoach.ColdOpenRequest,
+    isMockMode: boolean = false
+): Promise<string> => {
+    if (isMockMode) {
+        return mockService.generateColdOpen(request);
+    }
+    return aiDmCoach.generateColdOpen(request);
 };
 
 export const generateRollableTable = (prompt: string, campaignContext?: string, useLiteModel: boolean = false, isMockMode: boolean = false): Promise<RollableTable> => {

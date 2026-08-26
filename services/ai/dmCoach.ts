@@ -3,6 +3,7 @@ import type { Campaign, RollableTable } from '../../types/index';
 import type { DormantPiece } from '../../utils/dormantMaterial';
 import { generateText, generateWithSchema } from './core';
 import { buildCampaignContext } from '../contextBuilder';
+import { getPlayedSessionsInOrder, getLastCompletedSession } from '../../utils/storyDerivations';
 
 // --- Schemas ---
 
@@ -294,6 +295,93 @@ export const generateCallbackComplication = async (
   const tier = request.useLiteModel ? 'lite' : 'standard';
   const prompt = buildCallbackComplicationPrompt(request);
   const result = await generateText(prompt, tier, request.campaignContext);
+  return result.trim();
+};
+
+/**
+ * P4 — the "Previously on…" cold open. The DM types nothing: the whole draft is
+ * composed from what the campaign already holds — the last completed session's
+ * `recap` and `looseEnds`, plus the most recent engraved moments (starred
+ * `SessionLogEntry.isImportant` entries, zero new schema) — and written in the
+ * campaign's `styleProfile` voice when one has been analysed.
+ */
+export interface ColdOpenRequest {
+  /** The campaign the cold open is drafted from. Nothing else is read. */
+  campaign: Campaign;
+  /** Caller-built campaign context, forwarded verbatim. Never built here. */
+  campaignContext?: string;
+  useLiteModel?: boolean;
+}
+
+/** Cap on how many engraved moments are handed to the model — a spine, not a transcript. */
+const MAX_COLD_OPEN_MOMENTS = 5;
+
+/**
+ * Every engraved moment (a starred `SessionLogEntry` with real words in it)
+ * across every PLAYED session (`completed` or `active` — a star from the
+ * live session counts, same as the Moments reel), oldest first: sessions in
+ * `getPlayedSessionsInOrder`'s order, entries within a session in the order
+ * they were logged (array order, never the timestamp — see
+ * `utils/storyDerivations.ts` and `tests/momentsReel.view.test.tsx`).
+ *
+ * Deliberately re-walked here rather than shared with `TonightsTable.tsx`'s
+ * reel — both derive from `getPlayedSessionsInOrder`, but a single hoisted
+ * walker belongs in `utils/storyDerivations.ts`, outside this lane's file
+ * allowlist. Flagged as a follow-up rather than done here.
+ */
+function gatherEngravedMoments(campaign: Campaign): string[] {
+  const moments: string[] = [];
+  for (const session of getPlayedSessionsInOrder(campaign)) {
+    for (const note of session.structuredNotes ?? []) {
+      if (note.isImportant && (note.content ?? '').trim()) {
+        moments.push(note.content);
+      }
+    }
+  }
+  return moments;
+}
+
+/**
+ * True when the campaign holds anything a cold open could be written from:
+ * words in the last completed session's recap or loose ends, or at least one
+ * engraved moment anywhere. Pure — re-exported through `aiService.ts` so the
+ * Session Prep Wizard can decide whether to offer the action at all.
+ */
+export const hasColdOpenMaterial = (campaign: Campaign): boolean => {
+  const lastCompleted = getLastCompletedSession(campaign);
+  const hasRecap = !!(lastCompleted?.recap ?? '').trim();
+  const hasLooseEnds = !!(lastCompleted?.looseEnds ?? '').trim();
+  return hasRecap || hasLooseEnds || gatherEngravedMoments(campaign).length > 0;
+};
+
+export const generateColdOpen = async (request: ColdOpenRequest): Promise<string> => {
+  const { campaign, campaignContext, useLiteModel } = request;
+
+  if (!hasColdOpenMaterial(campaign)) {
+    throw new Error(
+      'There is nothing to draft a cold open from yet — write a recap, a loose end, or star a moment first.'
+    );
+  }
+
+  const lastCompleted = getLastCompletedSession(campaign);
+  const recapText = (lastCompleted?.recap ?? '').trim();
+  const looseEndsText = (lastCompleted?.looseEnds ?? '').trim();
+  const moments = gatherEngravedMoments(campaign).slice(-MAX_COLD_OPEN_MOMENTS).reverse();
+  const styleText = (campaign.styleProfile ?? '').trim();
+
+  const sections = [
+    'You are a master Dungeon Master\'s assistant. Draft a "Previously on…" cold open: read-aloud performance material of roughly 150 words that the DM can read aloud verbatim to open tonight\'s session, the way a returning show recaps itself. Write continuous prose — no bullet points, no headings, no meta-commentary about the task.',
+    recapText ? `Last session's recap:\n${recapText}` : '',
+    looseEndsText ? `Loose ends still hanging from last session:\n${looseEndsText}` : '',
+    moments.length > 0
+      ? `The engraved moments from this campaign, newest first:\n${moments.map((m) => `- ${m}`).join('\n')}`
+      : '',
+    styleText ? `Match this campaign's voice guide exactly:\n${styleText}` : '',
+  ].filter(Boolean);
+
+  const prompt = sections.join('\n\n');
+  const tier = useLiteModel ? 'lite' : 'standard';
+  const result = await generateText(prompt, tier, campaignContext);
   return result.trim();
 };
 

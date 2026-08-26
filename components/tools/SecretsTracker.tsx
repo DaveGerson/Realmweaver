@@ -5,6 +5,8 @@ import { Icons } from '@/components/common/Icons';
 import { Button } from '@/components/common/Button';
 import { twMerge } from 'tailwind-merge';
 import { campaignService } from '@/services/campaignService';
+import { generateSecretBatch, type SecretDraft } from '@/services/aiService';
+import { buildCampaignContext } from '@/services/contextBuilder';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { ENTITY_TYPE_CONFIG } from '@/utils/entityUtils';
 
@@ -16,6 +18,13 @@ type CategoryFilter = 'all' | SecretCategory;
 interface SecretsTrackerProps {
   campaign: Campaign;
   activeSessionId?: string;
+  /**
+   * R2 ("Generate ten"). Optional and defaulting to false so the two existing
+   * call sites (`ViewRouter.tsx`, `session/QuickToolsPanel.tsx`) keep
+   * compiling untouched — both already have the flag in scope and should pass
+   * it through.
+   */
+  isMockMode?: boolean;
 }
 
 // --- Constants ---
@@ -280,11 +289,16 @@ interface SecretCardProps {
   sessionName?: string;
   activeSessionId?: string;
   allEntities: PickableEntity[];
+  /** E1/E2 mystery edges: every `category: 'revelation'` secret in the campaign, for the "Supports revelation" picker. */
+  revelations: Secret[];
+  /** E1/E2: count of secrets whose `revealsSecretId` equals this card's id (self-reference excluded); 0 for a non-revelation. */
+  inboundClueCount: number;
   onReveal: (id: string, sessionId?: string) => void;
   onUnreveal: (id: string) => void;
   onDelete: (id: string) => void;
   onLinkEntity: (secretId: string, entityId: string) => void;
   onUnlinkEntity: (secretId: string, entityId: string) => void;
+  onUpdateSecret: (id: string, updates: Partial<Secret>) => void;
 }
 
 const SecretCard: React.FC<SecretCardProps> = ({
@@ -292,11 +306,14 @@ const SecretCard: React.FC<SecretCardProps> = ({
   sessionName,
   activeSessionId,
   allEntities,
+  revelations,
+  inboundClueCount,
   onReveal,
   onUnreveal,
   onDelete,
   onLinkEntity,
   onUnlinkEntity,
+  onUpdateSecret,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
@@ -311,6 +328,33 @@ const SecretCard: React.FC<SecretCardProps> = ({
     () => linkedIds.map(id => allEntities.find(e => e.id === id)).filter(Boolean) as PickableEntity[],
     [linkedIds, allEntities]
   );
+
+  // E1/E2 mystery edges — documented default threshold is 3 when cluesNeeded is absent.
+  const cluesNeededThreshold = secret.cluesNeeded ?? 3;
+
+  const handleRevealsSecretChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    // The key must be PRESENT even when clearing — updateSecret is an
+    // Object.assign, and an omitted key clears nothing.
+    onUpdateSecret(secret.id, { revealsSecretId: value === '' ? undefined : value });
+  };
+
+  const handleVitalToggle = () => {
+    onUpdateSecret(secret.id, { isVital: !secret.isVital });
+  };
+
+  const handleCluesNeededChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    if (raw === '') {
+      // Clearing the field returns to the documented default (3) — the key
+      // must be present, same reasoning as the picker's clearing option.
+      onUpdateSecret(secret.id, { cluesNeeded: undefined });
+      return;
+    }
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 1) return; // refuse anything below one
+    onUpdateSecret(secret.id, { cluesNeeded: n });
+  };
 
   const handleRevealToggle = () => {
     if (secret.isRevealed) {
@@ -374,6 +418,20 @@ const SecretCard: React.FC<SecretCardProps> = ({
         >
           {secret.title}
         </button>
+
+        {/* E1/E2 inbound-clue badge — every revelation card, readable
+            without expanding anything. "Inbound" = any secret whose
+            revealsSecretId equals this card's id, whatever its own
+            category; a self-reference never counts (computed by the
+            parent's inboundClueCount). */}
+        {secret.category === 'revelation' && (
+          <span
+            aria-label={`${inboundClueCount} of ${cluesNeededThreshold} clues`}
+            className="flex-shrink-0 mt-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-slate-700/60 text-slate-400"
+          >
+            {inboundClueCount}/{cluesNeededThreshold}
+          </span>
+        )}
 
         {/* Actions */}
         <div className="flex items-center gap-1 flex-shrink-0">
@@ -500,6 +558,64 @@ const SecretCard: React.FC<SecretCardProps> = ({
               </p>
             )}
           </div>
+
+          {/* E1 mystery edge — "supports revelation" picker, clue cards only */}
+          {secret.category === 'clue' && (
+            <div className="border-t border-slate-700 pt-2">
+              <p className="text-xs text-slate-500 uppercase tracking-wide mb-1.5">Supports Revelation</p>
+              {revelations.length > 0 ? (
+                <select
+                  aria-label="Supports revelation"
+                  value={secret.revealsSecretId ?? ''}
+                  onChange={handleRevealsSecretChange}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                >
+                  <option value="">— none —</option>
+                  {revelations.map(r => (
+                    <option key={r.id} value={r.id}>{r.title}</option>
+                  ))}
+                </select>
+              ) : (
+                <p className="text-[11px] text-slate-600 italic">
+                  No revelations yet. Create one to link this clue to.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* E1/E2 — vital toggle + clues-needed override, revelation cards only */}
+          {secret.category === 'revelation' && (
+            <div className="border-t border-slate-700 pt-2 flex items-center gap-3">
+              <button
+                onClick={handleVitalToggle}
+                aria-pressed={!!secret.isVital}
+                className={twMerge(
+                  'flex items-center gap-1.5 text-xs px-2 py-1 rounded-md transition-colors',
+                  secret.isVital
+                    ? 'text-amber-400 bg-amber-500/10'
+                    : 'text-slate-500 hover:text-slate-300 hover:bg-slate-700'
+                )}
+                title="Mark this revelation vital to the mystery (enables the Three-Clue lint)"
+              >
+                <Icons.Sparkles className="w-3 h-3" />
+                Vital
+              </button>
+
+              {secret.isVital && (
+                <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                  <span>Clues needed</span>
+                  <input
+                    type="number"
+                    min={1}
+                    aria-label="Clues needed"
+                    value={cluesNeededThreshold}
+                    onChange={handleCluesNeededChange}
+                    className="w-14 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -667,11 +783,183 @@ const AddSecretForm: React.FC<AddSecretFormProps> = ({ campaign, onAdd, onCancel
   );
 };
 
+// --- R2: "Generate ten, keep what you like" -------------------------------
+
+interface GenerateTenPanelProps {
+  campaign: Campaign;
+  isMockMode: boolean;
+  /**
+   * Reports whether the panel currently has anything of its own to show (an
+   * error message, or a non-empty preview) — the caller uses this to
+   * suppress the "No secrets yet." roster empty-state so the two don't stack
+   * into a confusing double message when the campaign has no secrets.
+   */
+  onActiveChange: (active: boolean) => void;
+}
+
+const GENERATE_TEN_PROMPT = 'Propose roughly ten secrets, clues, revelations, and rumors for this campaign.';
+
+/**
+ * R2 (lazy-dm-lens.md) — one model call proposes roughly ten secrets/clues;
+ * the GM keeps what they like at no cost to discarding the rest. Widens the
+ * shipped `QuickNpcGenerator` generate/preview/keep-discard idiom from one
+ * card to a checkable batch. Always creates via `campaignService.createSecret`
+ * — nothing is persisted for an unchecked or discarded draft.
+ */
+const GenerateTenPanel: React.FC<GenerateTenPanelProps> = ({ campaign, isMockMode, onActiveChange }) => {
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<SecretDraft[] | null>(null);
+  const [checked, setChecked] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    onActiveChange(error !== null || (drafts !== null && drafts.length > 0));
+  }, [error, drafts, onActiveChange]);
+
+  const handleGenerate = useCallback(async () => {
+    setGenerating(true);
+    setError(null);
+    try {
+      const campaignContext = buildCampaignContext({ variant: 'generation', campaign });
+      const result = await generateSecretBatch(GENERATE_TEN_PROMPT, isMockMode, campaignContext);
+      if (result.length === 0) {
+        setDrafts(null);
+        setError("Nothing came back — try again, or add entries by hand.");
+      } else {
+        setDrafts(result);
+        setChecked(new Set(result.map((_, i) => i)));
+      }
+    } catch (err) {
+      setDrafts(null);
+      setError(err instanceof Error ? err.message : 'Generation failed.');
+    } finally {
+      setGenerating(false);
+    }
+  }, [campaign, isMockMode]);
+
+  const toggleChecked = useCallback((index: number) => {
+    setChecked(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index); else next.add(index);
+      return next;
+    });
+  }, []);
+
+  const handleKeep = useCallback(() => {
+    if (!drafts) return;
+    drafts.forEach((draft, i) => {
+      if (!checked.has(i)) return;
+      campaignService.createSecret({
+        title: draft.title,
+        content: draft.content,
+        category: draft.category,
+        isRevealed: false,
+        ...(draft.notes ? { notes: draft.notes } : {}),
+      });
+    });
+    // One-shot: dismiss immediately so the same batch cannot be kept twice.
+    setDrafts(null);
+    setChecked(new Set());
+  }, [drafts, checked]);
+
+  const handleDiscard = useCallback(() => {
+    setDrafts(null);
+    setChecked(new Set());
+    setError(null);
+  }, []);
+
+  return (
+    <div className="px-3 pt-2">
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={handleGenerate}
+        disabled={generating}
+        className="w-full"
+      >
+        {generating ? (
+          <Icons.Loader className="w-4 h-4 animate-spin mr-1.5" />
+        ) : (
+          <Icons.Sparkles className="w-4 h-4 mr-1.5" />
+        )}
+        Generate ten
+      </Button>
+
+      {error && (
+        <p className="mt-1.5 text-xs text-red-400">{error}</p>
+      )}
+
+      {drafts && drafts.length > 0 && (
+        <div className="mt-2 space-y-1.5">
+          {drafts.map((draft, i) => {
+            const config = CATEGORY_CONFIG[draft.category];
+            return (
+              <label
+                key={`${draft.title}-${i}`}
+                className={twMerge(
+                  'flex items-start gap-2 bg-slate-800 border border-slate-700 rounded-lg border-l-2 pl-2.5 pr-3 py-2 cursor-pointer',
+                  config.borderColor
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked.has(i)}
+                  onChange={() => toggleChecked(i)}
+                  aria-label={draft.title}
+                  className="mt-0.5 accent-amber-500"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span
+                      className={twMerge(
+                        'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide',
+                        config.badgeBg,
+                        config.badgeText
+                      )}
+                    >
+                      {config.label}
+                    </span>
+                    <span className="text-sm font-semibold text-slate-100">{draft.title}</span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{draft.content}</p>
+                  {draft.notes && (
+                    <p className="text-[11px] text-slate-500 italic mt-0.5">{draft.notes}</p>
+                  )}
+                </div>
+              </label>
+            );
+          })}
+
+          <div className="flex gap-2 pt-0.5">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleKeep}
+              disabled={checked.size === 0}
+              className="flex-1"
+            >
+              Keep {checked.size}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleDiscard}
+            >
+              Discard
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // --- Main Component ---
 
 export const SecretsTracker: React.FC<SecretsTrackerProps> = ({
   campaign,
   activeSessionId,
+  isMockMode = false,
 }) => {
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const [showRevealed, setShowRevealed] = useState(true);
@@ -679,6 +967,10 @@ export const SecretsTracker: React.FC<SecretsTrackerProps> = ({
   // R4: "here now" filter — defaults off, and only ever means anything when a
   // scene is actually live (see `activeScene` below).
   const [hereNowOnly, setHereNowOnly] = useState(false);
+  // R2: true while GenerateTenPanel has an error or a non-empty preview of
+  // its own to show, so the roster's "No secrets yet." empty state doesn't
+  // stack with it into a confusing double message.
+  const [generateTenActive, setGenerateTenActive] = useState(false);
 
   const secrets = campaign.secrets || [];
 
@@ -729,6 +1021,27 @@ export const SecretsTracker: React.FC<SecretsTrackerProps> = ({
     const revealed = secrets.filter(s => s.isRevealed).length;
     return { total: secrets.length, hidden, revealed };
   }, [secrets]);
+
+  // E1/E2 mystery edges — the revelation roster for the "Supports revelation"
+  // picker, and each revelation's inbound-clue count for its badge. Shared
+  // single definition (same as continuityChecker/backlinkUtils): any secret
+  // whose revealsSecretId points at S, whatever its own category; a
+  // self-reference never counts.
+  const revelations = useMemo(() => secrets.filter(s => s.category === 'revelation'), [secrets]);
+
+  const inboundClueCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const s of secrets) {
+      if (s.revealsSecretId && s.revealsSecretId !== s.id) {
+        map.set(s.revealsSecretId, (map.get(s.revealsSecretId) ?? 0) + 1);
+      }
+    }
+    return map;
+  }, [secrets]);
+
+  const handleUpdateSecret = useCallback((id: string, updates: Partial<Secret>) => {
+    campaignService.updateSecret(id, updates);
+  }, []);
 
   const handleAdd = useCallback((data: Omit<Secret, 'id' | 'createdAt'>) => {
     campaignService.createSecret(data);
@@ -839,6 +1152,11 @@ export const SecretsTracker: React.FC<SecretsTrackerProps> = ({
         </div>
       </div>
 
+      {/* R2: "Generate ten, keep what you like" */}
+      <div className="border-b border-slate-800 pb-2 flex-shrink-0">
+        <GenerateTenPanel campaign={campaign} isMockMode={isMockMode} onActiveChange={setGenerateTenActive} />
+      </div>
+
       {/* Scrollable list area */}
       <div className="flex-1 overflow-y-auto min-h-0 p-3 space-y-2">
         {/* Add form */}
@@ -851,7 +1169,7 @@ export const SecretsTracker: React.FC<SecretsTrackerProps> = ({
         )}
 
         {/* Empty state */}
-        {filteredSecrets.length === 0 && !showAddForm && (
+        {filteredSecrets.length === 0 && !showAddForm && !generateTenActive && (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <Icons.Lock className="w-8 h-8 text-slate-700 mb-2" />
             {secrets.length === 0 ? (
@@ -881,11 +1199,14 @@ export const SecretsTracker: React.FC<SecretsTrackerProps> = ({
             sessionName={secret.revealedInSessionId ? sessionNameMap[secret.revealedInSessionId] : undefined}
             activeSessionId={activeSessionId}
             allEntities={allEntities}
+            revelations={revelations}
+            inboundClueCount={inboundClueCounts.get(secret.id) ?? 0}
             onReveal={handleReveal}
             onUnreveal={handleUnreveal}
             onDelete={handleDelete}
             onLinkEntity={handleLinkEntity}
             onUnlinkEntity={handleUnlinkEntity}
+            onUpdateSecret={handleUpdateSecret}
           />
         ))}
       </div>

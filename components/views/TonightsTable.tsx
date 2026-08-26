@@ -17,6 +17,7 @@ import { Button } from '../common/Button';
 import { ENTITY_TYPE_CONFIG } from '../../utils/entityUtils';
 import {
   getLastCompletedSession,
+  getPlayedSessionsInOrder,
   deriveNpcLastAppearances,
   derivePlotThreadAges,
   deriveLoadedGuns,
@@ -39,6 +40,13 @@ export interface TonightsTableProps {
   onNavigate: (entityType: string, entityId: string) => void;
   /** Handed the new session log id when the Session Prep Wizard finishes. */
   onGoLive: (sessionLogId: string) => void;
+  /**
+   * Routed straight through to the Session Prep Wizard's cold-open action.
+   * Optional (default `false`, the real provider path) so a pre-existing
+   * render call site with no mock-mode concept of its own still compiles —
+   * same reasoning as `SessionPrepWizard`'s own `isMockMode`.
+   */
+  isMockMode?: boolean;
 }
 
 /**
@@ -56,7 +64,47 @@ function resolveLinkedEntityName(campaign: Campaign, id: string): string | null 
   );
 }
 
-export const TonightsTable: React.FC<TonightsTableProps> = ({ campaign, onNavigate, onGoLive }) => {
+/** A starred running-log entry (P4's "engraved moment"), tied back to its session. */
+interface EngravedMoment {
+  sessionId: string;
+  sessionTitle: string;
+  entryId: string;
+  content: string;
+}
+
+/**
+ * Every starred `SessionLogEntry` (`isImportant`) across every played session
+ * — zero new schema — oldest first: sessions in `getPlayedSessionsInOrder`'s
+ * order (by `sessionDate`, ties broken by array position), entries within one
+ * session kept in the order they were logged rather than by timestamp — that
+ * IS the order they happened, and a timestamp can be missing or wrong on an
+ * old save. An unstarred entry, or a starred entry with no words in it, never
+ * becomes a moment.
+ *
+ * Deliberately re-walked here rather than shared with
+ * `services/ai/dmCoach.ts`'s cold-open walker (which caps at the five most
+ * recent, newest first, for the prompt) — both derive from
+ * `getPlayedSessionsInOrder`, but hoisting one shared walker belongs in
+ * `utils/storyDerivations.ts`, outside this lane's file allowlist.
+ */
+function deriveEngravedMoments(campaign: Campaign): EngravedMoment[] {
+  const moments: EngravedMoment[] = [];
+  for (const session of getPlayedSessionsInOrder(campaign)) {
+    for (const note of session.structuredNotes ?? []) {
+      if (note.isImportant && (note.content ?? '').trim()) {
+        moments.push({
+          sessionId: session.id,
+          sessionTitle: session.title,
+          entryId: note.id,
+          content: note.content,
+        });
+      }
+    }
+  }
+  return moments;
+}
+
+export const TonightsTable: React.FC<TonightsTableProps> = ({ campaign, onNavigate, onGoLive, isMockMode = false }) => {
   const [isPrepOpen, setIsPrepOpen] = useState(false);
 
   const lastCompleted = useMemo(() => getLastCompletedSession(campaign), [campaign]);
@@ -66,6 +114,7 @@ export const TonightsTable: React.FC<TonightsTableProps> = ({ campaign, onNaviga
     [campaign]
   );
   const loadedGuns = useMemo(() => deriveLoadedGuns(campaign), [campaign]);
+  const moments = useMemo(() => deriveEngravedMoments(campaign), [campaign]);
 
   // Same live-session check the Session Manager's "Prepare Session" button
   // uses: prefer the explicit activeSessionId, fall back to status==='active'.
@@ -76,6 +125,7 @@ export const TonightsTable: React.FC<TonightsTableProps> = ({ campaign, onNaviga
 
   const plotAccent = ENTITY_TYPE_CONFIG.plot.color;
   const npcAccent = ENTITY_TYPE_CONFIG.npc.color;
+  const sessionLogAccent = ENTITY_TYPE_CONFIG['session-log'].color;
 
   const handleWizardComplete = (sessionLogId: string) => {
     setIsPrepOpen(false);
@@ -209,6 +259,36 @@ export const TonightsTable: React.FC<TonightsTableProps> = ({ campaign, onNaviga
         </section>
       </div>
 
+      {/* Moments — the campaign's emotional spine (P4): every star, oldest first, uncapped. */}
+      <section
+        role="region"
+        aria-labelledby="tt-moments"
+        className="bg-slate-800/60 border border-slate-700 rounded-xl p-5 space-y-3"
+      >
+        <h2 id="tt-moments" className="text-sm font-bold text-slate-300 uppercase tracking-wider">
+          Moments
+        </h2>
+        {moments.length === 0 ? (
+          <p className="text-sm text-slate-400 italic">Star a moment during play and it lands here.</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {moments.map((moment) => (
+              <li key={`${moment.sessionId}-${moment.entryId}`}>
+                <button
+                  onClick={() => onNavigate('session-log', moment.sessionId)}
+                  className="w-full text-left px-3 py-2 rounded-lg bg-slate-900/40 hover:bg-slate-900 transition-colors"
+                >
+                  <span className={`block text-xs font-semibold uppercase tracking-wide text-${sessionLogAccent}-400`}>
+                    {moment.sessionTitle}
+                  </span>
+                  <span className="block text-sm text-slate-200">{moment.content}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       <div>
         <Button
           onClick={() => setIsPrepOpen(true)}
@@ -222,7 +302,12 @@ export const TonightsTable: React.FC<TonightsTableProps> = ({ campaign, onNaviga
 
       {isPrepOpen && (
         <Suspense fallback={null}>
-          <SessionPrepWizard campaign={campaign} onComplete={handleWizardComplete} onClose={() => setIsPrepOpen(false)} />
+          <SessionPrepWizard
+            campaign={campaign}
+            onComplete={handleWizardComplete}
+            onClose={() => setIsPrepOpen(false)}
+            isMockMode={isMockMode}
+          />
         </Suspense>
       )}
     </div>

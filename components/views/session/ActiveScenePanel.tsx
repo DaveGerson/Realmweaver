@@ -1,14 +1,130 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
-import type { Campaign, Scene, Location, NPC, SessionLog, DiceRoll } from '@/types';
+import type { Campaign, Scene, Location, NPC, SessionLog, DiceRoll, HistoryEntry, HistoryReferenceType } from '@/types';
 import { Icons, SceneIcon } from '@/components/common/Icons';
 import { Button } from '@/components/common/Button';
 import { twMerge } from 'tailwind-merge';
 import { campaignService } from '@/services/campaignService';
 import { EntityLink } from '@/components/common/EntityLink';
 import { LinkedText } from '@/components/common/LinkedText';
+import { textareaBaseClasses } from '@/components/common/Textarea';
 import { rollDice } from '@/utils/diceUtils';
 import type { QuickCardEntityType } from '@/components/common/EntityQuickCard';
+
+// ─── The quote ledger (Wave 2 / P3) ──────────────────────────────────────────
+//
+// Zero new schema: a logged line is an ordinary `HistoryEntry` on the NPC's
+// existing `history[]`, distinguished from a hand-written history row purely by
+// the shape of its `summary` — `Said: "…"`. That keeps the whole mechanism
+// inside machinery that already exists and already survives the cascade purge
+// (`_purgeEntityReferences` blanks a dangling `referenceId` and demotes the row
+// to `referenceType: 'manual'`, leaving the words the NPC said intact).
+//
+// These helpers live here because the scene NPC card is the ledger's primary
+// surface; `components/dialogs/DmCoach.tsx` imports them for the roleplay tool's
+// "log this line" action so the format is defined exactly once.
+
+/** Prefix that marks a `HistoryEntry` as a logged spoken line. */
+export const QUOTE_LEDGER_PREFIX = 'Said: ';
+
+/** How many logged lines an NPC card shows. */
+export const QUOTE_LEDGER_DISPLAY_LIMIT = 3;
+
+/** The slice of the campaign store the ledger writes through. */
+export interface QuoteLedgerStore {
+    getActiveCampaign: () => Campaign | null | undefined;
+    updateNpc: (id: string, updatedData: Partial<NPC>) => void;
+}
+
+/** The wrapper a formatted line always starts/ends with: `Said: "`…`"`. */
+const QUOTE_WRAPPER_OPEN = `${QUOTE_LEDGER_PREFIX}"`;
+
+/** `Hold the line.` → `Said: "Hold the line."` */
+export const formatQuoteLedgerSummary = (line: string): string =>
+    `${QUOTE_WRAPPER_OPEN}${line.trim()}"`;
+
+/**
+ * True when this history row was written by the quote ledger — its summary
+ * wraps non-empty text in the ledger's `Said: "…"` shape. Anchored to the
+ * START of the string (not a substring match anywhere in it), so an ordinary
+ * history row that merely mentions someone saying something ("The captain
+ * Said: "run" — but nobody moved") is never mistaken for a logged line.
+ */
+export const isQuoteLedgerEntry = (entry: HistoryEntry): boolean => {
+    const { summary } = entry;
+    if (!summary.startsWith(QUOTE_WRAPPER_OPEN) || !summary.endsWith('"')) return false;
+    return summary.slice(QUOTE_WRAPPER_OPEN.length, -1).length > 0;
+};
+
+/** The spoken words inside a ledger row, or null for any other history row. */
+export const extractQuoteLine = (entry: HistoryEntry): string | null => {
+    if (!isQuoteLedgerEntry(entry)) return null;
+    return entry.summary.slice(QUOTE_WRAPPER_OPEN.length, -1);
+};
+
+/** The NPC's most recently logged lines, newest first. */
+export const selectRecentQuoteLines = (
+    npc: NPC | null | undefined,
+    limit: number = QUOTE_LEDGER_DISPLAY_LIMIT,
+): string[] => {
+    if (!npc || !npc.history || limit <= 0) return [];
+    const lines: string[] = [];
+    for (let i = npc.history.length - 1; i >= 0 && lines.length < limit; i--) {
+        const line = extractQuoteLine(npc.history[i]);
+        if (line !== null) lines.push(line);
+    }
+    return lines;
+};
+
+/**
+ * Appends a spoken line to the NPC's ledger, reading the NPC's history from the
+ * live store rather than from a render-time closure. Returns whether a row was
+ * actually written.
+ *
+ * A fumbled double press must not log the same line twice, but a genuinely new
+ * utterance — the same words said again after another line intervened, or in a
+ * different session — is real and IS recorded. So the duplicate check compares
+ * the proposed line AND its reference (session id, or the manual fallback)
+ * against only the most recently logged LEDGER row (skipping any ordinary
+ * history rows appended after it), not the row array's literal last entry.
+ */
+export const logNpcQuote = (
+    npcId: string,
+    line: string,
+    store: QuoteLedgerStore = campaignService,
+): boolean => {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+
+    const campaign = store.getActiveCampaign();
+    if (!campaign) return false;
+
+    const npc = campaign.npcs.find(n => n.id === npcId);
+    if (!npc) return false;
+
+    const history = npc.history ?? [];
+    const sessionId = campaign.activeSessionId;
+    const referenceType: HistoryReferenceType = sessionId ? 'session' : 'manual';
+
+    for (let i = history.length - 1; i >= 0; i--) {
+        const priorLine = extractQuoteLine(history[i]);
+        if (priorLine === null) continue;
+        const priorEntry = history[i];
+        const isSameReference = priorEntry.referenceType === referenceType && priorEntry.referenceId === sessionId;
+        if (priorLine === trimmed && isSameReference) return false;
+        break;
+    }
+
+    const entry: HistoryEntry = {
+        id: crypto.randomUUID(),
+        summary: formatQuoteLedgerSummary(trimmed),
+        referenceType,
+        ...(sessionId ? { referenceId: sessionId } : {}),
+    };
+
+    store.updateNpc(npcId, { history: [...history, entry] });
+    return true;
+};
 
 /** Copy-to-clipboard button with 2-second visual feedback. */
 const CopyButton: React.FC<{ text: string; className?: string }> = ({ text, className }) => {
@@ -65,6 +181,33 @@ export const ActiveScenePanel: React.FC<ActiveScenePanelProps> = ({
     const [showRecap, setShowRecap] = useState(true);
     const [skillCheckRolls, setSkillCheckRolls] = useState<Record<number, { d20: number; modifier: number; total: number; passed: boolean }>>({});
     const [skillCheckModifiers, setSkillCheckModifiers] = useState<Record<number, number>>({});
+
+    // Quote ledger composer: only one card's composer is open at a time, and its
+    // text resets whenever a card's "Log a line" button (re)opens it, so a
+    // fumbled second press never re-sends a line still sitting in the box.
+    const [quoteComposerNpcId, setQuoteComposerNpcId] = useState<string | null>(null);
+    const [quoteComposerText, setQuoteComposerText] = useState('');
+
+    const handleOpenQuoteComposer = useCallback((npcId: string) => {
+        setQuoteComposerNpcId(npcId);
+        setQuoteComposerText('');
+    }, []);
+
+    const handleCloseQuoteComposer = useCallback(() => {
+        setQuoteComposerNpcId(null);
+        setQuoteComposerText('');
+    }, []);
+
+    const handleSaveQuoteLine = useCallback((npcId: string) => {
+        // logNpcQuote reads the NPC through campaignService.getActiveCampaign()
+        // at press time, not from the `campaign` prop this panel rendered with
+        // (finding: a line logged from a second surface in between must survive).
+        const wrote = logNpcQuote(npcId, quoteComposerText, campaignService);
+        if (wrote) {
+            setQuoteComposerNpcId(null);
+            setQuoteComposerText('');
+        }
+    }, [quoteComposerText]);
 
     // Skill check rolls are keyed by array index, which is only meaningful within a
     // single scene's skillChecks list. Reset them whenever the active scene changes so a
@@ -201,6 +344,9 @@ export const ActiveScenePanel: React.FC<ActiveScenePanelProps> = ({
                                 {activeSceneNpcs.map(npc => {
                                     const faction = npc.factionId ? campaign.factions.find(f => f.id === npc.factionId) : null;
                                     const npcRels = sceneNpcRelationshipMap.get(npc.id) ?? [];
+                                    const hasVoice = Boolean(npc.voiceNotes && npc.voiceNotes.trim());
+                                    const recentLines = selectRecentQuoteLines(npc);
+                                    const isComposerOpen = quoteComposerNpcId === npc.id;
                                     return (
                                         <div key={npc.id} className="bg-slate-900/50 rounded-md p-3">
                                             <div className="flex items-center gap-2 flex-wrap">
@@ -219,9 +365,26 @@ export const ActiveScenePanel: React.FC<ActiveScenePanelProps> = ({
                                                     </span>
                                                 )}
                                             </div>
+                                            {/* Voice (Wave 2 / P3) — leads the card: mid-scene the DM needs to
+                                                know how she sounds before who she hates. */}
+                                            {hasVoice && (
+                                                <p className="text-amber-300 text-xs mt-1">
+                                                    <span className="font-semibold uppercase tracking-wide text-[10px] text-amber-500/80 mr-1">Voice</span>
+                                                    {npc.voiceNotes}
+                                                </p>
+                                            )}
                                             {npc.traits && <p className="text-slate-400 text-xs mt-1">{npc.traits}</p>}
                                             {npc.motivations && <p className="text-slate-500 text-xs mt-1 italic">{npc.motivations}</p>}
                                             {npc.exampleQuote && <p className="text-amber-400/70 text-xs mt-1 italic">"{npc.exampleQuote}"</p>}
+                                            {/* The quote ledger (Wave 2 / P3) — the 3 most recent lines actually
+                                                heard at the table, next to the aspirational exampleQuote. */}
+                                            {recentLines.length > 0 && (
+                                                <div className="mt-1 space-y-0.5">
+                                                    {recentLines.map((line, idx) => (
+                                                        <p key={idx} className="text-amber-300/60 text-xs italic">"{line}"</p>
+                                                    ))}
+                                                </div>
+                                            )}
                                             {/* Inter-NPC relationship badges */}
                                             {npcRels.length > 0 && (
                                                 <div className="flex flex-wrap gap-1 mt-2">
@@ -249,6 +412,51 @@ export const ActiveScenePanel: React.FC<ActiveScenePanelProps> = ({
                                                     })}
                                                 </div>
                                             )}
+                                            {/* The quote ledger's "log a line" affordance (Wave 2 / P3) */}
+                                            <div className="mt-2 pt-2 border-t border-slate-800/60">
+                                                {isComposerOpen ? (
+                                                    <div className="space-y-1.5">
+                                                        <textarea
+                                                            aria-label={`Line spoken by ${npc.name}`}
+                                                            value={quoteComposerText}
+                                                            onChange={e => setQuoteComposerText(e.target.value)}
+                                                            rows={2}
+                                                            placeholder={`What did ${npc.name} just say?`}
+                                                            className={twMerge(textareaBaseClasses, 'w-full px-2 py-1.5 text-xs')}
+                                                        />
+                                                        <div className="flex gap-1.5 justify-end">
+                                                            <Button variant="ghost" size="sm" onClick={handleCloseQuoteComposer} className="text-xs">
+                                                                Cancel
+                                                            </Button>
+                                                            <Button
+                                                                variant="primary"
+                                                                size="sm"
+                                                                onClick={() => handleSaveQuoteLine(npc.id)}
+                                                                disabled={!quoteComposerText.trim()}
+                                                                aria-label={`Save line for ${npc.name}`}
+                                                                className="text-xs"
+                                                            >
+                                                                Save line
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    // The NPC's name is carried in aria-label rather than the
+                                                    // visible label so it doesn't duplicate the name text
+                                                    // already on the card — a duplicate would trip getByText
+                                                    // and any DOM-position check keyed on the NPC's name.
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => handleOpenQuoteComposer(npc.id)}
+                                                        aria-label={`Log a line for ${npc.name}`}
+                                                        className="text-xs text-slate-500 hover:text-amber-400"
+                                                    >
+                                                        <Icons.Mic className="w-3 h-3 mr-1.5" />
+                                                        Log a line
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </div>
                                     );
                                 })}

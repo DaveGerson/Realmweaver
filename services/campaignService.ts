@@ -626,6 +626,12 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             if (secret.revealedInSessionId === entityId) {
                 secret.revealedInSessionId = undefined;
             }
+            // E1 mystery edge: deleting a revelation must clear the edge on
+            // every clue that points at it (the edge is one-directional —
+            // deleting a clue never touches the revelation it supports).
+            if (secret.revealsSecretId === entityId) {
+                secret.revealsSecretId = undefined;
+            }
         });
 
         if (draftCampaign.pinnedEntities) {
@@ -1152,6 +1158,14 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     id: remapRequired(s.id),
                     linkedEntityIds: remapIds(s.linkedEntityIds),
                     revealedInSessionId: remap(s.revealedInSessionId),
+                    // E1 mystery edge — idMap.get-or-KEEP, deliberately not
+                    // `remap()`: `remap()` MINTS a fresh id for anything not
+                    // already in the table, which would turn an
+                    // already-dangling revealsSecretId into a fresh UUID that
+                    // points at nothing. A pure lookup preserves it verbatim.
+                    revealsSecretId: s.revealsSecretId !== undefined
+                        ? (idMap.get(s.revealsSecretId) ?? s.revealsSecretId)
+                        : undefined,
                 })),
             };
 
@@ -1485,6 +1499,19 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         linkedEntityIds: remapIds(s.linkedEntityIds),
                         createdAt: s.createdAt || new Date().toISOString(),
                         notes: s.notes,
+                        // E1 mystery edge — remap-or-drop: `remap()` resolves
+                        // to `undefined` for a target absent from this
+                        // template (never re-minted as a fresh, foreign id).
+                        // `isVital`/`cluesNeeded` are not id-bearing, but an
+                        // untyped template is not trusted to have respected
+                        // the UI's own guard (SecretsTracker's clues-needed
+                        // input refuses non-integers and values < 1) — coerce
+                        // the same way here so a hand-edited `cluesNeeded: 0`
+                        // (or a string) can't silently disable the three-clue
+                        // lint by making `inbound < threshold` never true.
+                        revealsSecretId: remap(s.revealsSecretId),
+                        isVital: s.isVital === true ? true : undefined,
+                        cluesNeeded: Number.isInteger(s.cluesNeeded) && s.cluesNeeded >= 1 ? s.cluesNeeded : undefined,
                     };
                     if (!campaign.secrets) campaign.secrets = [];
                     campaign.secrets.push(secret);

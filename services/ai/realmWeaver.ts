@@ -337,3 +337,110 @@ export const generateArticle = async (prompt: string, campaignContext?: string):
 
 export const generatePoiFromLoot = async (prompt: string, campaignContext?: string): Promise<Omit<PointOfInterest, 'id'>> =>
   generateEntity(poiConfig, prompt, campaignContext);
+
+// --- R2: "Generate ten, keep what you like" (Secrets Tracker) ---------------
+
+/**
+ * One proposed secret/clue, before the GM keeps it. Deliberately NOT a
+ * `types/` shape: nothing here is persisted until `campaignService.createSecret`
+ * mints the id and `createdAt`. Re-exported as a type by `services/aiService.ts`
+ * so components never import this module directly.
+ */
+export interface SecretDraft {
+  title: string;
+  content: string;
+  category: 'secret' | 'clue' | 'revelation' | 'rumor';
+  notes?: string;
+}
+
+const SECRET_DRAFT_CATEGORIES: SecretDraft['category'][] = ['secret', 'clue', 'revelation', 'rumor'];
+
+/** A runaway model must not flood the preview panel. */
+const MAX_SECRET_DRAFTS = 12;
+
+const secretDraftSchema = {
+  type: 'object',
+  properties: {
+    title: { type: 'string', description: 'A short, evocative label for this entry.' },
+    content: { type: 'string', description: 'The actual secret, clue, revelation, or rumor text — what a GM would write down and use at the table.' },
+    category: {
+      type: 'string',
+      enum: SECRET_DRAFT_CATEGORIES,
+      description: "One of 'secret' (a plain hidden truth), 'clue' (points toward a revelation), 'revelation' (the truth a mystery builds to), or 'rumor' (something overheard, true or not).",
+    },
+    notes: { type: 'string', description: "Optional GM-only notes on how or where to use this entry. Omit if there's nothing to add." },
+  },
+  required: ['title', 'content', 'category'],
+};
+
+const secretBatchSchema = {
+  type: 'object',
+  properties: {
+    secrets: {
+      type: 'array',
+      description: 'Roughly ten distinct secrets, clues, revelations, and rumors for this campaign.',
+      items: secretDraftSchema,
+    },
+  },
+  required: ['secrets'],
+};
+
+const SECRET_BATCH_INSTRUCTIONS = `You are The Prep Architect, an expert TTRPG worldbuilder helping a GM over-prepare cheaply for tonight's table. Propose about ten (10) secrets, clues, revelations, and rumors for this campaign — a mix of plain secrets, clues that point toward a bigger revelation, full revelations, and rumors the party might overhear. Each entry should be distinct, plausible, and ready to drop into play without further editing. The GM will keep the ones they like and discard the rest, so favor variety and specificity over polish.
+
+- **title:** A short, evocative label for this entry.
+- **content:** The actual secret, clue, revelation, or rumor text.
+- **category:** One of secret, clue, revelation, or rumor.
+- **notes:** Optional GM-only notes on how or where to use this entry.`;
+
+/**
+ * Model output is made structurally safe HERE, not downstream: accepts a
+ * `{ secrets: [...] }` envelope or a bare array, drops any entry missing a
+ * non-blank `title`/`content`, falls back an unrecognised `category` to
+ * `'secret'`, omits a blank `notes` rather than storing `''`, and caps the
+ * result at `MAX_SECRET_DRAFTS`. Always returns an array — never throws on
+ * malformed model output (a rejected provider call is a different matter and
+ * is left to propagate).
+ */
+function normalizeSecretDrafts(raw: unknown): SecretDraft[] {
+  let list: unknown[];
+  if (Array.isArray(raw)) {
+    list = raw;
+  } else if (raw && typeof raw === 'object' && Array.isArray((raw as { secrets?: unknown }).secrets)) {
+    list = (raw as { secrets: unknown[] }).secrets;
+  } else {
+    return [];
+  }
+
+  const drafts: SecretDraft[] = [];
+  for (const entry of list) {
+    if (drafts.length >= MAX_SECRET_DRAFTS) break;
+    if (!entry || typeof entry !== 'object') continue;
+
+    const entryObj = entry as Record<string, unknown>;
+    const title = typeof entryObj.title === 'string' ? entryObj.title.trim() : '';
+    const content = typeof entryObj.content === 'string' ? entryObj.content.trim() : '';
+    if (!title || !content) continue;
+
+    const category = SECRET_DRAFT_CATEGORIES.includes(entryObj.category as SecretDraft['category'])
+      ? (entryObj.category as SecretDraft['category'])
+      : 'secret';
+
+    const draft: SecretDraft = { title, content, category };
+    const notes = typeof entryObj.notes === 'string' ? entryObj.notes.trim() : '';
+    if (notes) draft.notes = notes;
+
+    drafts.push(draft);
+  }
+  return drafts;
+}
+
+/**
+ * R2 — proposes roughly ten secrets/clues from campaign context in a SINGLE
+ * model call. Never throws on malformed model output: the result is always an
+ * array (possibly empty). A provider-level rejection (network, timeout, bad
+ * JSON after retries) propagates rather than being swallowed into `[]`.
+ */
+export const generateSecretBatch = async (prompt: string, campaignContext?: string): Promise<SecretDraft[]> => {
+  const raw = await generateWithSchema(prompt, secretBatchSchema, SECRET_BATCH_INSTRUCTIONS, {}, 'standard', campaignContext);
+  return normalizeSecretDrafts(raw);
+};

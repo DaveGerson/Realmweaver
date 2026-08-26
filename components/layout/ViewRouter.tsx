@@ -157,7 +157,7 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
   // Session Runner (which always wins, above) and above every editor branch
   // (nothing is selected when a GM navigates here via the sidebar).
   if (activeView === 'tonight') {
-    return <TonightsTable campaign={campaign} onNavigate={onNavigate} onGoLive={onGoLive} />;
+    return <TonightsTable campaign={campaign} onNavigate={onNavigate} onGoLive={onGoLive} isMockMode={isMockMode} />;
   }
 
   // Render Generators
@@ -558,7 +558,7 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
   if (activeView === 'secrets') {
     return (
       <ContentWrapper title="Secrets & Clues" icon="Lock">
-        <SecretsTracker campaign={campaign} />
+        <SecretsTracker campaign={campaign} isMockMode={isMockMode} />
       </ContentWrapper>
     );
   }

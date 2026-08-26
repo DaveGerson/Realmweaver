@@ -279,6 +279,8 @@ The Lorebook is your campaign encyclopedia. Articles are ideal for historical ev
 
 One button, **Prep tonight's session**, opens the Session Prep Wizard from here. Click any thread or name to go straight to it.
 
+Tonight's Table also keeps your campaign's **Moments** — every running-log entry you starred during play, gathered chronologically across all your sessions. Star the natural 20 at the worst time or the betrayal nobody saw coming, and it lands here; click any moment to revisit its session.
+
 ### Session Prep Wizard
 
 Open the **Session Weaver** from the header (or start a session directly from a Session Log). The wizard walks you through five steps:
@@ -292,6 +294,8 @@ Open the **Session Weaver** from the header (or start a session directly from a 
 If no adventure is selected, the scenes and entities steps are skipped automatically.
 
 Would rather prep light? Toggle **Lazy prep** on the first step and the wizard trades those middle steps for three quick moves: write a strong start — the first thing you'll say when the session starts — list a few beats for what might happen, and take a glance at your still-unrevealed secrets. It works alongside whichever adventure you picked, so the cast and places you would have gathered anyway are still there for that glance, then you go live the same way.
+
+Don't want to write the strong start cold? **Draft it from last session** asks the AI to compose a short read-aloud "previously on…" from your last recap, loose ends, and starred moments, written in your campaign's own voice. It fills the strong-start field as a draft — edit it freely, or generate another.
 
 ### Preparing Without the Wizard
 
@@ -341,6 +345,12 @@ For a longer-form transcript, open a Session Log and use **AI Scribe**, which st
 
 In the right panel of the Session Runner, the **Quick NPC Generator** lets you create a new NPC on the fly without leaving the runner. The new NPC is immediately added to your campaign and can be linked to the active scene.
 
+### NPC Voice at the Table
+
+Every NPC has an optional **Voice** field in their editor — accent, cadence, verbal tics, register ("clipped sentences, never uses contractions, calls everyone 'pet'"). When that NPC appears in the live scene, their voice notes sit at the top of their card, right where you glance before speaking.
+
+Beneath the voice, the card shows the NPC's most recent **logged lines** — press **Log a line** on the card (or **Log this line** in the DM Coach's roleplay tool) to save something they actually said at the table. The AI reads both when it roleplays that NPC, so Serah still sounds like the Serah your table has heard, not the one on a six-month-old character sheet.
+
 ### Session Timer
 
 A live session timer displays in the Session Runner header, counting up from when the session started. The start time persists if you navigate away and return.
@@ -373,7 +383,7 @@ When you click **End Session** in the Session Runner, the **Session End Wizard**
 
 1. **AI Recap** — the wizard reads the notes you captured in the Running Log and writes a summary, also detecting unresolved loose ends. It runs automatically on open once you have five or more logged notes; with fewer, it tells you how many notes it found and waits for you to click **Generate AI Recap** (sparse notes produce unreliable recaps). The generated text is fully editable, and **Regenerate** re-runs it. If generation fails, the error is shown inline with a **Try Again** button.
 2. **Plot Status** — for each plot linked to the session, click it to cycle Advanced → Stalled → Unchanged
-3. **Loose Ends** — review the AI-suggested loose ends and add your own; these carry forward into the next session
+3. **Loose Ends** — review the AI-suggested loose ends and add your own; these carry forward into the next session. If the session has beats you never checked off, one click folds them in here too, so an unplayed idea survives to next week instead of vanishing
 4. **Player Recap** — the AI generates a player-facing version of the recap (spoiler-free) you can copy and share with your group
 5. **Save and End** — saves everything and closes the runner
 
@@ -382,6 +392,8 @@ Everything the wizard collects — the GM recap, loose ends, per-plot progressio
 ### Session Logs
 
 All session data is stored in **Session Logs**, accessible from the sidebar. Each log records the adventure played, planned scenes, running notes, structured note entries, plot progressions, loose ends, the GM recap, and the player-facing recap. You can edit any field after the session ends. Only one session can be live at a time — the **Start Session** button on a session log is disabled while another log is already active.
+
+A planned or active session also offers a **Prep Sheet**: one clean printable page assembled from what prep already collected — your strong start first, beats as a checklist, the planned scenes with their opening lines, checks, and rewards, the cast and places, active threads, and the unrevealed secrets linked to them. Preview it, copy it, or download it and run the whole night from a single page.
 
 ---
 
@@ -418,11 +430,17 @@ The checker deliberately does not flag items that no lore article references —
 Available from the **Quick Tools** panel in the Session Runner, and from the sidebar in Standard and Power modes (Guided mode hides it unless you turn it back on with a feature override). The Secrets Tracker lets you catalog four types of information:
 
 - **Secrets** — hidden truths players do not know yet
-- **Clues** — discoverable hints pointing toward secrets
-- **Revelations** — information the players have already learned
+- **Clues** — discoverable hints pointing toward a bigger truth
+- **Revelations** — the big answers a mystery is building toward
 - **Rumors** — hearsay that may or may not be true
 
-Each entry can be linked to specific entities — the NPC who holds the secret, the location where the clue can be found, the faction the revelation implicates. Use the category filter tabs to focus on one type at a time.
+Each entry can be linked to specific entities — the NPC who holds the secret, the location where the clue can be found, the faction the revelation implicates. Use the category filter tabs to focus on one type at a time, and mark an entry revealed when the moment comes — it remembers which session revealed it.
+
+**Wire your mysteries together.** A clue can name the revelation it *supports*, and a revelation can be marked **vital** with a "clues needed" count (three by default — the classic three-clue rule: give a vital answer three independent paths, so one missed clue never dead-ends the mystery). Every revelation card shows its count at a glance, like "1 of 3 clues," and the **Continuity Checker** watches the whole web for you: a vital revelation running thin on clues, a revelation no clue leads to at all, a secret nothing in the world can surface, or a revealed answer none of whose clues ever came out.
+
+**Generate ten, keep what you like.** One button asks the AI for about ten fresh secrets and clues drawn from your world. They arrive as checkable cards — keep the ones you like, discard the rest for free. Kept entries arrive unrevealed, ready to wire in. Over-preparing is supposed to be cheap; now it is.
+
+**Here now.** When a scene is live, a one-tap filter narrows the list to what's deployable in the room — secrets linked to this scene's cast or its location.
 
 ### Relationship Graph
 

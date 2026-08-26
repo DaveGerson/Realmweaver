@@ -90,6 +90,16 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue, onDismiss, onNavigate }) =
   // EntityLink itself resolves the name via EntityQuickCard which reads from
   // the campaignService store — so we pass the ID as the label placeholder,
   // EntityLink will show the real name from the QuickCard data.
+  //
+  // `secret` is excluded here: it is not a `QuickCardEntityType` — there is no
+  // secret quick-card, no secrets editor to navigate to, and no `'secret'`
+  // case in `useEntitySelection`'s `handleSelect`. Rendering it as a link
+  // would show the raw UUID (no label is ever supplied) with a hover card
+  // reading "Entity not found" and a click that does nothing. The mystery-edge
+  // rules that emit `entityTypes: ['secret']` (services/continuityChecker.ts)
+  // already name the secret by title in `description`, so the chip is not
+  // needed to identify it — only to (fail to) navigate to it.
+  const linkableEntities = uniqueEntities.filter(e => e.type !== 'secret');
 
   return (
     <div
@@ -114,9 +124,9 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue, onDismiss, onNavigate }) =
             <p className="text-slate-300 text-sm mt-1 leading-relaxed">{issue.description}</p>
 
             {/* Entity links */}
-            {uniqueEntities.length > 0 && onNavigate && (
+            {linkableEntities.length > 0 && onNavigate && (
               <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
-                {uniqueEntities.map(({ id, type }) => (
+                {linkableEntities.map(({ id, type }) => (
                   <EntityLink
                     key={id}
                     entityType={type as QuickCardEntityType}

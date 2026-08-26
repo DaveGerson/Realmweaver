@@ -253,6 +253,7 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
                   campaign={campaign}
                   onComplete={handleWizardComplete}
                   onClose={() => setIsPrepWizardOpen(false)}
+                  isMockMode={isMockMode}
               />
           </Suspense>
       )}

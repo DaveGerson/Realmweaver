@@ -1,5 +1,6 @@
 // FIX: Updated type import path to use the barrel file 'types/index.ts'.
-import type { Campaign, Article } from '../types/index';
+import type { Campaign, Article, SessionLog, NPC, Location, Plot, Scene } from '../types/index';
+import { parseStrongStartPrepNotes } from '../utils/strongStartFormat';
 
 // ---------------------------------------------------------------------------
 // Version constants
@@ -797,6 +798,279 @@ export const exportCampaignAsObsidian = (campaign: Campaign) => {
     const filename = `${campaign.title.replace(/ /g, '_')}.md`;
     const content = generateMarkdownForCampaign(campaign);
     downloadFile(filename, content, 'text/markdown');
+};
+
+// ---------------------------------------------------------------------------
+// R3 — the one-page session prep sheet
+// ---------------------------------------------------------------------------
+
+// ---- internal helpers -------------------------------------------------
+// Every helper below is defensive on purpose: the whole point of this
+// generator is that it degrades gracefully on old/degenerate saves instead
+// of throwing (see the contract docblock on `generateSessionPrepSheetMarkdown`).
+
+/** First non-empty line of a block of text, trimmed. `''` for nothing/blank. */
+const firstNonEmptyLine = (text: string | undefined | null): string => {
+  if (!text) return '';
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed) return trimmed;
+  }
+  return '';
+};
+
+/** Collapses a multi-line field onto a single space-joined line. */
+const collapseToOneLine = (text: string | undefined | null): string => {
+  if (!text) return '';
+  return text
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+};
+
+/** ISO calendar date (`2026-05-01`), never a locale string. `null` on anything unparseable/missing. */
+const formatIsoDate = (sessionDate: unknown): string | null => {
+  if (typeof sessionDate !== 'string' || !sessionDate) return null;
+  const d = new Date(sessionDate);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+};
+
+/** Dedupes a list of ids, preserving first-seen order; drops falsy entries. */
+const dedupeOrdered = (ids: Array<string | undefined>): string[] => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const id of ids) {
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+};
+
+/**
+ * The roster rule (R3): the curated list wins whenever it is present AND
+ * non-empty — even if every id in it turns out dangling, because a DM who
+ * curated a roster down to nothing did not ask for the scene roster back.
+ * Only an absent/empty curated list falls back to the scene-derived roster.
+ */
+const resolveRosterIds = (curated: string[] | undefined, fallback: string[]): string[] =>
+  Array.isArray(curated) && curated.length > 0 ? curated : fallback;
+
+/** Finds a Scene by id across every adventure (mirrors `storyDerivations.findSceneById`). */
+const findSceneAcrossAdventures = (
+  adventures: Campaign['adventures'] | undefined,
+  sceneId: string,
+): Scene | undefined => {
+  for (const adventure of adventures ?? []) {
+    const found = (adventure.scenes ?? []).find(s => s.id === sceneId);
+    if (found) return found;
+  }
+  return undefined;
+};
+
+/** Quotes each line of a (possibly multi-line) strong start as its own `>` line. */
+const quoteAsBlockquote = (text: string): string =>
+  text
+    .split('\n')
+    .map(line => `> ${line}`)
+    .join('\n');
+
+/**
+ * Derives the download filename from a session title (pinned by
+ * `tests/prepSheet.download.test.ts`): strip path/prose-hostile punctuation,
+ * trim, collapse whitespace runs to `_`, append `_Prep.md`. A title that
+ * strips to nothing falls back to `Session_Prep.md`.
+ */
+const buildPrepSheetFilename = (title: string | undefined | null): string => {
+  const cleaned = (title ?? '')
+    .replace(/[\\/:*?"<>|]/g, '')
+    .trim()
+    .replace(/\s+/g, '_');
+  return cleaned ? `${cleaned}_Prep.md` : 'Session_Prep.md';
+};
+
+/**
+ * Assembles ONE session's prep into clean printable markdown (Wave 2, lane
+ * SHEET / `docs/design/lazy-dm-lens.md` R3).
+ *
+ * Pure assembly over already-persisted fields — zero schema, zero AI. The
+ * adventure-level precedent is `components/editors/PrepDocumentView.tsx`; this
+ * is the same idea one level down, because a Lazy DM preps a *session*, not an
+ * adventure.
+ *
+ * Contract (pinned by `tests/prepSheet.markdown.test.ts`):
+ *  - Sections, in this order, each emitted ONLY when it has content: strong
+ *    start (parsed out of `prepNotes`), beats checklist, planned scenes,
+ *    planned cast, planned locations, active related plots, unrevealed secrets
+ *    linked to the planned cast/locations.
+ *  - Degrades gracefully on old saves: every optional array is read `?? []`,
+ *    unresolvable ids are skipped silently, and the function never throws.
+ *  - Pure: it returns the same string for the same inputs and mutates neither
+ *    `sessionLog` nor `campaign`.
+ */
+export const generateSessionPrepSheetMarkdown = (
+  sessionLog: SessionLog,
+  campaign: Campaign,
+): string => {
+  const log = sessionLog ?? ({} as SessionLog);
+  const camp = campaign ?? ({} as Campaign);
+
+  // ---- Header -----------------------------------------------------------
+  const rawTitle = typeof log.title === 'string' ? log.title : '';
+  const title = rawTitle.trim() || 'Untitled Session';
+  const isoDate = formatIsoDate(log.sessionDate);
+
+  const headerLines = [`# ${title}`];
+  if (isoDate) headerLines.push(isoDate);
+
+  const sections: string[] = [];
+
+  // ---- Strong Start -------------------------------------------------------
+  const { strongStart } = parseStrongStartPrepNotes(log.prepNotes);
+  if (strongStart && strongStart.trim()) {
+    sections.push(`## Strong Start\n\n${quoteAsBlockquote(strongStart)}`);
+  }
+
+  // ---- Beats ---------------------------------------------------------------
+  const rawBeats = Array.isArray(log.beats) ? log.beats : [];
+  const beats = rawBeats.filter(b => b && typeof b.title === 'string' && b.title.trim());
+  if (beats.length > 0) {
+    const lines = beats.map(b => {
+      const box = b.isCompleted ? '[x]' : '[ ]';
+      let block = `- ${box} ${b.title.trim()}`;
+      if (b.notes && b.notes.trim()) block += `\n  ${collapseToOneLine(b.notes)}`;
+      return block;
+    });
+    sections.push(`## Beats\n\n${lines.join('\n')}`);
+  }
+
+  // ---- Scenes ----------------------------------------------------------
+  const plannedSceneIds = Array.isArray(log.plannedSceneIds) ? log.plannedSceneIds : [];
+  const resolvedScenes = plannedSceneIds
+    .map(id => findSceneAcrossAdventures(camp.adventures, id))
+    .filter((s): s is Scene => Boolean(s));
+
+  const campLocations = camp.locations ?? [];
+
+  if (resolvedScenes.length > 0) {
+    const blocks = resolvedScenes.map(scene => {
+      const location = scene.locationId ? campLocations.find(l => l.id === scene.locationId) : undefined;
+      const parts = [`### ${scene.title}${location ? ` (${location.name})` : ''}`];
+
+      const firstLine = firstNonEmptyLine(scene.readAloudText);
+      if (firstLine) parts.push(`> ${firstLine}`);
+
+      const checks = (scene.skillChecks ?? []).filter(sc => sc.skill && sc.skill.trim());
+      if (checks.length > 0) {
+        parts.push(
+          checks.map(sc => `- **${sc.skill.trim()} (DC ${sc.dc}):** ${sc.description ?? ''}`).join('\n'),
+        );
+      }
+
+      if (scene.rewards && scene.rewards.trim()) {
+        parts.push(`**Rewards:** ${collapseToOneLine(scene.rewards)}`);
+      }
+
+      return parts.join('\n');
+    });
+    sections.push(`## Scenes\n\n${blocks.join('\n\n')}`);
+  }
+
+  // ---- Cast & Locations roster (curated, falling back to the scene cast) ---
+  const sceneFallbackNpcIds = dedupeOrdered(
+    plannedSceneIds.flatMap(id => findSceneAcrossAdventures(camp.adventures, id)?.npcIds ?? []),
+  );
+  const sceneFallbackLocationIds = dedupeOrdered(
+    plannedSceneIds.map(id => findSceneAcrossAdventures(camp.adventures, id)?.locationId),
+  );
+
+  const rosterNpcIds = resolveRosterIds(log.plannedNpcIds, sceneFallbackNpcIds);
+  const rosterLocationIds = resolveRosterIds(log.plannedLocationIds, sceneFallbackLocationIds);
+
+  const campNpcs = camp.npcs ?? [];
+  const resolvedNpcs = rosterNpcIds
+    .map(id => campNpcs.find(n => n.id === id))
+    .filter((n): n is NPC => Boolean(n));
+
+  if (resolvedNpcs.length > 0) {
+    const lines = resolvedNpcs.map(npc => {
+      const desc = collapseToOneLine(npc.description);
+      let line = `- **${npc.name}**${desc ? ` — ${desc}` : ''}`;
+      if (npc.voiceNotes && npc.voiceNotes.trim()) {
+        line += `\n  Voice: ${collapseToOneLine(npc.voiceNotes)}`;
+      }
+      return line;
+    });
+    sections.push(`## Cast\n\n${lines.join('\n')}`);
+  }
+
+  const resolvedLocations = rosterLocationIds
+    .map(id => campLocations.find(l => l.id === id))
+    .filter((l): l is Location => Boolean(l));
+
+  if (resolvedLocations.length > 0) {
+    const lines = resolvedLocations.map(loc => {
+      const desc = collapseToOneLine(loc.description);
+      return `- **${loc.name}**${desc ? ` — ${desc}` : ''}`;
+    });
+    sections.push(`## Locations\n\n${lines.join('\n')}`);
+  }
+
+  // ---- Plot Threads (related AND still active) -----------------------------
+  const relatedPlotIds = Array.isArray(log.relatedPlotIds) ? log.relatedPlotIds : [];
+  const campPlots = camp.plots ?? [];
+  const activePlots = relatedPlotIds
+    .map(id => campPlots.find(p => p.id === id))
+    .filter((p): p is Plot => Boolean(p) && p.status === 'active');
+
+  if (activePlots.length > 0) {
+    const lines = activePlots.map(p => {
+      const desc = collapseToOneLine(p.description);
+      return `- **${p.title}**${desc ? ` — ${desc}` : ''}`;
+    });
+    sections.push(`## Plot Threads\n\n${lines.join('\n')}`);
+  }
+
+  // ---- Secrets & Clues (unrevealed, linked to tonight's cast/locations) ----
+  const rosterSet = new Set<string>([...rosterNpcIds, ...rosterLocationIds]);
+  const campSecrets = camp.secrets ?? [];
+  const relevantSecrets = campSecrets.filter(
+    s => s && !s.isRevealed && (s.linkedEntityIds ?? []).some(id => rosterSet.has(id)),
+  );
+
+  if (relevantSecrets.length > 0) {
+    const lines = relevantSecrets.map(s => {
+      const content = collapseToOneLine(s.content);
+      return `- **${s.title}**${content ? ` — ${content}` : ''}`;
+    });
+    sections.push(`## Secrets & Clues\n\n${lines.join('\n')}`);
+  }
+
+  const body = sections.length > 0 ? `\n\n${sections.join('\n\n')}` : '';
+  return `${headerLines.join('\n')}${body}`;
+};
+
+/**
+ * Downloads the session prep sheet as a `.md` file through the same
+ * `downloadFile` pipeline every other export uses.
+ *
+ * Filename contract (pinned by `tests/prepSheet.download.test.ts`): strip
+ * `\ / : * ? " < > |` from the session title, trim, collapse each remaining
+ * whitespace run to a single `_`, then append `_Prep.md`. A title that is
+ * empty (or nothing but stripped characters) falls back to `Session_Prep.md`.
+ */
+export const exportSessionPrepSheet = (
+  sessionLog: SessionLog,
+  campaign: Campaign,
+): void => {
+  const markdown = generateSessionPrepSheetMarkdown(sessionLog, campaign);
+  const filename = buildPrepSheetFilename(sessionLog?.title);
+  downloadFile(filename, markdown, 'text/markdown');
 };
 
 // ---------------------------------------------------------------------------
