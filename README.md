@@ -142,7 +142,7 @@ All code at **project root** (no `src/` directory). Import alias `@/` maps to ro
 | [`docs/architecture/implementation-plan.md`](docs/architecture/implementation-plan.md) | Phased implementation plan (Phases A-F) with work packages |
 | [`docs/ship-readiness/remediation-plan.md`](docs/ship-readiness/remediation-plan.md) | The 124-finding ship-readiness review and its 13 work packages |
 | [`docs/roadmap.md`](docs/roadmap.md) | Forward-looking feature roadmap |
-| [`docs/design/dm-archetypes.md`](docs/design/dm-archetypes.md) | 5 DM personas driving feature prioritization |
+| [`docs/design/dm-archetypes.md`](docs/design/dm-archetypes.md) | 6 DM personas driving feature prioritization |
 | [`docs/design/schema-presentation-guide.md`](docs/design/schema-presentation-guide.md) | Style guide for presenting the data model to DMs — the consistency contract across docs, the walkthrough, and future in-app help |
 | [`docs/design/storyteller-first-design.md`](docs/design/storyteller-first-design.md) | Proposed storyteller-first elements (P1–P8): story-first home, improv support, story health, campaign endings |
 | [`docs/design/lazy-dm-lens.md`](docs/design/lazy-dm-lens.md) | The Lazy DM analysis: Shea's and Monte Cook's prep schools mapped onto the shipped app, P1–P8 re-ranked through that lens, and five "lazy mode" refinements (R1–R5) |

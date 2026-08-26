@@ -1,18 +1,20 @@
 # Realmweaver DM Archetype Personas
 
-> **Purpose:** Product design reference defining 7 Dungeon Master archetypes grounded in real-world TTRPG community research.
-> **Date:** 2026-08-14 (v3 — reconciled the five test-backed archetypes against the shipped feature set after the ship-readiness hardening pass; v2, 2026-03-22, added Digital-First DM, Published Module Runner, and Design Philosophy)
+> **Purpose:** Product design reference defining 8 Dungeon Master archetypes grounded in real-world TTRPG community research.
+> **Date:** 2026-08-26 (v4 — added the Player-Driven Improviser as Archetype 6, correctly attributing Monte Cook's school per `lazy-dm-lens.md`, and renumbered Digital-First DM / Published Module Runner to 7/8; v3, 2026-08-14, reconciled the five test-backed archetypes against the shipped feature set after the ship-readiness hardening pass; v2, 2026-03-22, added Digital-First DM, Published Module Runner, and Design Philosophy)
 > **Audience:** Realmweaver product and engineering teams
 
 ---
 
 ## How These Personas Stay Honest
 
-Five of the seven archetypes are backed by executable end-to-end store tests in `tests/archetype.*.test.ts` — `forever-dm`, `lazy-dm`, `new-dm`, `tactical-dm`, `worldbuilder`. Each drives a real `campaignService` store (created with `{ persist: false }`) through that persona's actual session lifecycle, from campaign creation to post-session recap, asserting on the data the persona would care about rather than on UI details. They are the closest thing the product has to a "would this DM's evening actually work?" check, and a persona claim that no longer survives its archetype test is a claim to delete, not to defend.
+Five of the eight archetypes are backed by executable end-to-end store tests in `tests/archetype.*.test.ts` — `forever-dm`, `lazy-dm`, `new-dm`, `tactical-dm`, `worldbuilder`. Each drives a real `campaignService` store (created with `{ persist: false }`) through that persona's actual session lifecycle, from campaign creation to post-session recap, asserting on the data the persona would care about rather than on UI details. They are the closest thing the product has to a "would this DM's evening actually work?" check, and a persona claim that no longer survives its archetype test is a claim to delete, not to defend.
 
 The archetypes carry a **Reconciliation** block below their needs list recording what the product does for them today and what it still does not. Those blocks are read off the source tree, not off the roadmap.
 
-The **Digital-First DM** and **Published Module Runner** have no archetype test. They are composites — a Digital-First DM's flows are the union of the other five plus search and export, and a Module Runner's are a Worldbuilder's entity decomposition driving a New DM's session loop. Both remain useful for prioritization; neither is independently pinned by a regression suite.
+The **Player-Driven Improviser** (Archetype 6) is persona-grade but not yet test-backed: it was added 2026-08-26 alongside the Wave 1 storyteller-first build, after the pass that produced the other five suites. Its lifecycle test — minimal prep, go live, spend a Callback complication, reveal the spent secret, discard the rest — is the outstanding addition, and until it exists this persona's claims are held to the same delete-not-defend standard by manual reconciliation only.
+
+The **Digital-First DM** and **Published Module Runner** have no archetype test. They are composites — a Digital-First DM's flows are the union of the five test-backed personas plus search and export, and a Module Runner's are a Worldbuilder's entity decomposition driving a New DM's session loop. Both remain useful for prioritization; neither is independently pinned by a regression suite.
 
 ---
 
@@ -24,6 +26,7 @@ These archetypes are synthesized from multiple real-world sources:
 - **Sly Flourish Twitter/YouTube polls** (2,900-3,800 respondents per poll, 2020-2025): prep time distribution, tool usage
 - **EN World DM Burnout Poll** (2022): community-wide data on burnout prevalence
 - **Return of the Lazy Dungeon Master** by Mike Shea (Sly Flourish): the eight-step prep methodology
+- **Monte Cook's GM philosophy** (Monte Cook Games): *Your Best Game Ever* (2020), the Cypher System's GM Intrusion mechanic, and the near-zero-prep product line (*Weird Discoveries*, *Who the Devil Are You?*)
 - **Matt Colville's "Running the Game"** YouTube series (2016-present): DM philosophy, player/audience taxonomy
 - **The Angry GM** (theangrygm.com): Investment/Ownership framework, GM-as-player philosophy
 - **Robin Laws' "Robin's Laws of Good Game Mastering"**: seven player archetypes (Tactician, Power Gamer, Method Actor, etc.)
@@ -368,7 +371,65 @@ The "Forever DM" is one of the most-discussed identities in the TTRPG community.
 
 ---
 
-## Archetype 6: The Digital-First DM
+## Archetype 6: The Player-Driven Improviser
+
+### Profile
+- **Experience Level:** Intermediate to veteran (3-15+ years; frequently runs or has run Cypher System games alongside D&D)
+- **Session Frequency:** Weekly or biweekly
+- **Prep Style:** Minimal and selective — preps only what excites them, sometimes nothing beyond a page read minutes before the table sits down (0-2 hours)
+- **Play Style:** Player-driven improv; treats player choice as the story's engine and introduces complications live rather than scripting them
+- **Tech Comfort:** Comfortable but ceremony-averse — adopts a tool only if it never treats prepared material as a commitment
+- **Group Size:** 4-6 players
+- **Campaign Length:** Variable; invests heavily in session zero and thinks at the whole-campaign, whole-table level
+
+### Real-World Basis
+
+Directly modeled on Monte Cook's published GM philosophy — Monte Cook is co-designer of D&D 3rd Edition and founder of Monte Cook Games (Numenera, the Cypher System, Invisible Sun). Unlike Shea's method (Archetype 2), this is a philosophy, not a checklist: prep whatever specific thing most excites *you*, the GM, rather than working a fixed list of categories; stay willing to throw prepared material away the instant players go somewhere else; treat player choice as the actual engine of the story rather than an obstacle to route around. Two concrete artifacts carry the philosophy into practice. The **GM Intrusion** (Cypher System / Numenera) formalizes improvisation itself as a rewarded table mechanic — instead of pre-scripting a complication, the GM introduces one live, in exchange for XP the player can accept or buy off; improvising *is* the technique, not a fallback from failed prep. *Your Best Game Ever* (2020) frames "best game" as a whole-table property — group chemistry, being a fan of your players, prioritizing fun over any specific plotted outcome. Monte Cook Games also ships explicitly near-zero-prep products (*Weird Discoveries*, *Who the Devil Are You?*) built to run from a few pages read minutes before play.
+
+**Attribution note:** this persona is deliberately distinct from Archetype 2, which models Michael E. Shea's (Sly Flourish) *Lazy Dungeon Master* method. The two schools agree on the destination — player choice drives the story, prep must survive being discarded — but differ in form: Shea publishes a repeatable eight-step checklist; Cook publishes a prioritization mindset plus one live-table mechanic. The full untangling is in [`lazy-dm-lens.md`](lazy-dm-lens.md) §1. The team's colloquial handle for this persona is "the Monte Cook DM."
+
+### Core Motivations
+- Following the players — their choices are the story's engine, never obstacles to route around
+- Prep as excitement, not obligation — writes down only what they cannot wait to run
+- Improvisation as first-class craft — introducing a live complication IS the technique, not damage control
+- The whole table's best game — group chemistry, being a fan of the players, fun over any plotted outcome
+
+### Pain Points
+- Tools assume prep survives contact with the table — most structure quietly punishes discarding
+- Sunk-cost pressure — an app full of authored content argues against throwing any of it away
+- Live complications need material in seconds — the world's dormant details live in memory or nowhere
+- The whole-table layer (session-zero agreements, per-player appetites) has no home in any campaign tool
+- The Intrusion's mechanical half doesn't port — the XP exchange is Cypher-specific; only the posture travels between systems
+
+### Tool Usage Patterns
+- **Primary:** a few index cards or a single page of notes; the Cypher System's own GM-facing books; whatever excited them enough to write down that week
+- **At the table:** minimal — dice, cards, maybe a phone
+- **Explicitly avoids:** anything that treats prepared material as a commitment; heavyweight wikis; tools whose "help" starts with a blank prompt box
+- **Wish:** a tool that hands them a usable complication from their own world in seconds, and never sulks when prep is discarded
+
+### Session Workflow
+1. **Pre-session (0-2 hours):** Writes only what excites them — one scene, one strange NPC, one weird discovery. Sometimes reads a few pages minutes before the table sits down and runs from that.
+2. **During session:** Follows the players wherever they go. Introduces complications live in the GM Intrusion posture. Discards prepared material without ceremony the moment the fiction moves elsewhere.
+3. **Post-session:** Light notes at most. Thinks at the whole-campaign level — is every player at this table having their best game?
+
+### Key Needs from a Session Cockpit
+- Zero-prompt live complications drawn from the campaign's own established material
+- A front door that shows where the players took the story, not what content exists
+- Discard-as-normal affordances — unused material is inventory to spend later, never a flagged failure
+- A home for whole-table inputs — pillars, player appetites — written once at session zero, honored forever
+- Capture for improvised details, so live inventions become the world's canon instead of evaporating
+
+### Reconciliation with the Shipped Product
+
+**Regression coverage** — none yet; see "How These Personas Stay Honest" above. This is the one persona-grade archetype without a `tests/archetype.*.test.ts` suite, and writing one is the natural next hardening step.
+
+**What the product does for this archetype today** (assessed against the Wave 1 storyteller-first build). The Callback Machine is essentially this persona's signature mechanic translated into the app: **Complicate This**, in the Session Runner's quick tools, is a GM-Intrusion-shaped, zero-prompt live complication. One click samples 2-3 pieces of dormant material from the DM's own world — an offstage NPC, an unspent secret linked to someone present, a stalled plot, an unused planned scene — and proposes a complication that reincorporates them into the current scene; **Use it** logs it to the running log and, when a secret was spent, offers a one-tap reveal; **Another** resamples. There is no typed prompt anywhere in the flow — improvising is treated as the technique, exactly as this school insists, and the material spent is established canon rather than a generic random-table result. **Tonight's Table** serves the "follow the players" posture directly: the campaign now opens on where the story actually went — last session's recap and loose ends verbatim, open threads by staleness, the offstage cast, the loaded guns — all derived, with nothing for the DM to maintain. The **lazy prep path** (strong start → beats → secrets glance) is prep sized to "only what excites you," and beats are check-off-or-discard by design, with unfinished ones offered a carry-forward at session end instead of silently vanishing. The **here-now filter** in the Secrets Tracker shows only what is deployable in the current scene. And the discard posture is structurally respected: nothing anywhere in the app flags unused material as a problem.
+
+**What it still does not do.** The Intrusion's other half — the player-facing XP exchange, accept-or-buy-off — has no home and never will: Realmweaver is DM-private and not a rules engine, so the app carries the posture, not the mechanic. The whole-table layer this school starts from — session-zero pillars, per-player appetites — has no fields until P5's Campaign Charter lands, and P5 is gated on the owner's scope decision. There is no near-zero-prep on-ramp shaped like *Weird Discoveries* — the First Campaign Wizard generates a world, not a runnable evening. R2's "generate ten, keep what you like" — the discard-freely pattern applied to secrets — is Wave 2, not yet built. And generation is still buffered behind a spinner with no streaming output, which stings most for a DM who wanted the complication five seconds ago.
+
+---
+
+## Archetype 7: The Digital-First DM
 
 ### Profile
 - **Experience Level:** Intermediate to veteran (3-15+ years; comfortable with both analog and digital tools)
@@ -426,7 +487,7 @@ Realmweaver's architecture — AI-assisted generation, structured entity types, 
 
 ---
 
-## Archetype 7: The Published Module Runner
+## Archetype 8: The Published Module Runner
 
 ### Profile
 - **Experience Level:** Any (new DMs often start here; veterans use modules to reduce prep)
@@ -494,23 +555,23 @@ Realmweaver's entity system (NPCs, Locations, Factions, Adventures, Scenes, Plot
 
 ### Overlap Map
 
-| Need | Worldbuilder | Lazy DM | New DM | Tactical DM | Forever DM | Digital-First | Module Runner |
-|------|:-----------:|:-------:|:------:|:-----------:|:----------:|:-------------:|:-------------:|
-| NPC quick reference | HIGH | HIGH | HIGH | MEDIUM | HIGH | CRITICAL | CRITICAL |
-| Session recap | MEDIUM | HIGH | MEDIUM | LOW | CRITICAL | HIGH | HIGH |
-| Encounter balancing | LOW | MEDIUM | HIGH | CRITICAL | MEDIUM | MEDIUM | HIGH |
-| Lore/world wiki | CRITICAL | LOW | LOW | LOW | MEDIUM | HIGH | MEDIUM |
-| AI content generation | HIGH | MEDIUM | HIGH | MEDIUM | HIGH | HIGH | HIGH |
-| Combat tracker (TotM) | MEDIUM | LOW | HIGH | HIGH | MEDIUM | MEDIUM | MEDIUM |
-| Continuity tracking | HIGH | HIGH | LOW | LOW | CRITICAL | CRITICAL | CRITICAL |
-| Guided/structured prep | LOW | LOW | CRITICAL | MEDIUM | LOW | LOW | HIGH |
-| Improv capture | LOW | CRITICAL | MEDIUM | LOW | HIGH | HIGH | MEDIUM |
-| Cross-campaign mgmt | LOW | LOW | LOW | LOW | CRITICAL | MEDIUM | LOW |
-| Global search / Cmd+K | MEDIUM | HIGH | LOW | MEDIUM | HIGH | CRITICAL | CRITICAL |
-| Module decomposition | LOW | LOW | HIGH | LOW | MEDIUM | LOW | CRITICAL |
-| Plot thread tracking | MEDIUM | MEDIUM | LOW | LOW | HIGH | HIGH | CRITICAL |
-| D&D Beyond integration | LOW | LOW | HIGH | HIGH | MEDIUM | HIGH | HIGH |
-| Export / portability | MEDIUM | LOW | LOW | LOW | MEDIUM | CRITICAL | LOW |
+| Need | Worldbuilder | Lazy DM | New DM | Tactical DM | Forever DM | Player-Driven | Digital-First | Module Runner |
+|------|:-----------:|:-------:|:------:|:-----------:|:----------:|:-------------:|:-------------:|:-------------:|
+| NPC quick reference | HIGH | HIGH | HIGH | MEDIUM | HIGH | MEDIUM | CRITICAL | CRITICAL |
+| Session recap | MEDIUM | HIGH | MEDIUM | LOW | CRITICAL | MEDIUM | HIGH | HIGH |
+| Encounter balancing | LOW | MEDIUM | HIGH | CRITICAL | MEDIUM | LOW | MEDIUM | HIGH |
+| Lore/world wiki | CRITICAL | LOW | LOW | LOW | MEDIUM | LOW | HIGH | MEDIUM |
+| AI content generation | HIGH | MEDIUM | HIGH | MEDIUM | HIGH | HIGH | HIGH | HIGH |
+| Combat tracker (TotM) | MEDIUM | LOW | HIGH | HIGH | MEDIUM | LOW | MEDIUM | MEDIUM |
+| Continuity tracking | HIGH | HIGH | LOW | LOW | CRITICAL | MEDIUM | CRITICAL | CRITICAL |
+| Guided/structured prep | LOW | LOW | CRITICAL | MEDIUM | LOW | LOW | LOW | HIGH |
+| Improv capture | LOW | CRITICAL | MEDIUM | LOW | HIGH | CRITICAL | HIGH | MEDIUM |
+| Cross-campaign mgmt | LOW | LOW | LOW | LOW | CRITICAL | LOW | MEDIUM | LOW |
+| Global search / Cmd+K | MEDIUM | HIGH | LOW | MEDIUM | HIGH | MEDIUM | CRITICAL | CRITICAL |
+| Module decomposition | LOW | LOW | HIGH | LOW | MEDIUM | LOW | LOW | CRITICAL |
+| Plot thread tracking | MEDIUM | MEDIUM | LOW | LOW | HIGH | MEDIUM | HIGH | CRITICAL |
+| D&D Beyond integration | LOW | LOW | HIGH | HIGH | MEDIUM | LOW | HIGH | HIGH |
+| Export / portability | MEDIUM | LOW | LOW | LOW | MEDIUM | LOW | CRITICAL | LOW |
 
 ### Willingness to Pay (Estimated)
 
@@ -520,7 +581,8 @@ Realmweaver's entity system (NPCs, Locations, Factions, Adventures, Scenes, Plot
 4. **Published Module Runner** — Moderate-high. Already buying modules ($30-50 each); a tool that makes them usable is an easy sell. Sweet spot $5-10/month.
 5. **Tactical DM** — Moderate. Will pay for combat-specific tools, but Realmweaver's TotM combat tracker may underwhelm. Sweet spot $5-10/month.
 6. **Lazy DM** — Low-moderate. Resistant unless tool genuinely reduces their already-minimal prep.
-7. **New DM** — Low individually, but high volume. Free tier essential for acquisition.
+7. **Player-Driven Improviser** — Low-moderate. Shares the Lazy DM's ceremony aversion; pays only for a tool that improvises *with* them at the table. The Callback Machine is the pitch.
+8. **New DM** — Low individually, but high volume. Free tier essential for acquisition.
 
 ### Realmweaver Fit Score
 
@@ -533,6 +595,7 @@ How well Realmweaver's current architecture and design philosophy serve each arc
 | **Prep-Heavy Worldbuilder** | ★★★★☆ | Deep entity model with cycle-checked hierarchies and swept cascade deletes. Backlinks now cover `@`-mentions and non-source entity types, and the relationship graph is keyboard-reachable. Still needs wiki-style navigation and list virtualization at scale. |
 | **Forever DM / Burnout-Risk** | ★★★★☆ | Multi-campaign isolation is pinned by tests, and the persistence layer now has backups, recovery, quota fallback, unload flush, and explicit multi-tab conflict resolution — the durability this archetype's decade of data depends on. Still needs cross-campaign content reuse. |
 | **Lazy DM / Improviser** | ★★★☆☆ | AI improv tools exist (DM Coach, RealmChat) and live notes now survive a closed laptop. But the interface still adds ceremony, generation has no streaming feedback, and prep-step curation does not reach the runner. |
+| **Player-Driven Improviser** | ★★★★☆ | *Assessed against the Wave 1 storyteller-first build (the other rows predate it).* The Callback Machine is this persona's signature mechanic as a button — a GM-Intrusion-shaped, zero-prompt live complication drawn from their own world — and Tonight's Table matches the follow-the-players posture with zero upkeep. Held back from five stars: no whole-table charter yet (P5 gated), no streaming generation, and the Intrusion's reward economy is out of scope by design. |
 | **New/Nervous DM** | ★★☆☆☆ | Guided mode's feature gates are now real rather than inert, and the first-run wizard confirms before discarding drafts — but the onboarding surface itself is unchanged, and there are still no encounter-confidence guardrails. High priority for guided workflows. |
 | **Tactical Combat DM** | ★★☆☆☆ | The Theatre of the Mind tracker's turn order, round wrapping, HP handling, and dice logging are now correct, but AC, damage deltas, and structured conditions remain absent. By design, Realmweaver will never match dedicated combat tools (Improved Initiative, Shieldmaiden). This archetype is best served indirectly — prep NPCs and encounters in Realmweaver, run combat in a dedicated tracker. |
 
@@ -554,6 +617,8 @@ Worldbuilder ──> Forever DM (takes on more groups who want their world)
              ──> Digital-First DM (natural evolution as campaign complexity grows)
 
 Lazy DM ─────> Digital-First DM (finds tools that match their minimal-ceremony philosophy)
+Lazy DM ─────> Player-Driven Improviser (keeps the posture, drops even the checklist)
+Player-Driven Improviser ──> Lazy DM (borrows Shea's eight steps when running D&D tables)
 
 Any Archetype ──> Forever DM (by default, over time, because nobody else will DM)
 Any Experienced ──> Digital-First DM (as campaign data grows, analog tools hit limits)
@@ -574,7 +639,8 @@ Based on design philosophy alignment and market fit:
 **Secondary (serve well, don't distort product for):**
 4. **Prep-Heavy Worldbuilder** — Strong natural fit, but resist the pull toward becoming "World Anvil with AI."
 5. **Lazy DM / Improviser** — Serve through speed and minimal ceremony, not through feature depth.
+6. **Player-Driven Improviser** — Serve through zero-prompt improv surfaces and the discard-friendly posture (the Callback Machine is the template), never through new mechanics or required structure.
 
 **Tertiary (accommodate, don't target):**
-6. **New/Nervous DM** — Serve through onboarding and guided workflows, not by simplifying core features.
-7. **Tactical Combat DM** — Acknowledge the TotM combat tracker serves basic needs; point to dedicated tools for deeper combat management.
+7. **New/Nervous DM** — Serve through onboarding and guided workflows, not by simplifying core features.
+8. **Tactical Combat DM** — Acknowledge the TotM combat tracker serves basic needs; point to dedicated tools for deeper combat management.

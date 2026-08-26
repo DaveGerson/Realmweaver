@@ -47,8 +47,9 @@ frames "best game" as a whole-table property — group chemistry, being a fan of
 prioritizing fun over any specific plotted outcome — argued at the level of the campaign and the
 group, not the session. Monte Cook Games also ships explicitly near-zero-prep products (*Weird
 Discoveries*, *Who the Devil Are You?*) built to run from a few pages read minutes before the
-table sits down. No Realmweaver persona currently represents this lens; it is a second, distinct
-voice the product owner's phrasing folded into Shea's.
+table sits down. This lens is now represented by `dm-archetypes.md`'s Archetype 6, the
+Player-Driven Improviser; it is a second, distinct voice the product owner's phrasing folded
+into Shea's.
 
 ### Where they agree, where they diverge
 
