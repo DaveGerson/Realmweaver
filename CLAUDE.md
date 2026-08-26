@@ -112,7 +112,9 @@ Realmweaver/
 ├── utils/           # entityUtils.ts (factories + ENTITY_TYPE_CONFIG), backlinkUtils,
 │                      dmStyleUtils, entityFieldSave, formReconciliation, demoTemplates,
 │                      diceUtils, keyboardShortcuts, popoverPosition, entityDetailExtractors,
-│                      storyDerivations (Tonight's Table panel derivations)
+│                      storyDerivations (Tonight's Table panel derivations),
+│                      dormantMaterial (Callback Machine sampler), strongStartFormat
+│                      (strong-start marker encoding shared by prep wizard + Session Runner)
 ├── tests/           # Vitest — top-level suites + components/, services/, helpers/,
 │                      and ship/ (the ship-readiness regression suite, wp-*.test.ts[x])
 └── e2e/             # Playwright specs (port 4200 is hardcoded in playwright.config.ts)

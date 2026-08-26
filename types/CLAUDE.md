@@ -7,7 +7,7 @@ two modules end up holding structurally-identical-but-separately-imported types.
 | File | Declares |
 |------|----------|
 | `Campaign.ts` | `Campaign`, `SettingType` — the root aggregate; every entity array hangs off it. |
-| `NPC.ts` | `NPC`, `EntityRelationship`; re-exports `HistoryEntry` / `HistoryReferenceType` from `common`. |
+| `NPC.ts` | `NPC` (incl. optional `voiceNotes?` — non-id-bearing, read as `?? ''`), `EntityRelationship`; re-exports `HistoryEntry` / `HistoryReferenceType` from `common`. |
 | `Location.ts` | `Location`, `LocationConnection`, `PointOfInterest`, `PoiInteraction`, `LootItem`. |
 | `Faction.ts` | `Faction`. |
 | `Item.ts` | `Item`, `ItemRarity`, `ItemType`. |
@@ -16,7 +16,7 @@ two modules end up holding structurally-identical-but-separately-imported types.
 | `Article.ts` | `Article`, `ArticleCategory`. |
 | `Plot.ts` | `Plot`, `PlotStatus`. |
 | `Note.ts` | `Note`. |
-| `Secret.ts` | `Secret`. |
+| `Secret.ts` | `Secret` — incl. the optional E1/E2 mystery-edge fields: `revealsSecretId?` (id-bearing clue→revelation FK — in the purge-sweep / both-remap-passes / backlink / broken-ref contract), `isVital?`, and `cluesNeeded?` (read as `cluesNeeded ?? 3`). |
 | `SessionLog.ts` | `SessionLog`, `SessionLogEntry`, `SessionLogEntryType`, `SessionStatus`, `PlotSessionStatus`, `Beat`. |
 | `PlayerCharacter.ts` | `PlayerCharacter`, `CharacterSocial`, `CharacterStatistics`, `AbilityScores`, `Skills`, `ProficiencyLevel`, `ClassLevel`. |
 | `Encounter.ts` | `Encounter`, `Combatant`, `CombatantType` — live combat state, distinct from a `'combat'` Scene's prep data. |

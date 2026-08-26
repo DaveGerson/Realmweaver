@@ -24,9 +24,9 @@ RealmWeaver is a single-page application for tabletop RPG Game Masters who want 
 | **World Building** | AI-generated NPCs, locations, factions, items, adventures, articles, plots. Campaign context injected into every generation for consistency. |
 | **Tonight's Table** | Story-first campaign home — previously-on recap, open threads, who's been offstage, and loaded guns (unrevealed secrets in play), derived from existing data with zero clicks. |
 | **Session Management** | Session Prep Wizard (5-step guided flow), Session Runner with scene advancement, running log, beats mode, voice capture, auto-event capture. |
-| **In-Session Tools** | DM Coach (narrate, improvise, rollable tables, NPC roleplay), Combat Tracker, Dice Roller, Secrets & Clues Tracker. |
+| **In-Session Tools** | DM Coach (narrate, improvise, rollable tables, NPC roleplay), Complicate This (reincorporates dormant material as a live complication), Combat Tracker, Dice Roller, Secrets & Clues Tracker (clue→revelation mystery wiring, "generate ten" secret drafting). |
 | **Navigation** | Entity cross-linking with hover tooltips (EntityQuickCard), backlinks ("Referenced By"), back stack, recent items, pinned favorites, command palette (Ctrl+K). |
-| **World Intelligence** | Continuity Checker (8 rules), Plot Timeline, World Simulation Engine, Content Style Matching, Smart Context Builder (tiered token-budget-aware). |
+| **World Intelligence** | Continuity Checker (12 rules, incl. four mystery-edge lints), Plot Timeline, World Simulation Engine, Content Style Matching, Smart Context Builder (tiered token-budget-aware, with a player-safe variant that never leaks unrevealed secrets). |
 | **Smart Linking** | Word-boundary matching engine behind `@mention` capture, auto-linking on template import, scene smart-link bar, link suggestions panel. |
 | **Onboarding** | First Campaign Wizard (5-step), 4 template campaigns, DM Style progressive disclosure (guided/standard/power). |
 | **Data** | localStorage persistence with IndexedDB quota fallback, 3-slot rotating backups + startup recovery, cross-tab conflict resolution, JSON import/export with validation warnings, Obsidian markdown export, PDF character sheet parsing. |
@@ -135,7 +135,7 @@ All code at **project root** (no `src/` directory). Import alias `@/` maps to ro
 | [`docs/architecture/system-architecture.md`](docs/architecture/system-architecture.md) | **Start here.** Authoritative reference: runtime topology, AI-proxy security posture, component catalog, state deep-dive, known debt |
 | [`docs/architecture/semantic-model.html`](docs/architecture/semantic-model.html) | Full semantic model and taxonomy: every entity, every edge, integrity machinery, vocabulary systems (open in a browser) |
 | [`docs/architecture/campaign-model-walkthrough.html`](docs/architecture/campaign-model-walkthrough.html) | Visual, exploratory walkthrough of the campaign model for DMs — three depth levels, an interactive map, one worked example story (open in a browser) |
-| [`docs/architecture/ontology-tracker.md`](docs/architecture/ontology-tracker.md) | Tracker for ontological-model elements **not in use today**: adopted-but-unimplemented extensions (E1–E11) and dormant shipped elements |
+| [`docs/architecture/ontology-tracker.md`](docs/architecture/ontology-tracker.md) | Per-element status tracker for the adopted ontology extensions (E1–E13; E1–E3 are implemented as of 2026-08-26) and dormant shipped elements |
 | [`docs/architecture/ontology-proposal-evaluation.md`](docs/architecture/ontology-proposal-evaluation.md) | Evaluation of the external DDAO & ADRAS ontology proposals: what was adopted into the model, what was rejected, and why |
 | [`docs/architecture/high-level-design.md`](docs/architecture/high-level-design.md) | System overview, architecture diagram, data model, feature map, project structure |
 | [`docs/architecture/technical-design.md`](docs/architecture/technical-design.md) | Detailed technical design: state management, AI integration, hooks, dialog system, styling, build |
@@ -188,7 +188,7 @@ npm run test:e2e:ui      # Playwright interactive UI mode
 
 | Layer | Framework | Tests | Scope |
 |-------|-----------|-------|-------|
-| Unit + component | Vitest | 990 across 143 files | Services, storage/migration, linking engine, utilities, context builder, AI adapters, archetype scenarios, plus jsdom render tests (`@testing-library/react`) for editors, dialogs and hooks |
+| Unit + component | Vitest | 1855 across 178 files | Services, storage/migration, linking engine, utilities, context builder, AI adapters, archetype scenarios, plus jsdom render tests (`@testing-library/react`) for editors, dialogs and hooks |
 | E2E | Playwright | 114 per project × 2 projects (chromium, mobile-chrome); 2 permanently skipped + 4 runtime skip guards | Campaign lifecycle, entity CRUD, navigation, generators, dialogs, session runner, DM tools, visualizers, mobile, RealmChat |
 | Smoke | Built-in (`smokeTest.ts`) | ~20 checks | Service availability + entity CRUD; **opt-in**, dev-only, requires `VITE_RUN_SMOKE_TESTS=true` |
 | Mock | Built-in | Full app | Every AI function has a mock — all features work without API key or network |

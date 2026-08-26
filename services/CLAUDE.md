@@ -9,7 +9,7 @@ AI lives in `services/ai/` — see `services/ai/CLAUDE.md`.
 | `storageService.ts` | `createStorageService()` + `storageService` singleton. localStorage writes, IndexedDB quota fallback, rotating backups, cross-tab conflict events. |
 | `importExportService.ts` | `validateImportedCampaign`, `validateExportRoundTrip`, `exportCampaignAsJson`, `exportCampaignAsObsidian`, `importCampaignFromJsonValidated`, `importCampaignFromJson`, `CURRENT_CAMPAIGN_VERSION`. |
 | `contextBuilder.ts` | `buildCampaignContext(options)` — tiered, token-budget-aware `campaignContext` string. |
-| `continuityChecker.ts` | `checkContinuity(campaign)` — pure, 8 rule functions, returns `ContinuityIssue[]`. |
+| `continuityChecker.ts` | `checkContinuity(campaign)` — pure, 9 rule functions emitting 12 distinct `ruleId`s (`checkMysteryEdges` alone emits four E1/E2 mystery lints), returns `ContinuityIssue[]`. |
 | `aiService.ts` | The AI facade. See `services/ai/CLAUDE.md`. |
 | `linking/autoLinker.ts` | `autoLinkScenes`, `autoLinkNpcFactions` — name-in-prose → id linking, used by `importTemplateData`. |
 | `linking/matchingEngine.ts` | `MatchingEngine` + `TextMatchingEngine` (Unicode word-boundary regex, longest-name-first, min 3 chars). |
@@ -48,7 +48,7 @@ Tests use `{ persist: false }` (init then just sets `appStatus: 'welcome'`).
 connections/mentions, NPC/location `history[].referenceId` (nulled + `referenceType: 'manual'` — the timeline row
 itself stays), faction `leaderId`/`headquartersLocationId`/mentions, scene mentions, plot and article
 `relatedEntityIds`/mentions, session-log `relatedPlotIds`/`plotProgressions`/`structuredNotes[].taggedEntityIds`/
-`plannedNpcIds`/`plannedLocationIds`, secret `linkedEntityIds`/`revealedInSessionId`, and `campaign.pinnedEntities`.
+`plannedNpcIds`/`plannedLocationIds`, secret `linkedEntityIds`/`revealedInSessionId`/`revealsSecretId`, and `campaign.pinnedEntities`.
 
 All twelve entity deletes call it: `deleteNpc`, `deleteLocation`, `deleteFaction`, `deleteItem`, `deleteArticle`,
 `deleteAdventure`, `deleteScene`, `deleteSessionLog`, `deletePlayerCharacter`, `deletePlot`, `deleteNote`,

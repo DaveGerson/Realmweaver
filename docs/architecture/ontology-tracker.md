@@ -72,6 +72,7 @@ against the codebase on 2026-08-25.
 | `RollableTable` / `RollableTableEntry` | `types/RollableTable.ts` | `transient` (by design) | DM Coach AI output only; never persisted on `Campaign`, carries no `id`. Listed here so nobody mistakes it for a persisted graph node. |
 | `EntityType` enum coverage | `types/Graph.ts` | `partial` (by design) | The graph view's node vocabulary covers 7 kinds; Plot, SessionLog, and PlayerCharacter are not graph nodes today. Tracked as a known vocabulary gap (see `semantic-model.html` §9's planned `EntityKind` consolidation). |
 | `Encounter.sceneId` / `Encounter.sessionId` dangling refs | `types/Encounter.ts` | in use, unswept (by design) | Display-only provenance stamped at combat start; outside the purge sweep, dangles harmlessly. Listed to record that the omission is intentional, not an oversight. |
+| `Campaign.secrets?` optionality | `types/Campaign.ts` | `partial` (growing tax) | Still the only optional entity array, and the mystery expansion multiplied its consumers — every one must read `campaign.secrets ?? []`. *Reconciliation finding 2026-08-26:* candidate for promotion to a required, migrated array (backfilled by `migrateCampaignsData` / `normaliseRequiredArrays`) the next time a lane touches the migration path. |
 
 ---
 
