@@ -200,10 +200,70 @@ change, immediate AI-grounding gain:
 
 ---
 
+## Addendum (2026-08-26): Option 3 — tree-style ontology
+
+A third external proposal was evaluated after the first two: a much simpler,
+plain-language indented-tree ontology (Campaign → Story → Scene, with Quests,
+Dungeons/Chambers, Creatures, Choices/Consequences, and box-diagram visualizations).
+The product owner's stated interest was primarily its value **as a communication
+vehicle** — explaining the schema model to DMs who don't know data-modeling concepts.
+
+**Verdict:** as a *schema*, the weakest of the three — essentially DDAO's taxonomy
+re-drawn as a tree, with nearly everything either already shipped, already adopted
+(E1–E11), or already in the rejected table above, and no new arguments for the
+rejected items it re-asserts (quest prerequisite chains, faction↔faction
+allies/enemies edges, XP/CR/reward tracks, Choice/Event/Consequence engines, numeric
+scalars like danger/urgency/importance ratings, Atmosphere objects). As a
+*presentation*, the strongest of the three: plain-verb edge labels that read as
+sentences ("a Scene takes place at a Location"), an indented containment tree, and a
+"how do I build one" step order are exactly the right form for a DM-facing
+explanation — and Realmweaver's real model, being one aggregate root with a single
+nested collection, renders in that form even more cleanly than Option 3's own model
+does.
+
+**Adopted:**
+
+- **E12 — `Scene.expectedDurationMinutes?`** — the one surviving schema field:
+  optional, non-id-bearing (so it does *not* join the N-place integrity contract),
+  landing on `types/Scene.ts` with the Session Prep Wizard summing planned scenes
+  into "you've planned ≈N hours of game" (the archetype research's four-hour-session
+  baseline gives it a real consumer). The companion `pacing` enum was declined as
+  redundant with `Scene.type` + `gmNotes`.
+- **E2 amendment — `Secret.cluesNeeded?`** — an optional per-revelation override of
+  the Three-Clue lint threshold (default 3), recorded on the E2 tracker row rather
+  than as a new element.
+- **The communication vehicle itself — implemented.** A DM-facing
+  "How a Campaign Fits Together" section now opens the *Building Your World* chapter
+  of [`../USER_GUIDE.md`](../USER_GUIDE.md): the real 12-node model in plain-verb
+  tree form on the shipped world/story/table three-tier frame, plus a re-grounded
+  build order. A phase-2 in-app port (a small `DialogShell` help popover, the
+  `KeyboardShortcutsHelp` pattern) is possible later but was deliberately not made a
+  tracked model element — it is UI work, not ontology.
+
+**The do-not-inherit checklist.** Any future DM-facing text adapted from Option 3
+must not import its vocabulary where it contradicts the shipped model. The eleven
+mismatches, for the record: (1) Campaign→**Story**→Scene vs. our
+Campaign→**Adventure**→Scene; (2) "scenes contain encounters" vs. our Scene-as-prep-
+unit / Encounter-as-live-combat-runtime split; (3) first-class
+**Quest/Objective** machinery vs. our Plot + Adventure + prose rewards; (4)
+**Dungeon/Chamber** types vs. nested Locations + points of interest; (5) a
+**Creature** bestiary with stat math vs. `NPC.stats` as a free string; (6)
+pre-authored **Choice/Option/Event/Consequence** branching vs. recording outcomes at
+the table (a philosophy the explainer states positively); (7) four-way Lore trees
+vs. Article categories + NPC-resident character lore; (8) separate
+Mystery/Clue/Hidden-Lore node types vs. the single `Secret` with categories (+E1);
+(9) faction↔faction alliance edges (rejected); (10) hard cardinalities
+("a story must have 2+ scenes") vs. everything-optional (E5); (11) omitting the
+table tier entirely, which is half of Realmweaver.
+
+---
+
 ## Sources
 
 - Option 1 (DDAO) and Option 2 (ADRAS): externally supplied proposals, evaluated
   2026-08-25 on branch `claude/evaluate-ontology-proposals-ww3eto`.
+- Option 3 (tree-style ontology): externally supplied proposal, evaluated 2026-08-26
+  on the same branch (see Addendum above).
 - Baseline: [`semantic-model.html`](semantic-model.html) as of the ship-readiness merge
   (2026-08-15), verified against `types/*.ts`, `services/campaignService.ts`,
   `services/continuityChecker.ts`, `services/contextBuilder.ts`,

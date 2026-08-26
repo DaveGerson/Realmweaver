@@ -20,7 +20,9 @@ live writer/reader) · `transient` (in the type vocabulary by design, never pers
 
 ## A. Adopted extensions — in the model, not in the code
 
-All adopted 2026-08-25 from the DDAO/ADRAS proposal evaluation. None of these exist in
+E1–E11 adopted 2026-08-25 from the DDAO/ADRAS proposal evaluation; E12 and the E2
+amendment adopted 2026-08-26 from the Option 3 (tree-style) evaluation — see the
+evaluation doc's Addendum. None of these exist in
 `types/`, `services/`, or any UI surface yet. **Every id-bearing field below must be
 registered in `_purgeEntityReferences`, both id-remap passes, the backlink scanner, and
 the continuity checker's broken-reference rule when implemented** (the N-place contract,
@@ -29,7 +31,7 @@ the continuity checker's broken-reference rule when implemented** (the N-place c
 | ID | Element | Kind | Landing spot(s) | Status |
 |----|---------|------|-----------------|--------|
 | E1 | `Secret.revealsSecretId?` — clue→revelation FK; `Secret.isVital?` | schema (optional fields) | `types/Secret.ts` · purge sweep · `SecretsTracker` picker | `not-implemented` |
-| E2 | Mystery lints: Three-Clue Rule (warning) · unreachable revelation (error) · undeliverable secret (warning) · revealed-revelation-without-revealed-clues (info) | lint rules (needs E1) | `services/continuityChecker.ts` | `not-implemented` |
+| E2 | Mystery lints: Three-Clue Rule (warning) · unreachable revelation (error) · undeliverable secret (warning) · revealed-revelation-without-revealed-clues (info). *Amended 2026-08-26 (Option 3):* the Three-Clue threshold is per-revelation overridable via optional `Secret.cluesNeeded?` (default 3) | lint rules (needs E1) | `services/continuityChecker.ts` · `types/Secret.ts` (`cluesNeeded?`) | `not-implemented` |
 | E3 | Party-knowledge AI wiring: secrets reveal-state in GM context; hard revealed-only rule for player-facing output; `'player-safe'` context variant | derivation (zero schema) | `services/contextBuilder.ts` · `services/ai/dmCoach.ts` (player recap) | `not-implemented` |
 | E4 | `Plot.escalation?` — Front/threat-clock track (`doom`, ordered `steps[]` with `triggered` / `triggeredInSessionId`) | schema (optional field) | `types/Plot.ts` · `SessionEndWizard` · `services/ai/worldSimulation.ts` · purge sweep (`triggeredInSessionId`) · fully-escalated lint | `not-implemented` |
 | E5 | Modeling principle: GM craft lands as warning-severity lint, never schema-level cardinality constraints | principle | applies to all future rules | adopted (standing) |
@@ -39,6 +41,7 @@ the continuity checker's broken-reference rule when implemented** (the N-place c
 | E9 | `PlotStatus` widened with `'abandoned'` | vocabulary widening | `types/Plot.ts` · plot editor/dashboard status pickers · dormant-plot lint interaction | `not-implemented` |
 | E10 | Context derivations: location ancestor chain in scene context · faction-control-in-scene (controlling faction + present members) | derivation (zero schema) | `services/contextBuilder.ts` | `not-implemented` |
 | E11 | Craft lints: unreachable plot (warning) · hook naming no entity (info, via `TextMatchingEngine`) · faction with empty `goals` but members/holdings (info) | lint rules (zero schema) | `services/continuityChecker.ts` · `services/linking/matchingEngine.ts` | `not-implemented` |
+| E12 | `Scene.expectedDurationMinutes?` — planned-time estimate; Session Prep Wizard sums selected scenes into a session-length total. Non-id-bearing: does **not** join the N-place contract. *(Adopted 2026-08-26 from Option 3.)* | schema (optional field) | `types/Scene.ts` · `SessionPrepWizard` · optional AI wire field in the scene schema | `not-implemented` |
 
 ### Suggested implementation order (value-to-effort, from the evaluation)
 
@@ -47,7 +50,12 @@ the continuity checker's broken-reference rule when implemented** (the N-place c
 3. **E7** — one field + one context section; an AI-generation product needs it.
 4. **E10 + E11** — pure derivations/lints, no schema; can ship independently any time.
 5. **E4** — highest design weight; also fixes the world simulator's memorylessness.
-6. **E6, E8, E9** — cheap, independent, schedule opportunistically.
+6. **E6, E8, E9, E12** — cheap, independent, schedule opportunistically.
+
+*(The Option 3 evaluation's other adoption — the DM-facing "How a Campaign Fits
+Together" explainer — shipped directly into `docs/USER_GUIDE.md` on 2026-08-26 and is
+therefore not tracked here; a phase-2 in-app help-dialog port is UI work, not an
+ontology element.)*
 
 ---
 

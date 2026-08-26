@@ -122,6 +122,76 @@ Neither choice merges the two copies. If you are unsure which is newer, export a
 
 ## Building Your World
 
+### How a Campaign Fits Together
+
+You don't need to know anything about data modeling to use RealmWeaver — the app thinks about your campaign the same way you already talk about it. Everything you create lives in one of three layers:
+
+- **The world** — the setting you build: characters, places, organizations, objects, and lore.
+- **The story** — what you plan to happen: adventures broken into scenes, ongoing plot threads, and the secrets you're waiting to reveal.
+- **The table** — what actually happens: session plans and logs, your players' characters, live combat, and quick notes.
+
+Here is the whole model at a glance. Read each line as a plain sentence — "a Scene *takes place at* a Location," "a Faction *is led by* an NPC":
+
+```
+Your Campaign
+│
+├── THE WORLD — the setting you build
+│   ├── NPCs ............... can belong to a Faction · can have named relationships
+│   │                        with other NPCs and player characters · keep a history
+│   │                        of what happened to them
+│   ├── Locations .......... can sit inside a bigger Location ("The Crypt" inside
+│   │                        "The Ruined Monastery" inside "The Ashen Vale") · can
+│   │                        connect to other Locations · can be controlled by a
+│   │                        Faction · hold points of interest and hidden loot
+│   ├── Factions ........... have members (NPCs) · are led by an NPC · can keep a
+│   │                        headquarters (a Location) · can control territory
+│   ├── Items .............. treasures, artifacts, and key props — mention them in
+│   │                        lore, plots, and secrets to weave them into the story
+│   └── Lorebook Articles .. your world encyclopedia (lore, history, cosmology) ·
+│                            can nest under a parent Article · can reference any
+│                            other entity in your campaign
+│
+├── THE STORY — what you plan to happen
+│   ├── Adventures ......... story arcs with a hook, theme, and level; each one
+│   │   │                    contains an ordered list of…
+│   │   └── Scenes ......... your prep unit for one moment of play — combat,
+│   │                        social, exploration, or puzzle · takes place at a
+│   │                        Location · features NPCs · carries read-aloud text,
+│   │                        private GM notes, skill checks, and rewards
+│   ├── Plots .............. ongoing storyline threads · can link to anything ·
+│   │                        tracked as active, dormant, or resolved across sessions
+│   └── Secrets ............ things the players don't know yet — secrets, clues,
+│                            revelations, and rumors · linked to the entities they
+│                            concern · marked revealed when the moment comes
+│
+└── THE TABLE — what actually happened
+    ├── Session Logs ....... before play: pick the scenes, NPCs, and locations you
+    │                        plan to use · during play: the running log records
+    │                        events as they happen · after play: recap, loose ends,
+    │                        and which Plots moved forward
+    ├── Player Characters .. your players' heroes — the rest of the world points
+    │                        at them (relationships, session plans, mentions)
+    ├── Combat Tracker ..... live initiative and HP for the current fight; when the
+    │                        session ends, the encounter is archived into its log
+    └── Notes .............. quick freeform thoughts — deliberately connected to
+                             nothing, so you can jot without filing
+```
+
+Two things are worth knowing about how the layers behave:
+
+- **Connections maintain themselves.** Assign an NPC to a faction and the faction's member list updates too; type an `@`-mention in any description and both entities remember it; delete anything and every reference to it is cleaned up automatically (see [Linking Entities](#linking-entities)).
+- **Player choices aren't pre-scripted.** RealmWeaver doesn't ask you to author branching decision trees. You prep scenes and secrets, your players do something unexpected at the table, and the running log and Session End Wizard *record* what actually happened — the world updates to match reality, not the other way around.
+
+**A build order that works** (start anywhere — this is a well-worn path, not a rule):
+
+1. **Set the stage** — create the campaign and write a world synopsis in the Campaign Setting Editor.
+2. **Sketch the world** — a handful of NPCs, locations, and factions; link them as you go.
+3. **Plan the story** — create an Adventure, then break it into ordered Scenes.
+4. **Open plot threads** — add Plots for the storylines you want to track, linked to the entities they involve.
+5. **Plant secrets and clues** — in the Secrets & Clues Tracker, write down what's hidden and connect each entry to who or where it lives.
+6. **Prep the session** — the Session Prep Wizard turns your scenes, cast, and plots into a plan.
+7. **Play, then close the loop** — run the session with the Session Runner, and let the Session End Wizard capture the recap, loose ends, and plot progress that feed your next prep.
+
 ### Entity Types
 
 RealmWeaver organizes campaign content into these entity types, all accessible from the sidebar:

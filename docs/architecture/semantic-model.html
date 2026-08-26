@@ -636,12 +636,12 @@
 <section id="extensions">
   <p class="eyebrow">Section 11</p>
   <h2>Adopted extensions — in the model, not yet in the code</h2>
-  <p>Everything above documents the model <em>as shipped</em>. This section is the one deliberate exception: extensions adopted into the ontological model on 2026-08-25 after evaluating two external ontology proposals (DDAO, a large OWL-style class taxonomy, and ADRAS, a design-plane/runtime-plane schema). Full rationale, coverage analysis, and the rejected remainder live in <a href="ontology-proposal-evaluation.md">ontology-proposal-evaluation.md</a>; per-element implementation status is tracked in <a href="ontology-tracker.md">ontology-tracker.md</a>, which is canonical — an element listed here is <strong>not in use today</strong> unless the tracker says otherwise.</p>
+  <p>Everything above documents the model <em>as shipped</em>. This section is the one deliberate exception: extensions adopted into the ontological model after evaluating three external ontology proposals (DDAO, a large OWL-style class taxonomy, and ADRAS, a design-plane/runtime-plane schema, on 2026-08-25; a simpler tree-style ontology — whose main adoption was the plain-language "How a Campaign Fits Together" explainer now in <code>docs/USER_GUIDE.md</code> — on 2026-08-26). Full rationale, coverage analysis, and the rejected remainder live in <a href="ontology-proposal-evaluation.md">ontology-proposal-evaluation.md</a>; per-element implementation status is tracked in <a href="ontology-tracker.md">ontology-tracker.md</a>, which is canonical — an element listed here is <strong>not in use today</strong> unless the tracker says otherwise.</p>
   <div class="scroll-x"><table>
     <thead><tr><th>ID</th><th>Extension</th><th>Lands in</th><th>Status</th></tr></thead>
     <tbody>
       <tr><td>E1</td><td><code>Secret.revealsSecretId?</code> (clue→revelation FK) + <code>Secret.isVital?</code></td><td><code>types/Secret.ts</code> · purge sweep · SecretsTracker</td><td>not implemented</td></tr>
-      <tr><td>E2</td><td>Mystery lints: Three-Clue Rule · unreachable revelation · undeliverable secret · revealed-without-revealed-clues</td><td><code>continuityChecker.ts</code> (needs E1)</td><td>not implemented</td></tr>
+      <tr><td>E2</td><td>Mystery lints: Three-Clue Rule · unreachable revelation · undeliverable secret · revealed-without-revealed-clues (threshold per-revelation overridable via <code>Secret.cluesNeeded?</code>)</td><td><code>continuityChecker.ts</code> (needs E1)</td><td>not implemented</td></tr>
       <tr><td>E3</td><td>Party-knowledge AI wiring: secrets reveal-state in GM context; hard revealed-only rule + <code>'player-safe'</code> variant for player-facing output</td><td><code>contextBuilder.ts</code> · <code>ai/dmCoach.ts</code></td><td>not implemented</td></tr>
       <tr><td>E4</td><td><code>Plot.escalation?</code> — Front/threat-clock track (<code>doom</code>, ordered <code>steps[]</code>)</td><td><code>types/Plot.ts</code> · SessionEndWizard · <code>ai/worldSimulation.ts</code> · purge sweep</td><td>not implemented</td></tr>
       <tr><td>E5</td><td>Principle: GM craft lands as warning-severity lint, never schema-level cardinality constraints</td><td>all future rules</td><td>standing</td></tr>
@@ -651,6 +651,7 @@
       <tr><td>E9</td><td><code>PlotStatus</code> widened with <code>'abandoned'</code></td><td><code>types/Plot.ts</code> · status pickers</td><td>not implemented</td></tr>
       <tr><td>E10</td><td>Context derivations: location ancestor chain · faction-control-in-scene</td><td><code>contextBuilder.ts</code></td><td>not implemented</td></tr>
       <tr><td>E11</td><td>Craft lints: unreachable plot · hook naming no entity · empty faction <code>goals</code></td><td><code>continuityChecker.ts</code> · <code>linking/matchingEngine.ts</code></td><td>not implemented</td></tr>
+      <tr><td>E12</td><td><code>Scene.expectedDurationMinutes?</code> — planned-time estimate, summed by session prep (non-id-bearing)</td><td><code>types/Scene.ts</code> · SessionPrepWizard</td><td>not implemented</td></tr>
     </tbody>
   </table></div>
   <div class="callout"><p><strong>Implementation reminder:</strong> every id-bearing field above (E1, E4's <code>triggeredInSessionId</code>, E6's keys, E8) joins the hand-maintained N-place integrity contract from Section 7 — purge sweep, both id-remap passes, backlink scanner, continuity checker — before it can ship. The tracker lists the suggested implementation order.</p></div>
