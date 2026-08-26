@@ -258,12 +258,78 @@ table tier entirely, which is half of Realmweaver.
 
 ---
 
+## Addendum (2026-08-26): Option 4 — DND-AO (five-domain ontology)
+
+A fourth external proposal was evaluated after the first three: "DND-AO," a five-domain
+taxonomy (Narrative, Spatial, Entity, Mechanical, Epistemic) with a predicate list, a
+worked example scene, and a closing pitch for bidirectional cross-entity querying.
+
+**Verdict:** the highest-overlap proposal yet — with three evaluations absorbed, nearly
+every DND-AO concept is shipped (Scene/Encounter split, location hierarchy + PoIs,
+`LocationConnection`, `SkillCheck`/DC gates, `PoiInteraction` as the trigger primitive,
+faction goals/resources), already adopted (its epistemic domain maps 1:1 onto E1/E2/E3/E8;
+its PC-backstory linkage onto P5; its NPC Voice/Mannerisms onto P3's `voiceNotes`), or
+already in the rejected table with no new argument (Actor/Monster subclass trees, CR
+budgets, Quest machinery, scene transitions, `opposes`/`alliesWith`, the
+Consequence/WorldState engine, typed connection/travel mechanics). Its epistemic domain
+is the fourth independent convergence on the clue→revelation edge — recorded as further
+evidence for E1/E2's priority. Its "bidirectional querying" pitch is already delivered
+architecturally by forward-only edges + scan-derived backlinks.
+
+**Adopted:**
+
+- **E13 — `Faction.partyStanding?: 'hostile' | 'wary' | 'neutral' | 'friendly' |
+  'allied'`** — the one surviving schema field: the party's current standing with a
+  faction, today expressible only as scattered prose. Optional, non-id-bearing (joins no
+  integrity contract), absent ⇒ untracked. Lands on `types/Faction.ts`, edited in the
+  faction editor (picker + dashboard badge), consumed by E10's faction-control-in-scene
+  derivation ("controlled by ⟨faction⟩ — hostile to the party"). Deliberately **no** lint,
+  no nag, no session-end step, and not world-sim-writable — kept under the lazy-lens
+  bookkeeping ceiling. Adjacent to the rejected `Resource`/`StateChange` engine, which
+  stands: the new argument Option 4 brings is reputation as faction-*intrinsic* state DMs
+  already track by hand, not as event-engine output; a single coarse enum is `Plot.status`'s
+  weight class, not a runtime.
+
+**Declined residue** (each with the honest reason): NPC/scene-level starting attitudes
+(E13 is the faction-level default; per-scene matrices are prep bookkeeping); sub-location
+sensory fields (re-asserts the Option 3 Atmosphere rejection — `readAloudText` is the
+delivery mechanism; the residue is a prompt-engineering nudge, not schema); structured NPC
+Ideals/Bonds/Flaws (the AI consumes `traits`/`motivations` prose whole; the field-worthy
+NPC axis was voice, already in build); Personal Character Quest (is P5's gated hooks; no
+argument to un-gate); clue `pointsTo Location` / `exposes weakness` (E1 + `linkedEntityIds`
++ content prose cover it; a third typed clue role isn't worth an N-place contract seat);
+scene pacing tags (the Rest-inclusive framing is noted as a genuinely better argument than
+Option 3's version, but the native fix if ever needed is widening `SceneType` with
+`'downtime'` — an E9-style move — not a parallel DM-tagged intensity enum; P6 Tier 1
+derives pacing for free).
+
+**Toolkit note** (owner-requested focus): Option 4's compound-query example ("sub-locations
+controlled by faction X containing a clue pointing to Y") exposes a real but narrow gap —
+no shipped surface answers a set-returning question chained across ≥2 edges (backlinks are
+one-hop, search is text-only, the graph has type toggles but no focus mode and no Secret
+nodes, R4 is one hop; planned P6 is health checks, not querying). A query engine remains
+rightly rejected. Two curated compound filters are recorded as feature (not ontology)
+recommendations for the storyteller/lazy track: **T1** — widen R4's "here now" by one hop
+(controlling faction + location ancestor chain, reusing E10's derivations; size S, zero
+schema); **T2** — a RelationshipGraph focus lens (2-hop neighborhood dimming around a
+selected node, optionally with an unrevealed-clue count badge; size M, zero schema).
+
+**Validations recorded:** epistemic domain ≙ E1/E2/E3/E8 (E3 implemented, E1/E2 in build);
+Voice/Mannerisms ≙ P3 (in build); Scene/Encounter and prep/runtime split ≙ shipped;
+sub-location granularity ≙ shipped hierarchy; PC backstory linkage ≙ P5; faction
+goals/resources ≙ shipped verbatim; the bidirectional-querying pitch ≙ the shipped
+forward-only + derived-backlinks architecture, which delivers it without symmetric writes.
+
+---
+
 ## Sources
 
 - Option 1 (DDAO) and Option 2 (ADRAS): externally supplied proposals, evaluated
   2026-08-25 on branch `claude/evaluate-ontology-proposals-ww3eto`.
 - Option 3 (tree-style ontology): externally supplied proposal, evaluated 2026-08-26
   on the same branch (see Addendum above).
+- Option 4 (DND-AO, five-domain ontology): externally supplied proposal, evaluated
+  2026-08-26 on the same branch (see Addendum above).
 - Baseline: [`semantic-model.html`](semantic-model.html) as of the ship-readiness merge
   (2026-08-15), verified against `types/*.ts`, `services/campaignService.ts`,
   `services/continuityChecker.ts`, `services/contextBuilder.ts`,

@@ -42,6 +42,7 @@ the continuity checker's broken-reference rule when implemented** (the N-place c
 | E10 | Context derivations: location ancestor chain in scene context · faction-control-in-scene (controlling faction + present members) | derivation (zero schema) | `services/contextBuilder.ts` | `not-implemented` |
 | E11 | Craft lints: unreachable plot (warning) · hook naming no entity (info, via `TextMatchingEngine`) · faction with empty `goals` but members/holdings (info) | lint rules (zero schema) | `services/continuityChecker.ts` · `services/linking/matchingEngine.ts` | `not-implemented` |
 | E12 | `Scene.expectedDurationMinutes?` — planned-time estimate; Session Prep Wizard sums selected scenes into a session-length total. Non-id-bearing: does **not** join the N-place contract. *(Adopted 2026-08-26 from Option 3.)* | schema (optional field) | `types/Scene.ts` · `SessionPrepWizard` · optional AI wire field in the scene schema | `not-implemented` |
+| E13 | `Faction.partyStanding?: 'hostile' \| 'wary' \| 'neutral' \| 'friendly' \| 'allied'` — the party's standing with a faction; absent ⇒ untracked. Non-id-bearing. No lint, no nag, not world-sim-writable. *(Adopted 2026-08-26 from Option 4/DND-AO.)* | schema (optional field) | `types/Faction.ts` · FactionEditor picker + dashboard badge · `contextBuilder` (rides E10's faction-control derivation) | `not-implemented` |
 
 ### Suggested implementation order (value-to-effort, from the evaluation)
 
@@ -50,7 +51,7 @@ the continuity checker's broken-reference rule when implemented** (the N-place c
 3. **E7** — one field + one context section; an AI-generation product needs it.
 4. **E10 + E11** — pure derivations/lints, no schema; can ship independently any time.
 5. **E4** — highest design weight; also fixes the world simulator's memorylessness.
-6. **E6, E8, E9, E12** — cheap, independent, schedule opportunistically.
+6. **E6, E8, E9, E12, E13** — cheap, independent, schedule opportunistically.
 
 *(The Option 3 evaluation's other adoption — the DM-facing "How a Campaign Fits
 Together" explainer — shipped directly into `docs/USER_GUIDE.md` on 2026-08-26 and is

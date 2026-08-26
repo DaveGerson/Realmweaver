@@ -437,5 +437,13 @@ never a nag, filled by players at session zero.
   deferred). Then P5 alongside E7 (same editor, same Tier-1 injection point).
 - **Wave 3** — P6 Tier 1, E4 (escalation; also fixes the world simulator's
   memorylessness), then P6 Tier 2.
-- **Capstone** — P7 when a real campaign approaches its ending; E6/E8/E9/E12 ride
+- **Capstone** — P7 when a real campaign approaches its ending; E6/E8/E9/E12/E13 ride
   opportunistically in whichever wave touches their files.
+
+**Toolkit riders from the Option 4 (DND-AO) evaluation, 2026-08-26** — features, not
+tracker elements (full rationale in the evaluation doc's Option 4 addendum): **T1** —
+widen R4's "here now" filter by one hop (the active location's controlling faction and
+parent-location chain, reusing E10's derivations; S, zero schema); **T2** — a
+RelationshipGraph focus lens (dim outside a selected node's 2-hop neighborhood, optional
+unrevealed-clue count badge; M, zero schema). Slot opportunistically from Wave 3 —
+T1's file (`SecretsTracker.tsx`) is owned by the Wave 2 build until it lands.
