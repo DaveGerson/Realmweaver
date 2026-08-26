@@ -1,0 +1,1093 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Realmweaver Campaign Model</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&display=swap">
+<style>
+  :root {
+    --bg: #faf9f6;
+    --surface: #ffffff;
+    --surface-2: #f3f1ec;
+    --ink: #1e293b;
+    --ink-strong: #0f172a;
+    --muted: #64748b;
+    --accent: #b45309;
+    --line: #e4e0d8;
+
+    /* Entity identity colors — from ENTITY_TYPE_CONFIG. Dot color is constant
+       across themes; --t-* is the text-safe shade for the current theme. */
+    --c-npc:#f59e0b;      --t-npc:#b45309;
+    --c-location:#10b981; --t-location:#047857;
+    --c-faction:#8b5cf6;  --t-faction:#6d28d9;
+    --c-item:#0ea5e9;     --t-item:#0369a1;
+    --c-adventure:#f97316;--t-adventure:#c2410c;
+    --c-article:#06b6d4;  --t-article:#0e7490;
+    --c-scene:#3b82f6;    --t-scene:#1d4ed8;
+    --c-plot:#eab308;     --t-plot:#a16207;
+    --c-session:#f43f5e;  --t-session:#be123c;
+    --c-pc:#14b8a6;       --t-pc:#0f766e;
+    --c-note:#64748b;     --t-note:#475569;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f172a; --surface: #16213a; --surface-2: #1e293b;
+      --ink: #e2e8f0; --ink-strong: #f8fafc; --muted: #94a3b8;
+      --accent: #fbbf24; --line: #2c3a54;
+      --t-npc:#fbbf24; --t-location:#34d399; --t-faction:#a78bfa; --t-item:#38bdf8;
+      --t-adventure:#fb923c; --t-article:#22d3ee; --t-scene:#60a5fa; --t-plot:#facc15;
+      --t-session:#fb7185; --t-pc:#2dd4bf; --t-note:#94a3b8;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f172a; --surface: #16213a; --surface-2: #1e293b;
+    --ink: #e2e8f0; --ink-strong: #f8fafc; --muted: #94a3b8;
+    --accent: #fbbf24; --line: #2c3a54;
+    --t-npc:#fbbf24; --t-location:#34d399; --t-faction:#a78bfa; --t-item:#38bdf8;
+    --t-adventure:#fb923c; --t-article:#22d3ee; --t-scene:#60a5fa; --t-plot:#facc15;
+    --t-session:#fb7185; --t-pc:#2dd4bf; --t-note:#94a3b8;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0; padding: 0 22px 96px;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; }
+  h1, h2, h3 {
+    font-family: "Fraunces", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    color: var(--ink-strong); text-wrap: balance; line-height: 1.18; font-weight: 600;
+  }
+  h1 { font-size: clamp(2rem, 5vw, 2.9rem); margin: 0 0 14px; }
+  h2 { font-size: 1.65rem; margin: 0 0 14px; }
+  h3 { font-size: 1.14rem; margin: 34px 0 8px; }
+  p { margin: 0 0 13px; max-width: 70ch; }
+  a { color: var(--accent); }
+  strong { color: var(--ink-strong); }
+  .eyebrow {
+    font-size: 0.72rem; letter-spacing: 0.15em; text-transform: uppercase;
+    color: var(--accent); font-weight: 700; margin: 0 0 10px;
+  }
+  header { padding: 58px 0 4px; }
+  .lede { font-size: 1.06rem; max-width: 66ch; }
+  section { margin-top: 66px; }
+  .rule { border: 0; border-top: 1px solid var(--line); margin: 58px 0 0; }
+  .quiet { color: var(--muted); }
+  .small { font-size: 0.88rem; }
+
+  /* The running tale */
+  .tale {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    padding: 20px 24px; margin: 26px 0 0; max-width: 66ch;
+  }
+  .tale p {
+    font-family: "Fraunces", "Iowan Old Style", Palatino, Georgia, serif;
+    font-style: italic; font-size: 1.05rem; margin: 0; max-width: none; color: var(--ink);
+  }
+  .tale .label {
+    font-style: normal; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 0.7rem; letter-spacing: 0.13em; text-transform: uppercase;
+    color: var(--muted); font-weight: 700; display: block; margin-bottom: 8px;
+  }
+
+  /* Depth chooser */
+  .depths { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin: 26px 0 0; }
+  .depths a {
+    display: block; background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    padding: 14px 16px; text-decoration: none; color: var(--ink);
+  }
+  .depths a:hover { border-color: var(--accent); }
+  .depths .dn {
+    font-family: "Fraunces", Georgia, serif; font-weight: 600; color: var(--ink-strong);
+    display: block; margin-bottom: 3px;
+  }
+  .depths .dd { font-size: 0.85rem; color: var(--muted); display: block; }
+
+  /* Figures */
+  figure {
+    margin: 24px 0 0; background: var(--surface); border: 1px solid var(--line);
+    border-radius: 8px; padding: 16px;
+  }
+  figure svg { display: block; color: var(--ink); height: auto; }
+  figcaption { font-size: 0.88rem; color: var(--muted); margin-top: 12px; max-width: 90ch; }
+  .scroll-x { overflow-x: auto; }
+  .scroll-x svg { min-width: 880px; width: 100%; }
+  .scroll-x.wide svg { min-width: 1000px; }
+  .elabel { paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+
+  /* Entity chips */
+  .tiergroups { display: flex; flex-wrap: wrap; gap: 18px 30px; margin: 22px 0 0; }
+  .tiergroup .tg-label {
+    font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted); font-weight: 700; margin-bottom: 7px;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    font: inherit; font-size: 0.85rem; cursor: pointer;
+    color: var(--ink); background: var(--surface); border: 1px solid var(--line);
+    border-radius: 999px; padding: 5px 13px 5px 10px;
+  }
+  .chip .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--dc); flex: none; }
+  .chip.nodot .dot { background: transparent; border: 1.6px solid var(--muted); }
+  .chip:hover { border-color: var(--dc); }
+  .chip[aria-pressed="true"] {
+    border-color: var(--dc); color: var(--tc); font-weight: 600;
+    background: var(--surface-2);
+    background: color-mix(in srgb, var(--dc) 10%, var(--surface));
+  }
+  .chip:focus-visible, .depths a:focus-visible, details summary:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+
+  /* Level 2 graph interactivity */
+  #map .gnode { cursor: pointer; }
+  #map .gnode rect.nbox { fill: var(--surface-2); stroke: var(--line); stroke-width: 1.2; }
+  #map .gnode:hover rect.nbox { stroke: var(--muted); }
+  #map .gnode:focus-visible { outline: none; }
+  #map .gnode:focus-visible rect.nbox { stroke: var(--accent); stroke-width: 2; }
+  #map .gnode.sel rect.nbox { stroke: var(--hl, var(--accent)); stroke-width: 2.2; }
+  #map .edge path, #map .edge line { stroke: var(--muted); fill: none; }
+  #map .edge text { fill: var(--muted); }
+  #map .rail rect { stroke: var(--muted); fill: none; }
+  #map.has-sel .gnode:not(.lit) { opacity: 0.22; }
+  #map.has-sel .edge:not(.lit) { opacity: 0.13; }
+  #map.has-sel .rail:not(.lit) { opacity: 0.25; }
+  #map.has-sel .edge.lit path, #map.has-sel .edge.lit line { stroke: var(--hl); stroke-width: 1.8; }
+  #map.has-sel .edge.lit text { fill: var(--ink); }
+  @media (prefers-reduced-motion: no-preference) {
+    #map .gnode, #map .edge, #map .rail { transition: opacity 0.22s ease; }
+  }
+
+  /* Detail panel */
+  .panel {
+    margin-top: 20px; background: var(--surface); border: 1px solid var(--line);
+    border-radius: 8px; padding: 20px 22px; min-height: 150px;
+  }
+  .panel .phead { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 4px; }
+  .panel .pdot { width: 13px; height: 13px; border-radius: 50%; background: var(--hl); align-self: center; flex: none; }
+  .panel .pdot.hollow { background: transparent; border: 2px solid var(--muted); }
+  .panel h3 {
+    margin: 0; font-size: 1.35rem; color: var(--hlt, var(--ink-strong));
+  }
+  .panel .ptier { font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+  .panel .pmeet {
+    font-size: 0.8rem; color: var(--ink); background: var(--surface-2);
+    border: 1px solid var(--line); border-radius: 999px; padding: 2px 11px;
+  }
+  .panel .pid { color: var(--ink); margin: 6px 0 0; max-width: none; }
+  .panel .paccent { font-size: 0.82rem; color: var(--muted); margin: 2px 0 0; }
+  .pcols { display: grid; grid-template-columns: 1.25fr 1fr; gap: 22px; margin-top: 16px; }
+  @media (max-width: 760px) { .pcols { grid-template-columns: 1fr; } }
+  .pcols .pc-label {
+    font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted); font-weight: 700; margin-bottom: 7px;
+  }
+  .pcols ul { margin: 0; padding-left: 18px; }
+  .pcols li { margin-bottom: 7px; }
+  .pcols li::marker { color: var(--hl, var(--muted)); }
+  .pcols em { color: var(--hlt, var(--ink-strong)); font-style: italic; }
+  .pcols .ptale {
+    font-family: "Fraunces", "Iowan Old Style", Palatino, Georgia, serif;
+    font-style: italic; font-size: 1rem; color: var(--ink); margin: 0; max-width: none;
+  }
+  .pcols .ptale em { font-style: italic; }
+
+  /* Level 3 */
+  .kinds { display: grid; gap: 14px; margin-top: 20px; }
+  .kind { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px 20px; }
+  .kind h3 { margin: 0 0 6px; font-size: 1.06rem; }
+  .kind ul { margin: 8px 0 0; padding-left: 18px; }
+  .kind li { margin-bottom: 6px; max-width: 76ch; }
+  .term {
+    display: inline-block; font-size: 0.72rem; letter-spacing: 0.06em; font-weight: 700;
+    color: var(--muted); border: 1px solid var(--line); border-radius: 999px;
+    padding: 1px 9px; margin-left: 8px; vertical-align: 1px; white-space: nowrap;
+  }
+  details.field-card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    margin-top: 10px;
+  }
+  details.field-card summary {
+    display: flex; align-items: center; gap: 10px; cursor: pointer;
+    padding: 13px 18px; list-style: none; border-radius: 8px;
+  }
+  details.field-card summary::-webkit-details-marker { display: none; }
+  details.field-card summary .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  details.field-card summary .dot.hollow { background: transparent !important; border: 1.7px solid var(--muted); }
+  details.field-card summary .fname { font-weight: 600; color: var(--ink-strong); }
+  details.field-card summary .fhint { color: var(--muted); font-size: 0.83rem; margin-left: auto; padding-left: 12px; text-align: right; }
+  details.field-card summary::after {
+    content: "+"; color: var(--muted); font-size: 1.1rem; margin-left: 10px; flex: none;
+    font-family: "Fraunces", Georgia, serif;
+  }
+  details.field-card[open] summary::after { content: "–"; }
+  details.field-card .fbody { padding: 2px 20px 16px; border-top: 1px solid var(--line); }
+  details.field-card .fbody .pc-label {
+    font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted); font-weight: 700; margin: 14px 0 5px;
+  }
+  details.field-card .fbody p { max-width: 80ch; margin: 0 0 6px; }
+  details.field-card .fbody .ftale {
+    font-family: "Fraunces", "Iowan Old Style", Palatino, Georgia, serif;
+    font-style: italic; color: var(--ink);
+  }
+  footer { margin-top: 80px; color: var(--muted); font-size: 0.86rem; border-top: 1px solid var(--line); padding-top: 18px; }
+  footer p { max-width: 86ch; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">Realmweaver · for storytellers</p>
+  <h1>How your campaign fits together</h1>
+  <p class="lede">You don't need to know anything about data modeling to use Realmweaver. The app thinks about your campaign the same way you already talk about it: a world you build, a story you plan, and what actually happens at the table. This page walks that picture from a glance to the full map — go exactly as deep as you like, and stop whenever you have what you need.</p>
+
+  <div class="tale">
+    <span class="label">One small story runs all the way through</span>
+    <p>In the Ashen Vale stands a ruined monastery. Beneath it, a hidden crypt. Abbot Maren keeps the door sealed, and the Order of the Silent Vigil makes sure nobody asks why. Your players arrive on Friday.</p>
+  </div>
+
+  <nav class="depths" aria-label="Choose your depth">
+    <a href="#layers"><span class="dn">1 · The three layers</span><span class="dd">Two minutes. The whole shape of a campaign.</span></a>
+    <a href="#twelve"><span class="dn">2 · Meet the twelve</span><span class="dd">Tap around. See how everything connects, and where each thing lives in the app.</span></a>
+    <a href="#full"><span class="dn">3 · The full model</span><span class="dd">Every field, every kind of link, and what quietly keeps it all true.</span></a>
+  </nav>
+</header>
+
+<hr class="rule">
+
+<section id="layers">
+  <p class="eyebrow">Level one · a glance</p>
+  <h2>Your campaign is a story in three layers</h2>
+  <p>Everything you make in Realmweaver lives in one of three layers, and you already know them — they are <strong>my world</strong>, <strong>my plan</strong>, and <strong>my table nights</strong>:</p>
+  <p><strong>The world</strong> — the setting you build: the people, places, organizations, objects, and lore. <strong>The story</strong> — what you plan to happen: adventures broken into scenes, plot threads you're tracking, and the secrets you're waiting to reveal. <strong>The table</strong> — what actually happens: game nights, your players' heroes, the fights, and your quick notes.</p>
+
+  <figure>
+    <div class="scroll-x">
+    <svg viewBox="0 0 900 434" role="img" aria-label="Three layers of a Realmweaver campaign: the world (the setting you build), the story (what you plan to happen), and the table (what actually happens). The story draws on the world, the plan meets your players at the table, and what really happened flows back into next week's prep.">
+      <defs>
+        <marker id="l1arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <!-- strata -->
+      <g>
+        <rect x="120" y="18" width="600" height="100" rx="9" fill="var(--surface-2)" stroke="var(--line)"/>
+        <text x="144" y="48" font-size="13" font-weight="700" letter-spacing="1.5" fill="var(--accent)">THE WORLD</text>
+        <text x="242" y="48" font-size="12.5" fill="var(--muted)">— the setting you build</text>
+        <g font-size="11" fill="currentColor">
+          <circle cx="148" cy="70" r="4" fill="#f59e0b"/><text x="158" y="74">NPCs</text>
+          <circle cx="210" cy="70" r="4" fill="#10b981"/><text x="220" y="74">Locations</text>
+          <circle cx="300" cy="70" r="4" fill="#8b5cf6"/><text x="310" y="74">Factions</text>
+          <circle cx="382" cy="70" r="4" fill="#0ea5e9"/><text x="392" y="74">Items</text>
+          <circle cx="446" cy="70" r="4" fill="#06b6d4"/><text x="456" y="74">Lorebook</text>
+        </g>
+        <text x="144" y="99" font-size="11.5" font-style="italic" fill="var(--muted)" font-family="Fraunces, Georgia, serif">The Ashen Vale · the Ruined Monastery · Abbot Maren · the Order of the Silent Vigil</text>
+      </g>
+      <g>
+        <rect x="120" y="158" width="600" height="100" rx="9" fill="var(--surface-2)" stroke="var(--line)"/>
+        <text x="144" y="188" font-size="13" font-weight="700" letter-spacing="1.5" fill="var(--accent)">THE STORY</text>
+        <text x="244" y="188" font-size="12.5" fill="var(--muted)">— what you plan to happen</text>
+        <g font-size="11" fill="currentColor">
+          <circle cx="148" cy="210" r="4" fill="#f97316"/><text x="158" y="214">Adventures</text>
+          <circle cx="246" cy="210" r="4" fill="#3b82f6"/><text x="256" y="214">Scenes</text>
+          <circle cx="322" cy="210" r="4" fill="#eab308"/><text x="332" y="214">Plots</text>
+          <circle cx="388" cy="210" r="4" fill="none" stroke="var(--muted)" stroke-width="1.6"/><text x="398" y="214">Secrets</text>
+        </g>
+        <text x="144" y="239" font-size="11.5" font-style="italic" fill="var(--muted)" font-family="Fraunces, Georgia, serif">Whispers Below — three scenes, one plot thread, one buried secret</text>
+      </g>
+      <g>
+        <rect x="120" y="298" width="600" height="100" rx="9" fill="var(--surface-2)" stroke="var(--line)"/>
+        <text x="144" y="328" font-size="13" font-weight="700" letter-spacing="1.5" fill="var(--accent)">THE TABLE</text>
+        <text x="240" y="328" font-size="12.5" fill="var(--muted)">— what actually happens</text>
+        <g font-size="11" fill="currentColor">
+          <circle cx="148" cy="350" r="4" fill="#f43f5e"/><text x="158" y="354">Session Logs</text>
+          <circle cx="262" cy="350" r="4" fill="#14b8a6"/><text x="272" y="354">Player Characters</text>
+          <circle cx="404" cy="350" r="4" fill="none" stroke="var(--muted)" stroke-width="1.6"/><text x="414" y="354">Live combat</text>
+          <circle cx="510" cy="350" r="4" fill="#64748b"/><text x="520" y="354">Notes</text>
+        </g>
+        <text x="144" y="379" font-size="11.5" font-style="italic" fill="var(--muted)" font-family="Fraunces, Georgia, serif">Session 3 — the night your players open the crypt</text>
+      </g>
+      <!-- flows -->
+      <line x1="420" y1="118" x2="420" y2="152" stroke="currentColor" stroke-width="1.3" marker-end="url(#l1arrow)"/>
+      <text x="432" y="142" font-size="11" fill="var(--muted)" class="elabel">the story draws on the world</text>
+      <line x1="420" y1="258" x2="420" y2="292" stroke="currentColor" stroke-width="1.3" marker-end="url(#l1arrow)"/>
+      <text x="432" y="282" font-size="11" fill="var(--muted)" class="elabel">the plan meets your players</text>
+      <path d="M 720 348 C 838 348, 838 68, 726 68" fill="none" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#l1arrow)"/>
+      <text x="846" y="208" font-size="11" fill="var(--accent)" text-anchor="middle" transform="rotate(90 846 208)" class="elabel">what really happened flows back into next week's prep</text>
+    </svg>
+    </div>
+    <figcaption>The whole shape. You build a world, you plan a story on top of it, and the table decides what really happens — then the app carries what happened back into your next plan. The world updates to match reality, not the other way around.</figcaption>
+  </figure>
+
+  <p style="margin-top:22px">One well-worn path through those layers, if you want one (start anywhere — this is a path, not a rule): <strong>set the stage</strong> → <strong>sketch the world</strong> → <strong>plan the story</strong> → <strong>open plot threads</strong> → <strong>plant secrets</strong> → <strong>prep the session</strong> → <strong>play, then close the loop</strong>.</p>
+  <p class="quiet small">In the monastery story: you write a line about the Ashen Vale, sketch the monastery and the abbot, plan &ldquo;Whispers Below&rdquo;, open the thread <em>What is the Vigil hiding?</em>, plant the secret, prep Friday — and after Friday, the recap and loose ends feed the next one.</p>
+</section>
+
+<hr class="rule">
+
+<section id="twelve">
+  <p class="eyebrow">Level two · the map</p>
+  <h2>Meet the twelve</h2>
+  <p>Twelve kinds of thing you can create — five in the world, four in the story, three at the table — plus the live fight, which runs itself. Select any of them below: its connections light up on the map, and the panel tells you what it is, where you find it in the app, and how its connections read as plain sentences.</p>
+  <p>Two things to know once, so no sentence has to hedge: <strong>every connection is optional</strong> — a lone NPC with no faction is perfectly valid, and nothing breaks if you skip a link. And <strong>each type keeps one accent color everywhere in the app</strong> — dashboards, search, the World Graph — the same colors used on this page. Secrets and the live fight carry no accent, by design.</p>
+
+  <div class="tiergroups" role="group" aria-label="Select a type to explore">
+    <div class="tiergroup">
+      <div class="tg-label">The world</div>
+      <div class="chips">
+        <button class="chip" data-k="npc" style="--dc:#f59e0b; --tc:var(--t-npc)" aria-pressed="false"><span class="dot"></span>NPCs</button>
+        <button class="chip" data-k="location" style="--dc:#10b981; --tc:var(--t-location)" aria-pressed="false"><span class="dot"></span>Locations</button>
+        <button class="chip" data-k="faction" style="--dc:#8b5cf6; --tc:var(--t-faction)" aria-pressed="false"><span class="dot"></span>Factions</button>
+        <button class="chip" data-k="item" style="--dc:#0ea5e9; --tc:var(--t-item)" aria-pressed="false"><span class="dot"></span>Items</button>
+        <button class="chip" data-k="article" style="--dc:#06b6d4; --tc:var(--t-article)" aria-pressed="false"><span class="dot"></span>Lorebook Articles</button>
+      </div>
+    </div>
+    <div class="tiergroup">
+      <div class="tg-label">The story</div>
+      <div class="chips">
+        <button class="chip" data-k="adventure" style="--dc:#f97316; --tc:var(--t-adventure)" aria-pressed="false"><span class="dot"></span>Adventures</button>
+        <button class="chip" data-k="scene" style="--dc:#3b82f6; --tc:var(--t-scene)" aria-pressed="false"><span class="dot"></span>Scenes</button>
+        <button class="chip" data-k="plot" style="--dc:#eab308; --tc:var(--t-plot)" aria-pressed="false"><span class="dot"></span>Plots</button>
+        <button class="chip nodot" data-k="secret" style="--dc:var(--muted); --tc:var(--ink-strong)" aria-pressed="false"><span class="dot"></span>Secrets</button>
+      </div>
+    </div>
+    <div class="tiergroup">
+      <div class="tg-label">The table</div>
+      <div class="chips">
+        <button class="chip" data-k="session" style="--dc:#f43f5e; --tc:var(--t-session)" aria-pressed="false"><span class="dot"></span>Session Logs</button>
+        <button class="chip" data-k="pc" style="--dc:#14b8a6; --tc:var(--t-pc)" aria-pressed="false"><span class="dot"></span>Player Characters</button>
+        <button class="chip nodot" data-k="fight" style="--dc:var(--muted); --tc:var(--ink-strong)" aria-pressed="false"><span class="dot"></span>Live combat</button>
+        <button class="chip" data-k="note" style="--dc:#64748b; --tc:var(--t-note)" aria-pressed="false"><span class="dot"></span>Notes</button>
+      </div>
+    </div>
+  </div>
+
+  <figure>
+    <div class="scroll-x wide">
+    <svg id="map" viewBox="0 0 1120 700" role="img" aria-label="Map of the twelve types across the world, story, and table layers, with their connections labeled as plain sentences. Selecting a type highlights its connections.">
+      <!-- ===== edges ===== -->
+      <g class="edge" data-c="npc faction">
+        <line x1="170" y1="104" x2="270" y2="104" stroke-width="1.4"/>
+        <text x="220" y="94" text-anchor="middle" font-size="11" class="elabel">belongs to</text>
+        <text x="220" y="122" text-anchor="middle" font-size="11" class="elabel">is led by</text>
+      </g>
+      <g class="edge" data-c="faction location">
+        <path d="M 335 128 C 335 172, 566 172, 566 128" stroke-width="1.4"/>
+        <text x="450" y="178" text-anchor="middle" font-size="11" class="elabel">keeps its headquarters at</text>
+      </g>
+      <g class="edge" data-c="location">
+        <path d="M 540 80 C 540 42, 596 42, 596 80" stroke-width="1.4"/>
+        <text x="568" y="38" text-anchor="middle" font-size="11" class="elabel">sits inside</text>
+      </g>
+      <g class="edge" data-c="article">
+        <path d="M 772 80 C 772 42, 826 42, 826 80" stroke-width="1.4"/>
+        <text x="799" y="38" text-anchor="middle" font-size="11" class="elabel">nests under</text>
+      </g>
+      <g class="edge" data-c="scene npc">
+        <line x1="175" y1="322" x2="110" y2="128" stroke-width="1.4"/>
+        <text x="128" y="212" text-anchor="middle" font-size="11" class="elabel">features</text>
+      </g>
+      <g class="edge" data-c="scene location">
+        <line x1="400" y1="310" x2="600" y2="128" stroke-width="1.4"/>
+        <text x="512" y="212" text-anchor="middle" font-size="11" class="elabel">takes place at</text>
+      </g>
+      <g class="edge" data-c="npc pc">
+        <line x1="100" y1="128" x2="135" y2="470" stroke-width="1.4"/>
+        <text x="96" y="302" text-anchor="middle" font-size="11" class="elabel" transform="rotate(-84 96 302)">named relationships</text>
+      </g>
+      <g class="edge" data-c="session scene">
+        <line x1="365" y1="470" x2="300" y2="354" stroke-width="1.4"/>
+        <text x="318" y="420" text-anchor="middle" font-size="11" class="elabel">plans</text>
+      </g>
+      <g class="edge" data-c="session plot">
+        <line x1="465" y1="470" x2="570" y2="340" stroke-width="1.4"/>
+        <text x="590" y="424" text-anchor="start" font-size="11" class="elabel">records how it moved</text>
+      </g>
+      <g class="edge" data-c="secret session">
+        <line x1="730" y1="340" x2="450" y2="470" stroke-width="1.4"/>
+        <text x="648" y="386" text-anchor="middle" font-size="11" class="elabel">was revealed in</text>
+      </g>
+      <g class="edge" data-c="fight session">
+        <line x1="585" y1="494" x2="485" y2="494" stroke-width="1.4"/>
+        <text x="535" y="486" text-anchor="middle" font-size="11" class="elabel">is archived into</text>
+      </g>
+      <g class="edge" data-c="plot rail">
+        <line x1="575" y1="340" x2="552" y2="620" stroke-width="1.2" stroke-dasharray="5 4"/>
+        <text x="552" y="596" text-anchor="middle" font-size="10.5" class="elabel">involves anything</text>
+      </g>
+      <g class="edge" data-c="secret rail">
+        <line x1="765" y1="340" x2="765" y2="620" stroke-width="1.2" stroke-dasharray="5 4"/>
+        <text x="765" y="596" text-anchor="middle" font-size="10.5" class="elabel">concerns</text>
+      </g>
+      <g class="edge" data-c="article rail">
+        <line x1="840" y1="128" x2="870" y2="620" stroke-width="1.2" stroke-dasharray="5 4"/>
+        <text x="874" y="572" text-anchor="middle" font-size="10.5" class="elabel">can reference anything</text>
+      </g>
+
+      <!-- ===== band labels ===== -->
+      <text x="60" y="56" font-size="11" font-weight="700" letter-spacing="1.5" fill="var(--muted)">THE WORLD · THE SETTING YOU BUILD</text>
+      <text x="60" y="246" font-size="11" font-weight="700" letter-spacing="1.5" fill="var(--muted)">THE STORY · WHAT YOU PLAN TO HAPPEN</text>
+      <text x="60" y="452" font-size="11" font-weight="700" letter-spacing="1.5" fill="var(--muted)">THE TABLE · WHAT ACTUALLY HAPPENS</text>
+
+      <!-- ===== world nodes ===== -->
+      <g class="gnode" data-k="npc" tabindex="0" role="button" aria-pressed="false" aria-label="NPC — select to see its connections">
+        <rect class="nbox" x="60" y="80" width="110" height="48" rx="8"/>
+        <circle cx="80" cy="104" r="5" fill="#f59e0b"/>
+        <text x="93" y="109" font-size="13" font-weight="600" fill="currentColor">NPC</text>
+      </g>
+      <g class="gnode" data-k="faction" tabindex="0" role="button" aria-pressed="false" aria-label="Faction — select to see its connections">
+        <rect class="nbox" x="270" y="80" width="130" height="48" rx="8"/>
+        <circle cx="290" cy="104" r="5" fill="#8b5cf6"/>
+        <text x="303" y="109" font-size="13" font-weight="600" fill="currentColor">Faction</text>
+      </g>
+      <g class="gnode" data-k="location" tabindex="0" role="button" aria-pressed="false" aria-label="Location — select to see its connections">
+        <rect class="nbox" x="500" y="80" width="132" height="48" rx="8"/>
+        <circle cx="520" cy="104" r="5" fill="#10b981"/>
+        <text x="533" y="109" font-size="13" font-weight="600" fill="currentColor">Location</text>
+      </g>
+      <g class="gnode" data-k="article" tabindex="0" role="button" aria-pressed="false" aria-label="Lorebook Article — select to see its connections">
+        <rect class="nbox" x="740" y="80" width="118" height="48" rx="8"/>
+        <circle cx="760" cy="104" r="5" fill="#06b6d4"/>
+        <text x="773" y="109" font-size="13" font-weight="600" fill="currentColor">Article</text>
+      </g>
+      <g class="gnode" data-k="item" tabindex="0" role="button" aria-pressed="false" aria-label="Item — select to see its connections">
+        <rect class="nbox" x="950" y="80" width="100" height="48" rx="8"/>
+        <circle cx="970" cy="104" r="5" fill="#0ea5e9"/>
+        <text x="983" y="109" font-size="13" font-weight="600" fill="currentColor">Item</text>
+        <text x="1000" y="148" text-anchor="middle" font-size="10.5" fill="var(--muted)" class="elabel">the world points at it</text>
+      </g>
+
+      <!-- ===== story nodes ===== -->
+      <g class="gnode" data-k="adventure" tabindex="0" role="button" aria-pressed="false" aria-label="Adventure — select to see its connections">
+        <rect class="nbox" x="150" y="268" width="300" height="100" rx="8"/>
+        <circle cx="170" cy="292" r="5" fill="#f97316"/>
+        <text x="183" y="297" font-size="13" font-weight="600" fill="currentColor">Adventure</text>
+        <text x="434" y="297" text-anchor="end" font-size="10.5" fill="var(--muted)">contains its scenes, in order</text>
+      </g>
+      <g class="gnode" data-k="scene" tabindex="0" role="button" aria-pressed="false" aria-label="Scene — select to see its connections">
+        <rect class="nbox" x="175" y="310" width="250" height="44" rx="7"/>
+        <circle cx="195" cy="332" r="5" fill="#3b82f6"/>
+        <text x="208" y="337" font-size="12.5" font-weight="600" fill="currentColor">Scene</text>
+        <text x="412" y="337" text-anchor="end" font-size="10.5" fill="var(--muted)">one moment of play</text>
+      </g>
+      <g class="gnode" data-k="plot" tabindex="0" role="button" aria-pressed="false" aria-label="Plot — select to see its connections">
+        <rect class="nbox" x="540" y="292" width="110" height="48" rx="8"/>
+        <circle cx="560" cy="316" r="5" fill="#eab308"/>
+        <text x="573" y="321" font-size="13" font-weight="600" fill="currentColor">Plot</text>
+      </g>
+      <g class="gnode" data-k="secret" tabindex="0" role="button" aria-pressed="false" aria-label="Secret — select to see its connections">
+        <rect class="nbox" x="700" y="292" width="130" height="48" rx="8"/>
+        <circle cx="720" cy="316" r="4.4" fill="none" stroke="var(--muted)" stroke-width="1.7"/>
+        <text x="733" y="321" font-size="13" font-weight="600" fill="currentColor">Secret</text>
+      </g>
+
+      <!-- ===== table nodes ===== -->
+      <g class="gnode" data-k="pc" tabindex="0" role="button" aria-pressed="false" aria-label="Player Character — select to see its connections">
+        <rect class="nbox" x="60" y="470" width="170" height="48" rx="8"/>
+        <circle cx="80" cy="494" r="5" fill="#14b8a6"/>
+        <text x="93" y="499" font-size="13" font-weight="600" fill="currentColor">Player Character</text>
+        <text x="145" y="540" text-anchor="middle" font-size="10.5" fill="var(--muted)" class="elabel">the world points at it</text>
+      </g>
+      <g class="gnode" data-k="session" tabindex="0" role="button" aria-pressed="false" aria-label="Session Log — select to see its connections">
+        <rect class="nbox" x="330" y="470" width="155" height="48" rx="8"/>
+        <circle cx="350" cy="494" r="5" fill="#f43f5e"/>
+        <text x="363" y="499" font-size="13" font-weight="600" fill="currentColor">Session Log</text>
+      </g>
+      <g class="gnode" data-k="fight" tabindex="0" role="button" aria-pressed="false" aria-label="Live combat — select to see its connections">
+        <rect class="nbox" x="585" y="470" width="130" height="48" rx="8" stroke-dasharray="6 4"/>
+        <circle cx="605" cy="494" r="4.4" fill="none" stroke="var(--muted)" stroke-width="1.7"/>
+        <text x="618" y="499" font-size="13" font-weight="600" fill="currentColor">Live combat</text>
+      </g>
+      <g class="gnode" data-k="note" tabindex="0" role="button" aria-pressed="false" aria-label="Note — select to see its connections">
+        <rect class="nbox" x="900" y="470" width="110" height="48" rx="8"/>
+        <circle cx="920" cy="494" r="5" fill="#64748b"/>
+        <text x="933" y="499" font-size="13" font-weight="600" fill="currentColor">Note</text>
+        <text x="955" y="540" text-anchor="middle" font-size="10.5" fill="var(--muted)" class="elabel">connected to nothing, on purpose</text>
+      </g>
+
+      <!-- ===== mention rail ===== -->
+      <g class="rail" data-k="rail">
+        <rect x="60" y="620" width="990" height="58" rx="9" stroke-width="1.2" stroke-dasharray="7 5"/>
+        <text x="80" y="644" font-size="11.5" font-weight="700" letter-spacing="1" fill="currentColor">THE WEB OF MENTIONS — anything can @-mention anything; both sides remember it</text>
+        <text x="80" y="663" font-size="10.5" fill="var(--muted)">plots involve, secrets concern, articles reference, log entries tag, pins hold — every thread lands in the same web</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption>The map of the twelve. Solid lines are direct connections, each labeled with the sentence it makes; dashed lines drop into the web of mentions, which can reach anything. A scene lives inside its adventure; the live fight is drawn dashed because it runs at the table and then archives itself into the session's log.</figcaption>
+  </figure>
+
+  <div class="panel" id="panel" aria-live="polite">
+    <p class="quiet">Select any of the twelve above — its connections light up, and this panel explains them.</p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section id="full">
+  <p class="eyebrow">Level three · the full model</p>
+  <h2>The full model, for those who want it</h2>
+  <p>Everything below is the same picture, at full depth: the four kinds of connection, the web of mentions, the caretakers that quietly keep it all true, and every field on every type. Where an engineering term exists, it sits in a small tag after the plain words — take it or leave it.</p>
+
+  <h3>The four kinds of connection</h3>
+  <p>Every line on the map above is one of four kinds. (There is also one true act of containment: an adventure <em>contains</em> its scenes, in order, and a session's log holds its archived fights.)</p>
+  <div class="kinds">
+    <div class="kind">
+      <h3>Kept in step on both sides <span class="term">bidirectional sync</span></h3>
+      <p>You set one side; the app writes the other. These never drift apart.</p>
+      <ul>
+        <li>An NPC <em>belongs to</em> a faction; the faction <em>has members</em>. Assign Maren to the Vigil and he appears in its member list — move him, and both lists update.</li>
+        <li>A location <em>sits inside</em> a bigger location, and the bigger one knows its parts.</li>
+        <li>An article <em>nests under</em> a parent article, and the parent knows its children.</li>
+      </ul>
+    </div>
+    <div class="kind">
+      <h3>One thing remembers another <span class="term">one-way links</span></h3>
+      <p>A simple pointer, held on one side. The rest of the app finds it whenever it needs to.</p>
+      <ul>
+        <li>A faction <em>is led by</em> an NPC, and <em>keeps its headquarters at</em> a location.</li>
+        <li>A location <em>is controlled by</em> a faction.</li>
+        <li>A scene <em>takes place at</em> a location and <em>features</em> NPCs.</li>
+        <li>A session <em>plans</em> scenes, NPCs, and locations, and <em>records how each plot moved</em> — advanced, stalled, or unchanged.</li>
+        <li>A secret <em>was revealed in</em> a session.</li>
+        <li>A fight remembers the session and scene it began from, and <em>is archived into</em> the session's log.</li>
+      </ul>
+    </div>
+    <div class="kind">
+      <h3>Links that carry their own words <span class="term">labeled links</span></h3>
+      <p>Some connections are half link, half prose — the words are yours.</p>
+      <ul>
+        <li>An NPC <em>has named relationships</em> with NPCs and player characters — you write the label ("rival", "old flame", "family") and the story behind it.</li>
+        <li>A location <em>connects to</em> other locations — each road, tunnel, or hidden stair described in your words.</li>
+        <li>A history entry says what happened to an NPC or location, and can point at the session or article where it happened.</li>
+      </ul>
+    </div>
+    <div class="kind">
+      <h3>The web of mentions <span class="term">untyped links, resolved by scanning</span></h3>
+      <p>The loosest and most powerful kind: any-to-any threads that hold your world together.</p>
+      <ul>
+        <li>Anything <em>mentions</em> anything — type an @ in a description, and both sides remember it. NPCs, locations, factions, articles, plots, and scenes can carry mentions; items and adventures can be mentioned too.</li>
+        <li>An article <em>can reference</em> anything; a plot <em>involves</em> anything; a secret <em>concerns</em> the people, places, and things it is linked to.</li>
+        <li>A running-log entry <em>tags</em> whatever it names, and you can pin up to fifteen things for quick reach.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Backlinks: the web, read backwards</h3>
+  <p>None of those threads is ever stored twice. When you open something, the app scans your whole campaign for every thread pointing at it and shows them as <strong>backlinks</strong> — so they are never stale, and a mention follows a rename, because it tracks the thing itself, not its name.</p>
+  <figure>
+    <div class="scroll-x" style="--minw:640px">
+    <svg viewBox="0 0 760 150" role="img" aria-label="An article mentions an NPC; the mention is stored once, on the article. Opening the NPC, the app scans the campaign and shows the article among his backlinks." style="min-width:640px">
+      <g>
+        <rect x="30" y="45" width="250" height="56" rx="8" fill="var(--surface-2)" stroke="var(--line)"/>
+        <circle cx="52" cy="68" r="5" fill="#06b6d4"/>
+        <text x="65" y="72" font-size="13" font-weight="600" fill="currentColor">"The Vigil's Founding"</text>
+        <text x="52" y="90" font-size="10.5" fill="var(--muted)">a lorebook article</text>
+      </g>
+      <g>
+        <rect x="480" y="45" width="250" height="56" rx="8" fill="var(--surface-2)" stroke="var(--line)"/>
+        <circle cx="502" cy="68" r="5" fill="#f59e0b"/>
+        <text x="515" y="72" font-size="13" font-weight="600" fill="currentColor">Abbot Maren</text>
+        <text x="502" y="90" font-size="10.5" fill="var(--muted)">an NPC</text>
+      </g>
+      <line x1="280" y1="62" x2="480" y2="62" stroke="currentColor" stroke-width="1.4"/>
+      <text x="380" y="53" text-anchor="middle" font-size="11" fill="currentColor" class="elabel">mentions @Abbot Maren — stored once, here</text>
+      <line x1="480" y1="86" x2="280" y2="86" stroke="currentColor" stroke-width="1.2" stroke-dasharray="5 4"/>
+      <text x="380" y="106" text-anchor="middle" font-size="11" fill="var(--muted)" class="elabel">the article appears in his backlinks</text>
+      <text x="380" y="122" text-anchor="middle" font-size="10.5" fill="var(--muted)" class="elabel">found by a scan when you open him — never stored, never stale</text>
+    </svg>
+    </div>
+    <figcaption>One thread, two views. The article holds the mention; the abbot's backlinks are read fresh from the campaign every time. Open the Reliquary of Ash and you see the plot that involves it, the secret that concerns it, and every article that mentions it — the item itself points at nothing.</figcaption>
+  </figure>
+
+  <h3>The quiet caretakers</h3>
+  <p>Three pieces of housekeeping run on every change, so you never have to think about them:</p>
+  <div class="kinds">
+    <div class="kind">
+      <h3>Both sides stay true <span class="term">bidirectional sync</span></h3>
+      <p>Membership and nesting are written on both sides in the same breath, every time. There is no "sync" button because there is nothing to sync.</p>
+    </div>
+    <div class="kind">
+      <h3>No place can contain itself <span class="term">cycle guard</span></h3>
+      <p>Try to make the Ashen Vale sit inside the Crypt while the Crypt sits inside the Ashen Vale, and the app refuses — the change is rejected and everything stays exactly as it was. The same guard watches the lorebook's nesting.</p>
+    </div>
+    <div class="kind">
+      <h3>Nothing is left dangling <span class="term">cascade deletion</span></h3>
+      <p>Delete anything, and one sweep clears every thread that pointed at it — memberships, casts, plans, secrets, relationships, mentions, pins. A history entry that pointed at a deleted session is the one gentle exception: it keeps its words and simply becomes a manual entry, so your timeline survives.</p>
+    </div>
+  </div>
+
+  <figure>
+    <div class="scroll-x">
+    <svg viewBox="0 0 920 372" role="img" aria-label="Deleting Abbot Maren triggers one cleanup sweep: his name leaves the Order's member list, the scene's cast, Session 3's planned cast, the secret's links, other NPCs' named relationships, and every mention and pin.">
+      <g>
+        <rect x="30" y="150" width="240" height="66" rx="8" fill="var(--surface-2)" stroke="var(--line)"/>
+        <text x="52" y="178" font-size="13.5" font-weight="600" fill="currentColor">You delete Abbot Maren</text>
+        <text x="52" y="198" font-size="10.5" fill="var(--muted)">one click, one confirm</text>
+        <text x="150" y="240" text-anchor="middle" font-size="11" font-style="italic" fill="var(--muted)">one sweep cleans everything</text>
+      </g>
+      <g stroke="currentColor" stroke-width="1.2" opacity="0.75">
+        <line x1="270" y1="183" x2="420" y2="38"/>
+        <line x1="270" y1="183" x2="420" y2="96"/>
+        <line x1="270" y1="183" x2="420" y2="154"/>
+        <line x1="270" y1="183" x2="420" y2="212"/>
+        <line x1="270" y1="183" x2="420" y2="270"/>
+        <line x1="270" y1="183" x2="420" y2="328"/>
+      </g>
+      <g font-size="11.5">
+        <rect x="420" y="14" width="470" height="48" rx="7" fill="var(--surface-2)" stroke="var(--line)"/>
+        <text x="438" y="34" font-weight="600" fill="currentColor">The Order of the Silent Vigil</text>
+        <text x="438" y="51" fill="var(--muted)">his name leaves the member list; if he led it, the leader seat empties</text>
+        <rect x="420" y="72" width="470" height="48" rx="7" fill="var(--surface-2)" stroke="var(--line)"/>
+        <text x="438" y="92" font-weight="600" fill="currentColor">"What Sleeps in the Crypt"</text>
+        <text x="438" y="109" fill="var(--muted)">he leaves the scene's cast</text>
+        <rect x="420" y="130" width="470" height="48" rx="7" fill="var(--surface-2)" stroke="var(--line)"/>
+        <text x="438" y="150" font-weight="600" fill="currentColor">Session 3's plan</text>
+        <text x="438" y="167" fill="var(--muted)">he leaves the planned cast for Friday night</text>
+        <rect x="420" y="188" width="470" height="48" rx="7" fill="var(--surface-2)" stroke="var(--line)"/>
+        <text x="438" y="208" font-weight="600" fill="currentColor">"Maren sealed the crypt himself"</text>
+        <text x="438" y="225" fill="var(--muted)">the secret drops its link to him — the secret itself survives</text>
+        <rect x="420" y="246" width="470" height="48" rx="7" fill="var(--surface-2)" stroke="var(--line)"/>
+        <text x="438" y="266" font-weight="600" fill="currentColor">Every other NPC</text>
+        <text x="438" y="283" fill="var(--muted)">named relationships with him are removed</text>
+        <rect x="420" y="304" width="470" height="48" rx="7" fill="var(--surface-2)" stroke="var(--line)"/>
+        <text x="438" y="324" font-weight="600" fill="currentColor">Everywhere else</text>
+        <text x="438" y="341" fill="var(--muted)">every @-mention of him, and his pin, are cleared</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption>Cleanup on delete, worked through the monastery story. Nothing is ever left pointing at something that no longer exists.</figcaption>
+  </figure>
+
+  <p style="margin-top:18px">Two more comforts in the same spirit: <strong>a duplicated campaign is truly its own</strong> — copy a campaign and every thread inside the copy is rewired to the copy, so a what-if branch never reaches back into the original. And when something still looks off, the <strong>Continuity Checker</strong> reads the whole web for you: broken links, circular nesting, orphaned pieces, contradictions.</p>
+
+  <h3>Every field, on every type</h3>
+  <p>Open only what you're curious about. Each card lists what the type holds, how it connects, and where the monastery story touches it.</p>
+
+  <details class="field-card">
+    <summary><span class="dot" style="background:#f59e0b"></span><span class="fname">NPC</span><span class="fhint">amber · Sidebar → NPCs</span></summary>
+    <div class="fbody">
+      <div class="pc-label">What it holds</div>
+      <p>Name, description, personality traits, backstory, motivations, the secrets they keep to themselves, freeform stats, and an example quote in their own voice.</p>
+      <div class="pc-label">How it connects</div>
+      <p>Belongs to a faction. Has named relationships with NPCs and player characters, each with your own label and description. Keeps a history of what has happened to them — each entry can point at the session or article where it happened. Can @-mention anything.</p>
+      <div class="pc-label">In the monastery story</div>
+      <p class="ftale">Abbot Maren — traits: serene, patient, evasive. Example quote: "The lower stair is closed. It has always been closed."</p>
+    </div>
+  </details>
+
+  <details class="field-card">
+    <summary><span class="dot" style="background:#10b981"></span><span class="fname">Location</span><span class="fhint">emerald · Sidebar → Locations</span></summary>
+    <div class="fbody">
+      <div class="pc-label">What it holds</div>
+      <p>Name, description, its own secrets, and points of interest — each with a notice difficulty, a read-aloud description, and investigation checks and interactions, each with an outcome. Hidden loot, where each piece can hide at one of those points of interest. A history timeline, like an NPC's.</p>
+      <div class="pc-label">How it connects</div>
+      <p>Sits inside a bigger location. Connects to other locations, each connection described in your words. Is controlled by a faction. Can @-mention anything.</p>
+      <div class="pc-label">In the monastery story</div>
+      <p class="ftale">The Hidden Crypt sits inside The Ruined Monastery sits inside The Ashen Vale. A loose flagstone — notice difficulty 15 — hides a tarnished censer your players keep walking past.</p>
+    </div>
+  </details>
+
+  <details class="field-card">
+    <summary><span class="dot" style="background:#8b5cf6"></span><span class="fname">Faction</span><span class="fhint">violet · Sidebar → Factions</span></summary>
+    <div class="fbody">
+      <div class="pc-label">What it holds</div>
+      <p>Name, description, goals, alignment, resources, and influence.</p>
+      <div class="pc-label">How it connects</div>
+      <p>Has members and is led by an NPC. Keeps its headquarters at a location, and controls territory — the locations that name it as their controller. Can @-mention anything. Rivalries with other factions live in your prose, where they belong.</p>
+      <div class="pc-label">In the monastery story</div>
+      <p class="ftale">The Order of the Silent Vigil — goal: keep sealed what the founders buried. Led by Abbot Maren; headquartered at the Ruined Monastery.</p>
+    </div>
+  </details>
+
+  <details class="field-card">
+    <summary><span class="dot" style="background:#0ea5e9"></span><span class="fname">Item</span><span class="fhint">sky · Sidebar → Items</span></summary>
+    <div class="fbody">
+      <div class="pc-label">What it holds</div>
+      <p>Name, description, a rarity from common up to artifact, and properties in your words. Optionally a kind — weapon, armor, potion, scroll, wondrous, tool, or other — plus attunement, weight, and value.</p>
+      <div class="pc-label">How it connects</div>
+      <p>It points at nothing — the rest of the world points at it. Mention it in lore, let a plot involve it, let a secret concern it, and open it to see all of that as backlinks.</p>
+      <div class="pc-label">In the monastery story</div>
+      <p class="ftale">The Reliquary of Ash — very rare; cold to the touch; hums near consecrated ground.</p>
+    </div>
+  </details>
+
+  <details class="field-card">
+    <summary><span class="dot" style="background:#06b6d4"></span><span class="fname">Lorebook Article</span><span class="fhint">cyan · Sidebar → Lorebook</span></summary>
+    <div class="fbody">
+      <div class="pc-label">What it holds</div>
+      <p>Title, a category — lore, history, or cosmology — and the article text itself.</p>
+      <div class="pc-label">How it connects</div>
+      <p>Nests under a parent article, building your encyclopedia's tree. Can reference anything in the campaign, and can @-mention anything in its text.</p>
+      <div class="pc-label">In the monastery story</div>
+      <p class="ftale">"The Vigil's Founding" nests under "A History of the Ashen Vale", and mentions Abbot Maren, the crypt, and the reliquary.</p>
+    </div>
+  </details>
+
+  <details class="field-card">
+    <summary><span class="dot" style="background:#f97316"></span><span class="fname">Adventure</span><span class="fhint">orange · Sidebar → Storylines</span></summary>
+    <div class="fbody">
+      <div class="pc-label">What it holds</div>
+      <p>Title, a hook, a theme, and a level.</p>
+      <div class="pc-label">How it connects</div>
+      <p>Contains its scenes, in order — the one true act of containment in the whole model.</p>
+      <div class="pc-label">In the monastery story</div>
+      <p class="ftale">Whispers Below — hook: pilgrims have gone missing near the ruined monastery. Three scenes: an arrival, a descent, and what sleeps below.</p>
+    </div>
+  </details>
+
+  <details class="field-card">
+    <summary><span class="dot" style="background:#3b82f6"></span><span class="fname">Scene</span><span class="fhint">blue · inside its adventure</span></summary>
+    <div class="fbody">
+      <div class="pc-label">What it holds</div>
+      <p>Title, a kind of moment — combat, social, exploration, or puzzle — and a status: planned, in progress, or completed. Read-aloud text for your players, private GM notes for you, skill checks — each naming the skill, the difficulty, and what it reveals — and rewards.</p>
+      <div class="pc-label">How it connects</div>
+      <p>Takes place at a location and features NPCs. Can @-mention anything. A combat scene is your prep; the live fight is its own thing at the table.</p>
+      <div class="pc-label">In the monastery story</div>
+      <p class="ftale">"What Sleeps in the Crypt" — a combat scene at the Hidden Crypt, featuring Abbot Maren. Read-aloud: "The air below is colder than the stone should allow."</p>
+    </div>
+  </details>
+
+  <details class="field-card">
+    <summary><span class="dot" style="background:#eab308"></span><span class="fname">Plot</span><span class="fhint">yellow · Sidebar → Plots</span></summary>
+    <div class="fbody">
+      <div class="pc-label">What it holds</div>
+      <p>Title, description, and a status — active, dormant, or resolved.</p>
+      <div class="pc-label">How it connects</div>
+      <p>Involves anything in your world — NPCs, locations, factions, items. Each session records how it moved: advanced, stalled, or unchanged. Can @-mention anything.</p>
+      <div class="pc-label">In the monastery story</div>
+      <p class="ftale">"What is the Vigil hiding?" — active. Involves Maren, the crypt, and the reliquary. After Friday: advanced.</p>
+    </div>
+  </details>
+
+  <details class="field-card">
+    <summary><span class="dot hollow"></span><span class="fname">Secret</span><span class="fhint">no accent · Sidebar → Secrets &amp; Clues</span></summary>
+    <div class="fbody">
+      <div class="pc-label">What it holds</div>
+      <p>Title, the secret itself, a category — secret, clue, revelation, or rumor — whether it has been revealed, and your private notes. One type covers all four; no separate machinery for mysteries.</p>
+      <div class="pc-label">How it connects</div>
+      <p>Concerns the people, places, and things it is linked to. When the moment comes you mark it revealed, and it remembers which session revealed it.</p>
+      <div class="pc-label">In the monastery story</div>
+      <p class="ftale">"Maren sealed the crypt himself" — concerns Abbot Maren and the Hidden Crypt. Revealed in Session 3, when the flagstone finally moved.</p>
+    </div>
+  </details>
+
+  <details class="field-card">
+    <summary><span class="dot" style="background:#f43f5e"></span><span class="fname">Session Log</span><span class="fhint">rose · Sidebar → Session Timeline</span></summary>
+    <div class="fbody">
+      <div class="pc-label">What it holds</div>
+      <p>A status — planned, active, or completed — the session date, and when the night actually started. <strong>Before play:</strong> the adventure it draws on, planned scenes, a curated cast of NPCs and locations, and the plot threads in play. <strong>During play:</strong> running notes; a timestamped log whose entries can tag anything and are stamped with what kind of moment they were — a note you typed, a scene change, a fight, a new NPC, a dice roll; a beats checklist of little moments you hope to hit; and the dice rolls themselves. <strong>After play:</strong> the recap, notable events, loose ends, a player-facing recap, how each plot moved, and every archived fight.</p>
+      <div class="pc-label">How it connects</div>
+      <p>Plans scenes, NPCs, and locations. Its running log records events as they happen. Records how each plot moved. Fights are archived into it when the night ends. The Session Prep Wizard builds one; the Session Runner runs it; the Session End Wizard closes it.</p>
+      <div class="pc-label">In the monastery story</div>
+      <p class="ftale">Session 3 — plans the three scenes and casts Maren. The log records "they found the loose flagstone" at 9:42. The crypt fight is archived inside. Plot: advanced. Loose end: nobody asked about the raven.</p>
+    </div>
+  </details>
+
+  <details class="field-card">
+    <summary><span class="dot" style="background:#14b8a6"></span><span class="fname">Player Character</span><span class="fhint">teal · Sidebar → Player Characters</span></summary>
+    <div class="fbody">
+      <div class="pc-label">What it holds</div>
+      <p>The player's name, and the character sheet: background, species, personality, appearance, backstory, ideals, bonds, and flaws; class and level, ability scores, actions, and eighteen skills, each tracked from untrained up to expertise.</p>
+      <div class="pc-label">How it connects</div>
+      <p>It points at nothing — the rest of the world points at it: NPCs keep named relationships with it, and mentions reach it. When combat starts, it steps into the fight as a combatant.</p>
+      <div class="pc-label">In the monastery story</div>
+      <p class="ftale">Serra Duskwalker, played by Kim. Abbot Maren keeps a wary named relationship with her — "she asks the right questions."</p>
+    </div>
+  </details>
+
+  <details class="field-card">
+    <summary><span class="dot" style="background:#64748b"></span><span class="fname">Note</span><span class="fhint">slate · Sidebar → Notes</span></summary>
+    <div class="fbody">
+      <div class="pc-label">What it holds</div>
+      <p>Title, the text, free tags, and when it was created and last edited.</p>
+      <div class="pc-label">How it connects</div>
+      <p>Deliberately connected to nothing, so you can jot without filing. Still taggable, pinnable, and searchable.</p>
+      <div class="pc-label">In the monastery story</div>
+      <p class="ftale">"The players loved the talking raven — bring it back."</p>
+    </div>
+  </details>
+
+  <details class="field-card">
+    <summary><span class="dot hollow"></span><span class="fname">Live combat</span><span class="fhint">no accent · Sidebar → Combat Tracker</span></summary>
+    <div class="fbody">
+      <div class="pc-label">What it holds</div>
+      <p>The round, whose turn it is, and the combatants — each one of your players' characters, an NPC, or a monster, with initiative, hit points, armor class if you track it, and notes for conditions.</p>
+      <div class="pc-label">How it connects</div>
+      <p>Remembers the session and scene it began from. A combat scene is your prep; this is the fight itself, live at the table — and when the session ends, it is archived into that session's log.</p>
+      <div class="pc-label">In the monastery story</div>
+      <p class="ftale">The crypt fight — round three, Serra at the top of the order, Maren at four hit points and still refusing to explain himself.</p>
+    </div>
+  </details>
+</section>
+
+<footer>
+  <p>This walkthrough covers the model as shipped, phrased for storytellers. The engineering counterpart — every field and link in its precise form — lives beside it in the repository at <strong>docs/architecture/semantic-model.html</strong>; the plain-language overview is in <strong>docs/USER_GUIDE.md</strong> under "How a Campaign Fits Together", and the wording contract between all of these surfaces is <strong>docs/design/schema-presentation-guide.md</strong>.</p>
+</footer>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var E = {
+    npc: {
+      name: "NPCs", tier: "The world", dot: "#f59e0b", txt: "var(--t-npc)",
+      accent: "Amber everywhere in the app — dashboards, search, the World Graph.",
+      meet: "Sidebar → NPCs",
+      id: "Everyone your players might meet — allies, villains, shopkeepers, abbots.",
+      s: [
+        "An NPC <em>belongs to</em> a faction — and the faction's member list updates by itself.",
+        "An NPC <em>has named relationships</em> with NPCs and player characters — \"rival\", \"mentor\", \"family\".",
+        "An NPC <em>keeps a history</em> of what has happened to them, session by session.",
+        "An NPC can <em>@-mention</em> anything in its text — and both sides remember it."
+      ],
+      ex: "Abbot Maren <em>belongs to</em> the Order of the Silent Vigil and keeps a wary <em>named relationship</em> with Serra Duskwalker. His history already remembers the night your players first knocked."
+    },
+    location: {
+      name: "Locations", tier: "The world", dot: "#10b981", txt: "var(--t-location)",
+      accent: "Emerald everywhere in the app.",
+      meet: "Sidebar → Locations",
+      id: "The places — from a whole vale down to one loose flagstone.",
+      s: [
+        "A location <em>sits inside</em> a bigger location, as deep as you like.",
+        "A location <em>connects to</em> other locations — each road or hidden stair described in your words.",
+        "A location <em>is controlled by</em> a faction.",
+        "A location <em>holds</em> points of interest and hidden loot, and <em>keeps a history</em> of its own.",
+        "A location can <em>@-mention</em> anything in its text."
+      ],
+      ex: "The Hidden Crypt <em>sits inside</em> The Ruined Monastery, which <em>sits inside</em> The Ashen Vale. The crypt <em>is controlled by</em> the Order, and <em>holds</em> the loose flagstone your players keep walking past."
+    },
+    faction: {
+      name: "Factions", tier: "The world", dot: "#8b5cf6", txt: "var(--t-faction)",
+      accent: "Violet everywhere in the app.",
+      meet: "Sidebar → Factions",
+      id: "Organizations with shared goals — orders, guilds, cults, governments.",
+      s: [
+        "A faction <em>has members</em> and <em>is led by</em> an NPC.",
+        "A faction <em>keeps its headquarters at</em> a location, and <em>controls</em> territory.",
+        "A faction can <em>@-mention</em> anything in its text.",
+        "Rivalries between factions live in your prose — you describe them; the app doesn't force a diagram."
+      ],
+      ex: "The Order of the Silent Vigil <em>is led by</em> Abbot Maren and <em>keeps its headquarters at</em> the Ruined Monastery. Its goal, in one line: keep sealed what the founders buried."
+    },
+    item: {
+      name: "Items", tier: "The world", dot: "#0ea5e9", txt: "var(--t-item)",
+      accent: "Sky blue everywhere in the app.",
+      meet: "Sidebar → Items",
+      id: "Treasures, artifacts, and key props.",
+      s: [
+        "An item points at nothing — <em>the rest of the world points at it</em>.",
+        "Mention it in lore, let a plot <em>involve</em> it, let a secret <em>concern</em> it — then open the item and all of that appears as backlinks."
+      ],
+      ex: "The Reliquary of Ash has no links of its own. But the plot <em>involves</em> it, the secret <em>concerns</em> it, and \"The Vigil's Founding\" <em>mentions</em> it — open the reliquary and the whole web is there."
+    },
+    article: {
+      name: "Lorebook Articles", tier: "The world", dot: "#06b6d4", txt: "var(--t-article)",
+      accent: "Cyan everywhere in the app.",
+      meet: "Sidebar → Lorebook",
+      id: "Your world encyclopedia — lore, history, cosmology.",
+      s: [
+        "An article <em>nests under</em> a parent article, building a tree.",
+        "An article <em>can reference</em> anything else in your campaign.",
+        "An article can <em>@-mention</em> anything in its text."
+      ],
+      ex: "\"The Vigil's Founding\" <em>nests under</em> \"A History of the Ashen Vale\" and <em>mentions</em> Abbot Maren — so his backlinks quietly collect the lore written about him."
+    },
+    adventure: {
+      name: "Adventures", tier: "The story", dot: "#f97316", txt: "var(--t-adventure)",
+      accent: "Orange everywhere in the app.",
+      meet: "Sidebar → Storylines",
+      id: "A story arc with a hook, a theme, and a level.",
+      s: [
+        "An adventure <em>contains</em> an ordered list of scenes — the container between your campaign and a single moment of play."
+      ],
+      ex: "Whispers Below <em>contains</em> three scenes: \"Arrival at the Gate\", \"The Descent\", and \"What Sleeps in the Crypt\"."
+    },
+    scene: {
+      name: "Scenes", tier: "The story", dot: "#3b82f6", txt: "var(--t-scene)",
+      accent: "Blue everywhere in the app.",
+      meet: "Nested under its adventure in the sidebar",
+      id: "Your prep for one moment of play — combat, social, exploration, or puzzle.",
+      s: [
+        "A scene <em>takes place at</em> a location and <em>features</em> NPCs.",
+        "A scene <em>carries</em> read-aloud text, private GM notes, skill checks, and rewards.",
+        "A scene can <em>@-mention</em> anything in its text.",
+        "A combat scene is your prep; the live fight is its own thing at the table."
+      ],
+      ex: "\"What Sleeps in the Crypt\" <em>takes place at</em> the Hidden Crypt and <em>features</em> Abbot Maren. The read-aloud line is ready: \"The air below is colder than the stone should allow.\""
+    },
+    plot: {
+      name: "Plots", tier: "The story", dot: "#eab308", txt: "var(--t-plot)",
+      accent: "Yellow everywhere in the app.",
+      meet: "Sidebar → Plots",
+      id: "An ongoing storyline thread, tracked as active, dormant, or resolved.",
+      s: [
+        "A plot <em>involves</em> anything in your world — NPCs, locations, factions, items.",
+        "Each session <em>records how it moved</em> — advanced, stalled, or unchanged."
+      ],
+      ex: "\"What is the Vigil hiding?\" <em>involves</em> Maren, the crypt, and the reliquary. After Friday, Session 3 records it: advanced."
+    },
+    secret: {
+      name: "Secrets", tier: "The story", dot: null, txt: "var(--ink-strong)",
+      accent: "No accent color, by design — secrets stay unbadged in the app.",
+      meet: "Sidebar → Secrets & Clues",
+      id: "What the players don't know yet — a secret, clue, revelation, or rumor.",
+      s: [
+        "A secret <em>concerns</em> the people, places, and things it is linked to.",
+        "A secret <em>is marked revealed</em> when the moment comes — and <em>remembers which session</em> revealed it."
+      ],
+      ex: "\"Maren sealed the crypt himself\" <em>concerns</em> the abbot and the crypt. When the flagstone finally moves, you mark it revealed — and it remembers Session 3 did it."
+    },
+    session: {
+      name: "Session Logs", tier: "The table", dot: "#f43f5e", txt: "var(--t-session)",
+      accent: "Rose everywhere in the app.",
+      meet: "Sidebar → Session Timeline · built by the Session Prep Wizard, run by the Session Runner",
+      id: "One per game night — plan, live log, and record, all in one place.",
+      s: [
+        "Before play, a session <em>plans</em> the scenes, NPCs, and locations you expect to use.",
+        "During play, its running log <em>records</em> events as they happen.",
+        "After play, it <em>keeps</em> the recap and loose ends, and <em>records how each plot moved</em>.",
+        "A fight <em>is archived into</em> its session's log when the night ends."
+      ],
+      ex: "Session 3 <em>plans</em> the three scenes and casts Maren. Its log <em>records</em> the flagstone at 9:42, the crypt fight <em>is archived into</em> it, and the plot moved: advanced."
+    },
+    pc: {
+      name: "Player Characters", tier: "The table", dot: "#14b8a6", txt: "var(--t-pc)",
+      accent: "Teal everywhere in the app.",
+      meet: "Sidebar → Player Characters",
+      id: "Your players' heroes, imported from a character sheet or entered by hand.",
+      s: [
+        "A player character points at nothing — <em>the rest of the world points at it</em>: NPCs keep <em>named relationships</em> with it, and mentions reach it.",
+        "When combat starts, it steps into the fight as a combatant."
+      ],
+      ex: "Serra Duskwalker never points outward — but Abbot Maren keeps a wary <em>named relationship</em> with her, and on Friday she steps into the crypt fight."
+    },
+    fight: {
+      name: "Live combat", tier: "The table", dot: null, txt: "var(--ink-strong)",
+      accent: "No accent color, by design — the live fight stays unbadged in the app.",
+      meet: "Sidebar → Combat Tracker",
+      id: "Initiative and hit points for the current fight — the minimum a theatre-of-the-mind table needs.",
+      s: [
+        "A combat scene is your prep; the live fight is its own thing at the table.",
+        "The fight remembers the session and scene it began from.",
+        "When the session ends, the fight <em>is archived into</em> that session's log."
+      ],
+      ex: "The crypt fight: round three, Serra at the top of the order, Maren at four hit points and still refusing to explain himself. When the night ends, the whole fight lives on inside Session 3's log."
+    },
+    note: {
+      name: "Notes", tier: "The table", dot: "#64748b", txt: "var(--t-note)",
+      accent: "Slate everywhere in the app.",
+      meet: "Sidebar → Notes",
+      id: "A quick freeform thought, deliberately connected to nothing, so you can jot without filing.",
+      s: [
+        "A note links to nothing and nothing links to it — that's the point.",
+        "It still carries free tags, and it's pinnable and searchable like everything else."
+      ],
+      ex: "\"The players loved the talking raven — bring it back.\" Filed nowhere. Findable anyway."
+    }
+  };
+
+  // Adjacencies not drawn as lines (containment shown by geometry).
+  var EXTRA = { adventure: ["scene"], scene: ["adventure"] };
+
+  var map = document.getElementById("map");
+  var panel = document.getElementById("panel");
+  var chips = Array.prototype.slice.call(document.querySelectorAll(".chip"));
+  var nodes = Array.prototype.slice.call(map.querySelectorAll(".gnode"));
+  var edges = Array.prototype.slice.call(map.querySelectorAll(".edge"));
+  var rail = map.querySelector(".rail");
+  var selected = null;
+
+  function renderPanel(k) {
+    if (!k) {
+      panel.innerHTML = "<p class=\"quiet\">Select any of the twelve above — its connections light up, and this panel explains them.</p>";
+      panel.style.removeProperty("--hl");
+      panel.style.removeProperty("--hlt");
+      return;
+    }
+    var e = E[k];
+    panel.style.setProperty("--hl", e.dot || "var(--muted)");
+    panel.style.setProperty("--hlt", e.txt);
+    var h = "";
+    h += "<div class=\"phead\">";
+    h += "<span class=\"pdot" + (e.dot ? "" : " hollow") + "\"></span>";
+    h += "<h3>" + e.name + "</h3>";
+    h += "<span class=\"ptier\">" + e.tier + "</span>";
+    h += "<span class=\"pmeet\">" + e.meet + "</span>";
+    h += "</div>";
+    h += "<p class=\"pid\">" + e.id + "</p>";
+    h += "<p class=\"paccent\">" + e.accent + "</p>";
+    h += "<div class=\"pcols\">";
+    h += "<div><div class=\"pc-label\">How it reads</div><ul>";
+    for (var i = 0; i < e.s.length; i++) h += "<li>" + e.s[i] + "</li>";
+    h += "</ul></div>";
+    h += "<div><div class=\"pc-label\">In the monastery story</div><p class=\"ptale\">" + e.ex + "</p></div>";
+    h += "</div>";
+    panel.innerHTML = h;
+  }
+
+  function highlight(k) {
+    if (!k) {
+      map.classList.remove("has-sel");
+      map.style.removeProperty("--hl");
+      nodes.forEach(function (n) { n.classList.remove("lit", "sel"); n.setAttribute("aria-pressed", "false"); });
+      edges.forEach(function (g) { g.classList.remove("lit"); });
+      rail.classList.remove("lit");
+      return;
+    }
+    var e = E[k];
+    map.classList.add("has-sel");
+    map.style.setProperty("--hl", e.dot || "var(--muted)");
+    var neighbors = { };
+    neighbors[k] = true;
+    (EXTRA[k] || []).forEach(function (n) { neighbors[n] = true; });
+    edges.forEach(function (g) {
+      var c = g.getAttribute("data-c").split(" ");
+      var hit = c.indexOf(k) !== -1;
+      g.classList.toggle("lit", hit);
+      if (hit) c.forEach(function (n) { neighbors[n] = true; });
+    });
+    nodes.forEach(function (n) {
+      var nk = n.getAttribute("data-k");
+      n.classList.toggle("lit", !!neighbors[nk]);
+      n.classList.toggle("sel", nk === k);
+      n.setAttribute("aria-pressed", nk === k ? "true" : "false");
+    });
+    rail.classList.toggle("lit", !!neighbors.rail);
+  }
+
+  function select(k) {
+    selected = (selected === k) ? null : k;
+    chips.forEach(function (c) {
+      c.setAttribute("aria-pressed", c.getAttribute("data-k") === selected ? "true" : "false");
+    });
+    highlight(selected);
+    renderPanel(selected);
+  }
+
+  chips.forEach(function (c) {
+    c.addEventListener("click", function () { select(c.getAttribute("data-k")); });
+  });
+  nodes.forEach(function (n) {
+    n.addEventListener("click", function () { select(n.getAttribute("data-k")); });
+    n.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter" || ev.key === " " || ev.key === "Spacebar") {
+        ev.preventDefault();
+        select(n.getAttribute("data-k"));
+      }
+    });
+  });
+
+  select("npc");
+})();
+</script>
+</body>
+</html>
