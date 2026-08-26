@@ -16,6 +16,9 @@ as arguments and are safe to call inside `useMemo`.
 | `formReconciliation.ts` | `reconcileEntityFormData(prev, prevSeen, incoming)`. |
 | `popoverPosition.ts` | `calculatePopoverPosition(triggerRect, isExpanded)`, `PopoverPosition`. |
 | `demoTemplates.ts` | `WINTERS_DAUGHTER_SETTING`, `getWintersDaughterTemplate()`. |
+| `storyDerivations.ts` | `getPlayedSessionsInOrder`, `getLastCompletedSession`, `getSessionAppearanceIds`, `getSessionOnStageIds`, `deriveNpcLastAppearances`, `derivePlotThreadAges`, `deriveLoadedGuns`, `formatLastSeenLabel`, `formatThreadAgeLabel` — pure derivations behind the `TonightsTable` view (P1); zero schema change. |
+| `dormantMaterial.ts` | `sampleDormantMaterial` (+ `DormantPiece`) — draws 2–3 dormant pieces (offstage NPC, unspent linked secret, stalled plot, unused planned scene) for the Callback Machine (P2); injectable random source; reuses `storyDerivations`. |
+| `strongStartFormat.ts` | `STRONG_START_OPEN/CLOSE`, `composeStrongStartPrepNotes`, `parseStrongStartPrepNotes` — the zero-schema encoding of a session's strong start inside `prepNotes` (lazy prep path, R1); leaf module shared by `SessionPrepWizard` (write) and `SceneListPanel` (read). |
 
 ## `ENTITY_TYPE_CONFIG` (entityUtils.ts)
 

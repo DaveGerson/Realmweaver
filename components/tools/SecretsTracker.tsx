@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import type { Campaign, Secret } from '@/types/index';
+import type { Campaign, Secret, Scene } from '@/types/index';
 import { Icons } from '@/components/common/Icons';
 import { Button } from '@/components/common/Button';
 import { twMerge } from 'tailwind-merge';
@@ -71,6 +71,21 @@ interface PickableEntity {
   id: string;
   name: string;
   type: string;
+}
+
+/**
+ * R4 "here now" filter: resolves `campaign.activeSceneId` against every scene
+ * of every adventure in the campaign. Returns `undefined` when there is no
+ * active scene id, or it doesn't resolve (stale id, no adventures) — callers
+ * treat that as "the filter control doesn't exist", not "disabled".
+ */
+function findActiveScene(campaign: Campaign): Scene | undefined {
+  if (!campaign.activeSceneId) return undefined;
+  for (const adventure of campaign.adventures || []) {
+    const found = adventure.scenes.find(s => s.id === campaign.activeSceneId);
+    if (found) return found;
+  }
+  return undefined;
 }
 
 /** Builds a flat list of all linkable entities from the campaign. */
@@ -661,10 +676,32 @@ export const SecretsTracker: React.FC<SecretsTrackerProps> = ({
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const [showRevealed, setShowRevealed] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  // R4: "here now" filter — defaults off, and only ever means anything when a
+  // scene is actually live (see `activeScene` below).
+  const [hereNowOnly, setHereNowOnly] = useState(false);
 
   const secrets = campaign.secrets || [];
 
   const allEntities = useMemo(() => buildPickableEntities(campaign), [campaign]);
+
+  // The live scene, resolved across every adventure. `undefined` means the
+  // "here now" control is absent, not merely inactive.
+  const activeScene = useMemo(() => findActiveScene(campaign), [campaign]);
+
+  // A pressed filter must not silently survive into a *different* scene going
+  // live later — reset it whenever the live scene's identity changes.
+  const activeSceneId = activeScene?.id;
+  React.useEffect(() => {
+    setHereNowOnly(false);
+  }, [activeSceneId]);
+
+  // The set of entity ids "in the room": the scene's NPCs plus its location.
+  const hereNowIds = useMemo(() => {
+    if (!activeScene) return null;
+    const ids = new Set<string>(activeScene.npcIds ?? []);
+    if (activeScene.locationId) ids.add(activeScene.locationId);
+    return ids;
+  }, [activeScene]);
 
   // Build a session name lookup for revealed secrets
   const sessionNameMap = useMemo(() => {
@@ -679,9 +716,13 @@ export const SecretsTracker: React.FC<SecretsTrackerProps> = ({
     return secrets.filter(s => {
       if (!showRevealed && s.isRevealed) return false;
       if (categoryFilter !== 'all' && s.category !== categoryFilter) return false;
+      if (hereNowOnly && hereNowIds) {
+        const linked = s.linkedEntityIds ?? [];
+        if (!linked.some(id => hereNowIds.has(id))) return false;
+      }
       return true;
     });
-  }, [secrets, showRevealed, categoryFilter]);
+  }, [secrets, showRevealed, categoryFilter, hereNowOnly, hereNowIds]);
 
   const counts = useMemo(() => {
     const hidden = secrets.filter(s => !s.isRevealed).length;
@@ -746,17 +787,38 @@ export const SecretsTracker: React.FC<SecretsTrackerProps> = ({
           </Button>
         </div>
 
-        {/* Show/hide revealed toggle */}
-        <button
-          onClick={() => setShowRevealed(prev => !prev)}
-          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors mb-2"
-        >
-          {showRevealed
-            ? <Icons.Eye className="w-3 h-3" />
-            : <Icons.EyeOff className="w-3 h-3" />
-          }
-          {showRevealed ? 'Hide revealed' : 'Show revealed'}
-        </button>
+        {/* Show/hide revealed toggle + R4 "here now" scene filter */}
+        <div className="flex items-center gap-3 mb-2">
+          <button
+            onClick={() => setShowRevealed(prev => !prev)}
+            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+          >
+            {showRevealed
+              ? <Icons.Eye className="w-3 h-3" />
+              : <Icons.EyeOff className="w-3 h-3" />
+            }
+            {showRevealed ? 'Hide revealed' : 'Show revealed'}
+          </button>
+
+          {/* Only rendered while a scene is actually live — absent, not
+              disabled, otherwise. Label is constant; state rides aria-pressed. */}
+          {activeScene && (
+            <button
+              onClick={() => setHereNowOnly(prev => !prev)}
+              aria-pressed={hereNowOnly}
+              className={twMerge(
+                'flex items-center gap-1.5 text-xs transition-colors',
+                hereNowOnly
+                  ? 'text-amber-400'
+                  : 'text-slate-500 hover:text-slate-300'
+              )}
+              title="Show only secrets linked to the active scene's NPCs or location"
+            >
+              <Icons.MapPin className="w-3 h-3" />
+              Here now
+            </button>
+          )}
+        </div>
 
         {/* Category filter tabs */}
         <div className="flex flex-wrap gap-1">

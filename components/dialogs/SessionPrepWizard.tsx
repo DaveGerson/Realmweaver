@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo, useCallback } from 'react';
-import type { Campaign, Adventure, Scene, Plot, NPC, Location, SessionLog } from '../../types/index';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
+import type { Campaign, Adventure, Scene, Plot, NPC, Location, SessionLog, Beat, Secret } from '../../types/index';
 import { Icons, SceneIcon } from '../common/Icons';
 import { Button } from '../common/Button';
 import { twMerge } from 'tailwind-merge';
@@ -9,16 +9,33 @@ import { DialogShell } from '../common/DialogShell';
 import { textareaBaseClasses } from '../common/Textarea';
 import { useEntitySearch } from '@/hooks/useEntitySearch';
 
-type WizardStep = 'adventure' | 'scenes' | 'entities' | 'plots' | 'review';
+type WizardStep = 'adventure' | 'scenes' | 'entities' | 'plots' | 'strongStart' | 'beats' | 'secretsCheck' | 'review';
 
+// Standard flow (lazy prep OFF, adventure selected).
 const STEP_ORDER: WizardStep[] = ['adventure', 'scenes', 'entities', 'plots', 'review'];
+// Lazy prep path (docs/design/lazy-dm-lens.md §4 R1): a strong start, a loose
+// list of beats, a glance at the unrevealed secrets, then go. It composes with
+// whatever adventure is selected rather than forking on it — Scenes, NPCs &
+// Locations and Plot Threads simply drop out of the visible flow while their
+// underlying selections (auto-gathered cast/places, auto-selected scenes)
+// keep feeding Go Live and the Secrets Check step untouched.
+const LAZY_STEP_ORDER: WizardStep[] = ['adventure', 'strongStart', 'beats', 'secretsCheck', 'review'];
 const STEP_LABELS: Record<WizardStep, string> = {
     adventure: 'Adventure',
     scenes: 'Scenes',
     entities: 'NPCs & Locations',
     plots: 'Plot Threads',
+    strongStart: 'Strong Start',
+    beats: 'Beats',
+    secretsCheck: 'Secrets Check',
     review: 'Go Live',
 };
+
+// The strong start is persisted with ZERO new schema, as a clearly-delimited
+// leading section of `prepNotes` — the encoding lives in the leaf module
+// `utils/strongStartFormat.ts` so `SceneListPanel` can parse it back without
+// pulling this whole wizard into the Session Runner's chunk.
+import { composeStrongStartPrepNotes } from '@/utils/strongStartFormat';
 
 export interface SessionPrepWizardProps {
     campaign: Campaign;
@@ -36,6 +53,11 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
 
     // ── Step 1: Adventure selection ───────────────────────────────────────────
     const [selectedAdventureId, setSelectedAdventureId] = useState<string | null>(null);
+
+    // Lazy prep path toggle (docs/design/lazy-dm-lens.md §4 R1) — off by default,
+    // sits alongside the adventure choice on step 1. It COMPOSES with the
+    // adventure selection rather than replacing it; see computeStepOrder below.
+    const [lazyPrepOn, setLazyPrepOn] = useState(false);
 
     // ── Step 2: Scene selection ───────────────────────────────────────────────
     const selectedAdventure = useMemo(
@@ -222,6 +244,53 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
         });
     };
 
+    // ── Lazy path: Strong Start ───────────────────────────────────────────────
+    const [strongStart, setStrongStart] = useState('');
+
+    // ── Lazy path: Beats ──────────────────────────────────────────────────────
+    // Local title-only list; turned into real Beat[] (unique ids, isCompleted:
+    // false, trimmed, blanks dropped) at Go Live and attached to the created
+    // SessionLog — the same array components/views/session/SceneListPanel.tsx
+    // already renders and checks off.
+    const [lazyBeats, setLazyBeats] = useState<Array<{ id: string; title: string }>>([]);
+    const [beatDraft, setBeatDraft] = useState('');
+
+    const addLazyBeat = useCallback(() => {
+        const title = beatDraft.trim();
+        if (!title) return;
+        setLazyBeats(prev => [...prev, { id: crypto.randomUUID(), title }]);
+        setBeatDraft('');
+    }, [beatDraft]);
+
+    const updateLazyBeatTitle = useCallback((id: string, title: string) => {
+        setLazyBeats(prev => prev.map(b => (b.id === id ? { ...b, title } : b)));
+    }, []);
+
+    const removeLazyBeat = useCallback((id: string) => {
+        setLazyBeats(prev => prev.filter(b => b.id !== id));
+    }, []);
+
+    // ── Lazy path: Secrets Check ──────────────────────────────────────────────
+    // A read-only glance, not an editor (docs/design/lazy-dm-lens.md §2 step 4).
+    // Narrows to tonight's roster — the same activeNpcIds/activeLocationIds the
+    // standard path already persists as plannedNpcIds/plannedLocationIds — and
+    // falls back to showing everything unrevealed when that roster is empty
+    // (a freeform lazy session, or an adventure whose scenes carry no cast).
+    const unrevealedSecrets = useMemo<Secret[]>(
+        () => (campaign.secrets ?? []).filter(s => !s.isRevealed),
+        [campaign.secrets]
+    );
+
+    const tonightsRoster = useMemo<Set<string>>(
+        () => new Set([...activeNpcIds, ...activeLocationIds]),
+        [activeNpcIds, activeLocationIds]
+    );
+
+    const secretsCheckList = useMemo<Secret[]>(() => {
+        if (tonightsRoster.size === 0) return unrevealedSecrets;
+        return unrevealedSecrets.filter(s => (s.linkedEntityIds ?? []).some(id => tonightsRoster.has(id)));
+    }, [unrevealedSecrets, tonightsRoster]);
+
     // ── Step 5: Review / title ────────────────────────────────────────────────
     const sessionNumber = (campaign.sessionLogs?.length ?? 0) + 1;
     const defaultTitle = selectedAdventure
@@ -234,12 +303,17 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
 
     // ── Navigation ────────────────────────────────────────────────────────────
     const computeStepOrder = useCallback((): WizardStep[] => {
+        // Lazy prep is a modifier, not a fork: it composes with the adventure
+        // choice, so the shortened order applies whether or not one is picked.
+        if (lazyPrepOn) {
+            return LAZY_STEP_ORDER;
+        }
         // If no adventure selected, skip scenes and entities steps
         if (!selectedAdventureId) {
             return ['adventure', 'plots', 'review'];
         }
         return STEP_ORDER;
-    }, [selectedAdventureId]);
+    }, [lazyPrepOn, selectedAdventureId]);
 
     const goNext = useCallback(() => {
         const steps = computeStepOrder();
@@ -275,29 +349,54 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
     // all-removed curation) and falls back to the scene-derived sets only
     // when the fields are absent (`undefined`, for session logs created
     // before the fields existed) so older logs are unaffected.
+    // Guards against a double-click minting two session logs — Go Live is a
+    // one-way door (it also calls campaignService.goLive), so firing it twice
+    // must never create a second session.
+    const hasGoneLiveRef = useRef(false);
+
     const handleGoLive = useCallback(() => {
+        if (hasGoneLiveRef.current) return;
+
+        // Zero new schema: with the lazy path on, the strong start is folded
+        // into prepNotes as a leading delimited section (see
+        // composeStrongStartPrepNotes above); with it off, neither the strong
+        // start nor the beats ship, even if the fields were filled in earlier.
+        const finalPrepNotes = lazyPrepOn
+            ? composeStrongStartPrepNotes(strongStart, prepNotes)
+            : prepNotes.trim();
+        const finalBeats: Beat[] = lazyPrepOn
+            ? lazyBeats
+                .map(b => ({ id: b.id, title: b.title.trim(), isCompleted: false }))
+                .filter(b => b.title.length > 0)
+            : [];
+
         const sessionData: Omit<SessionLog, 'id'> = {
             title: effectiveTitle,
             status: 'planned' as const,
             sessionDate: new Date().toISOString(),
             adventureId: selectedAdventureId ?? undefined,
             plannedSceneIds: Array.from(selectedSceneIds),
-            prepNotes: prepNotes.trim(),
+            prepNotes: finalPrepNotes,
             plannedNpcIds: Array.from(activeNpcIds),
             plannedLocationIds: Array.from(activeLocationIds),
             runningNotes: '',
             structuredNotes: [],
             relatedPlotIds: Array.from(selectedPlotIds),
             encounterLog: [],
+            beats: finalBeats,
             recap: '',
             notableEvents: '',
             looseEnds: '',
         };
 
         const newId = campaignService.createSessionLog(sessionData);
+        // Latch only after the session actually exists: if createSessionLog
+        // throws (storage/Immer), Go Live stays pressable instead of dying
+        // silently until the dialog remounts.
+        hasGoneLiveRef.current = true;
         campaignService.goLive(newId);
         onComplete(newId);
-    }, [effectiveTitle, selectedAdventureId, selectedSceneIds, selectedPlotIds, prepNotes, activeNpcIds, activeLocationIds, onComplete]);
+    }, [effectiveTitle, selectedAdventureId, selectedSceneIds, selectedPlotIds, prepNotes, activeNpcIds, activeLocationIds, lazyPrepOn, strongStart, lazyBeats, onComplete]);
 
     // ── Status badge colour ───────────────────────────────────────────────────
     const sceneStatusBadge = (status: Scene['status']) => {
@@ -380,6 +479,28 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
                                 <p className="text-xs text-slate-400">Choose the adventure this session will follow, or run a freeform session.</p>
                             </div>
 
+                            {/* Lazy prep toggle — composes with whichever adventure choice is made below;
+                                see docs/design/lazy-dm-lens.md §4 R1. */}
+                            <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-700 bg-slate-800/60 p-3">
+                                <div>
+                                    <p className="text-sm font-semibold text-slate-200">Lazy prep</p>
+                                    <p className="text-xs text-slate-500 mt-0.5">Just a strong start, a few beats, and a glance at your secrets.</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setLazyPrepOn(v => !v)}
+                                    aria-pressed={lazyPrepOn}
+                                    className={twMerge(
+                                        'flex-shrink-0 text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-full border transition-colors',
+                                        lazyPrepOn
+                                            ? 'bg-amber-600 text-white border-amber-500'
+                                            : 'bg-slate-800 text-slate-400 border-slate-600 hover:border-slate-500'
+                                    )}
+                                >
+                                    {lazyPrepOn ? 'Lazy prep: on' : 'Lazy prep: off'}
+                                </button>
+                            </div>
+
                             {/* Freeform option */}
                             <button
                                 onClick={() => handleSelectAdventure(null)}
@@ -447,6 +568,126 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
                                     </div>
                                 </button>
                             ))}
+                        </div>
+                    )}
+
+                    {/* ── LAZY STEP: Strong Start ───────────────────────── */}
+                    {currentStep === 'strongStart' && (
+                        <div className="space-y-4">
+                            <div>
+                                <h3 className="text-sm font-bold text-white mb-1">Strong Start</h3>
+                                <p className="text-xs text-slate-400">
+                                    One good opening line covers a multitude of scenes you never got around to prepping.
+                                </p>
+                            </div>
+                            <div>
+                                <label
+                                    htmlFor="strong-start-field"
+                                    className="block text-sm text-slate-300 mb-2"
+                                >
+                                    Write the first thing you'll say when the session starts
+                                </label>
+                                <textarea
+                                    id="strong-start-field"
+                                    value={strongStart}
+                                    onChange={e => setStrongStart(e.target.value)}
+                                    rows={6}
+                                    placeholder={'e.g. "The bell in the drowned chapel starts ringing by itself."'}
+                                    className={`${textareaBaseClasses} w-full px-3 py-2 text-sm`}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── LAZY STEP: Beats ──────────────────────────────── */}
+                    {currentStep === 'beats' && (
+                        <div className="space-y-4">
+                            <div>
+                                <h3 className="text-sm font-bold text-white mb-1">Beats</h3>
+                                <p className="text-xs text-slate-400">
+                                    A loose list of scenes you might hit tonight — not a script. Check them off or drop them live in the Session Runner.
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                {lazyBeats.map((beat, idx) => (
+                                    <div key={beat.id} className="flex items-center gap-2">
+                                        <span className="text-xs text-slate-600 font-mono w-5 flex-shrink-0">{idx + 1}</span>
+                                        <input
+                                            type="text"
+                                            value={beat.title}
+                                            onChange={e => updateLazyBeatTitle(beat.id, e.target.value)}
+                                            aria-label={`Beat ${idx + 1}`}
+                                            className="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded-md px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                                        />
+                                        <Button
+                                            variant="icon"
+                                            onClick={() => removeLazyBeat(beat.id)}
+                                            aria-label={`Remove beat ${idx + 1}`}
+                                            title={`Remove beat ${idx + 1}`}
+                                            className="text-slate-500 hover:text-red-400 flex-shrink-0"
+                                        >
+                                            <Icons.X className="w-3.5 h-3.5" />
+                                        </Button>
+                                    </div>
+                                ))}
+                                {lazyBeats.length === 0 && (
+                                    <p className="text-xs text-slate-600 italic">No beats yet — add one below.</p>
+                                )}
+                            </div>
+
+                            <div className="flex gap-2">
+                                <label htmlFor="add-beat-field" className="sr-only">Add a beat</label>
+                                <input
+                                    id="add-beat-field"
+                                    type="text"
+                                    value={beatDraft}
+                                    onChange={e => setBeatDraft(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') addLazyBeat(); }}
+                                    placeholder="Add a beat..."
+                                    className="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                                />
+                                <Button
+                                    variant="secondary"
+                                    onClick={addLazyBeat}
+                                    disabled={!beatDraft.trim()}
+                                    className="flex-shrink-0"
+                                    title="Add beat"
+                                >
+                                    <Icons.Plus className="w-4 h-4 mr-1" />
+                                    Add beat
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── LAZY STEP: Secrets Check ──────────────────────── */}
+                    {currentStep === 'secretsCheck' && (
+                        <div className="space-y-4">
+                            <div>
+                                <h3 className="text-sm font-bold text-white mb-1">Secrets Check</h3>
+                                <p className="text-xs text-slate-400">
+                                    A last glance at what's still unrevealed before the table sits down. Nothing here can be edited — open the Secrets & Clues Tracker for that.
+                                </p>
+                            </div>
+
+                            {secretsCheckList.length === 0 ? (
+                                <div className="text-center py-8 bg-slate-800/40 rounded-lg border border-dashed border-slate-700">
+                                    <Icons.Eye className="w-7 h-7 text-slate-600 mx-auto mb-2" />
+                                    <p className="text-sm text-slate-500">No secrets to glance at right now.</p>
+                                </div>
+                            ) : (
+                                <ul className="space-y-2">
+                                    {secretsCheckList.map(secret => (
+                                        <li key={secret.id} className="bg-slate-800 border border-slate-700 rounded-lg p-3">
+                                            <p className="text-sm font-medium text-slate-200">{secret.title}</p>
+                                            {secret.content && (
+                                                <p className="text-xs text-slate-500 mt-0.5">{secret.content}</p>
+                                            )}
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
                         </div>
                     )}
 
@@ -815,8 +1056,9 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
 
                             {/* Title input */}
                             <div>
-                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Session Title</label>
+                                <label htmlFor="session-title-field" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Session Title</label>
                                 <input
+                                    id="session-title-field"
                                     type="text"
                                     value={sessionTitle}
                                     onChange={e => setSessionTitle(e.target.value)}
@@ -898,10 +1140,11 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
 
                             {/* Prep Notes */}
                             <div>
-                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                                <label htmlFor="prep-notes-field" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
                                     Prep Notes <span className="font-normal text-slate-600 normal-case tracking-normal">(optional)</span>
                                 </label>
                                 <textarea
+                                    id="prep-notes-field"
                                     value={prepNotes}
                                     onChange={e => setPrepNotes(e.target.value)}
                                     rows={4}

@@ -2,6 +2,7 @@
 import type { NPC, Location, Faction, RollableTable, Item, Scene, SceneType, AdventureForBatchAdd, Article, PointOfInterest, PlayerCharacter, RealmChatResponse, ChatMessage, DraftEntity, ModelTier, Campaign } from '../../types/index';
 import type { BatchAddData } from '../../types/index';
 import type { WorldEvent } from './worldSimulation';
+import type { CallbackComplicationRequest } from './dmCoach';
 import type { AudioTranscriptionConfig, AudioTranscriptionSession } from './audioTranscription';
 
 // --- Mock Data ---
@@ -228,6 +229,20 @@ export const generateImprovisation = async (prompt: string, campaignContext?: st
     logContext(campaignContext);
     await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
     return Promise.resolve(`This is a mock improvisation for: "${prompt}". The captain is shocked. The other guards draw their swords. A crowd begins to form, some gasping, others looking for an opportunity.`);
+}
+
+/** P2 — the Callback Machine's mock counterpart. Same empty-material rejection as the real path. */
+export const generateCallbackComplication = async (request: CallbackComplicationRequest): Promise<string> => {
+    const material = request?.material ?? [];
+    if (material.length === 0) {
+        throw new Error(
+            'generateCallbackComplication needs at least one piece of dormant material to reincorporate; the sample was empty.'
+        );
+    }
+    const names = material.map((piece) => piece.label).join(', ');
+    console.log(`[MOCK MODE] Called generateCallbackComplication with material: ${names}`);
+    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    return `This is a mock complication reincorporating ${names}: it ties them back into the current scene.`;
 }
 
 export const generateRollableTable = async (prompt: string, campaignContext?: string, useLiteModel: boolean = false, isMockMode: boolean = true): Promise<RollableTable> => {

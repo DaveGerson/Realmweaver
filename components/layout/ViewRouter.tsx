@@ -33,6 +33,7 @@ import { CampaignSettingEditor } from '@/components/editors/CampaignSettingEdito
 import { CombatTracker } from '@/components/tools/CombatTracker';
 import { SecretsTracker } from '@/components/tools/SecretsTracker';
 import { Icons } from '@/components/common/Icons';
+import { TonightsTable } from '@/components/views/TonightsTable';
 
 // Lazy-loaded RelationshipGraph — pulls in D3
 const RelationshipGraph = React.lazy(() => import('@/components/visualizers/RelationshipGraph').then(m => ({ default: m.RelationshipGraph })));
@@ -150,6 +151,13 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
         />
       );
     }
+  }
+
+  // Tonight's Table — the story-first campaign home. Sits below the live
+  // Session Runner (which always wins, above) and above every editor branch
+  // (nothing is selected when a GM navigates here via the sidebar).
+  if (activeView === 'tonight') {
+    return <TonightsTable campaign={campaign} onNavigate={onNavigate} onGoLive={onGoLive} />;
   }
 
   // Render Generators

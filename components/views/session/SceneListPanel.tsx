@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import type { Campaign, SessionLog, Scene, Beat } from '@/types';
 import { Icons } from '@/components/common/Icons';
 import { Button } from '@/components/common/Button';
@@ -7,6 +7,11 @@ import { twMerge } from 'tailwind-merge';
 import { campaignService } from '@/services/campaignService';
 import { EntityLink } from '@/components/common/EntityLink';
 import type { QuickCardEntityType } from '@/components/common/EntityQuickCard';
+// Strong start (docs/design/lazy-dm-lens.md §4 R1) is zero-new-schema: it is
+// written by the Session Prep Wizard as a leading delimited section of
+// `prepNotes`. Reuse the wizard's own encoder/decoder so the write side and
+// this, the read side, can never drift apart.
+import { parseStrongStartPrepNotes } from '@/utils/strongStartFormat';
 
 interface SceneListPanelProps {
     plannedScenes: Scene[];
@@ -46,12 +51,30 @@ export const SceneListPanel: React.FC<SceneListPanelProps> = ({
         setBeatInput('');
     }, [beatInput]);
 
+    // A strong start written at prep time is the first thing the DM says, so it
+    // is the first thing on this screen — surfaced above Scenes, never hunted
+    // for. Parsing is defensive by construction: anything that isn't exactly
+    // the wizard's delimited block is left as ordinary (unrendered-here) prep
+    // notes, never partially displayed.
+    const { strongStart } = useMemo(
+        () => parseStrongStartPrepNotes(sessionLog.prepNotes),
+        [sessionLog.prepNotes]
+    );
+
     return (
         <div className={twMerge(
             "flex-shrink-0 bg-slate-900 border-r border-slate-800 overflow-y-auto p-3",
             "w-full md:w-56",
             mobileTab === 'scenes' ? "flex flex-col md:flex" : "hidden md:flex md:flex-col"
         )}>
+            {strongStart && (
+                <div className="mb-4 pb-4 border-b border-slate-800">
+                    <h2 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <Icons.Zap className="w-3.5 h-3.5" /> Strong Start
+                    </h2>
+                    <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{strongStart}</p>
+                </div>
+            )}
             <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Scenes</h2>
             <div className="space-y-1">
                 {plannedScenes.map((scene) => {

@@ -22,6 +22,7 @@ RealmWeaver is a single-page application for tabletop RPG Game Masters who want 
 | Category | Features |
 |----------|---------|
 | **World Building** | AI-generated NPCs, locations, factions, items, adventures, articles, plots. Campaign context injected into every generation for consistency. |
+| **Tonight's Table** | Story-first campaign home — previously-on recap, open threads, who's been offstage, and loaded guns (unrevealed secrets in play), derived from existing data with zero clicks. |
 | **Session Management** | Session Prep Wizard (5-step guided flow), Session Runner with scene advancement, running log, beats mode, voice capture, auto-event capture. |
 | **In-Session Tools** | DM Coach (narrate, improvise, rollable tables, NPC roleplay), Combat Tracker, Dice Roller, Secrets & Clues Tracker. |
 | **Navigation** | Entity cross-linking with hover tooltips (EntityQuickCard), backlinks ("Referenced By"), back stack, recent items, pinned favorites, command palette (Ctrl+K). |

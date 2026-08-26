@@ -33,7 +33,7 @@ import { useModalState } from '@/hooks/useModalState';
 import { useEntitySelection } from '@/hooks/useEntitySelection';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 
-export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'notes' | 'combat' | 'relationships' | 'session-runner' | 'secrets';
+export type EditorView = 'tonight' | 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'notes' | 'combat' | 'relationships' | 'session-runner' | 'secrets';
 export type GeneratorType = 'npc' | 'location' | 'faction' | 'item' | 'scene' | 'article';
 
 export interface NavStackEntry {

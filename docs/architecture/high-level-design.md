@@ -199,6 +199,8 @@ Every `deleteX()` does two things: type-specific relationship unwinding, plus a 
 | First Campaign Wizard | `views/FirstCampaignWizard.tsx` | `aiService` -> `ai/evocationWizard` |
 | Campaign Templates | `views/CampaignCreator.tsx` | `data/templates/` |
 | Cross-Campaign | `views/CrossCampaignDashboard.tsx` (with search/filter) | `campaignService` |
+| Tonight's Table | `views/TonightsTable.tsx` (story-first campaign home: previously on, open threads, offstage cast, loaded guns) | `utils/storyDerivations.ts` |
+| Callback Machine | `views/session/QuickToolsPanel.tsx` ("Complicate This" — zero-prompt reincorporation of dormant campaign material, logged as a `coach-used` entry) | `utils/dormantMaterial.ts` (over `storyDerivations`) -> `aiService.generateCallbackComplication` -> `ai/dmCoach` |
 | DM Style Settings | `common/DmStylePanel.tsx` | `utils/dmStyleUtils` |
 
 ---

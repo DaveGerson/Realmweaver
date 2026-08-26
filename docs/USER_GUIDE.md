@@ -247,7 +247,6 @@ An **Adventure** is a folder containing an ordered sequence of **Scenes**. Creat
 - **GM Notes** — private notes on goals, motivations, and outcomes
 - **Skill Checks** — relevant checks and DCs
 - **Rewards** — loot, gold, or story payoffs
-- **Beat Tracking** — mark which beats have been hit during play
 
 Drag and drop scenes in the sidebar to reorder them. Open an adventure and click the **Prep Document** tab to compile the entire adventure into a clean, printable markdown document that includes linked NPCs, locations, and scenes.
 
@@ -269,6 +268,17 @@ The Lorebook is your campaign encyclopedia. Articles are ideal for historical ev
 
 ## Session Prep
 
+### Tonight's Table
+
+**Tonight's Table** sits at the top of the sidebar and answers one question: what matters tonight. It reads what you have already written, so there is nothing to keep up to date.
+
+- **Previously on** — the recap and loose ends from your last completed session, in the words you wrote them.
+- **Open threads** — your active plot threads, stalest first, each labelled with how many sessions have passed since one moved it forward. A thread nobody has touched in four sessions sits at the top.
+- **Who's been offstage** — your cast ranked by how long since the table saw them. An NPC counts as on stage when the running log tags them, when a session plans them, or when a planned scene features them.
+- **Loaded guns** — secrets you have not revealed yet that concern someone or somewhere the next session already plans to visit, or that was on stage last time.
+
+One button, **Prep tonight's session**, opens the Session Prep Wizard from here. Click any thread or name to go straight to it.
+
 ### Session Prep Wizard
 
 Open the **Session Weaver** from the header (or start a session directly from a Session Log). The wizard walks you through five steps:
@@ -280,6 +290,8 @@ Open the **Session Weaver** from the header (or start a session directly from a 
 5. **Go Live** — set a session title and write optional prep notes, then launch the Session Runner
 
 If no adventure is selected, the scenes and entities steps are skipped automatically.
+
+Would rather prep light? Toggle **Lazy prep** on the first step and the wizard trades those middle steps for three quick moves: write a strong start — the first thing you'll say when the session starts — list a few beats for what might happen, and take a glance at your still-unrevealed secrets. It works alongside whichever adventure you picked, so the cast and places you would have gathered anyway are still there for that glance, then you go live the same way.
 
 ### Preparing Without the Wizard
 
@@ -304,6 +316,10 @@ The Session Runner is a three-column live-game interface:
 - **Right column — Quick Tools** — DM Coach shortcut, dice roller, Secrets Tracker, plot status cycling, and Quick NPC Generator
 
 On mobile, the three columns collapse into tabs you can swipe between, and a floating **Quick Tools** button appears in the bottom-right corner with shortcuts to DM Coach, the Dice Roller, and — when your DM Style mode shows them — the Combat Tracker and Secrets & Clues. The menu is fully keyboard-operable: opening it moves focus to the first item, Up/Down arrows move between items, and Escape closes it and returns focus to the button.
+
+### Beats
+
+Beats are a loose checklist that belongs to the session as a whole, not to any single scene — quick one-line prompts for what might happen tonight rather than a fully worked-out plan. List a few from the Session Prep Wizard before the table sits down, or add one straight from the Scene List panel while you play. Check one off when it lands, edit the wording if the story bends, or remove it if you never got to it — nothing here is locked in, so jot down more than you expect to use.
 
 ### Running Log
 

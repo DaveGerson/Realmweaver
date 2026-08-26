@@ -85,7 +85,7 @@ Realmweaver/
 │   │                  SceneSmartLinkBar
 │   ├── layout/      # Header, CampaignSidebar, ContentWrapper, ViewRouter,
 │   │                  StatusBanners (ConflictBanner + BackupRecoveryBanner) + sidebar/
-│   ├── views/       # WelcomeScreen, CampaignCreator, FirstCampaignWizard,
+│   ├── views/       # TonightsTable, WelcomeScreen, CampaignCreator, FirstCampaignWizard,
 │   │                  CrossCampaignDashboard, SessionRunner + session/ sub-components
 │   ├── dashboards/  # One per entity type (NPC, Location, Faction, Item, Adventure, Article, etc.)
 │   ├── generators/  # AI creation forms per entity type + EntityChatGenerator
@@ -111,7 +111,8 @@ Realmweaver/
 ├── types/           # One file per entity, barrel export via index.ts
 ├── utils/           # entityUtils.ts (factories + ENTITY_TYPE_CONFIG), backlinkUtils,
 │                      dmStyleUtils, entityFieldSave, formReconciliation, demoTemplates,
-│                      diceUtils, keyboardShortcuts, popoverPosition, entityDetailExtractors
+│                      diceUtils, keyboardShortcuts, popoverPosition, entityDetailExtractors,
+│                      storyDerivations (Tonight's Table panel derivations)
 ├── tests/           # Vitest — top-level suites + components/, services/, helpers/,
 │                      and ship/ (the ship-readiness regression suite, wp-*.test.ts[x])
 └── e2e/             # Playwright specs (port 4200 is hardcoded in playwright.config.ts)
@@ -234,7 +235,7 @@ Lifecycle methods: `init`, `destroy`, `saveCampaign`, `flushPendingSave`, `resol
 
 Defined in `App.tsx`. New views need entries in BOTH `App.tsx` and `ViewRouter.tsx`:
 ```typescript
-export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' |
+export type EditorView = 'tonight' | 'setting' | 'npcs' | 'locations' | 'factions' | 'items' |
   'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'notes' |
   'combat' | 'relationships' | 'session-runner' | 'secrets';
 ```
@@ -316,7 +317,7 @@ sessionLog=rose, playerCharacter=teal, plot=yellow, note=slate, **scene=blue**
 ```typescript
 import { buildCampaignContext } from '@/services/contextBuilder';
 const ctx = buildCampaignContext({
-  variant: 'generation',        // 'generation' | 'coach' | 'chat'
+  variant: 'generation',        // 'generation' | 'coach' | 'chat' | 'player-safe'
   campaign,
   maxTokenEstimate: 4000,       // default 4000 (≈16 000 chars)
   // optional: activeSceneId, activeSessionId, focusEntityId, focusEntityType, focusSelection

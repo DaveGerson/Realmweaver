@@ -53,6 +53,35 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
     const [looseEnds, setLooseEnds] = useState(sessionLog.looseEnds || '');
     const [manualLooseEnd, setManualLooseEnd] = useState('');
 
+    // R5: unfinished beats carried forward into loose ends. Blank/whitespace
+    // titles never count as "something to carry" and never get appended.
+    const incompleteBeats = useMemo(
+        () => (sessionLog.beats || []).filter(b => !b.isCompleted && b.title.trim() !== ''),
+        [sessionLog.beats]
+    );
+
+    // One click, idempotent: dedupe against whatever the loose-ends text
+    // already has (a prior click, the saved value, or the DM's own typing),
+    // matched by trimmed line — never against raw string identity.
+    const handleCarryForwardBeats = useCallback(() => {
+        if (incompleteBeats.length === 0) return;
+        setLooseEnds(prev => {
+            const existingTrimmed = new Set(prev.split('\n').map(l => l.trim()));
+            const seenThisClick = new Set<string>();
+            const toAdd: string[] = [];
+            incompleteBeats.forEach(b => {
+                const title = b.title.trim();
+                if (existingTrimmed.has(title) || seenThisClick.has(title)) return;
+                seenThisClick.add(title);
+                toAdd.push(title);
+            });
+            if (toAdd.length === 0) return prev;
+            // Absorb a trailing newline instead of doubling it into a blank line.
+            const base = prev.replace(/\n+$/, '');
+            return base ? `${base}\n${toAdd.join('\n')}` : toAdd.join('\n');
+        });
+    }, [incompleteBeats]);
+
     // Player-facing recap state
     // Finding #25 regression fix: seed from the previously saved value, like
     // its `recap`/`looseEnds` siblings, so re-opening the wizard on a log that
@@ -87,11 +116,21 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
         setGenerateError(null);
         try {
             const campaignContext = `Campaign: ${campaign.title}\nSetting: ${campaign.setting}`;
+            // E3: the player-facing half of the recap is generated against a
+            // separately-derived player-safe context (never the GM
+            // `campaignContext` above) so unrevealed secrets, GM notes and
+            // hidden NPC motivations can't leak into the text the DM shares
+            // with the party. See tests/services/dmCoach.playerSafeRecap.test.ts.
             const result = await generateSessionRecap(
                 sessionNotesText || sessionLog.runningNotes || 'No notes recorded.',
                 plotSummariesText,
                 campaignContext,
                 isMockMode,
+                {
+                    campaign,
+                    activeSceneId: campaign.activeSceneId,
+                    activeSessionId: campaign.activeSessionId,
+                },
             );
             setRecap(result.recap);
             setAiLooseEnds(result.looseEnds);
@@ -351,6 +390,15 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
                                 <h3 className="text-sm font-bold text-white mb-1">Loose Ends</h3>
                                 <p className="text-xs text-slate-400">Unresolved threads and hooks for future sessions.</p>
                             </div>
+
+                            {/* R5: carry forward beats left unchecked at the table. Purely
+                                additive — absent entirely when there's nothing to carry. */}
+                            {incompleteBeats.length > 0 && (
+                                <Button onClick={handleCarryForwardBeats} variant="secondary" size="sm">
+                                    <Icons.List className="w-3 h-3 mr-1.5" />
+                                    Add {incompleteBeats.length} unfinished beat{incompleteBeats.length !== 1 ? 's' : ''} to loose ends
+                                </Button>
+                            )}
 
                             {aiLooseEnds.length > 0 && (
                                 <div className="bg-amber-900/10 border border-amber-800/30 rounded-lg p-3">

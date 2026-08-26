@@ -6,6 +6,12 @@ import type { AudioTranscriptionConfig, AudioTranscriptionSession } from './ai/a
 
 import * as aiRealmWeaver from './ai/realmWeaver';
 import * as aiDmCoach from './ai/dmCoach';
+// Re-exported so callers can build the E3 player-safe recap context without
+// reaching past this facade (CLAUDE.md) — see `generateSessionRecap` below.
+export type { PlayerSafeRecapContext } from './ai/dmCoach';
+// P2 (Callback Machine): callers assemble the request shape, so the facade
+// re-exports it rather than making them reach into `services/ai/*`.
+export type { CallbackComplicationRequest } from './ai/dmCoach';
 import * as aiEvocationWizard from './ai/evocationWizard';
 import * as aiRealmChat from './ai/realmChat';
 import * as aiWorldSimulation from './ai/worldSimulation';
@@ -83,6 +89,22 @@ export const generateImprovisation = (prompt: string, campaignContext?: string, 
         return mockService.generateImprovisation(prompt, campaignContext, useLiteModel, isMockMode);
     }
     return aiDmCoach.generateImprovisation(prompt, campaignContext, useLiteModel);
+};
+
+/**
+ * P2 — the Callback Machine. Zero-prompt: the caller samples dormant campaign
+ * material and hands it over with a coach-variant context; the DM types
+ * nothing. GM-facing only — the result belongs in the running log, never in a
+ * player-facing recap.
+ */
+export const generateCallbackComplication = (
+    request: aiDmCoach.CallbackComplicationRequest,
+    isMockMode: boolean = false
+): Promise<string> => {
+    if (isMockMode) {
+        return mockService.generateCallbackComplication(request);
+    }
+    return aiDmCoach.generateCallbackComplication(request);
 };
 
 export const generateRollableTable = (prompt: string, campaignContext?: string, useLiteModel: boolean = false, isMockMode: boolean = false): Promise<RollableTable> => {
@@ -173,12 +195,17 @@ export const generateSessionRecap = (
     sessionNotes: string,
     plotSummaries: string,
     campaignContext?: string,
-    isMockMode: boolean = false
+    isMockMode: boolean = false,
+    // E3: when supplied, dmCoach derives the player-facing half's context via
+    // buildCampaignContext({ variant: 'player-safe', ... }) internally — see
+    // tests/services/dmCoach.playerSafeRecap.test.ts. Ignored in mock mode
+    // (the mock response is canned and never touches campaign context).
+    playerSafe?: aiDmCoach.PlayerSafeRecapContext
 ): Promise<{ recap: string; looseEnds: string[]; playerFacingRecap: string }> => {
     if (isMockMode) {
         return mockService.generateSessionRecap(sessionNotes, plotSummaries, campaignContext);
     }
-    return aiDmCoach.generateSessionRecap(sessionNotes, plotSummaries, campaignContext);
+    return aiDmCoach.generateSessionRecap(sessionNotes, plotSummaries, campaignContext, playerSafe);
 };
 
 export const generateStarterNpcs = (

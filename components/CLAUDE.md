@@ -11,7 +11,7 @@ Every React component in the app. Hooks live in `hooks/` (see `hooks/CLAUDE.md`)
 | `editors/` | Detail views. Tabbed, inline AI-assist, per-field store writes. |
 | `layout/` | `Header`, `CampaignSidebar` (+ `sidebar/`), `ContentWrapper`, `ViewRouter`, `StatusBanners`. |
 | `dialogs/` | Multi-step / long-running modals: `DmCoach`, `EvocationWizard`, `WorldSimulationWizard`, `ContinuityChecker`, `SessionPrepWizard`, `SessionEndWizard`, `ExportModal`. |
-| `views/` | Top-level screens: `WelcomeScreen`, `CampaignCreator`, `FirstCampaignWizard`, `CrossCampaignDashboard`, `SessionRunner` (+ `session/`). |
+| `views/` | Top-level screens: `TonightsTable`, `WelcomeScreen`, `CampaignCreator`, `FirstCampaignWizard`, `CrossCampaignDashboard`, `SessionRunner` (+ `session/` — `QuickToolsPanel` hosts the Callback Machine's zero-prompt "Complicate This" flow). |
 | `tools/` | `CombatTracker`, `DiceRoller`, `SecretsTracker`. |
 | `visualizers/` | `RelationshipGraph`, `PlotTimeline` — heavy dep (D3); `RelationshipGraph` is `React.lazy`-loaded from `ViewRouter`. |
 | `RealmChat/` | `RealmChatWidget` — the only place indigo is allowed. |

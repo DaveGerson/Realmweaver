@@ -105,7 +105,12 @@ UI. `importCampaignFromJson` is the throw-on-error wrapper. `exportCampaignAsJso
 
 `buildCampaignContext({ variant, campaign, activeSceneId, activeSessionId, maxTokenEstimate, focusEntityId,
 focusEntityType, focusSelection })` — an **options object**, not positional args. `maxTokenEstimate` defaults to
-4000, converted at 1 token ≈ 4 chars. Tier 1 (identity, setting, `styleProfile`, active session/scene) always tries
+4000, converted at 1 token ≈ 4 chars. `variant` is `'generation' | 'coach' | 'chat' | 'player-safe'` — the last
+one (ontology element **E3**) is the player-facing build: it emits no GM-authored private prose (`NPC.secrets`,
+`Location.secrets`, `Scene.gmNotes`, session prep/running notes, the plot-threads section) and no unrevealed
+`Secret`, while `'generation'` / `'coach'` gain a Tier-2 GM-ONLY section of unrevealed secrets linked to the active
+scene's entities. Revealed secrets appear as established party knowledge in all three; `'chat'` gains neither
+section. Tier 1 (identity, setting, `styleProfile`, active session/scene) always tries
 first; Tier 2 adds scene participants, active location, plots, focus entity, and — `coach` only — the active
 encounter; Tier 3 fills the remainder with roster overviews (skipped for `coach`). Lists fill **entry-by-entry**
 (`tryAddList` / `tryAddJoined`, with an "…and N more" marker), and each Tier-3 section takes a fair share via
