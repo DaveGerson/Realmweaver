@@ -144,6 +144,7 @@ All code at **project root** (no `src/` directory). Import alias `@/` maps to ro
 | [`docs/design/dm-archetypes.md`](docs/design/dm-archetypes.md) | 5 DM personas driving feature prioritization |
 | [`docs/design/schema-presentation-guide.md`](docs/design/schema-presentation-guide.md) | Style guide for presenting the data model to DMs — the consistency contract across docs, the walkthrough, and future in-app help |
 | [`docs/design/storyteller-first-design.md`](docs/design/storyteller-first-design.md) | Proposed storyteller-first elements (P1–P8): story-first home, improv support, story health, campaign endings |
+| [`docs/design/lazy-dm-lens.md`](docs/design/lazy-dm-lens.md) | The Lazy DM analysis: Shea's and Monte Cook's prep schools mapped onto the shipped app, P1–P8 re-ranked through that lens, and five "lazy mode" refinements (R1–R5) |
 | [`docs/design/session-cockpit-review.md`](docs/design/session-cockpit-review.md) | 67 user stories and priority matrix |
 | [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) | End-user guide |
 | [`CLAUDE.md`](CLAUDE.md) | Developer conventions for AI-assisted development (plus per-directory `CLAUDE.md` files) |
