@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { reconcileEntityFormData } from '../../utils/formReconciliation';
-import type { SessionLog, SessionLogEntry, Campaign } from '../../types';
+import type { SessionLog, SessionLogEntry, SessionLogEntryType, Campaign } from '../../types';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useToast } from '@/hooks/useToast';
 import { Icons, SceneIcon } from '../common/Icons';
@@ -16,6 +16,9 @@ import { twMerge } from 'tailwind-merge';
 import type { AudioTranscriptionSession } from '../../services/aiService';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
 import { BacklinksPanel } from '../common/BacklinksPanel';
+import { CanonCapturePicker } from '../common/CanonCapturePicker';
+import { buildCanonDraft } from '../../utils/canonCapture';
+import type { CanonEntityKind } from '../../utils/canonCapture';
 
 interface SessionLogEditorProps {
   log: SessionLog;
@@ -58,6 +61,9 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
   const [newNoteContent, setNewNoteContent] = useState('');
   const [newNoteTags, setNewNoteTags] = useState<string[]>([]);
   const [hasCopiedPrepSheet, setHasCopiedPrepSheet] = useState(false);
+  // "Make this canon" (Monte Cook's improv-canon-capture posture): tracks
+  // which structured note (if any) currently has its inline picker open.
+  const [canonNoteId, setCanonNoteId] = useState<string | null>(null);
   const { confirm } = useConfirmDialog();
   const { addToast } = useToast();
 
@@ -141,6 +147,7 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
     setActiveTab('structured');
     setNewNoteContent('');
     setNewNoteTags([]);
+    setCanonNoteId(null);
     if (audioSessionRef.current) {
       audioSessionRef.current.stop().catch(e => {
         console.error('Error stopping audio session on log switch', e);
@@ -373,6 +380,59 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
       const updatedNotes = (formData.structuredNotes || []).filter(n => n.id !== noteId);
       setFormData(prev => ({...prev, structuredNotes: updatedNotes}));
       onUpdate(log.id, { structuredNotes: updatedNotes });
+      setCanonNoteId(prev => (prev === noteId ? null : prev));
+  }
+
+  /**
+   * Monte Cook's "improv canon capture" — the post-hoc twin of RunningLog's
+   * live "Make this canon": promotes a structured note into a real
+   * NPC/Location/Item/Note when reviewing a session afterwards. No scene
+   * linking and no Stage placement here (both are live-session-only
+   * concepts), matching QuickNpcGenerator's own auto-log convention for the
+   * write itself.
+   */
+  const handleMakeCanon = (noteContent: string, kind: CanonEntityKind, name: string) => {
+      const trimmedName = name.trim();
+      if (!trimmedName) return;
+
+      // Promotion notes are AUTO entries (`npc-created` / `entity-created`),
+      // never `manual` — a manual note is offered "Make this canon" again,
+      // and a promotion record must not be re-promotable.
+      let promotionType: SessionLogEntryType = 'entity-created';
+      let promotionContent: string;
+      if (kind === 'npc') {
+          campaignService.createNpc({ ...buildCanonDraft('npc', noteContent), name: trimmedName });
+          promotionType = 'npc-created';
+          promotionContent = `NPC created: ${trimmedName}`;
+      } else if (kind === 'location') {
+          campaignService.createLocation({ ...buildCanonDraft('location', noteContent), name: trimmedName });
+          promotionContent = `Location created: ${trimmedName}`;
+      } else if (kind === 'item') {
+          campaignService.createItem({ ...buildCanonDraft('item', noteContent), name: trimmedName });
+          promotionContent = `Item created: ${trimmedName}`;
+      } else {
+          campaignService.createNote({ ...buildCanonDraft('note', noteContent), title: trimmedName });
+          promotionContent = `Note created: ${trimmedName}`;
+      }
+
+      // The promotion is recorded in THIS log — the one being reviewed — through
+      // the editor's own update path, exactly like a note edit or delete.
+      // `campaignService.addAutoEvent` would target whichever session is live
+      // right now, which for a past session is either nothing or the wrong log.
+      const promotionEntry: SessionLogEntry = {
+          id: crypto.randomUUID(),
+          timestamp: new Date().toISOString(),
+          content: promotionContent,
+          taggedEntityIds: [],
+          type: promotionType,
+          isImportant: false,
+      };
+      const notesWithPromotion = [...(formData.structuredNotes || []), promotionEntry];
+      setFormData(prev => ({ ...prev, structuredNotes: notesWithPromotion }));
+      onUpdate(log.id, { structuredNotes: notesWithPromotion });
+
+      addToast(`${trimmedName} added to the world`, 'success');
+      setCanonNoteId(null);
   }
 
   // --- Derived Data ---
@@ -829,11 +889,25 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
 
                           {/* List Area */}
                           <div className="flex-grow overflow-y-auto custom-scrollbar space-y-2">
-                              {(formData.structuredNotes || []).slice().reverse().map(note => (
+                              {(formData.structuredNotes || []).slice().reverse().map(note => {
+                                  const isManualNote = !note.type || note.type === 'manual';
+                                  return (
                                   <div key={note.id} className="bg-slate-800/30 p-3 rounded-lg border border-slate-800 hover:border-slate-600 transition-colors group">
                                       <div className="flex justify-between items-start">
                                           <span className="text-xs text-slate-500 font-mono mb-1 block">{new Date(note.timestamp).toLocaleTimeString()}</span>
-                                          <button onClick={() => removeNote(note.id)} className="text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><Icons.Trash className="w-3 h-3" /></button>
+                                          <div className="flex items-center gap-2">
+                                              {isManualNote && (
+                                                  <button
+                                                      onClick={() => setCanonNoteId(prev => (prev === note.id ? null : note.id))}
+                                                      className="text-slate-600 hover:text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                      aria-label="Make this canon"
+                                                      title="Make this canon"
+                                                  >
+                                                      <Icons.Save className="w-3 h-3" />
+                                                  </button>
+                                              )}
+                                              <button onClick={() => removeNote(note.id)} className="text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><Icons.Trash className="w-3 h-3" /></button>
+                                          </div>
                                       </div>
                                       <p className="text-sm text-slate-200">{note.content}</p>
                                       {note.taggedEntityIds && note.taggedEntityIds.length > 0 && (
@@ -845,8 +919,18 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
                                               ))}
                                           </div>
                                       )}
+                                      {canonNoteId === note.id && (
+                                          <div className="mt-2">
+                                              <CanonCapturePicker
+                                                  content={note.content}
+                                                  onCancel={() => setCanonNoteId(null)}
+                                                  onSave={(kind, name) => handleMakeCanon(note.content, kind, name)}
+                                              />
+                                          </div>
+                                      )}
                                   </div>
-                              ))}
+                                  );
+                              })}
                               {(formData.structuredNotes || []).length === 0 && (
                                   <div className="text-center text-slate-600 py-10 italic text-sm">No log entries yet.</div>
                               )}

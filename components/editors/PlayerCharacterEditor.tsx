@@ -124,6 +124,29 @@ export const PlayerCharacterEditor: React.FC<PlayerCharacterEditorProps> = ({ pc
     onUpdate(pc.id, { characterStatistics: formData.characterStatistics });
   };
 
+  // ── Player flags (Table Pulse) ─────────────────────────────────────────────
+  // Free text, one appetite per line — deliberately not a fancier chip-input
+  // widget (lazy-dm-research.md §4.3 "Table Pulse"). `formData.playerFlags`
+  // mirrors NoteEditor's `tags` convention: onChange keeps the raw per-line
+  // split (so a fresh blank line the DM is about to type into doesn't vanish
+  // out from under them mid-edit); trimming and blank-line removal happen on
+  // commit. An emptied-out textarea commits `undefined`, not `[]`, so a PC
+  // nobody has annotated stays exactly as unset as one that was never
+  // touched — this is never a gap to flag or a field to require.
+  const handlePlayerFlagsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const lines = e.target.value.split('\n');
+    setFormData(prev => ({ ...prev, playerFlags: lines }));
+  };
+
+  const handlePlayerFlagsBlur = () => {
+    const cleaned = (formData.playerFlags ?? []).map(line => line.trim()).filter(Boolean);
+    const nextFlags = cleaned.length > 0 ? cleaned : undefined;
+    setFormData(prev => ({ ...prev, playerFlags: nextFlags }));
+    if ((pc.playerFlags ?? []).join('\n') !== cleaned.join('\n')) {
+      onUpdate(pc.id, { playerFlags: nextFlags });
+    }
+  };
+
   const getModifier = (score: number) => {
     const mod = Math.floor((score - 10) / 2);
     return mod >= 0 ? `+${mod}` : `${mod}`;
@@ -203,6 +226,24 @@ export const PlayerCharacterEditor: React.FC<PlayerCharacterEditorProps> = ({ pc
 
         {/* Right Column: Social & Backstory */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Player flags (Table Pulse) — optional, never a nag */}
+          <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800/50">
+            <h3 className="font-semibold text-slate-200 mb-1">What This Player Wants More Of</h3>
+            <p className="text-xs text-slate-400 mb-2">
+              Optional. Jot down what you've noticed this player wants more of — one line each, in your own words. Think Robin Laws' player types if that's a useful lens (the Tactician wants tough fights, the Storyteller wants worldbuilding) — but there's no list to fill in, just what you'd say out loud.
+            </p>
+            <textarea
+              name="playerFlags"
+              value={(formData.playerFlags ?? []).join('\n')}
+              onChange={handlePlayerFlagsChange}
+              onBlur={handlePlayerFlagsBlur}
+              rows={3}
+              placeholder={'e.g.\nwants more tactical combat\ncame for the mystery, not the fighting\nloves it when NPCs remember them'}
+              aria-label="What this player wants more of"
+              className={`${textareaBaseClasses} w-full px-3 py-2 text-sm`}
+            />
+          </div>
+
           {/* Social Traits — now editable */}
           <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800/50">
             <h3 className="font-semibold text-slate-200 mb-3">Social Traits</h3>

@@ -8,8 +8,13 @@ import { campaignService } from '../../services/campaignService';
 import { DialogShell } from '../common/DialogShell';
 import { textareaBaseClasses } from '../common/Textarea';
 import { useEntitySearch } from '@/hooks/useEntitySearch';
-import { generateColdOpen, hasColdOpenMaterial } from '@/services/aiService';
+import { generateColdOpen, hasColdOpenMaterial, generateStrongStart } from '@/services/aiService';
 import { buildCampaignContext } from '@/services/contextBuilder';
+import type { DormantPiece } from '@/utils/dormantMaterial';
+import { deriveLazyChecklistRows } from '@/utils/lazyChecklist';
+import { SceneMenuSuggestions } from './prep/SceneMenuSuggestions';
+import { LazyChecklist } from './prep/LazyChecklist';
+import { StrongStartStyles, type StrongStartStyle } from './prep/StrongStartStyles';
 
 type WizardStep = 'adventure' | 'scenes' | 'entities' | 'plots' | 'strongStart' | 'beats' | 'secretsCheck' | 'review';
 
@@ -275,12 +280,26 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
     // pass it and fire two generations.
     const coldOpenInFlightRef = useRef(false);
 
-    const handleDraftColdOpen = useCallback((applyDraft: (text: string) => void) => {
+    // §4.6 Strong Start Styles: widens the cold-open drafting action with two
+    // more zero-prompt styles. 'previously-on' is UNCHANGED — same
+    // `generateColdOpen` request shape as before, so every pinned cold-open
+    // test (tests/coldOpen.prepWizard.test.tsx) keeps passing untouched. The
+    // shared ref/phase below continue to guard ALL THREE styles, at BOTH call
+    // sites (lazy Strong Start step, standard Go Live step) — only one of
+    // which is ever mounted at a time.
+    const handleDraftStrongStart = useCallback((
+        style: StrongStartStyle,
+        applyDraft: (text: string) => void,
+        dormantPiece?: DormantPiece
+    ) => {
         if (coldOpenInFlightRef.current) return;
         coldOpenInFlightRef.current = true;
         setColdOpenPhase('loading');
         const campaignContext = buildCampaignContext({ variant: 'generation', campaign });
-        generateColdOpen({ campaign, campaignContext }, isMockMode)
+        const draft = style === 'previously-on'
+            ? generateColdOpen({ campaign, campaignContext }, isMockMode)
+            : generateStrongStart({ style, campaign, campaignContext, dormantPiece }, isMockMode);
+        draft
             .then(text => {
                 applyDraft(text);
                 setColdOpenPhase('idle');
@@ -301,7 +320,7 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
     // false, trimmed, blanks dropped) at Go Live and attached to the created
     // SessionLog — the same array components/views/session/SceneListPanel.tsx
     // already renders and checks off.
-    const [lazyBeats, setLazyBeats] = useState<Array<{ id: string; title: string }>>([]);
+    const [lazyBeats, setLazyBeats] = useState<Array<{ id: string; title: string; notes?: string }>>([]);
     const [beatDraft, setBeatDraft] = useState('');
 
     const addLazyBeat = useCallback(() => {
@@ -310,6 +329,17 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
         setLazyBeats(prev => [...prev, { id: crypto.randomUUID(), title }]);
         setBeatDraft('');
     }, [beatDraft]);
+
+    // §4.1 Scene Menu Generator: bulk-adds the checked drafts from
+    // SceneMenuSuggestions in one go — title -> title, hook -> notes (Beat
+    // already supports an optional `notes` field; see handleGoLive below).
+    const addLazyBeatsFromMenu = useCallback((items: Array<{ title: string; notes?: string }>) => {
+        if (items.length === 0) return;
+        setLazyBeats(prev => [
+            ...prev,
+            ...items.map(item => ({ id: crypto.randomUUID(), title: item.title, notes: item.notes })),
+        ]);
+    }, []);
 
     const updateLazyBeatTitle = useCallback((id: string, title: string) => {
         setLazyBeats(prev => prev.map(b => (b.id === id ? { ...b, title } : b)));
@@ -421,7 +451,12 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
             : composeStrongStartPrepNotes(goLiveColdOpen ?? '', prepNotes);
         const finalBeats: Beat[] = lazyPrepOn
             ? lazyBeats
-                .map(b => ({ id: b.id, title: b.title.trim(), isCompleted: false }))
+                .map(b => ({
+                    id: b.id,
+                    title: b.title.trim(),
+                    isCompleted: false,
+                    ...(b.notes?.trim() ? { notes: b.notes.trim() } : {}),
+                }))
                 .filter(b => b.title.length > 0)
             : [];
 
@@ -652,29 +687,16 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
                                 />
                             </div>
 
-                            {/* P4: draft it instead of staring at the blank field. */}
-                            {canDraftColdOpen ? (
-                                <div>
-                                    <Button
-                                        variant="secondary"
-                                        size="sm"
-                                        onClick={() => handleDraftColdOpen(setStrongStart)}
-                                        disabled={coldOpenPhase === 'loading'}
-                                    >
-                                        <Icons.Sparkles className="w-4 h-4 mr-1.5" />
-                                        Draft it from last session
-                                    </Button>
-                                    {coldOpenPhase === 'error' && (
-                                        <p role="status" className="text-xs text-red-400 mt-2">
-                                            That didn't come through. Try it again in a moment.
-                                        </p>
-                                    )}
-                                </div>
-                            ) : (
-                                <p className="text-xs text-slate-500 italic">
-                                    Star a moment at the table or write a recap when the session ends, and this drafts itself.
-                                </p>
-                            )}
+                            {/* §4.6 Strong Start Styles: a row of drafting styles instead of one
+                                button — "Draft it from last session" (unchanged: same label, same
+                                canDraftColdOpen gate, same call shape), "Drop into action" (always
+                                available), "Reincorporate" (hides itself with nothing dormant). */}
+                            <StrongStartStyles
+                                campaign={campaign}
+                                canDraftColdOpen={canDraftColdOpen}
+                                phase={coldOpenPhase}
+                                onSelectStyle={(style, dormantPiece) => handleDraftStrongStart(style, setStrongStart, dormantPiece)}
+                            />
                         </div>
                     )}
 
@@ -687,6 +709,14 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
                                     A loose list of scenes you might hit tonight — not a script. Check them off or drop them live in the Session Runner.
                                 </p>
                             </div>
+
+                            {/* §4.1 Scene Menu Generator: one click proposes a menu of scenes;
+                                checked drafts fold straight into the list below. */}
+                            <SceneMenuSuggestions
+                                campaign={campaign}
+                                isMockMode={isMockMode}
+                                onAdd={addLazyBeatsFromMenu}
+                            />
 
                             <div className="space-y-2">
                                 {lazyBeats.map((beat, idx) => (
@@ -1146,6 +1176,31 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
                                 />
                             </div>
 
+                            {/* §4.5 Lazy DM checklist — purely informational, works for either
+                                path (the standard flow's own Scenes/NPCs&Locations selections
+                                feed the same activeNpcIds/activeLocationIds/selectedSceneIds the
+                                lazy path uses). Never red, never a "missing" badge, never blocks
+                                Go Live. */}
+                            <LazyChecklist
+                                rows={deriveLazyChecklistRows({
+                                    hasPlayerCharacters: (campaign.playerCharacters ?? []).length > 0,
+                                    strongStart: lazyPrepOn ? strongStart : (goLiveColdOpen ?? ''),
+                                    beatsCount: lazyPrepOn ? lazyBeats.length : 0,
+                                    scenesSelectedCount: selectedSceneIds.size,
+                                    unrevealedSecretsCount: secretsCheckList.length,
+                                    locationsCount: activeLocationIds.size,
+                                    npcsCount: activeNpcIds.size,
+                                    itemsCount: campaign.items.length,
+                                    sceneRewardsCount: selectedAdventure
+                                        ? selectedAdventure.scenes.filter(
+                                            s => selectedSceneIds.has(s.id) && (s.rewards ?? '').trim().length > 0
+                                        ).length
+                                        : 0,
+                                    lazyStepsAvailable: lazyPrepOn,
+                                })}
+                                onNavigate={stepId => setCurrentStep(stepId)}
+                            />
+
                             {/* Summary cards */}
                             <div className="space-y-3">
                                 <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
@@ -1217,48 +1272,32 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
                                 )}
                             </div>
 
-                            {/* P4: the cold open — off the lazy path, this step owns the question
-                                instead of the Strong Start step. Never both at once. */}
+                            {/* §4.6 Strong Start Styles — off the lazy path, this step owns the
+                                question instead of the Strong Start step. Never both at once. */}
                             {!lazyPrepOn && (
                                 <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 space-y-3">
                                     <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                                         <Icons.Sparkles className="w-3.5 h-3.5" /> Cold open
                                     </h4>
-                                    {canDraftColdOpen ? (
-                                        <>
-                                            <Button
-                                                variant="secondary"
-                                                size="sm"
-                                                onClick={() => handleDraftColdOpen(setGoLiveColdOpen)}
-                                                disabled={coldOpenPhase === 'loading'}
-                                            >
-                                                <Icons.Sparkles className="w-4 h-4 mr-1.5" />
-                                                Draft it from last session
-                                            </Button>
-                                            {coldOpenPhase === 'error' && (
-                                                <p role="status" className="text-xs text-red-400">
-                                                    That didn't come through. Try it again in a moment.
-                                                </p>
-                                            )}
-                                            {goLiveColdOpen !== null && (
-                                                <div>
-                                                    <label htmlFor="cold-open-field" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                                                        Read this to open the session
-                                                    </label>
-                                                    <textarea
-                                                        id="cold-open-field"
-                                                        value={goLiveColdOpen}
-                                                        onChange={e => setGoLiveColdOpen(e.target.value)}
-                                                        rows={4}
-                                                        className={`${textareaBaseClasses} w-full px-3 py-2 text-sm`}
-                                                    />
-                                                </div>
-                                            )}
-                                        </>
-                                    ) : (
-                                        <p className="text-xs text-slate-500 italic">
-                                            Star a moment at the table or write a recap when the session ends, and this drafts itself.
-                                        </p>
+                                    <StrongStartStyles
+                                        campaign={campaign}
+                                        canDraftColdOpen={canDraftColdOpen}
+                                        phase={coldOpenPhase}
+                                        onSelectStyle={(style, dormantPiece) => handleDraftStrongStart(style, setGoLiveColdOpen, dormantPiece)}
+                                    />
+                                    {goLiveColdOpen !== null && (
+                                        <div>
+                                            <label htmlFor="cold-open-field" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                                                Read this to open the session
+                                            </label>
+                                            <textarea
+                                                id="cold-open-field"
+                                                value={goLiveColdOpen}
+                                                onChange={e => setGoLiveColdOpen(e.target.value)}
+                                                rows={4}
+                                                className={`${textareaBaseClasses} w-full px-3 py-2 text-sm`}
+                                            />
+                                        </div>
                                     )}
                                 </div>
                             )}

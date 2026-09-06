@@ -147,6 +147,7 @@ const makeCampaign = (overrides: Partial<Campaign> = {}): Campaign =>
                 secrets: '',
                 subLocationIds: [],
                 history: [],
+                aspects: ['Water sloshes with every footstep.', 'Cold as the crypt below.'],
             },
             {
                 id: 'loc-docks',
@@ -702,6 +703,76 @@ describe('session prep sheet — the planned cast and locations', () => {
         expect(locs).toContain('The Drowned Chapel');
         expect(locs).toContain('Saltwharf Docks');
         expect(locs).not.toContain('The Ember Waste');
+    });
+
+    // Lazy DM step 5 ("develop fantastic locations") — R3's aspects line.
+    it('carries aspects when the location has them', () => {
+        const md = generateSessionPrepSheetMarkdown(makeSession(), makeCampaign());
+
+        expect(section(md, '## Locations')).toContain(
+            'Aspects: Water sloshes with every footstep.; Cold as the crypt below.',
+        );
+    });
+
+    it('adds no aspects line for a location that has none', () => {
+        const md = generateSessionPrepSheetMarkdown(
+            makeSession({ plannedLocationIds: ['loc-docks'] }),
+            makeCampaign(),
+        );
+        const locs = section(md, '## Locations');
+
+        expect(locs).toContain('Saltwharf Docks');
+        expect(locs).not.toMatch(/aspects/i);
+    });
+
+    it('drops blank aspect entries and joins the rest with a semicolon', () => {
+        const campaign = makeCampaign({
+            locations: [
+                {
+                    id: 'loc-chapel',
+                    name: 'The Drowned Chapel',
+                    description: 'A flooded nave.',
+                    secrets: '',
+                    subLocationIds: [],
+                    history: [],
+                    aspects: ['  ', 'Real aspect one.', '', '   Real aspect two.  '],
+                },
+            ],
+        });
+        const md = generateSessionPrepSheetMarkdown(
+            makeSession({ plannedLocationIds: ['loc-chapel'], plannedNpcIds: [] }),
+            campaign,
+        );
+
+        expect(section(md, '## Locations')).toContain(
+            'Aspects: Real aspect one.; Real aspect two.',
+        );
+    });
+
+    it('does not throw and adds no aspects line when aspects is a malformed value', () => {
+        const campaign = makeCampaign({
+            locations: [
+                {
+                    id: 'loc-chapel',
+                    name: 'The Drowned Chapel',
+                    description: 'A flooded nave.',
+                    secrets: '',
+                    subLocationIds: [],
+                    history: [],
+                    aspects: 'not an array' as unknown as string[],
+                },
+            ],
+        });
+
+        let md = '';
+        expect(() => {
+            md = generateSessionPrepSheetMarkdown(
+                makeSession({ plannedLocationIds: ['loc-chapel'], plannedNpcIds: [] }),
+                campaign,
+            );
+        }).not.toThrow();
+        expect(section(md, '## Locations')).toContain('The Drowned Chapel');
+        expect(md).not.toMatch(/aspects/i);
     });
 
     it('skips a planned id whose entity was deleted, without a placeholder', () => {

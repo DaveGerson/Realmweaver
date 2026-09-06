@@ -21,9 +21,13 @@ import {
   deriveNpcLastAppearances,
   derivePlotThreadAges,
   deriveLoadedGuns,
+  derivePcSpotlight,
   formatLastSeenLabel,
   formatThreadAgeLabel,
+  formatSpotlightLabel,
 } from '../../utils/storyDerivations';
+import { ClockPips } from '../common/ClockPips';
+import { normalizePlotClock } from '../../utils/plotClock';
 
 // Lazy-loaded — same mechanism SessionLogDashboard uses to open the wizard;
 // only bundled once the GM actually asks for it.
@@ -40,6 +44,11 @@ export interface TonightsTableProps {
   onNavigate: (entityType: string, entityId: string) => void;
   /** Handed the new session log id when the Session Prep Wizard finishes. */
   onGoLive: (sessionLogId: string) => void;
+  /**
+   * The near-zero-prep on-ramp (docs/design/unstructured-play.md): start a
+   * freeform session with no wizard at all. The button is hidden when absent.
+   */
+  onQuickStart?: () => void;
   /**
    * Routed straight through to the Session Prep Wizard's cold-open action.
    * Optional (default `false`, the real provider path) so a pre-existing
@@ -104,11 +113,12 @@ function deriveEngravedMoments(campaign: Campaign): EngravedMoment[] {
   return moments;
 }
 
-export const TonightsTable: React.FC<TonightsTableProps> = ({ campaign, onNavigate, onGoLive, isMockMode = false }) => {
+export const TonightsTable: React.FC<TonightsTableProps> = ({ campaign, onNavigate, onGoLive, onQuickStart, isMockMode = false }) => {
   const [isPrepOpen, setIsPrepOpen] = useState(false);
 
   const lastCompleted = useMemo(() => getLastCompletedSession(campaign), [campaign]);
   const openThreads = useMemo(() => derivePlotThreadAges(campaign), [campaign]);
+  const spotlight = useMemo(() => derivePcSpotlight(campaign), [campaign]);
   const offstage = useMemo(
     () => deriveNpcLastAppearances(campaign).slice(0, OFFSTAGE_LIMIT),
     [campaign]
@@ -126,6 +136,7 @@ export const TonightsTable: React.FC<TonightsTableProps> = ({ campaign, onNaviga
   const plotAccent = ENTITY_TYPE_CONFIG.plot.color;
   const npcAccent = ENTITY_TYPE_CONFIG.npc.color;
   const sessionLogAccent = ENTITY_TYPE_CONFIG['session-log'].color;
+  const pcAccent = ENTITY_TYPE_CONFIG['player-character'].color;
 
   const handleWizardComplete = (sessionLogId: string) => {
     setIsPrepOpen(false);
@@ -185,17 +196,36 @@ export const TonightsTable: React.FC<TonightsTableProps> = ({ campaign, onNaviga
             </p>
           ) : (
             <ul className="space-y-1.5">
-              {openThreads.map((thread) => (
-                <li key={thread.plotId}>
-                  <button
-                    onClick={() => onNavigate('plot', thread.plotId)}
-                    className="w-full text-left px-3 py-2 rounded-lg bg-slate-900/40 hover:bg-slate-900 transition-colors"
-                  >
-                    <span className={`block font-medium text-${plotAccent}-400`}>{thread.plotTitle}</span>
-                    <span className="block text-xs text-slate-500">{formatThreadAgeLabel(thread)}</span>
-                  </button>
-                </li>
-              ))}
+              {openThreads.map((thread) => {
+                // Pressure (unstructured play): the plot's countdown and its
+                // own move when the party looks away, read straight off the plot.
+                const plot = (campaign.plots ?? []).find((p) => p.id === thread.plotId);
+                const clock = normalizePlotClock(plot?.clock);
+                const ifIgnored = plot?.ifIgnored?.trim();
+                return (
+                  <li key={thread.plotId}>
+                    <button
+                      onClick={() => onNavigate('plot', thread.plotId)}
+                      className="w-full text-left px-3 py-2 rounded-lg bg-slate-900/40 hover:bg-slate-900 transition-colors"
+                    >
+                      <span className={`block font-medium text-${plotAccent}-400`}>{thread.plotTitle}</span>
+                      <span className="block text-xs text-slate-500">{formatThreadAgeLabel(thread)}</span>
+                      {clock && (
+                        <span className="flex items-center gap-1.5 mt-1">
+                          <ClockPips clock={clock} label={thread.plotTitle} />
+                          <span className="text-[10px] text-slate-500 font-mono">{clock.filled}/{clock.segments}</span>
+                          {clock.filled >= clock.segments && (
+                            <span className="text-[10px] font-semibold text-yellow-300 uppercase tracking-wider">Time's up</span>
+                          )}
+                        </span>
+                      )}
+                      {ifIgnored && (
+                        <span className="block text-xs text-slate-500 italic mt-0.5 truncate">If ignored: {ifIgnored}</span>
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>
@@ -221,6 +251,39 @@ export const TonightsTable: React.FC<TonightsTableProps> = ({ campaign, onNaviga
                   >
                     <span className={`block font-medium text-${npcAccent}-400`}>{appearance.npcName}</span>
                     <span className="block text-xs text-slate-500">{formatLastSeenLabel(appearance)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {/* Spotlight — "review the characters": who has been quiet, read off the running logs */}
+        <section
+          role="region"
+          aria-labelledby="tt-spotlight"
+          className="bg-slate-800/60 border border-slate-700 rounded-xl p-5 space-y-3"
+        >
+          <h2 id="tt-spotlight" className="text-sm font-bold text-slate-300 uppercase tracking-wider">
+            Spotlight
+          </h2>
+          {spotlight.length === 0 ? (
+            <p className="text-sm text-slate-400 italic">
+              Bring in your players' characters and this shows who has been waiting for their moment.
+            </p>
+          ) : (
+            <ul className="space-y-1.5">
+              {spotlight.map((entry) => (
+                <li key={entry.pcId}>
+                  <button
+                    onClick={() => onNavigate('player-character', entry.pcId)}
+                    className="w-full text-left px-3 py-2 rounded-lg bg-slate-900/40 hover:bg-slate-900 transition-colors"
+                  >
+                    <span className={`block font-medium text-${pcAccent}-400`}>
+                      {entry.pcName}
+                      {entry.playerName && <span className="text-xs text-slate-500 font-normal"> · {entry.playerName}</span>}
+                    </span>
+                    <span className="block text-xs text-slate-500">{formatSpotlightLabel(entry)}</span>
                   </button>
                 </li>
               ))}
@@ -289,7 +352,7 @@ export const TonightsTable: React.FC<TonightsTableProps> = ({ campaign, onNaviga
         )}
       </section>
 
-      <div>
+      <div className="flex flex-wrap items-center gap-3">
         <Button
           onClick={() => setIsPrepOpen(true)}
           disabled={isSessionLive}
@@ -298,6 +361,17 @@ export const TonightsTable: React.FC<TonightsTableProps> = ({ campaign, onNaviga
         >
           Prep tonight's session
         </Button>
+        {onQuickStart && (
+          <Button
+            variant="secondary"
+            size="lg"
+            onClick={onQuickStart}
+            disabled={isSessionLive}
+            title={isSessionLive ? 'A session is already live' : 'No prep tonight? Go straight to the table.'}
+          >
+            Just start playing
+          </Button>
+        )}
       </div>
 
       {isPrepOpen && (

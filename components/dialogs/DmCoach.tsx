@@ -11,8 +11,9 @@ import type { QuickCardEntityType } from '../common/EntityQuickCard';
 import { buildCampaignContext } from '../../services/contextBuilder';
 import { campaignService } from '../../services/campaignService';
 import { logNpcQuote, selectRecentQuoteLines } from '../views/session/ActiveScenePanel';
+import { CheckInPanel } from './DmCoachCheckIn';
 
-type CoachTool = 'narrate' | 'improvise' | 'table' | 'roleplay';
+type CoachTool = 'narrate' | 'improvise' | 'table' | 'roleplay' | 'checkin';
 
 interface RoleplayMessage {
     id: string;
@@ -24,7 +25,7 @@ interface RoleplayMessage {
     logged?: boolean;
 }
 
-const TEMPLATE_PROMPTS: Record<Exclude<CoachTool, 'roleplay'>, string[]> = {
+const TEMPLATE_PROMPTS: Record<Exclude<CoachTool, 'roleplay' | 'checkin'>, string[]> = {
     narrate: [
         "Describe the party arriving at [location]",
         "Set the scene for a tense negotiation",
@@ -193,7 +194,7 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
     }, [roleplayMessages, activeTool]);
 
     const contextTokens = extractContextTokens(activeContext);
-    const chips = activeTool !== 'roleplay'
+    const chips = (activeTool !== 'roleplay' && activeTool !== 'checkin')
         ? TEMPLATE_PROMPTS[activeTool].map(label => resolveChipLabel(label, contextTokens))
         : [];
 
@@ -221,7 +222,7 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
         }
     }
 
-    const currentTool = activeTool !== 'roleplay' ? toolConfig[activeTool] : null;
+    const currentTool = (activeTool !== 'roleplay' && activeTool !== 'checkin') ? toolConfig[activeTool] : null;
 
     const handleGenerate = async () => {
         if (!prompt.trim()) {
@@ -427,7 +428,7 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
             </header>
 
             <div className="p-4 flex-shrink-0">
-                 <div className="grid grid-cols-4 gap-1.5 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                 <div className="grid grid-cols-5 gap-1.5 bg-slate-950 p-1 rounded-lg border border-slate-800">
                     <ToolButton
                         label="Narrate"
                         icon={Icons.Scenes}
@@ -451,6 +452,12 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
                         icon={Icons.Roleplay}
                         isActive={activeTool === 'roleplay'}
                         onClick={() => handleSwitchTool('roleplay')}
+                    />
+                    <ToolButton
+                        label="Ask the Table"
+                        icon={Icons.Chat}
+                        isActive={activeTool === 'checkin'}
+                        onClick={() => handleSwitchTool('checkin')}
                     />
                 </div>
             </div>
@@ -479,6 +486,8 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
                     onLogLine={handleLogRoleplayLine}
                     messagesEndRef={messagesEndRef}
                 />
+            ) : activeTool === 'checkin' ? (
+                <CheckInPanel campaign={campaign} isMockMode={isMockMode} />
             ) : currentTool && (
                 <div className="flex-1 flex flex-col p-4 pt-0 overflow-y-auto custom-scrollbar">
                     {/* Active Context Hint */}

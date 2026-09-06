@@ -34,6 +34,8 @@ interface SessionLogDashboardProps {
   onSessionLogCreated: (data: Omit<SessionLog, 'id'>) => void;
   onSelectSessionLog: (id: string) => void;
   onGoLive: (sessionLogId: string) => void;
+  /** Start a freeform session now, no wizard (unstructured play). Hidden when absent. */
+  onQuickStart?: () => void;
   isMockMode: boolean;
 }
 
@@ -43,6 +45,7 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
   onSessionLogCreated,
   onSelectSessionLog,
   onGoLive,
+  onQuickStart,
   isMockMode,
 }) => {
   const [isPrepWizardOpen, setIsPrepWizardOpen] = useState(false);
@@ -110,6 +113,16 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
                 >
                     <Icons.Play className="w-4 h-4 mr-2" /> Prepare Session
                 </Button>
+                {onQuickStart && (
+                    <Button
+                        onClick={onQuickStart}
+                        variant="secondary"
+                        disabled={!!activeSession}
+                        title={activeSession ? 'A session is already live' : 'Skip the wizard — start a freeform session now'}
+                    >
+                        <Icons.Zap className="w-4 h-4 mr-2" /> Start Now
+                    </Button>
+                )}
                 <Button onClick={handleCreate} variant="secondary">
                     <Icons.Plus className="w-4 h-4 mr-2" /> Quick Plan
                 </Button>

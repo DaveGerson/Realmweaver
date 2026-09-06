@@ -85,6 +85,8 @@ export interface ViewRouterProps {
   onSetSelectedPlotId: (id: string | null) => void;
   onSetSelectedNoteId: (id: string | null) => void;
   onGoLive: (sessionLogId: string) => void;
+  /** The near-zero-prep on-ramp: start a freeform session with no wizard (unstructured play). */
+  onQuickStart?: () => void;
   onImportPC: (file: File) => Promise<string>;
   onAddToast: (message: string, variant?: 'success' | 'error' | 'info') => void;
 }
@@ -125,6 +127,7 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
   onSetSelectedPlotId,
   onSetSelectedNoteId,
   onGoLive,
+  onQuickStart,
   onImportPC,
   onAddToast,
 }) => {
@@ -157,7 +160,7 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
   // Session Runner (which always wins, above) and above every editor branch
   // (nothing is selected when a GM navigates here via the sidebar).
   if (activeView === 'tonight') {
-    return <TonightsTable campaign={campaign} onNavigate={onNavigate} onGoLive={onGoLive} isMockMode={isMockMode} />;
+    return <TonightsTable campaign={campaign} onNavigate={onNavigate} onGoLive={onGoLive} onQuickStart={onQuickStart} isMockMode={isMockMode} />;
   }
 
   // Render Generators
@@ -403,6 +406,7 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
           }
         }}
         onGoLive={onGoLive}
+        onQuickStart={onQuickStart}
         isMockMode={isMockMode}
       />
     );

@@ -7,6 +7,10 @@ import { twMerge } from 'tailwind-merge';
 import { campaignService } from '@/services/campaignService';
 import { MentionInput } from '@/components/common/MentionInput';
 import { useToast } from '@/hooks/useToast';
+import { CanonCapturePicker } from '@/components/common/CanonCapturePicker';
+import { buildCanonDraft } from '@/utils/canonCapture';
+import type { CanonEntityKind } from '@/utils/canonCapture';
+import { resolveSceneById } from '@/utils/storyDerivations';
 
 const NOTE_TAG_OPTIONS = ['Combat', 'NPC', 'Decision', 'Loot', 'Discovery'] as const;
 
@@ -26,6 +30,13 @@ const ENTRY_TYPE_STYLES: Record<string, { text: string; border: string; icon: Re
         border: 'border-l-2 border-l-green-500 pl-2',
         icon: <Icons.NPCs className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />,
     },
+    // A Location/Item/Note promoted from a note ("Make this canon") — the
+    // same save glyph as the action that produced it.
+    'entity-created': {
+        text: 'text-emerald-300',
+        border: 'border-l-2 border-l-emerald-500 pl-2',
+        icon: <Icons.Save className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />,
+    },
     'dice-roll': {
         text: 'text-amber-300',
         border: 'border-l-2 border-l-amber-500 pl-2',
@@ -35,6 +46,12 @@ const ENTRY_TYPE_STYLES: Record<string, { text: string; border: string; icon: Re
         text: 'text-amber-300',
         border: 'border-l-2 border-l-amber-500 pl-2',
         icon: <Icons.Coach className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />,
+    },
+    // A plot clock ticked — the world moved on its own (yellow: the plot accent).
+    'world-moved': {
+        text: 'text-yellow-300',
+        border: 'border-l-2 border-l-yellow-500 pl-2',
+        icon: <Icons.Clock className="w-3.5 h-3.5 text-yellow-400 flex-shrink-0" />,
     },
 };
 
@@ -56,6 +73,10 @@ export const RunningLog: React.FC<RunningLogProps> = ({ sessionLog, mobileTab })
     // Inline editing state: tracks which note (if any) is being edited
     const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
     const [editingNoteContent, setEditingNoteContent] = useState('');
+
+    // "Make this canon" (Monte Cook's improv-canon-capture posture): tracks
+    // which MANUAL note (if any) currently has its inline picker open.
+    const [canonNoteId, setCanonNoteId] = useState<string | null>(null);
 
     const recognitionRef = useRef<SpeechRecognition | null>(null);
     const noteInputWrapperRef = useRef<HTMLDivElement>(null);
@@ -191,6 +212,9 @@ export const RunningLog: React.FC<RunningLogProps> = ({ sessionLog, mobileTab })
     const startEditing = (noteId: string, content: string) => {
         setEditingNoteId(noteId);
         setEditingNoteContent(content);
+        // Editing and canon-capturing the same note at once would show two
+        // overlapping inline forms — close this note's picker if it's open.
+        setCanonNoteId(prev => (prev === noteId ? null : prev));
     };
 
     const commitEdit = () => {
@@ -205,6 +229,52 @@ export const RunningLog: React.FC<RunningLogProps> = ({ sessionLog, mobileTab })
         setEditingNoteId(null);
         setEditingNoteContent('');
     };
+
+    /**
+     * Monte Cook's "improv canon capture": promotes a MANUAL running-log
+     * note into a real NPC/Location/Item/Note. Reads the campaign only in
+     * here, at click time — never at render — because
+     * `wp-e-app-shell.session-runner-a11y` mounts the whole Session Runner
+     * against a `campaignService` mock that defines neither
+     * `getActiveCampaign` nor `createNpc`/`createLocation`/etc., so nothing
+     * below may execute outside this handler.
+     */
+    const handleMakeCanon = useCallback((noteContent: string, kind: CanonEntityKind, name: string) => {
+        const trimmedName = name.trim();
+        if (!trimmedName) return;
+
+        if (kind === 'npc') {
+            const newNpcId = campaignService.createNpc({ ...buildCanonDraft('npc', noteContent), name: trimmedName });
+
+            // Link to the active scene — resolved across ALL adventures,
+            // the same way QuickNpcGenerator links its own quick NPCs — or,
+            // with no prepped scene active, put the improvised NPC on the
+            // Stage instead of leaving them unlinked in the roster.
+            const campaign = campaignService.getActiveCampaign();
+            const resolved = campaign ? resolveSceneById(campaign, campaign.activeSceneId) : null;
+            if (resolved) {
+                campaignService.updateScene(resolved.adventure.id, resolved.scene.id, {
+                    npcIds: [...resolved.scene.npcIds, newNpcId],
+                });
+            } else {
+                campaignService.addNpcToStage(newNpcId);
+            }
+
+            campaignService.addAutoEvent('npc-created', `NPC created: ${trimmedName}`);
+        } else if (kind === 'location') {
+            campaignService.createLocation({ ...buildCanonDraft('location', noteContent), name: trimmedName });
+            campaignService.addAutoEvent('entity-created', `Location created: ${trimmedName}`);
+        } else if (kind === 'item') {
+            campaignService.createItem({ ...buildCanonDraft('item', noteContent), name: trimmedName });
+            campaignService.addAutoEvent('entity-created', `Item created: ${trimmedName}`);
+        } else {
+            campaignService.createNote({ ...buildCanonDraft('note', noteContent), title: trimmedName });
+            campaignService.addAutoEvent('entity-created', `Note created: ${trimmedName}`);
+        }
+
+        addToast(`${trimmedName} added to the world`, 'success');
+        setCanonNoteId(null);
+    }, [addToast]);
 
     // Full log panel — shown on desktop always, on mobile only when mobileTab === 'active'
     const fullLogVisible = mobileTab === 'active';
@@ -241,9 +311,10 @@ export const RunningLog: React.FC<RunningLogProps> = ({ sessionLog, mobileTab })
                     {filteredNotes.map(note => {
                         const typeStyle = note.type && note.type !== 'manual' ? ENTRY_TYPE_STYLES[note.type] : null;
                         const isEditing = editingNoteId === note.id;
+                        const isManualNote = !note.type || note.type === 'manual';
                         return (
+                            <React.Fragment key={note.id}>
                             <div
-                                key={note.id}
                                 className={twMerge(
                                     "flex items-start gap-2 text-sm py-0.5 group",
                                     typeStyle?.border
@@ -318,9 +389,23 @@ export const RunningLog: React.FC<RunningLogProps> = ({ sessionLog, mobileTab })
                                             )}
                                         />
                                     </button>
+                                    {/* Make this canon — Monte Cook's improv-canon-capture posture: promote a MANUAL note into a real entity at near-zero cost */}
+                                    {isManualNote && (
+                                        <button
+                                            onClick={() => setCanonNoteId(prev => (prev === note.id ? null : note.id))}
+                                            className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-slate-600 hover:text-emerald-400"
+                                            aria-label="Make this canon"
+                                            title="Make this canon"
+                                        >
+                                            <Icons.Save className="w-3.5 h-3.5" />
+                                        </button>
+                                    )}
                                     {/* Delete button */}
                                     <button
-                                        onClick={() => campaignService.deleteSessionNote(note.id)}
+                                        onClick={() => {
+                                            campaignService.deleteSessionNote(note.id);
+                                            setCanonNoteId(prev => (prev === note.id ? null : prev));
+                                        }}
                                         className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-slate-600 hover:text-red-400"
                                         title="Delete note"
                                     >
@@ -328,6 +413,16 @@ export const RunningLog: React.FC<RunningLogProps> = ({ sessionLog, mobileTab })
                                     </button>
                                 </div>
                             </div>
+                            {canonNoteId === note.id && (
+                                <div className="pl-6 pb-2">
+                                    <CanonCapturePicker
+                                        content={note.content}
+                                        onCancel={() => setCanonNoteId(null)}
+                                        onSave={(kind, name) => handleMakeCanon(note.content, kind, name)}
+                                    />
+                                </div>
+                            )}
+                            </React.Fragment>
                         );
                     })}
                     {filteredNotes.length === 0 && (

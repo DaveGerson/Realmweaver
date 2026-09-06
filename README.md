@@ -22,11 +22,12 @@ RealmWeaver is a single-page application for tabletop RPG Game Masters who want 
 | Category | Features |
 |----------|---------|
 | **World Building** | AI-generated NPCs, locations, factions, items, adventures, articles, plots. Campaign context injected into every generation for consistency. |
-| **Tonight's Table** | Story-first campaign home — previously-on recap, open threads, who's been offstage, and loaded guns (unrevealed secrets in play), derived from existing data with zero clicks. |
-| **Session Management** | Session Prep Wizard (5-step guided flow), Session Runner with scene advancement, running log, beats mode, voice capture, auto-event capture. |
-| **In-Session Tools** | DM Coach (narrate, improvise, rollable tables, NPC roleplay), Complicate This (reincorporates dormant material as a live complication), Combat Tracker, Dice Roller, Secrets & Clues Tracker (clue→revelation mystery wiring, "generate ten" secret drafting). |
+| **Tonight's Table** | Story-first campaign home — previously-on recap, open threads (with plot clocks), who's been offstage, the party spotlight, and loaded guns (unrevealed secrets in play), derived from existing data with zero clicks. |
+| **Session Management** | Session Prep Wizard (5-step guided flow, lazy path, strong-start styles, scene-menu suggestions, Lazy DM checklist), one-click freeform start, Session Runner with a live **Stage** (where / who / what, scene-optional), scenes as a menu drawn from any adventure, running log, beats, voice capture, auto-event capture. |
+| **Unstructured Play** | The Stage layers over prepped scenes or replaces them; Done / Set Aside / shelf instead of a linear track; plot **clocks** with an "if ignored" move so the world acts on its own; spotlight tracking read off the running log; "Make this canon" promotes an improvised note to an NPC, location, item or note. |
+| **In-Session Tools** | DM Coach (narrate, improvise, rollable tables, NPC roleplay, Ask the Table), Complicate This (reincorporates dormant material as a live complication, or browse the shelf and pick), GM Intrusion (zero-precondition live complication), Extras (throwaway NPCs), Quick Tables, Combat Tracker, Dice Roller, Secrets & Clues Tracker (clue→revelation mystery wiring, "generate ten" secret drafting). |
 | **Navigation** | Entity cross-linking with hover tooltips (EntityQuickCard), backlinks ("Referenced By"), back stack, recent items, pinned favorites, command palette (Ctrl+K). |
-| **World Intelligence** | Continuity Checker (12 rules, incl. four mystery-edge lints), Plot Timeline, World Simulation Engine, Content Style Matching, Smart Context Builder (tiered token-budget-aware, with a player-safe variant that never leaks unrevealed secrets). |
+| **World Intelligence** | Continuity Checker (13 rules, incl. four mystery-edge lints and an expired-clock nudge), Plot Timeline, World Simulation Engine, Content Style Matching, Smart Context Builder (tiered token-budget-aware, Stage-aware, with a player-safe variant that never leaks unrevealed secrets). |
 | **Smart Linking** | Word-boundary matching engine behind `@mention` capture, auto-linking on template import, scene smart-link bar, link suggestions panel. |
 | **Onboarding** | First Campaign Wizard (5-step), 4 template campaigns, DM Style progressive disclosure (guided/standard/power). |
 | **Data** | localStorage persistence with IndexedDB quota fallback, 3-slot rotating backups + startup recovery, cross-tab conflict resolution, JSON import/export with validation warnings, Obsidian markdown export, PDF character sheet parsing. |
@@ -146,6 +147,7 @@ All code at **project root** (no `src/` directory). Import alias `@/` maps to ro
 | [`docs/design/schema-presentation-guide.md`](docs/design/schema-presentation-guide.md) | Style guide for presenting the data model to DMs — the consistency contract across docs, the walkthrough, and future in-app help |
 | [`docs/design/storyteller-first-design.md`](docs/design/storyteller-first-design.md) | Proposed storyteller-first elements (P1–P8): story-first home, improv support, story health, campaign endings |
 | [`docs/design/lazy-dm-lens.md`](docs/design/lazy-dm-lens.md) | The Lazy DM analysis: Shea's and Monte Cook's prep schools mapped onto the shipped app, P1–P8 re-ranked through that lens, and five "lazy mode" refinements (R1–R5) |
+| [`docs/design/unstructured-play.md`](docs/design/unstructured-play.md) | The "less railroady" design record: the Stage, the scene menu and shelf, plot clocks, the spotlight, the one-click freeform start, and the Lazy DM / Monte Cook capability lanes built alongside them |
 | [`docs/design/session-cockpit-review.md`](docs/design/session-cockpit-review.md) | 67 user stories and priority matrix |
 | [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) | End-user guide |
 | [`CLAUDE.md`](CLAUDE.md) | Developer conventions for AI-assisted development (plus per-directory `CLAUDE.md` files) |
@@ -188,7 +190,7 @@ npm run test:e2e:ui      # Playwright interactive UI mode
 
 | Layer | Framework | Tests | Scope |
 |-------|-----------|-------|-------|
-| Unit + component | Vitest | 1855 across 178 files | Services, storage/migration, linking engine, utilities, context builder, AI adapters, archetype scenarios, plus jsdom render tests (`@testing-library/react`) for editors, dialogs and hooks |
+| Unit + component | Vitest | 2285 across 210 files | Services, storage/migration, linking engine, utilities, context builder, AI adapters, archetype scenarios, plus jsdom render tests (`@testing-library/react`) for editors, dialogs and hooks |
 | E2E | Playwright | 114 per project × 2 projects (chromium, mobile-chrome); 2 permanently skipped + 4 runtime skip guards | Campaign lifecycle, entity CRUD, navigation, generators, dialogs, session runner, DM tools, visualizers, mobile, RealmChat |
 | Smoke | Built-in (`smokeTest.ts`) | ~20 checks | Service availability + entity CRUD; **opt-in**, dev-only, requires `VITE_RUN_SMOKE_TESTS=true` |
 | Mock | Built-in | Full app | Every AI function has a mock — all features work without API key or network |
@@ -218,6 +220,8 @@ ship-readiness hardening pass.**
 | Claude Migration | Done | Gemini -> Claude Code CLI, provider abstraction layer, model tier system, Vite proxy middleware |
 | Phase 7 (UX Conv. Cleanup) | Done | Button migration (219 usages, 29 files), sidebar drag-drop React state, all sections expanded by default, CrossCampaignDashboard search/filter, DM Style ARIA radiogroup, EntityCreationPanel viewport-relative sizing, BacklinksPanel count, universal language, article icon fix, wizard handoff, deleteAdventure cascade, AdventureEditor delete button, WelcomeScreen import wiring |
 | Ship Readiness | Done | 124 findings across 13 work packages ([plan](docs/ship-readiness/remediation-plan.md)): storage backups + init recovery + autosave max-wait/unload flush + multi-tab conflict resolution, cascade/duplication reference purging, import validation warnings, AI provider env plumbing, linking/mention rewrite, app-shell and editor fixes, AI-proxy hardening (loopback peer check, Origin/Host allowlist, body/stdout caps, preview-server support), Tailwind moved from CDN to build-time, CI workflow, test suite 516 → 990 |
+| Storyteller Waves 1–2 | Done | Tonight's Table, Callback Machine, lazy prep path, party-knowledge (player-safe) AI context, mystery edges + lints, voice cards, moments + cold open, generate-ten secrets, prep sheet ([plan](docs/design/storyteller-first-design.md), [lens](docs/design/lazy-dm-lens.md)) |
+| Unstructured Play | Done | The Stage (scene-optional live where / who / what), scenes as a menu from any adventure with a shelf, Done / Set Aside, plot clocks + "if ignored", spotlight, one-click freeform start; plus the Lazy DM / Monte Cook lanes — GM Intrusion, browse the shelf, Extras, Quick Tables, scene-menu suggestions, Lazy DM checklist, strong-start styles, Ask the Table + player appetites, location aspects, Make this canon ([design](docs/design/unstructured-play.md)) |
 
 ---
 

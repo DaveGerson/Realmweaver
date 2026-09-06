@@ -224,6 +224,19 @@ Click any entity in the sidebar to open its editor. Every field is editable. Loo
 
 Edits save themselves as you type. In the NPC, Location, Faction, Article, and Plot editors, the rich `@`-mention fields settle a moment after you stop typing, and anything still in flight is written out the instant you click away to another entity — so jumping straight from one NPC to the next never strands a half-typed paragraph on the wrong character.
 
+**Location Aspects.** Every location editor has a compact **Aspects** section above the main description — two or three short, sensory one-liners ("Cold mist beads on every surface," "A draft hums one low note through the cracks") you can read straight to the table without reaching for a full paragraph. Type one and press Enter to add it, or click **Suggest aspects** to have the AI propose some from the location's existing name and description — no prompt to write. Remove any aspect with its × button. Newly generated locations arrive with aspects already written. Aspects are entirely optional; a location with none behaves exactly like one always did, and when a location is on stage in the Session Runner its aspects sit at the top of its card.
+
+**What This Player Wants More Of.** Open a player character and you'll find one small optional field for the *player*, not the character: jot down what you've noticed this player wants more of, one line each, in your own words — "wants more tactical combat," "came for the mystery." It's never required and never flagged as missing. The DM Coach's **Ask the Table** questions lean on it when it's there, and the AI's campaign context carries it into generation.
+
+### Plot Pressure: Clocks and "If Ignored"
+
+Open a plot and you'll find a **Pressure** block. Two optional things live there:
+
+- **What happens if the party ignores this?** — the plot's own next move, written as one or two sentences. It shows up in the Session Runner's plot panel and on Tonight's Table, and the AI reads it when it improvises, so the world can move without you scripting a branch.
+- **Countdown clock** — pick 4, 6 or 8 segments and fill them as the fiction says time passed: **Tick** in the editor or in the Session Runner's plot panel (each tick lands in the running log), or click a pip directly. When the clock runs out the move above is due — the Continuity Checker mentions it as a plain note, never a warning. Reset the clock or resolve the plot when the world has made its move.
+
+Nothing here ticks by itself, and a plot with no clock is exactly as valid as one with a clock — this is a tool for the DM who wants the world to push back, not a chore.
+
 ### Linking Entities
 
 Connections make your world feel alive and improve AI generation quality:
@@ -275,9 +288,12 @@ The Lorebook is your campaign encyclopedia. Articles are ideal for historical ev
 - **Previously on** — the recap and loose ends from your last completed session, in the words you wrote them.
 - **Open threads** — your active plot threads, stalest first, each labelled with how many sessions have passed since one moved it forward. A thread nobody has touched in four sessions sits at the top.
 - **Who's been offstage** — your cast ranked by how long since the table saw them. An NPC counts as on stage when the running log tags them, when a session plans them, or when a planned scene features them.
+- **Spotlight** — your players' characters, quietest first: who has not been named in a running-log note for the longest. It reads the notes you already take (a character counts as in the spotlight when a note names them, or tags them), so a character called only by a nickname the log never spells out will read as quiet — write the name once and it catches up.
 - **Loaded guns** — secrets you have not revealed yet that concern someone or somewhere the next session already plans to visit, or that was on stage last time.
 
-One button, **Prep tonight's session**, opens the Session Prep Wizard from here. Click any thread or name to go straight to it.
+Open threads also show a plot's **countdown clock** when it has one, "Time's up" once it has run out, and the plot's **If ignored** move — see [Plot Pressure](#plot-pressure-clocks-and-if-ignored).
+
+Two buttons: **Prep tonight's session** opens the Session Prep Wizard from here, and **Just start playing** skips prep entirely — it opens a freeform session and drops you straight into the Session Runner with an empty Stage. Click any thread or name to go straight to it.
 
 Tonight's Table also keeps your campaign's **Moments** — every running-log entry you starred during play, gathered chronologically across all your sessions. Star the natural 20 at the worst time or the betrayal nobody saw coming, and it lands here; click any moment to revisit its session.
 
@@ -295,7 +311,11 @@ If no adventure is selected, the scenes and entities steps are skipped automatic
 
 Would rather prep light? Toggle **Lazy prep** on the first step and the wizard trades those middle steps for three quick moves: write a strong start — the first thing you'll say when the session starts — list a few beats for what might happen, and take a glance at your still-unrevealed secrets. It works alongside whichever adventure you picked, so the cast and places you would have gathered anyway are still there for that glance, then you go live the same way.
 
-Don't want to write the strong start cold? **Draft it from last session** asks the AI to compose a short read-aloud "previously on…" from your last recap, loose ends, and starred moments, written in your campaign's own voice. It fills the strong-start field as a draft — edit it freely, or generate another.
+Don't want to write the strong start cold? Wherever the wizard asks how you are opening tonight — the lazy path's Strong Start step, or the cold-open card on the standard path's Go Live step — a row of style chips drafts it for you, in your campaign's own voice. **Draft it from last session** composes a short read-aloud "previously on…" from your last recap, loose ends, and starred moments; it appears once you have a finished session to draw on. **Drop into action** always works, even in your very first session — it drops the party straight into motion with no recap needed. **Reincorporate** builds the opener around one piece of your campaign's own history you haven't touched in a while, and only shows up when there is something to spend. Each fills the strong-start field as a draft — edit it freely, or pick another.
+
+Stuck for beats? **Suggest a few** on the Beats step asks the AI for five or six possible scenes for tonight — each a one-line title with an optional hook — with nothing to type. They arrive checked; untick the ones you don't want and click **Add** to fold the rest into your beats, or **Discard** to throw the whole batch away without a trace.
+
+On the **Review & Go Live** step, the **Lazy DM checklist** (collapsed until you open it) is a plain, judgment-free mirror of the eight-step Lazy Dungeon Master method — what you have for a strong start, scenes, secrets, locations, NPCs, and rewards, in one glance. It never turns red, never nags, and never blocks Go Live. With lazy prep on, the Strong Start, Beats, and Secrets Check lines are links that jump straight back to that step.
 
 ### Preparing Without the Wizard
 
@@ -307,23 +327,45 @@ You can also prep manually:
 - Check your **Plots** dashboard to review active storylines
 - Use **DM Coach** for narration and improv practice
 
+Or don't prep at all. **Start Now** in the Session Manager (and **Just start playing** on Tonight's Table) opens a freeform session immediately — no adventure, no scenes, nothing planned. You set the stage as you go; see [The Stage](#the-stage) below. Prepped scenes stay on the shelf and can be pulled in at any moment.
+
 ---
 
 ## Running a Session
 
 ### Session Runner Layout
 
-The Session Runner is a three-column live-game interface:
+The Session Runner is a three-column live-game interface. It works with a full prepped scene list, a handful of beats, or nothing at all — the centre column is never empty.
 
-- **Left column — Scene List** — the planned scenes for the session in order; click any scene to jump to it; the current scene is highlighted
-- **Center column — Active Scene** — the full active scene view: read-aloud text with a copy button, GM notes, linked NPCs with relationship dynamics summary, linked location, and a Next Scene button
-- **Right column — Quick Tools** — DM Coach shortcut, dice roller, Secrets Tracker, plot status cycling, and Quick NPC Generator
+- **Left column — Scenes** — tonight's scenes as a menu, not a track: click any scene to enter it, in any order. A scene you started and stepped out of shows as paused so you can come back to it; **Pull a scene from the shelf** adds any prepped scene from any adventure, and each scene's small **put back** control returns it to the shelf for another night. Beats, your spotlight strip, and last session's recap live here too.
+- **Center column — the Stage and the active scene** — the Stage (where the party is, who is with them, what is happening) sits on top; the active scene's read-aloud text, GM notes, skill checks and rewards render below it when a scene is open, with **Done**, **Next Scene** and **Set Aside** controls. The location card and the NPC cards show everyone and everywhere present, scene or Stage.
+- **Right column — Quick Tools** — DM Coach shortcut, Complicate This (with the dormant-material shelf), GM Intrusion, Extras, Quick Tables, dice roller, Secrets Tracker, Quick NPC Generator, and your active plots with their status and countdown clocks
 
 On mobile, the three columns collapse into tabs you can swipe between, and a floating **Quick Tools** button appears in the bottom-right corner with shortcuts to DM Coach, the Dice Roller, and — when your DM Style mode shows them — the Combat Tracker and Secrets & Clues. The menu is fully keyboard-operable: opening it moves focus to the first item, Up/Down arrows move between items, and Escape closes it and returns focus to the button.
 
+### The Stage
+
+The Stage is the live truth of the table, independent of any prepped scene. It answers three questions and nothing else:
+
+- **Where is the party?** Pick a place from your locations, or just name one — "a nameless roadside shrine" is fine. A named place can be promoted with **Save as a location** the moment it turns out to matter.
+- **Who is here?** The active scene's own cast appears as fixed chips; anyone you add — **Add someone** searches your NPCs, and a Quick NPC made with no scene open walks straight on — appears as a chip you can take off stage again.
+- **What's happening right now?** One line. Press Enter or click away to keep it.
+
+Entering a prepped scene clears the Stage, because the scene now says where you are. Finishing a scene with **Done** (or stepping out with **Set Aside**) hands the scene's place and people back to the Stage, so the room persists after the script runs out. Every change — a move, an arrival, a departure, a new "now" — is logged to the Running Log, which is how an improvised night gets a timeline for the recap without anyone typing it.
+
+Everything that reads the scene reads the Stage too: the NPC cards with their voice notes and logged lines, the Combat Tracker's auto-filled roster, Complicate This, and the DM Coach's picture of who is in the room.
+
+### Scenes as a Menu
+
+Nothing in tonight's list has to be played in order, or at all. Enter a scene and the one you were in stays *started*, not finished — it shows as paused in the list until you return, finish it, or put it back on the shelf. A scene you pull from another adventure carries a small label saying where it came from. Scenes you never reach stay exactly as they were, ready for another night, and the Callback Machine treats them as material to spend.
+
 ### Beats
 
-Beats are a loose checklist that belongs to the session as a whole, not to any single scene — quick one-line prompts for what might happen tonight rather than a fully worked-out plan. List a few from the Session Prep Wizard before the table sits down, or add one straight from the Scene List panel while you play. Check one off when it lands, edit the wording if the story bends, or remove it if you never got to it — nothing here is locked in, so jot down more than you expect to use.
+Beats are a loose checklist that belongs to the session as a whole, not to any single scene — quick one-line prompts for what might happen tonight rather than a fully worked-out plan. List a few from the Session Prep Wizard before the table sits down, or add one straight from the Scene List panel while you play. Check one off when it lands, edit the wording if the story bends, or remove it if you never got to it — nothing here is locked in, so jot down more than you expect to use. Press the small **play** control on a beat to make it the Stage's "what's happening right now".
+
+### Spotlight Tonight
+
+Under the beats, **Spotlight tonight** lists your players' characters with how many running-log notes named them so far this session. A character reading "quiet so far" is not a warning — it is a nudge to look their way in the next scene. Tonight's Table keeps the same reading across sessions.
 
 ### Running Log
 
@@ -333,7 +375,7 @@ The Running Log sits at the bottom of the Session Runner. Use it to capture note
 - Tag notes as Combat, NPC, Decision, Loot, or Discovery
 - Use `@` to mention entities by name — they become clickable links
 - Toggle **Important Only** to filter the log to highlighted entries
-- System events such as scene transitions, dice rolls, and NPC creation are automatically logged with color-coded icons
+- System events such as scene transitions, moves and arrivals on the Stage, dice rolls, NPC creation, and plot-clock ticks are automatically logged with color-coded icons
 
 ### Voice Capture
 
@@ -341,15 +383,39 @@ Tap the microphone icon in the Running Log to start voice capture. RealmWeaver u
 
 For a longer-form transcript, open a Session Log and use **AI Scribe**, which streams audio to Google's live transcription service and appends the result to your running notes. AI Scribe requires a Google Cloud API key in Campaign Settings; if the connection fails you get a toast telling you to check the key.
 
+### Make This Canon
+
+Hover over any note you typed yourself in the Running Log (tap it on mobile) and click the **Make this canon** icon to turn it into a real entity. RealmWeaver proposes a name from the note's leading phrase — edit it if you like — then pick New NPC, New Location, New Item, or New Note and click Save. A new NPC is linked to your active scene automatically, or placed on the Stage if no scene is open; either way the promotion is logged to the Running Log and you get a confirmation toast. Nothing is ever promoted for you: Cancel throws nothing away, and a note you never promote stays exactly as valid as it always was.
+
+You get the same **Make this canon** button on a session's structured notes in the Session Log editor, so you can turn a note into an entity after the fact too — reviewing a past session works the same way, just without scene-linking or Stage placement, since both only make sense mid-session. The promotion note lands in the log you are reviewing.
+
 ### Quick NPC Generator
 
-In the right panel of the Session Runner, the **Quick NPC Generator** lets you create a new NPC on the fly without leaving the runner. The new NPC is immediately added to your campaign and can be linked to the active scene.
+In the right panel of the Session Runner, the **Quick NPC Generator** lets you create a new NPC on the fly without leaving the runner. The new NPC is immediately added to your campaign and linked to the active scene — or, when no scene is open, put straight onto the Stage.
 
 ### NPC Voice at the Table
 
 Every NPC has an optional **Voice** field in their editor — accent, cadence, verbal tics, register ("clipped sentences, never uses contractions, calls everyone 'pet'"). When that NPC appears in the live scene, their voice notes sit at the top of their card, right where you glance before speaking.
 
 Beneath the voice, the card shows the NPC's most recent **logged lines** — press **Log a line** on the card (or **Log this line** in the DM Coach's roleplay tool) to save something they actually said at the table. The AI reads both when it roleplays that NPC, so Serah still sounds like the Serah your table has heard, not the one on a six-month-old character sheet.
+
+### Complicate This, GM Intrusion, and the Shelf
+
+**Complicate This** in Quick Tools samples two or three pieces of your world's dormant material — an offstage NPC, an unrevealed secret linked to someone present, a stalled thread, a scene you prepped and never ran — and asks the AI for one complication that brings them back into the scene. Nothing to type: press it, read the card, **Use It** to log it (and, if a secret was spent, mark it revealed in one tap) or **Another** for a fresh draw. The people currently on the Stage count as present, not offstage.
+
+**GM Intrusion**, next to it, is the other live-complication button — and it needs nothing established first. Where Complicate This spends something your world already has lying around, GM Intrusion introduces a brand-new twist on the spot, straight from the Cypher System's own GM Intrusion technique. It works in your very first session, before anything is dormant to spend. Press it, read the card, and either **Use It** — which logs it to the running log — or hit **Another** for a different twist.
+
+Under Complicate This's card, **Browse dormant material** opens every piece of dormant material your campaign is carrying — offstage cast, unrevealed secrets, stalled threads, unused scenes — grouped and laid out for you to read. If you already know exactly which thread you want to pull back into tonight, click **Spend this** next to it instead of pressing Complicate This over and over hoping the random draw lands on it. Spending a piece writes the same kind of complication card, with its own **Use It** to log it.
+
+### Extras and Quick Tables
+
+When a scene needs bodies in it and none of them matter yet, **Extras** in Quick Tools hands you four to six names with one vivid detail each — a scar, an accent, a nervous habit — nothing more. **Copy all** puts the whole list on your clipboard to read straight off; **Promote to NPC** turns any one line into a real NPC, linked to the active scene if one is open (or put on the Stage when none is), with everything else defaulted so you don't have to fill out a form mid-session.
+
+**Quick Tables** rolls instantly, with no AI wait — Tavern Interruption, The Watch Notices, A Rumor Making the Rounds, Complication on the Road, and What's in the Pocket, ready the moment you expand the panel. Click a table to roll it and read the result off the card; **Log it** writes the roll straight into your running notes.
+
+### Plot Clocks at the Table
+
+Active plots in Quick Tools show their **countdown clock** and **If ignored** move when they have one. Click the small arrow to tick the clock when the fiction says time passed — the tick lands in the running log — and when it runs out the panel says so. See [Plot Pressure](#plot-pressure-clocks-and-if-ignored) for setting them up.
 
 ### Session Timer
 
@@ -389,6 +455,10 @@ When you click **End Session** in the Session Runner, the **Session End Wizard**
 
 Everything the wizard collects — the GM recap, loose ends, per-plot progressions, and the player-facing recap — is written to the session log when you finish. Reopening the wizard on a session that already has a saved recap loads those values back in rather than starting blank, so a second pass edits your existing text instead of overwriting it with an empty field.
 
+### Ask the Table
+
+Between sessions, open the **DM Coach** from the header and switch to the **Ask the Table** tab. One click on **Generate** produces four or five short, warm check-in questions worth sending your players — nothing to type. When you have noted what a player wants more of on their character (see [Editing Entities](#editing-entities)), the questions lean on it; otherwise they draw on the campaign as it stands. Copy any line, or all of them; nothing is logged or saved unless you paste it somewhere yourself.
+
 ### Session Logs
 
 All session data is stored in **Session Logs**, accessible from the sidebar. Each log records the adventure played, planned scenes, running notes, structured note entries, plot progressions, loose ends, the GM recap, and the player-facing recap. You can edit any field after the session ends. Only one session can be live at a time — the **Start Session** button on a session log is disabled while another log is already active.
@@ -415,11 +485,11 @@ This is useful before a time-skip, to simulate faction politics while players we
 
 ### Continuity Checker
 
-Access from the header. The Continuity Checker scans your entire campaign data against eight rule-based checks and surfaces issues at three severity levels:
+Access from the header. The Continuity Checker scans your entire campaign data against thirteen rule-based checks and surfaces issues at three severity levels:
 
 - **Errors** (red) — definite problems, such as scenes referencing deleted NPCs
 - **Warnings** (amber) — likely issues, such as an adventure with no scenes
-- **Info** (blue) — notable gaps worth reviewing, such as NPCs without a faction
+- **Info** (blue) — notable gaps worth reviewing, such as NPCs without a faction, or a plot whose countdown clock has run out while the plot is still active
 
 Click any issue to navigate directly to the entity with the problem. Dismiss issues you have intentionally set up that way. Run the checker before session prep to catch problems before they surface at the table.
 

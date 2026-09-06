@@ -447,3 +447,19 @@ parent-location chain, reusing E10's derivations; S, zero schema); **T2** — a
 RelationshipGraph focus lens (dim outside a selected node's 2-hop neighborhood, optional
 unrevealed-clue count badge; M, zero schema). Slot opportunistically from Wave 3 —
 T1's file (`SecretsTracker.tsx`) is owned by the Wave 2 build until it lands.
+
+---
+
+## Unstructured-play addendum (2026-09-06)
+
+Waves 1 and 2 shipped as planned. The next pass —
+[`unstructured-play.md`](unstructured-play.md) — turned from **prep** to **play**: the
+Session Runner gained the **Stage** (a scene-optional live where/who/what), the scene list
+became a **menu** that can draw from any adventure with a shelf to pull from and put back,
+plots gained **pressure** (a countdown clock and an "if ignored" move — the smallest useful
+form of E4), the party **spotlight** is read off the running log, and a session can start with
+one click. The P5 gate moved by one field: `PlayerCharacter.playerFlags?` (player appetites)
+shipped as Table Pulse; `Campaign.pillars?` and `PlayerCharacter.hooks?` remain gated. Ten
+Lazy DM / Monte Cook capabilities from a fresh research pass landed alongside (GM Intrusion,
+browse the shelf, Extras, Quick Tables, scene-menu suggestions, Lazy DM checklist, strong-start
+styles, Ask the Table, location aspects, Make this canon).

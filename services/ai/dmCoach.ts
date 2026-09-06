@@ -299,6 +299,104 @@ export const generateCallbackComplication = async (
 };
 
 /**
+ * §4.2 — GM Intrusion (Monte Cook / Cypher System). Structurally a sibling of
+ * `generateCallbackComplication` above, but with the one precondition that
+ * function has and this one deliberately does not: it never requires dormant
+ * material and never throws on an empty campaign. Session 1 of a brand-new
+ * campaign has nothing dormant yet — this is the button that still works that
+ * night. Where the Callback Machine looks *backward* into the world's own
+ * idle inventory, this looks *forward*: it introduces something NEW, right
+ * now, unprompted by any failed roll or specific trigger — the Cypher
+ * System's own GM Intrusion technique. The mechanic's reward-economy half
+ * (the XP exchange) is deliberately out of scope: Realmweaver carries the
+ * posture, never a rules engine, the same call the Callback Machine already
+ * made.
+ */
+function buildGmIntrusionPrompt(sceneSummary?: string): string {
+  const sections = [
+    'You are a master Dungeon Master practicing the GM Intrusion technique from the Cypher System: at any moment, unprompted by a failed roll or any specific trigger, you introduce ONE unexpected complication or twist that raises the stakes or pushes the scene forward.',
+    sceneSummary ? `What is happening on stage right now: ${sceneSummary}` : '',
+    'Commit to a single complication (2-4 sentences), not a menu of options. Look forward — introduce something new rather than reincorporating what has already happened. Do not break character.',
+  ];
+  return sections.filter(Boolean).join('\n\n');
+}
+
+export const generateGmIntrusion = async (
+  campaignContext?: string,
+  sceneSummary?: string,
+  useLiteModel: boolean = false
+): Promise<string> => {
+  const tier = useLiteModel ? 'lite' : 'standard';
+  const prompt = buildGmIntrusionPrompt(sceneSummary);
+  const result = await generateText(prompt, tier, campaignContext);
+  return result.trim();
+};
+
+// --- §4.8 — Extras & spear-carriers (Sly Flourish step 6) -------------------
+//
+// Scoped to the truly disposable case the shipped Quick NPC Generator doesn't
+// target: not a full NPC record, just a name and one vivid one-line detail,
+// four to six at a time, for a crowd scene that needs bodies in it right now.
+
+const extrasSchema = {
+  type: 'object',
+  properties: {
+    extras: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'A name for a throwaway background character.' },
+          detail: {
+            type: 'string',
+            description: 'ONE vivid one-line detail — an accent, a scar, a nervous habit. No backstory or motivation.',
+          },
+        },
+        required: ['name', 'detail'],
+      },
+    },
+  },
+  required: ['extras'],
+};
+
+export interface ExtraNpc {
+  name: string;
+  detail: string;
+}
+
+/**
+ * Drops any draft missing a name or a detail and caps the list — the same
+ * defensive shape-normalization every schema-backed generator applies to
+ * model output before it reaches a component.
+ */
+function normalizeExtras(raw: unknown): ExtraNpc[] {
+  if (!Array.isArray(raw)) return [];
+  const result: ExtraNpc[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const record = item as Record<string, unknown>;
+    const name = typeof record.name === 'string' ? record.name.trim() : '';
+    const detail = typeof record.detail === 'string' ? record.detail.trim() : '';
+    if (!name || !detail) continue;
+    result.push({ name, detail });
+    if (result.length >= 8) break;
+  }
+  return result;
+}
+
+export const generateExtras = async (
+  count: number,
+  campaignContext?: string,
+  useLiteModel: boolean = false
+): Promise<ExtraNpc[]> => {
+  const tier = useLiteModel ? 'lite' : 'standard';
+  const requested = Number.isFinite(count) ? Math.min(8, Math.max(1, Math.floor(count))) : 5;
+  const instructions = `You are a Dungeon Master's assistant. Generate ${requested} throwaway background characters for a crowd scene — just a name and ONE vivid one-line detail each (an accent, a scar, a nervous habit). These are not major characters; do not give them backstories or motivations.`;
+  const result = await generateWithSchema(`Generate ${requested} extras.`, extrasSchema, instructions, {}, tier, campaignContext);
+  return normalizeExtras(result?.extras);
+};
+
+/**
  * P4 — the "Previously on…" cold open. The DM types nothing: the whole draft is
  * composed from what the campaign already holds — the last completed session's
  * `recap` and `looseEnds`, plus the most recent engraved moments (starred
@@ -385,6 +483,177 @@ export const generateColdOpen = async (request: ColdOpenRequest): Promise<string
   return result.trim();
 };
 
+// --- Scene Menu Generator (docs/design/lazy-dm-lens.md §4 R1 / the "scene
+// menu"; Wave 2, SessionPrepWizard bundle) -----------------------------------
+//
+// Widens the lazy path's Beats step, which ships with zero AI assist today,
+// with the same generate -> preview -> keep-some idiom R2 already shipped for
+// the Secrets Tracker (`generateSecretBatch` above / `GenerateTenPanel`), one
+// step down in scale: 5-6 short scene drafts instead of ten secrets. The
+// "prompt" handed to the model is a fixed constant — the DM never sees or
+// edits a text box (docs/design/lazy-dm-lens.md §5's no-crafted-prompt rule).
+
+/**
+ * One proposed scene, before the DM keeps it. Maps directly onto the shipped
+ * `Beat` shape (`title` -> `title`, `hook` -> `notes`) — nothing here is
+ * persisted until the DM checks it and the wizard folds it into its own
+ * `lazyBeats` state. Deliberately NOT a `types/` shape, same reasoning as R2's
+ * `SecretDraft`.
+ */
+export interface SceneMenuDraft {
+  title: string;
+  hook?: string;
+}
+
+/** A runaway model must not flood the preview panel. */
+const MAX_SCENE_MENU_DRAFTS = 8;
+
+const sceneMenuDraftSchema = {
+  type: 'object',
+  properties: {
+    title: { type: 'string', description: 'A short, one-line title for a possible scene tonight.' },
+    hook: { type: 'string', description: "Optional: one sentence of texture or a hook for the scene. Omit if the title says enough on its own." },
+  },
+  required: ['title'],
+};
+
+const sceneMenuSchema = {
+  type: 'object',
+  properties: {
+    scenes: {
+      type: 'array',
+      description: 'Five to six possible short scenes for tonight, offered as a MENU — not a fixed sequence, and not all of them will be used.',
+      items: sceneMenuDraftSchema,
+    },
+  },
+  required: ['scenes'],
+};
+
+const SCENE_MENU_INSTRUCTIONS = `You are a master Dungeon Master helping a fellow GM outline potential scenes for tonight's table. Propose 5-6 possible short scenes the party might run into tonight, as a MENU the DM can pick from — not a fixed sequence, and not all of them will be used. Ground them in the loose ends, active plot threads, and NPCs or locations already established in the campaign. Each is a one-line title and, optionally, one sentence of texture.
+
+- **title:** A short, evocative one-line scene title.
+- **hook:** Optional — one sentence of texture or a hook. Omit if the title says enough on its own.`;
+
+/** Fixed constant — the DM never types or edits this. Zero-prompt by construction. */
+const SCENE_MENU_PROMPT = 'Propose 5-6 possible short scenes the party might run into tonight, as a menu I can pick from — not a fixed sequence.';
+
+/**
+ * Model output is made structurally safe HERE, not downstream: accepts a
+ * `{ scenes: [...] }` envelope or a bare array, drops any entry missing a
+ * non-blank `title`, omits a blank `hook` rather than storing `''`, and caps
+ * the result at `MAX_SCENE_MENU_DRAFTS`. Always returns an array — never
+ * throws on malformed model output (a rejected provider call is a different
+ * matter and is left to propagate).
+ */
+function normalizeSceneMenuDrafts(raw: unknown): SceneMenuDraft[] {
+  let list: unknown[];
+  if (Array.isArray(raw)) {
+    list = raw;
+  } else if (raw && typeof raw === 'object' && Array.isArray((raw as { scenes?: unknown }).scenes)) {
+    list = (raw as { scenes: unknown[] }).scenes;
+  } else {
+    return [];
+  }
+
+  const drafts: SceneMenuDraft[] = [];
+  for (const entry of list) {
+    if (drafts.length >= MAX_SCENE_MENU_DRAFTS) break;
+    if (!entry || typeof entry !== 'object') continue;
+
+    const entryObj = entry as Record<string, unknown>;
+    const title = typeof entryObj.title === 'string' ? entryObj.title.trim() : '';
+    if (!title) continue;
+
+    const draft: SceneMenuDraft = { title };
+    const hook = typeof entryObj.hook === 'string' ? entryObj.hook.trim() : '';
+    if (hook) draft.hook = hook;
+
+    drafts.push(draft);
+  }
+  return drafts;
+}
+
+/**
+ * §4.1 — one model call proposes 5-6 possible scenes for tonight from
+ * campaign context alone. Never throws on malformed model output: the result
+ * is always an array (possibly empty). A provider-level rejection (network,
+ * timeout, bad JSON after retries) propagates rather than being swallowed
+ * into `[]`.
+ */
+export const generateSceneMenu = async (campaignContext?: string): Promise<SceneMenuDraft[]> => {
+  const raw = await generateWithSchema(SCENE_MENU_PROMPT, sceneMenuSchema, SCENE_MENU_INSTRUCTIONS, {}, 'standard', campaignContext);
+  return normalizeSceneMenuDrafts(raw);
+};
+
+// --- Strong Start Styles (docs/design/lazy-dm-lens.md §4.6; widens R1/P4) ---
+//
+// The shipped cold open ("Previously on…") is one drafting angle for Shea's
+// step 2, and it depends on there being a prior session to recap. These two
+// styles cover the rest: one that needs no history at all ('action'), and one
+// built around exactly one sampled piece of the campaign's own dormant
+// material ('reincorporate'). The 'previously-on' style is NOT handled here —
+// callers continue to call `generateColdOpen` verbatim; this function only
+// ever drafts 'action' or 'reincorporate'.
+
+export interface StrongStartRequest {
+  /** Which style to draft. 'previously-on' stays on `generateColdOpen` — it is deliberately not a member of this union. */
+  style: 'action' | 'reincorporate';
+  /** The campaign the strong start is drafted for — read only for its optional `styleProfile` voice guide, same precedent as `generateColdOpen`. */
+  campaign: Campaign;
+  /** Caller-built campaign context, forwarded verbatim. Never built here. */
+  campaignContext?: string;
+  /** Required for style 'reincorporate' — the ONE sampled dormant piece (`utils/dormantMaterial.ts`, read-only here) to build the opening around. */
+  dormantPiece?: DormantPiece;
+  useLiteModel?: boolean;
+}
+
+function styleGuideSection(campaign: Campaign): string {
+  const styleText = (campaign.styleProfile ?? '').trim();
+  return styleText ? `Match this campaign's voice guide exactly:\n${styleText}` : '';
+}
+
+function buildActionStrongStartPrompt(campaign: Campaign): string {
+  const sections = [
+    'You are a master Dungeon Master\'s assistant. Draft an in-medias-res strong start: read-aloud performance material of roughly 50-80 words that the DM can read aloud verbatim to open tonight\'s session by dropping the party straight into a moment of tension or motion — no recap, no setup, just action already underway. Write continuous prose — no bullet points, no headings, no meta-commentary about the task.',
+    styleGuideSection(campaign),
+  ].filter(Boolean);
+  return sections.join('\n\n');
+}
+
+function buildReincorporateStrongStartPrompt(campaign: Campaign, dormantPiece: DormantPiece): string {
+  const sections = [
+    `You are a master Dungeon Master's assistant. Draft a strong start built around this piece of the campaign's own history: ${dormantPiece.label} — ${dormantPiece.reason}. Write read-aloud performance material of roughly 50-80 words that the DM can read aloud verbatim, bringing it back into the light as the hook for tonight. Write continuous prose — no bullet points, no headings, no meta-commentary about the task.`,
+    styleGuideSection(campaign),
+  ].filter(Boolean);
+  return sections.join('\n\n');
+}
+
+/**
+ * §4.6 — the DM types nothing in either style. 'reincorporate' needs a
+ * sampled dormant piece to build around; asking for it with none supplied is
+ * a caller mistake this refuses rather than papering over (same posture as
+ * `generateCallbackComplication`'s empty-material guard above).
+ */
+export const generateStrongStart = async (request: StrongStartRequest): Promise<string> => {
+  const { style, campaign, campaignContext, dormantPiece, useLiteModel } = request;
+
+  let prompt: string;
+  if (style === 'reincorporate') {
+    if (!dormantPiece) {
+      throw new Error(
+        'generateStrongStart needs a sampled dormant piece for the "reincorporate" style; none was supplied.'
+      );
+    }
+    prompt = buildReincorporateStrongStartPrompt(campaign, dormantPiece);
+  } else {
+    prompt = buildActionStrongStartPrompt(campaign);
+  }
+
+  const tier = useLiteModel ? 'lite' : 'standard';
+  const result = await generateText(prompt, tier, campaignContext);
+  return result.trim();
+};
+
 export const analyzeSessionNotes = async (notes: string, knownEntityNames: string[], campaignContext?: string): Promise<{entries: {content: string, relatedEntityNames: string[]}[]}> => {
     const modelName = 'standard';
     const instructions = `You are an expert Game Master's assistant. Your task is to process raw session notes into structured log entries.
@@ -398,3 +667,112 @@ export const analyzeSessionNotes = async (notes: string, knownEntityNames: strin
 
     return generateWithSchema(notes, sessionAnalysisSchema, instructions, {}, modelName, campaignContext);
 }
+
+// ---------------------------------------------------------------------------
+// Table Pulse (lazy-dm-research.md §4.3) — "Ask the Table" check-in questions
+// ---------------------------------------------------------------------------
+//
+// This is P5's narrowest slice (storyteller-first-design.md P5):
+// `PlayerCharacter.playerFlags` only. `Campaign.pillars` and
+// `PlayerCharacter.hooks[]` stay gated — not built here, not implied by this
+// change.
+
+/**
+ * "Ask the Table": a zero-prompt DM Coach tool (docs/design/lazy-dm-lens.md
+ * §5 — no crafted prompt as the entry point) that hands the DM a short list
+ * of warm, between-session questions to copy and send to their players.
+ * Unlike `generateCallbackComplication`, there is no material precondition —
+ * this always has something to offer, even for a brand-new campaign with an
+ * empty roster.
+ */
+export interface CheckInQuestionsRequest {
+  /**
+   * Read ONLY for `playerCharacters[].playerFlags` (the players' own stated
+   * appetites) — nothing else on the campaign is touched here.
+   * `contextBuilder.ts` is deliberately NOT the source for this section; a
+   * separate, later change owns injecting `playerFlags` into the shared
+   * tiered context.
+   */
+  campaign?: Campaign;
+  /** Caller-built campaign context, forwarded verbatim. Never built here. */
+  campaignContext?: string;
+  useLiteModel?: boolean;
+}
+
+const checkInQuestionsSchema = {
+  type: 'object',
+  properties: {
+    questions: {
+      type: 'array',
+      description: 'Four to five short, warm between-session questions a GM could text their players.',
+      items: { type: 'string' },
+    },
+  },
+  required: ['questions'],
+};
+
+/** Zero DM-typed input — the "prompt" is always this fixed constant. */
+const CHECK_IN_QUESTIONS_PROMPT = 'Propose a few check-in questions the DM can send the players between sessions.';
+
+/** Hard cap so a verbose model response can't turn a glanceable list into a chore to read. */
+const MAX_CHECK_IN_QUESTIONS = 6;
+
+/**
+ * Every non-blank line across the whole roster's `playerFlags`, in roster
+ * order. A PC with none, a roster with none, or a missing campaign
+ * contributes nothing — this never throws on an empty campaign.
+ */
+function gatherPlayerFlags(campaign?: Campaign): string[] {
+  const flags: string[] = [];
+  for (const pc of campaign?.playerCharacters ?? []) {
+    for (const flag of pc.playerFlags ?? []) {
+      const trimmed = flag.trim();
+      if (trimmed) flags.push(trimmed);
+    }
+  }
+  return flags;
+}
+
+/**
+ * Model output made structurally safe HERE, mirroring `realmWeaver.ts`'s
+ * `normalizeSecretDrafts`: accepts a `{ questions: [...] }` envelope or a
+ * bare array, drops anything that isn't a non-blank string, and caps the
+ * result at `MAX_CHECK_IN_QUESTIONS`. Always returns an array — never throws
+ * on malformed model output.
+ */
+function normalizeCheckInQuestions(raw: unknown): string[] {
+  let list: unknown[];
+  if (Array.isArray(raw)) {
+    list = raw;
+  } else if (raw && typeof raw === 'object' && Array.isArray((raw as { questions?: unknown }).questions)) {
+    list = (raw as { questions: unknown[] }).questions;
+  } else {
+    return [];
+  }
+
+  const questions: string[] = [];
+  for (const entry of list) {
+    if (questions.length >= MAX_CHECK_IN_QUESTIONS) break;
+    if (typeof entry !== 'string') continue;
+    const trimmed = entry.trim();
+    if (trimmed) questions.push(trimmed);
+  }
+  return questions;
+}
+
+export const generateCheckInQuestions = async (request: CheckInQuestionsRequest = {}): Promise<string[]> => {
+  const { campaign, campaignContext, useLiteModel } = request;
+  const flags = gatherPlayerFlags(campaign);
+
+  const instructions = [
+    "You are a Game Master's assistant helping a DM check in with their players between sessions.",
+    'Propose 4-5 short, warm questions a GM could text their players — things like what their character wants right now, what they wish had happened, or who they want to see again. Keep each under 15 words. Return only the questions themselves, no numbering or preamble.',
+    flags.length > 0
+      ? `Players have said they want more of:\n${flags.map((flag) => `- ${flag}`).join('\n')}`
+      : '',
+  ].filter(Boolean).join('\n\n');
+
+  const tier = useLiteModel ? 'lite' : 'standard';
+  const raw = await generateWithSchema(CHECK_IN_QUESTIONS_PROMPT, checkInQuestionsSchema, instructions, {}, tier, campaignContext);
+  return normalizeCheckInQuestions(raw);
+};

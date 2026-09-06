@@ -220,3 +220,18 @@ Schema: none.
   fiction," and Shea's method preps *scenes*, not *decision trees*, precisely so a diverging party
   never invalidates the prep. The Callback Machine (P2) is this lens's actual answer to the same
   anxiety a branching tool would try to solve.
+
+---
+
+## 6. Follow-through (2026-09-06)
+
+R1–R5 shipped in Waves 1–2. A second research pass then mapped both schools against the
+shipped app again and built the remaining gaps as parallel lanes — GM Intrusion (the
+zero-precondition half of Cook's signature move), browsing the shelf instead of sampling it,
+Extras and Quick Tables, scene-menu suggestions and strong-start styles in the wizard, an
+informational Lazy DM checklist, Ask the Table + player appetites (Shea step 1 and Cook's
+whole-table posture converging on one field), location aspects (step 5), and "Make this
+canon" — alongside the Session Runner's turn to structure-optional play (the Stage, the scene
+menu, plot clocks, the spotlight, a one-click start). Design record:
+[`unstructured-play.md`](unstructured-play.md). §5's rulings were honoured throughout: no
+new ledger, no encounter math, no blank prompt box, no branching planner.

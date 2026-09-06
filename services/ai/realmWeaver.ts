@@ -24,6 +24,14 @@ export const locationSchema = {
         name: { type: 'string', description: "The name of the location." },
         description: { type: 'string', description: "A vivid description of the location, including sights, sounds, and smells." },
         secrets: { type: 'string', description: "Hidden details, history, or secrets about this location. e.g., 'A loose brick on the north wall reveals a hidden compartment.'" },
+        // Sly Flourish's "develop fantastic locations" step (Lazy DM step 5) —
+        // optional so a model that omits it never breaks the schema; postProcess
+        // below normalises whatever comes back (including nothing at all).
+        aspects: {
+            type: 'array',
+            description: "2-3 short, evocative SENSORY one-liners (sight, sound, smell, texture) a GM can read aloud or paraphrase on the fly — lighter and punchier than the full description. e.g. 'Damp stone smells of tallow smoke', 'A draft hums one low note through the cracks.'",
+            items: { type: 'string' },
+        },
     },
     required: ['name', 'description', 'secrets'],
 };
@@ -158,6 +166,29 @@ function addSkillCheckIds(skillChecks: Omit<SkillCheck, 'id'>[]): any[] {
   return skillChecks.map(sc => ({ ...sc, id: crypto.randomUUID() }));
 }
 
+/** Location aspects (Lazy DM step 5) are capped here defensively; the schema
+ *  prompt asks for 2-3, but a runaway model must not flood the editor's list. */
+const MAX_LOCATION_ASPECTS = 4;
+
+/**
+ * Makes a location's `aspects` structurally safe: a missing/malformed value
+ * from the model (an absent key, `null`, a non-array, non-string entries)
+ * normalises to `undefined` rather than throwing, so every consumer can read
+ * `location.aspects ?? []` with no further guard. Entries are trimmed,
+ * blanks are dropped, and the result is capped at `MAX_LOCATION_ASPECTS`.
+ * Shared by `locationConfig.postProcess` (full location generation) and
+ * `generateLocationAspects` (retrofitting an existing location).
+ */
+function normalizeAspects(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const cleaned = raw
+    .filter((a): a is string => typeof a === 'string')
+    .map(a => a.trim())
+    .filter(Boolean)
+    .slice(0, MAX_LOCATION_ASPECTS);
+  return cleaned.length > 0 ? cleaned : undefined;
+}
+
 const npcConfig: EntityGenerationConfig = {
   entityType: 'npc',
   entityLabel: 'NPC dossier',
@@ -181,7 +212,15 @@ const locationConfig: EntityGenerationConfig = {
   schema: locationSchema,
   fieldInstructions: `- **name:** The name of the location.
 - **description:** A "read-aloud" description focusing on sensory details (sight, sound, smell) to set the scene for players. Keep it evocative but concise.
-- **secrets:** Hidden details, lore, or clues that players can discover through investigation. Frame these as "investigation" opportunities (e.g., "A DC 15 Investigation check on the bookshelf reveals a false book that acts as a lever.").`,
+- **secrets:** Hidden details, lore, or clues that players can discover through investigation. Frame these as "investigation" opportunities (e.g., "A DC 15 Investigation check on the bookshelf reveals a false book that acts as a lever.").
+- **aspects:** 2-3 short, evocative sensory one-liners (sight, sound, smell, texture) a GM can read aloud or paraphrase without consulting the full description — lighter and punchier, distinct from it rather than a restatement.`,
+  // A missing/malformed `aspects` from the model must never crash the
+  // generation flow — normalizeAspects tolerates absence, returning
+  // `undefined` rather than throwing (Lazy DM step 5).
+  postProcess: (data) => {
+    data.aspects = normalizeAspects(data.aspects);
+    return data;
+  },
 };
 
 const factionConfig: EntityGenerationConfig = {
@@ -337,6 +376,42 @@ export const generateArticle = async (prompt: string, campaignContext?: string):
 
 export const generatePoiFromLoot = async (prompt: string, campaignContext?: string): Promise<Omit<PointOfInterest, 'id'>> =>
   generateEntity(poiConfig, prompt, campaignContext);
+
+// --- Lazy DM step 5: "develop fantastic locations" -------------------------
+
+const locationAspectsSchema = {
+  type: 'object',
+  properties: {
+    aspects: {
+      type: 'array',
+      description: "2-3 short, evocative SENSORY one-liners (sight, sound, smell, texture) for this location, ready to read aloud or paraphrase at the table without consulting a full paragraph.",
+      items: { type: 'string' },
+    },
+  },
+  required: ['aspects'],
+};
+
+const LOCATION_ASPECTS_INSTRUCTIONS = `You are The Prep Architect, an expert TTRPG worldbuilder helping a GM sketch a location fast. Given the location's name and description below, propose 2-3 short, evocative SENSORY one-liners (sight, sound, smell, texture) the GM can read aloud or paraphrase at the table — lighter and punchier than a full paragraph. Each aspect should be distinct from the others and from the description already given, not a restatement of it.
+
+- **aspects:** 2-3 short sensory one-liners, ready to read aloud or paraphrase.`;
+
+/**
+ * Retrofits `aspects` onto a location that predates the field (or whose
+ * generated aspects were discarded) — a small standalone `generateWithSchema`
+ * call, not a full re-run of `generateLocation`. Zero-typed-prompt by
+ * construction: the "prompt" is built entirely from the location's own
+ * name/description, mirroring `generateSecretBatch`'s fixed-instructions
+ * convention — the GM never sees or edits a text box. Never throws on
+ * malformed model output: the result is always an array, possibly empty.
+ */
+export const generateLocationAspects = async (
+  location: { name: string; description: string },
+  campaignContext?: string,
+): Promise<string[]> => {
+  const prompt = `Location Name: ${location.name}\nDescription: ${location.description || 'Not specified'}`;
+  const data = await generateWithSchema(prompt, locationAspectsSchema, LOCATION_ASPECTS_INSTRUCTIONS, {}, 'standard', campaignContext);
+  return normalizeAspects((data as { aspects?: unknown })?.aspects) ?? [];
+};
 
 // --- R2: "Generate ten, keep what you like" (Secrets Tracker) ---------------
 

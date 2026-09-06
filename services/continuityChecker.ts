@@ -3,6 +3,7 @@
 // Rule-based continuity checker — pure function, no side effects, no API calls.
 
 import type { Campaign } from '@/types/Campaign';
+import { normalizePlotClock } from '@/utils/plotClock';
 
 export type IssueSeverity = 'error' | 'warning' | 'info';
 
@@ -617,6 +618,41 @@ function checkMysteryEdges(campaign: Campaign, makeId: MakeId): ContinuityIssue[
   return issues;
 }
 
+// ─── Rule 10: Expired Plot Clocks (info) ─────────────────────────────────────
+//
+// A plot's countdown clock (types/Plot.ts `PlotClock`, unstructured play) is
+// the DM's own promise that the world moves when the party looks away. When
+// every segment is filled and the plot is still active, the promised move is
+// due — an `info` nudge, never an error: the clock is optional and a DM who
+// never sets one is never told about it.
+
+function checkExpiredClocks(campaign: Campaign, makeId: MakeId): ContinuityIssue[] {
+  const issues: ContinuityIssue[] = [];
+
+  for (const plot of campaign.plots ?? []) {
+    if (plot.status !== 'active') continue;
+    const clock = normalizePlotClock(plot.clock);
+    if (!clock || clock.filled < clock.segments) continue;
+    const move = plot.ifIgnored?.trim();
+    issues.push({
+      id: makeId('clock-expired'),
+      severity: 'info',
+      ruleId: 'clock-expired',
+      title: 'A plot clock has run out',
+      description: move
+        ? `The clock on "${plot.title}" is full (${clock.filled}/${clock.segments}). Its move is due: ${move}`
+        : `The clock on "${plot.title}" is full (${clock.filled}/${clock.segments}) and the plot is still active.`,
+      entityIds: [plot.id],
+      entityTypes: ['plot'],
+      suggestedFix: move
+        ? 'Make the move at the table, then reset the clock or resolve the plot.'
+        : 'Decide what the world does now — write it as the plot\'s "if ignored" move, then reset the clock or resolve the plot.',
+    });
+  }
+
+  return issues;
+}
+
 // ─── Main entry point ─────────────────────────────────────────────────────────
 
 /**
@@ -640,5 +676,6 @@ export function checkContinuity(campaign: Campaign): ContinuityIssue[] {
     ...checkAdventuresWithoutScenes(campaign, makeId),
     ...checkDuplicateNames(campaign, makeId),
     ...checkMysteryEdges(campaign, makeId),
+    ...checkExpiredClocks(campaign, makeId),
   ];
 }

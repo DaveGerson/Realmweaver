@@ -23,13 +23,15 @@ import type {
     Secret,
     Beat,
     DmStyle,
-    HistoryEntry
+    HistoryEntry,
+    SessionStage
 } from '../types/index';
 import { importCampaignFromJsonValidated } from './importExportService';
 import { parseCharacterSheetPdf } from './aiService';
 import { storageService } from './storageService';
 import { autoLinkScenes, autoLinkNpcFactions } from './linking/autoLinker';
-import { createDefaultPlayerCharacter, createDefaultScene } from '../utils/entityUtils';
+import { createDefaultPlayerCharacter, createDefaultScene, createDefaultSession } from '../utils/entityUtils';
+import { resolveSceneById } from '../utils/storyDerivations';
 
 type AppStatus = 'loading' | 'welcome' | 'selecting' | 'creating' | 'editing';
 export type SaveStatus = 'idle' | 'saved' | 'saving' | 'error' | 'quota-warning';
@@ -414,7 +416,59 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         if (!currentState.activeCampaignId) return null;
         return currentState.campaigns.find(c => c.id === currentState.activeCampaignId) || null;
     }
-    
+
+    // --- The Stage helpers (unstructured play; see the "Stage & scene menu" methods) ---
+
+    /** The live session on the given (draft) state, or null when nothing is live. */
+    const _getActiveSession = (currentState: CampaignState): SessionLog | null => {
+        const campaign = getActiveCampaignFromState(currentState);
+        if (!campaign?.activeSessionId) return null;
+        return campaign.sessionLogs?.find(s => s.id === campaign.activeSessionId) ?? null;
+    };
+
+    /** Returns the session's Stage, creating an empty one on first use. */
+    const _ensureStage = (session: SessionLog): SessionStage => {
+        if (!session.stage) session.stage = { npcIds: [] };
+        if (!Array.isArray(session.stage.npcIds)) session.stage.npcIds = [];
+        return session.stage;
+    };
+
+    /** Appends an auto-generated running-log entry — same shape `addAutoEvent` writes. */
+    const _pushAutoEntry = (session: SessionLog, type: SessionLogEntryType, content: string) => {
+        if (!session.structuredNotes) session.structuredNotes = [];
+        session.structuredNotes.push({
+            id: crypto.randomUUID(),
+            timestamp: new Date().toISOString(),
+            content,
+            taggedEntityIds: [],
+            type,
+            isImportant: false,
+        });
+    };
+
+    /** Entering a prepped scene: the scene now says where the party is, so the Stage empties. */
+    const _resetStageForScene = (session: SessionLog) => {
+        session.stage = { npcIds: [] };
+    };
+
+    /**
+     * Leaving a scene: the script ends but the room persists. Seeds the Stage
+     * with the scene's place and cast (using the same session-roster rule the
+     * Session Runner renders with — `plannedNpcIds` / `plannedLocationIds`
+     * win over the scene's own links when present, finding #26) merged with
+     * whoever the DM had already added to the Stage.
+     */
+    const _seedStageFromScene = (session: SessionLog, scene: Scene) => {
+        const castIds = session.plannedNpcIds ?? scene.npcIds ?? [];
+        const priorStageIds = session.stage?.npcIds ?? [];
+        const locationAllowed = !!scene.locationId
+            && (!session.plannedLocationIds || session.plannedLocationIds.includes(scene.locationId));
+        session.stage = {
+            locationId: locationAllowed ? scene.locationId : undefined,
+            npcIds: Array.from(new Set([...castIds, ...priorStageIds])),
+        };
+    };
+
     // --- Relationship Management & Validation Helpers ---
 
     const _synchronizeNpcFactionLink = (draftCampaign: Campaign, npcId: string, oldFactionId?: string, newFactionId?: string) => {
@@ -614,6 +668,16 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             }
             if (log.plannedLocationIds) {
                 log.plannedLocationIds = log.plannedLocationIds.filter(id => id !== entityId);
+            }
+            // The Stage (unstructured play) is id-bearing too: a deleted NPC
+            // must leave the room, and a deleted place must not stay "here".
+            if (log.stage) {
+                if (log.stage.locationId === entityId) {
+                    log.stage.locationId = undefined;
+                }
+                if (log.stage.npcIds) {
+                    log.stage.npcIds = log.stage.npcIds.filter(id => id !== entityId);
+                }
             }
         });
 
@@ -1137,6 +1201,15 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         ...entry,
                         taggedEntityIds: remapIds(entry.taggedEntityIds),
                     })),
+                    // The Stage's place/cast point at this campaign's own
+                    // entities — same rule as plannedNpcIds/plannedLocationIds.
+                    stage: l.stage
+                        ? {
+                              ...l.stage,
+                              locationId: l.stage.locationId ? (idMap.get(l.stage.locationId) ?? l.stage.locationId) : undefined,
+                              npcIds: remapIds(l.stage.npcIds),
+                          }
+                        : l.stage,
                 })),
 
                 playerCharacters: (source.playerCharacters ?? []).map(pc => ({
@@ -1410,7 +1483,13 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                             referenceId: remap(h.referenceId),
                         })),
                         mentionedEntityIds: remapIds(l.mentionedEntityIds),
+                        // Lazy DM step 5's sensory one-liners — non-id-bearing, so
+                        // a defensive pass-through (template JSON is untrusted).
+                        aspects: Array.isArray(l.aspects)
+                            ? (l.aspects as unknown[]).filter((a): a is string => typeof a === 'string' && a.trim().length > 0)
+                            : undefined,
                     };
+                    if (location.aspects && location.aspects.length === 0) location.aspects = undefined;
                     campaign.locations.push(location);
                 });
 
@@ -1547,6 +1626,16 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         encounterLog: l.encounterLog || [],
                         diceRolls: l.diceRolls,
                         beats: l.beats,
+                        // The Stage: unknown ids are dropped (template rule),
+                        // freeform `place`/`focus` prose rides through as-is.
+                        stage: l.stage && typeof l.stage === 'object'
+                            ? {
+                                  locationId: remap(l.stage.locationId),
+                                  place: typeof l.stage.place === 'string' ? l.stage.place : undefined,
+                                  npcIds: remapIds(l.stage.npcIds),
+                                  focus: typeof l.stage.focus === 'string' ? l.stage.focus : undefined,
+                              }
+                            : undefined,
                         recap: l.recap || '',
                         notableEvents: l.notableEvents || '',
                         looseEnds: l.looseEnds || '',
@@ -1573,6 +1662,21 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         status: p.status || 'active',
                         relatedEntityIds: remapIds(p.relatedEntityIds),
                         mentionedEntityIds: remapIds(p.mentionedEntityIds),
+                        // Countdown clock / "if ignored" move (unstructured
+                        // play). Non-id-bearing, but validated the same way
+                        // `isVital`/`cluesNeeded` are on secrets so a
+                        // hand-edited `segments: 0` or `filled: 99` can't
+                        // land in the store.
+                        clock: p.clock && Number.isInteger(p.clock.segments) && p.clock.segments >= 1
+                            ? {
+                                  segments: p.clock.segments,
+                                  filled: Math.min(
+                                      Math.max(Number.isInteger(p.clock.filled) ? p.clock.filled : 0, 0),
+                                      p.clock.segments
+                                  ),
+                              }
+                            : undefined,
+                        ifIgnored: typeof p.ifIgnored === 'string' && p.ifIgnored.trim() ? p.ifIgnored : undefined,
                     };
                     campaign.plots.push(plot);
                 });
@@ -2280,13 +2384,19 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 const campaign = getActiveCampaignFromState(draft);
                 if (!campaign) return;
 
+                const session = campaign.sessionLogs?.find(s => s.id === sessionLogId);
+                if (!session) return;
+
+                // Idempotent: the Session Prep Wizard calls goLive itself and
+                // then hands the id to App.handleGoLive, which calls it again.
+                // A second call for the session that is already live must not
+                // log a second "Session started" or re-run the scene setup.
+                if (campaign.activeSessionId === sessionLogId && session.status === 'active') return;
+
                 // Deactivate any currently active session
                 campaign.sessionLogs?.forEach(log => {
                     if (log.status === 'active') log.status = 'planned';
                 });
-
-                const session = campaign.sessionLogs?.find(s => s.id === sessionLogId);
-                if (!session) return;
 
                 session.status = 'active';
                 campaign.activeSessionId = sessionLogId;
@@ -2301,21 +2411,22 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     session.startedAt = new Date().toISOString();
                 }
 
-                // Activate the first planned scene if adventure is linked
-                if (session.adventureId && session.plannedSceneIds.length > 0) {
-                    campaign.activeSceneId = session.plannedSceneIds[0];
-                    // Set scene statuses
-                    const adventure = campaign.adventures.find(a => a.id === session.adventureId);
-                    if (adventure) {
-                        adventure.scenes.forEach(scene => {
-                            if (session.plannedSceneIds.includes(scene.id)) {
-                                if (scene.id === session.plannedSceneIds[0]) {
-                                    scene.status = 'in-progress';
-                                } else {
-                                    scene.status = scene.status === 'completed' ? 'completed' : 'planned';
-                                }
-                            }
-                        });
+                // Activate the first planned scene, wherever it lives — a
+                // session may pull scenes from more than one adventure (the
+                // scene menu), so resolution is campaign-wide, not
+                // adventure-bound. A freeform session with no planned scenes
+                // opens on the Stage instead.
+                const firstSceneId = session.plannedSceneIds.length > 0 ? session.plannedSceneIds[0] : undefined;
+                if (firstSceneId && resolveSceneById(campaign, firstSceneId)) {
+                    campaign.activeSceneId = firstSceneId;
+                    for (const sceneId of session.plannedSceneIds) {
+                        const found = resolveSceneById(campaign, sceneId);
+                        if (!found) continue;
+                        if (sceneId === firstSceneId) {
+                            found.scene.status = 'in-progress';
+                        } else {
+                            found.scene.status = found.scene.status === 'completed' ? 'completed' : 'planned';
+                        }
                     }
                 }
 
@@ -2340,28 +2451,30 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 if (!campaign || !campaign.activeSessionId) return;
 
                 const session = campaign.sessionLogs?.find(s => s.id === campaign.activeSessionId);
-                if (!session || !session.adventureId) return;
-
-                const adventure = campaign.adventures.find(a => a.id === session.adventureId);
-                if (!adventure) return;
+                if (!session) return;
 
                 const currentIndex = session.plannedSceneIds.indexOf(campaign.activeSceneId || '');
                 if (currentIndex === -1) return;
 
-                // Mark current scene completed
-                const currentScene = adventure.scenes.find(s => s.id === session.plannedSceneIds[currentIndex]);
-                if (currentScene) currentScene.status = 'completed';
+                // Mark current scene completed. Scenes are resolved
+                // campaign-wide: tonight's list may hold scenes pulled from
+                // several adventures (the scene menu, unstructured play).
+                const current = resolveSceneById(campaign, session.plannedSceneIds[currentIndex]);
+                if (current) current.scene.status = 'completed';
 
                 // Advance to next scene
                 const nextIndex = currentIndex + 1;
                 if (nextIndex < session.plannedSceneIds.length) {
                     const nextSceneId = session.plannedSceneIds[nextIndex];
                     campaign.activeSceneId = nextSceneId;
-                    const nextScene = adventure.scenes.find(s => s.id === nextSceneId);
-                    if (nextScene) nextScene.status = 'in-progress';
+                    const next = resolveSceneById(campaign, nextSceneId);
+                    if (next) next.scene.status = 'in-progress';
+                    // Entering a prepped scene clears the Stage — the scene
+                    // now says where the party is and who is there.
+                    _resetStageForScene(session);
 
                     // Auto-log scene transition
-                    const nextSceneName = nextScene?.title || 'Unknown';
+                    const nextSceneName = next?.scene.title || 'Unknown';
                     if (!session.structuredNotes) session.structuredNotes = [];
                     session.structuredNotes.push({
                         id: crypto.randomUUID(),
@@ -2372,7 +2485,11 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         isImportant: false,
                     });
                 } else {
-                    // No more scenes — clear active scene
+                    // No more scenes — the script ends but the room persists:
+                    // seed the Stage from the scene that just finished so the
+                    // party is still somewhere, with someone, when the DM
+                    // keeps playing past the prep.
+                    if (current) _seedStageFromScene(session, current.scene);
                     campaign.activeSceneId = undefined;
                 }
             });
@@ -2625,6 +2742,217 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 if (!session?.beats) return;
                 const beat = session.beats.find(b => b.id === id);
                 if (beat) beat.isCompleted = !beat.isCompleted;
+            });
+        },
+
+        // --- The Stage & the scene menu (unstructured play) ---------------------
+        //
+        // The Stage is the live where/who/what of the table, independent of any
+        // prepped Scene (types/SessionLog.ts `SessionStage`). Every write below
+        // targets the ACTIVE session, and the ones that change what is true at
+        // the table auto-log a running-log entry — that is how an improvised
+        // session gets a timeline for free (docs/design/unstructured-play.md).
+
+        /** Merges `updates` into the active session's Stage without logging (place text, bulk edits). */
+        updateStage(updates: Partial<SessionStage>): void {
+            updateState(draft => {
+                const session = _getActiveSession(draft);
+                if (!session) return;
+                const stage = _ensureStage(session);
+                Object.assign(stage, updates);
+                if (!Array.isArray(stage.npcIds)) stage.npcIds = [];
+            });
+        },
+
+        /**
+         * Puts the party somewhere: a linked Location (`locationId`), a freeform
+         * place (`null` + `place`), or nowhere in particular (`null`, no place).
+         * Logs "Moved to …" when the place actually changed.
+         */
+        setStageLocation(locationId: string | null, place?: string): void {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                const session = _getActiveSession(draft);
+                if (!campaign || !session) return;
+                const stage = _ensureStage(session);
+                const nextLocationId = locationId && campaign.locations.some(l => l.id === locationId) ? locationId : undefined;
+                const nextPlace = nextLocationId ? undefined : (place?.trim() || undefined);
+                const changed = stage.locationId !== nextLocationId || (stage.place ?? '') !== (nextPlace ?? '');
+                stage.locationId = nextLocationId;
+                stage.place = nextPlace;
+                if (!changed) return;
+                const label = nextLocationId
+                    ? campaign.locations.find(l => l.id === nextLocationId)?.name
+                    : nextPlace;
+                if (label) _pushAutoEntry(session, 'scene-transition', `Moved to: ${label}`);
+            });
+        },
+
+        /** Puts an NPC on the Stage. Returns false when it was already there or does not exist. */
+        addNpcToStage(npcId: string): boolean {
+            let added = false;
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                const session = _getActiveSession(draft);
+                if (!campaign || !session) return;
+                const npc = campaign.npcs.find(n => n.id === npcId);
+                if (!npc) return;
+                const stage = _ensureStage(session);
+                if (stage.npcIds.includes(npcId)) return;
+                stage.npcIds.push(npcId);
+                added = true;
+                _pushAutoEntry(session, 'scene-transition', `${npc.name} enters the scene`);
+            });
+            return added;
+        },
+
+        /** Takes an NPC off the Stage (a scene's own cast is not on the Stage and is unaffected). */
+        removeNpcFromStage(npcId: string): void {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                const session = _getActiveSession(draft);
+                if (!campaign || !session?.stage) return;
+                if (!session.stage.npcIds.includes(npcId)) return;
+                session.stage.npcIds = session.stage.npcIds.filter(id => id !== npcId);
+                const name = campaign.npcs.find(n => n.id === npcId)?.name;
+                if (name) _pushAutoEntry(session, 'scene-transition', `${name} leaves the scene`);
+            });
+        },
+
+        /** Sets the one-line "what is happening right now". Logs it when it changed and is non-empty. */
+        setStageFocus(focus: string): void {
+            updateState(draft => {
+                const session = _getActiveSession(draft);
+                if (!session) return;
+                const stage = _ensureStage(session);
+                const next = focus.trim() || undefined;
+                if ((stage.focus ?? '') === (next ?? '')) return;
+                stage.focus = next;
+                if (next) _pushAutoEntry(session, 'scene-transition', `Now: ${next}`);
+            });
+        },
+
+        /**
+         * Enters a prepped scene from the scene menu. The scene the DM was in
+         * is left `in-progress` (started, not finished — a menu, not a track),
+         * a completed scene the DM returns to is reopened, and the Stage is
+         * cleared because the scene now says where the party is.
+         */
+        enterScene(sceneId: string): void {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign) return;
+                const found = resolveSceneById(campaign, sceneId);
+                if (!found) return;
+                if (campaign.activeSceneId === sceneId) return;
+                found.scene.status = 'in-progress';
+                campaign.activeSceneId = sceneId;
+                const session = _getActiveSession(draft);
+                if (!session) return;
+                _resetStageForScene(session);
+                _pushAutoEntry(session, 'scene-transition', `Scene: "${found.scene.title}"`);
+            });
+        },
+
+        /**
+         * Leaves the active scene. `complete: true` is "Done" (the scene is
+         * finished); `false` is "Set aside" (it stays `in-progress` to come
+         * back to). Either way the Stage is seeded from the scene — the party
+         * is still in that room with those people until the DM says otherwise.
+         */
+        leaveScene(options: { complete: boolean }): void {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign?.activeSceneId) return;
+                const found = resolveSceneById(campaign, campaign.activeSceneId);
+                const session = _getActiveSession(draft);
+                if (found && options.complete) found.scene.status = 'completed';
+                if (session && found) {
+                    _seedStageFromScene(session, found.scene);
+                    _pushAutoEntry(
+                        session,
+                        'scene-transition',
+                        options.complete ? `Scene completed: "${found.scene.title}"` : `Set aside: "${found.scene.title}"`
+                    );
+                }
+                campaign.activeSceneId = undefined;
+            });
+        },
+
+        /** Pulls a prepped scene (from any adventure) into tonight's list. Returns false if unknown or already there. */
+        addPlannedScene(sceneId: string): boolean {
+            let added = false;
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                const session = _getActiveSession(draft);
+                if (!campaign || !session) return;
+                if (!resolveSceneById(campaign, sceneId)) return;
+                if (session.plannedSceneIds.includes(sceneId)) return;
+                session.plannedSceneIds.push(sceneId);
+                added = true;
+            });
+            return added;
+        },
+
+        /**
+         * Puts a scene back on the shelf: drops it from tonight's list, reopens
+         * it as `planned` if it had been started, and steps out of it if it was
+         * the active scene. The scene itself is untouched — unused prep is
+         * inventory to spend later, never a failure.
+         */
+        removePlannedScene(sceneId: string): void {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                const session = _getActiveSession(draft);
+                if (!campaign || !session) return;
+                if (!session.plannedSceneIds.includes(sceneId)) return;
+                session.plannedSceneIds = session.plannedSceneIds.filter(id => id !== sceneId);
+                const found = resolveSceneById(campaign, sceneId);
+                if (found && found.scene.status === 'in-progress') found.scene.status = 'planned';
+                if (campaign.activeSceneId === sceneId) campaign.activeSceneId = undefined;
+            });
+        },
+
+        /**
+         * The near-zero-prep on-ramp: mints a freeform session (no adventure,
+         * no scenes, nothing planned) and returns its id. It does NOT go live —
+         * the caller routes the id through the same `goLive` path the prep
+         * wizard uses, so there is exactly one way a session starts.
+         */
+        createFreeformSession(title?: string): string | null {
+            const campaign = this.getActiveCampaign();
+            if (!campaign) return null;
+            const sessionNumber = (campaign.sessionLogs?.length ?? 0) + 1;
+            const { id: _unusedId, ...defaults } = createDefaultSession();
+            void _unusedId;
+            return this.createSessionLog({
+                ...defaults,
+                title: title?.trim() || `Session ${sessionNumber}`,
+                sessionDate: new Date().toISOString(),
+                stage: { npcIds: [] },
+            });
+        },
+
+        /**
+         * Ticks a plot's countdown clock by `delta` segments (default +1),
+         * clamped to [0, segments]. Logs a `world-moved` entry when a session is
+         * live and the clock actually moved. A plot with no clock is untouched.
+         */
+        tickPlotClock(plotId: string, delta: number = 1): void {
+            updateState(draft => {
+                const campaign = getActiveCampaignFromState(draft);
+                if (!campaign) return;
+                const plot = (campaign.plots ?? []).find(p => p.id === plotId);
+                if (!plot?.clock) return;
+                const segments = Math.max(1, Math.floor(plot.clock.segments));
+                const before = Math.min(Math.max(plot.clock.filled, 0), segments);
+                const after = Math.min(Math.max(before + delta, 0), segments);
+                plot.clock = { segments, filled: after };
+                if (after === before) return;
+                const session = _getActiveSession(draft);
+                if (!session) return;
+                const suffix = after >= segments ? ' — the clock has run out' : '';
+                _pushAutoEntry(session, 'world-moved', `Clock: "${plot.title}" ${after}/${segments}${suffix}`);
             });
         },
 

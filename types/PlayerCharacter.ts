@@ -60,6 +60,15 @@ export interface CharacterStatistics {
 export interface PlayerCharacter {
   id: string;
   playerName: string;
+  /**
+   * Table Pulse (storyteller-first-design.md P5's narrowest slice — pillars
+   * and hooks stay gated). Free text, one appetite per line: what this
+   * PLAYER (not the character) has said they want more of. Optional,
+   * non-id-bearing, top-level so `normalizePlayerCharacter`'s nested-block
+   * deep-merge never has to know about it. Absent on every save that predates
+   * this field — read as `?? []`, never defaulted to `[]` on write.
+   */
+  playerFlags?: string[];
   characterSocial: CharacterSocial;
   characterStatistics: CharacterStatistics;
 }

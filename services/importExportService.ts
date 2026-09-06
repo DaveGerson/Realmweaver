@@ -220,6 +220,11 @@ const normaliseRequiredArrays = (data: Record<string, unknown>): void => {
       ensureArrayField(log, 'relatedPlotIds');
       ensureArrayField(log, 'structuredNotes');
       ensureArrayField(log, 'encounterLog');
+      // The Stage is optional, but when present its cast array is required.
+      const stage = log['stage'];
+      if (isPlainObject(stage)) {
+        ensureArrayField(stage, 'npcIds');
+      }
     }
   }
 
@@ -1016,7 +1021,19 @@ export const generateSessionPrepSheetMarkdown = (
   if (resolvedLocations.length > 0) {
     const lines = resolvedLocations.map(loc => {
       const desc = collapseToOneLine(loc.description);
-      return `- **${loc.name}**${desc ? ` — ${desc}` : ''}`;
+      let line = `- **${loc.name}**${desc ? ` — ${desc}` : ''}`;
+      // Lazy DM step 5 ("develop fantastic locations") — an aspects line only
+      // when the location actually has some; never a placeholder for one that
+      // doesn't (mirrors the NPC "Voice:" line immediately above). Guarded
+      // with Array.isArray, not just `?? []` — a malformed non-array value
+      // (a hand-edited import, an old save) must degrade, not throw.
+      const aspects = Array.isArray(loc.aspects)
+        ? loc.aspects.filter((a): a is string => typeof a === 'string' && a.trim().length > 0)
+        : [];
+      if (aspects.length > 0) {
+        line += `\n  Aspects: ${aspects.map(a => a.trim()).join('; ')}`;
+      }
+      return line;
     });
     sections.push(`## Locations\n\n${lines.join('\n')}`);
   }

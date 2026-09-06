@@ -19,6 +19,9 @@ export type { PlayerSafeRecapContext } from './ai/dmCoach';
 export type { CallbackComplicationRequest } from './ai/dmCoach';
 // P4 (cold open): same reason — the caller assembles the request.
 export type { ColdOpenRequest } from './ai/dmCoach';
+// §4.8 (Extras & spear-carriers): the wire shape for a promotable draft —
+// re-exported so components never reach into `services/ai/*` (CLAUDE.md).
+export type { ExtraNpc } from './ai/dmCoach';
 // Re-exported as-is rather than wrapped: a pure predicate over the campaign
 // with no mock-mode branch, so the Session Prep Wizard can ask whether a cold
 // open has anything to draw on without importing `services/ai/*` (CLAUDE.md).
@@ -93,6 +96,23 @@ export const generateSecretBatch = (prompt: string, isMockMode: boolean = false,
     return aiRealmWeaver.generateSecretBatch(prompt, campaignContext);
 };
 
+/**
+ * Lazy DM step 5 ("develop fantastic locations") — retrofits 2-3 sensory
+ * one-liners onto a location that predates `aspects` (or had them cleared).
+ * Zero-typed-prompt: the request is built entirely from the location's own
+ * name/description, the same convention as `generateSecretBatch`.
+ */
+export const generateLocationAspects = (
+    location: { name: string; description: string },
+    isMockMode: boolean = false,
+    campaignContext?: string,
+): Promise<string[]> => {
+    if (isMockMode) {
+        return mockService.generateLocationAspects(location, campaignContext);
+    }
+    return aiRealmWeaver.generateLocationAspects(location, campaignContext);
+};
+
 export const generateArticle = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds'>> => {
     if (isMockMode) {
         return mockService.generateArticle(prompt, campaignContext);
@@ -131,6 +151,43 @@ export const generateCallbackComplication = (
 };
 
 /**
+ * §4.2 — GM Intrusion. Zero-prompt and zero-precondition: unlike
+ * `generateCallbackComplication` above, this never needs dormant material and
+ * never throws on an empty campaign, so it is the one live-complication
+ * button that still works in a brand-new campaign's first session. GM-facing
+ * only, same as Callback — the result belongs in the running log, never in a
+ * player-facing recap.
+ */
+export const generateGmIntrusion = (
+    isMockMode: boolean = false,
+    campaignContext?: string,
+    sceneSummary?: string,
+    useLiteModel: boolean = false
+): Promise<string> => {
+    if (isMockMode) {
+        return mockService.generateGmIntrusion(campaignContext, sceneSummary, useLiteModel);
+    }
+    return aiDmCoach.generateGmIntrusion(campaignContext, sceneSummary, useLiteModel);
+};
+
+/**
+ * §4.8 — Extras & spear-carriers. Generates `count` throwaway name +
+ * one-line-detail pairs for a crowd scene — lighter than a full NPC record,
+ * with each line individually promotable to one via `campaignService.createNpc`.
+ */
+export const generateExtras = (
+    count: number,
+    campaignContext?: string,
+    useLiteModel: boolean = false,
+    isMockMode: boolean = false
+): Promise<aiDmCoach.ExtraNpc[]> => {
+    if (isMockMode) {
+        return mockService.generateExtras(count, campaignContext, useLiteModel);
+    }
+    return aiDmCoach.generateExtras(count, campaignContext, useLiteModel);
+};
+
+/**
  * P4 — the "Previously on…" cold open. Zero-prompt: the caller hands over the
  * campaign (and, optionally, a context string it built) and the draft is
  * composed from the last completed session's recap + loose ends + the most
@@ -144,6 +201,45 @@ export const generateColdOpen = (
         return mockService.generateColdOpen(request);
     }
     return aiDmCoach.generateColdOpen(request);
+};
+
+// §4.1 Scene Menu Generator — the proposal wire shape. Nothing is persisted
+// until the DM keeps a draft (folded into the Session Prep Wizard's own
+// `lazyBeats` state), so it is not a `types/` entity; re-exported here so
+// components never reach into `services/ai/*` (CLAUDE.md).
+export type { SceneMenuDraft } from './ai/dmCoach';
+// §4.6 Strong Start Styles — same reasoning: the caller assembles the request.
+export type { StrongStartRequest } from './ai/dmCoach';
+
+/**
+ * §4.1 Scene Menu Generator — zero-prompt: the "prompt" is a fixed constant
+ * inside `dmCoach.ts`, never DM-typed. Widens the lazy path's Beats step with
+ * a generate -> preview -> keep-some flow, mirroring R2's `generateSecretBatch`
+ * one step down in scale.
+ */
+export const generateSceneMenu = (
+    campaignContext?: string,
+    isMockMode: boolean = false
+): Promise<aiDmCoach.SceneMenuDraft[]> => {
+    if (isMockMode) {
+        return mockService.generateSceneMenu(campaignContext);
+    }
+    return aiDmCoach.generateSceneMenu(campaignContext);
+};
+
+/**
+ * §4.6 Strong Start Styles — widens the cold open with two more zero-prompt
+ * drafting angles ('action', 'reincorporate'). The 'previously-on' style is
+ * NOT here — it continues to call `generateColdOpen` verbatim, unchanged.
+ */
+export const generateStrongStart = (
+    request: aiDmCoach.StrongStartRequest,
+    isMockMode: boolean = false
+): Promise<string> => {
+    if (isMockMode) {
+        return mockService.generateStrongStart(request);
+    }
+    return aiDmCoach.generateStrongStart(request);
 };
 
 export const generateRollableTable = (prompt: string, campaignContext?: string, useLiteModel: boolean = false, isMockMode: boolean = false): Promise<RollableTable> => {
@@ -228,6 +324,22 @@ export const generateNpcRoleplay = (
         return mockService.generateNpcRoleplay(npcContext, conversationHistory, userMessage, campaignContext);
     }
     return aiRealmChat.generateNpcRoleplay(npcContext, conversationHistory, userMessage, campaignContext);
+};
+
+/**
+ * Table Pulse, §4.3 of the lazy-DM research doc — "Ask the Table" (P5's
+ * narrowest slice: `PlayerCharacter.playerFlags` only). Zero-prompt: the DM
+ * taps one button and gets a short list of between-session check-in
+ * questions, personalized with any player appetites already on the roster.
+ */
+export const generateCheckInQuestions = (
+    request: aiDmCoach.CheckInQuestionsRequest = {},
+    isMockMode: boolean = false
+): Promise<string[]> => {
+    if (isMockMode) {
+        return mockService.generateCheckInQuestions(request);
+    }
+    return aiDmCoach.generateCheckInQuestions(request);
 };
 
 export const generateSessionRecap = (

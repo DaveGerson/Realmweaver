@@ -36,6 +36,7 @@ import type { NPC } from '../types/NPC';
 import type { Scene } from '../types/Scene';
 import type { SessionLog } from '../types/SessionLog';
 import type { Secret } from '../types/Secret';
+import { normalizePlotClock } from '../utils/plotClock';
 
 // ---------------------------------------------------------------------------
 // E3 — party-knowledge section headers (exact strings; see
@@ -422,6 +423,27 @@ export function buildCampaignContext(options: ContextOptions): string {
     tryAdd(sceneLines.join('\n'));
   }
 
+  // --- On stage now (unstructured play: the session's live Stage) ---
+  // The Stage is the DM's live statement of where the party is and who is
+  // with them, independent of any prepped scene — a freeform session has
+  // nothing else. Its place and cast are player-visible facts; `focus` is
+  // the DM's own running line and can carry GM truth, so it stays GM-only.
+  const stage = activeSession?.stage;
+  const stageLocation = stage?.locationId
+    ? campaign.locations.find(l => l.id === stage.locationId)
+    : undefined;
+  const stageNpcs: NPC[] = (stage?.npcIds ?? [])
+    .map(id => campaign.npcs.find(n => n.id === id))
+    .filter((n): n is NPC => n !== undefined);
+  const stagePlace = stageLocation?.name ?? stage?.place?.trim();
+  if (stage && (stagePlace || stageNpcs.length > 0 || stage.focus?.trim()) && hasBudget()) {
+    const stageLines: string[] = ['On Stage Now:'];
+    if (stagePlace) stageLines.push(`  Place: ${stagePlace}`);
+    if (stageNpcs.length > 0) stageLines.push(`  Present: ${stageNpcs.map(n => n.name).join(', ')}`);
+    if (!isPlayerSafe && stage.focus?.trim()) stageLines.push(`  Happening: ${trunc(stage.focus.trim(), 200)}`);
+    if (stageLines.length > 1) tryAdd(stageLines.join('\n'));
+  }
+
   // =========================================================================
   // TIER 2 — Contextual (~2000 tokens)
   // Scene participants, active location, plot threads, focus entity.
@@ -439,9 +461,15 @@ export function buildCampaignContext(options: ContextOptions): string {
     tryAdd(combatLines.join('\n'));
   }
 
-  // --- NPCs present in active scene ---
-  if (activeScene && hasBudget()) {
-    const sceneNpcs = npcsInScene(activeScene);
+  // --- NPCs present in active scene (the scene's cast ∪ the Stage's cast) ---
+  if ((activeScene || stageNpcs.length > 0) && hasBudget()) {
+    const sceneNpcs: NPC[] = [];
+    const seenNpcIds = new Set<string>();
+    for (const npc of [...(activeScene ? npcsInScene(activeScene) : []), ...stageNpcs]) {
+      if (seenNpcIds.has(npc.id)) continue;
+      seenNpcIds.add(npc.id);
+      sceneNpcs.push(npc);
+    }
     if (sceneNpcs.length > 0) {
       const sceneNpcIds = new Set(sceneNpcs.map(n => n.id));
       const npcLines = sceneNpcs.map(n => {
@@ -473,8 +501,8 @@ export function buildCampaignContext(options: ContextOptions): string {
     }
   }
 
-  // --- Active scene location ---
-  if (activeScene?.locationId && hasBudget()) {
+  // --- Active scene location (the Stage's place, when set, already covered it above) ---
+  if (!stageLocation && activeScene?.locationId && hasBudget()) {
     const loc = campaign.locations.find(l => l.id === activeScene.locationId);
     if (loc) {
       tryAdd([
@@ -491,9 +519,14 @@ export function buildCampaignContext(options: ContextOptions): string {
       .filter(p => p.status === 'active')
       .slice(0, 5);
     if (activePlots.length > 0) {
-      const plotLines = activePlots.map(
-        p => `  - ${p.title} [${p.status}]${p.description ? ': ' + trunc(p.description, 80) : ''}`
-      );
+      // Pressure (unstructured play): a plot's countdown and its own move when
+      // ignored are exactly what an improvising GM wants the AI to know.
+      const plotLines = activePlots.map(p => {
+        const clock = normalizePlotClock(p.clock);
+        const clockText = clock ? ` [clock ${clock.filled}/${clock.segments}${clock.filled >= clock.segments ? ' — run out' : ''}]` : '';
+        const ifIgnored = p.ifIgnored?.trim() ? ` — if ignored: ${trunc(p.ifIgnored.trim(), 80)}` : '';
+        return `  - ${p.title} [${p.status}]${clockText}${p.description ? ': ' + trunc(p.description, 80) : ''}${ifIgnored}`;
+      });
       tryAdd(['Active Plot Threads:', ...plotLines].join('\n'));
     }
   }
@@ -521,6 +554,9 @@ export function buildCampaignContext(options: ContextOptions): string {
       activeScene.npcIds.forEach(id => relevantIds.add(id));
       if (activeScene.locationId) relevantIds.add(activeScene.locationId);
     }
+    // The Stage's place and cast are in scope right now too.
+    stageNpcs.forEach(n => relevantIds.add(n.id));
+    if (stageLocation) relevantIds.add(stageLocation.id);
     if (focusEntityId) relevantIds.add(focusEntityId);
     if (focusSelection) {
       const { selectedNpcId, selectedLocationId, selectedSceneId, selectedAdventureId } = focusSelection;
@@ -640,9 +676,16 @@ export function buildCampaignContext(options: ContextOptions): string {
       tryAddJoined('Notable Items:', campaign.items.map(i => i.name), nextTier3Quota());
     }
 
-    // Player characters
+    // Player characters — with what each PLAYER has said they want more of
+    // (Table Pulse: `playerFlags`), so generation can lean toward the table's
+    // actual appetites. These are the players' own statements, so they are
+    // fine in every variant that shows this roster.
     if (hasPlayerCharacters && hasBudget()) {
-      const pcNames = campaign.playerCharacters!.map(pc => pc.characterSocial?.characterName ?? '?');
+      const pcNames = campaign.playerCharacters!.map(pc => {
+        const name = pc.characterSocial?.characterName ?? '?';
+        const wants = (pc.playerFlags ?? []).map(f => f.trim()).filter(Boolean);
+        return wants.length > 0 ? `${name} (player wants more of: ${trunc(wants.join('; '), 120)})` : name;
+      });
       tryAddJoined('Player Characters:', pcNames, nextTier3Quota());
     }
   } else {

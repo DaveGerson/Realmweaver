@@ -8,7 +8,60 @@
 // Consumed first by `components/views/TonightsTable.tsx` (P1); P2's Callback
 // Machine sampler and P6's story-health checks reuse the same functions.
 
-import type { Campaign, SessionLog, Scene, Secret } from '../types/index';
+import type { Campaign, SessionLog, Scene, Secret, Adventure, PlayerCharacter } from '../types/index';
+
+// ---------------------------------------------------------------------------
+// Scene lookup — a session may pull scenes from ANY adventure (the scene
+// menu, unstructured play), so every consumer that resolves a scene id must
+// search the whole campaign, never one adventure.
+// ---------------------------------------------------------------------------
+
+/** A scene together with the adventure that owns it. */
+export interface ResolvedScene {
+  scene: Scene;
+  adventure: Adventure;
+}
+
+/**
+ * Finds a scene by id across every adventure in the campaign, with its owning
+ * adventure. Returns null for a blank/unknown id. Pure; safe on an Immer draft
+ * (it only `find`s — the objects it returns are the draft's own).
+ */
+export function resolveSceneById(campaign: Campaign, sceneId: string | null | undefined): ResolvedScene | null {
+  if (!sceneId) return null;
+  for (const adventure of campaign.adventures ?? []) {
+    const scene = adventure.scenes?.find((s) => s.id === sceneId);
+    if (scene) return { scene, adventure };
+  }
+  return null;
+}
+
+/** One prepped scene sitting on the shelf, ready to be pulled into tonight. */
+export interface ShelfScene {
+  scene: Scene;
+  adventureId: string;
+  adventureTitle: string;
+}
+
+/**
+ * The scene shelf: every scene in the campaign that is still runnable
+ * (`planned` or `in-progress`) and not already in the given session's
+ * `plannedSceneIds`. Adventure order, then scene order. This is what the
+ * Session Runner's "pull a scene from the shelf" picker lists — a menu of
+ * prepped material across ALL adventures, not one adventure's track.
+ */
+export function deriveSceneShelf(campaign: Campaign, session: Pick<SessionLog, 'plannedSceneIds'> | null | undefined): ShelfScene[] {
+  const planned = new Set(session?.plannedSceneIds ?? []);
+  const shelf: ShelfScene[] = [];
+  for (const adventure of campaign.adventures ?? []) {
+    for (const scene of adventure.scenes ?? []) {
+      if (scene.status === 'completed') continue;
+      if (planned.has(scene.id)) continue;
+      shelf.push({ scene, adventureId: adventure.id, adventureTitle: adventure.title });
+    }
+  }
+  return shelf;
+}
 
 /** A played session, reduced to what a story-age label needs. */
 export interface SessionRef {
@@ -111,11 +164,7 @@ export function getLastCompletedSession(campaign: Campaign): SessionLog | null {
 
 /** Finds a scene by id across every adventure in the campaign. */
 function findSceneById(campaign: Campaign, sceneId: string): Scene | undefined {
-  for (const adventure of campaign.adventures ?? []) {
-    const scene = adventure.scenes?.find((s) => s.id === sceneId);
-    if (scene) return scene;
-  }
-  return undefined;
+  return resolveSceneById(campaign, sceneId)?.scene;
 }
 
 /**
@@ -300,6 +349,129 @@ export function deriveLoadedGuns(campaign: Campaign): LoadedGun[] {
   });
 
   return guns;
+}
+
+// ---------------------------------------------------------------------------
+// PC spotlight — "review the characters" (Shea, step 1) / "be a fan of the
+// players" (Cook), as a derivation. Player characters are not @-mention
+// candidates today, so a PC's presence in a session is read from the running
+// log's TEXT: a note that names the character (full name, or a first name of
+// at least three letters, Unicode word boundaries, case-insensitive) or that
+// tags the PC's id counts as a spotlight moment. A heuristic, stated as one —
+// it under-counts nicknames and never over-counts a name inside a longer word.
+// ---------------------------------------------------------------------------
+
+/** Where one player character stands relative to the table's attention. */
+export interface PcSpotlight {
+  pcId: string;
+  pcName: string;
+  playerName: string;
+  /** The most recent played session whose log named this character; null if none ever did. */
+  lastSpotlight: SessionRef | null;
+  /** Played sessions since `lastSpotlight` (0 = the most recent one); null if never. */
+  sessionsSinceSpotlight: number | null;
+}
+
+const MIN_SPOTLIGHT_NAME_LENGTH = 3;
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** The name forms a note is scanned for: the full name, plus a first name long enough to be unambiguous. */
+function spotlightNameForms(fullName: string): string[] {
+  const trimmed = fullName.trim();
+  if (trimmed.length < MIN_SPOTLIGHT_NAME_LENGTH) return [];
+  const forms = [trimmed];
+  const first = trimmed.split(/\s+/)[0];
+  if (first && first !== trimmed && first.length >= MIN_SPOTLIGHT_NAME_LENGTH) forms.push(first);
+  return forms;
+}
+
+/** True when `text` names the character, on Unicode word boundaries, ignoring case. */
+export function textNamesCharacter(text: string, characterName: string): boolean {
+  if (!text) return false;
+  return spotlightNameForms(characterName).some((form) => {
+    const pattern = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(form)}(?![\\p{L}\\p{N}])`, 'iu');
+    return pattern.test(text);
+  });
+}
+
+function pcDisplayName(pc: PlayerCharacter): string {
+  return pc.characterSocial?.characterName?.trim() || '';
+}
+
+/**
+ * How many running-log entries in `session` put each player character in the
+ * spotlight (named in the text, or tagged by id). Every PC gets a key, so a
+ * zero reads as "hasn't had a moment tonight" rather than as absence.
+ */
+export function countPcSpotlightInSession(campaign: Campaign, session: SessionLog): Map<string, number> {
+  const counts = new Map<string, number>();
+  const pcs = campaign.playerCharacters ?? [];
+  for (const pc of pcs) counts.set(pc.id, 0);
+  for (const note of session.structuredNotes ?? []) {
+    const tagged = new Set(note.taggedEntityIds ?? []);
+    for (const pc of pcs) {
+      const name = pcDisplayName(pc);
+      if (tagged.has(pc.id) || (name && textNamesCharacter(note.content ?? '', name))) {
+        counts.set(pc.id, (counts.get(pc.id) ?? 0) + 1);
+      }
+    }
+  }
+  return counts;
+}
+
+/**
+ * One entry per player character, quietest first: characters never named in
+ * any played session's log come first (they are the ones being missed), then
+ * by `sessionsSinceSpotlight` descending, ties by character name. A campaign
+ * with no PCs yields an empty list.
+ */
+export function derivePcSpotlight(campaign: Campaign): PcSpotlight[] {
+  const playedSessions = getPlayedSessionsInOrder(campaign);
+  const total = playedSessions.length;
+  const sessionRefs: SessionRef[] = playedSessions.map((s, i) => ({
+    id: s.id,
+    title: s.title,
+    sessionDate: s.sessionDate,
+    ordinal: i + 1,
+  }));
+  const spotlightSets = playedSessions.map((s) => {
+    const counts = countPcSpotlightInSession(campaign, s);
+    return new Set(Array.from(counts.entries()).filter(([, n]) => n > 0).map(([id]) => id));
+  });
+
+  const results: PcSpotlight[] = (campaign.playerCharacters ?? []).map((pc) => {
+    const pcName = pcDisplayName(pc) || 'Unnamed character';
+    const playerName = pc.playerName ?? '';
+    for (let i = total - 1; i >= 0; i--) {
+      if (spotlightSets[i].has(pc.id)) {
+        return { pcId: pc.id, pcName, playerName, lastSpotlight: sessionRefs[i], sessionsSinceSpotlight: total - 1 - i };
+      }
+    }
+    return { pcId: pc.id, pcName, playerName, lastSpotlight: null, sessionsSinceSpotlight: null };
+  });
+
+  results.sort((a, b) => {
+    if (a.sessionsSinceSpotlight === null && b.sessionsSinceSpotlight === null) {
+      return a.pcName.localeCompare(b.pcName);
+    }
+    if (a.sessionsSinceSpotlight === null) return -1;
+    if (b.sessionsSinceSpotlight === null) return 1;
+    if (a.sessionsSinceSpotlight !== b.sessionsSinceSpotlight) return b.sessionsSinceSpotlight - a.sessionsSinceSpotlight;
+    return a.pcName.localeCompare(b.pcName);
+  });
+
+  return results;
+}
+
+/** Session-ordinal phrasing for a character's last spotlight. */
+export function formatSpotlightLabel(spotlight: PcSpotlight): string {
+  if (spotlight.sessionsSinceSpotlight === null) return "Hasn't had a moment yet";
+  if (spotlight.sessionsSinceSpotlight === 0) return 'In the spotlight last session';
+  if (spotlight.sessionsSinceSpotlight === 1) return 'Quiet for 1 session';
+  return `Quiet for ${spotlight.sessionsSinceSpotlight} sessions`;
 }
 
 /** Session-ordinal phrasing for an NPC's last appearance. */

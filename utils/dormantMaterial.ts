@@ -49,6 +49,11 @@ export interface DormantMaterialOptions {
   campaign: Campaign;
   /** The scene currently on stage, if any. Its cast is not dormant. */
   activeSceneId?: string | null;
+  /**
+   * NPCs the DM has put on the Stage right now (unstructured play) — present
+   * in the room, so not offstage, even with no prepped scene active.
+   */
+  presentNpcIds?: readonly string[];
   /** How many pieces to sample. Clamped to 2–3; defaults to 3. */
   count?: number;
   /** Injectable [0,1) source. Defaults to `Math.random`. */
@@ -173,9 +178,11 @@ function collectUnusedScenes(campaign: Campaign, activeSceneId?: string | null):
  */
 export function collectDormantCandidates(
   campaign: Campaign,
-  activeSceneId?: string | null
+  activeSceneId?: string | null,
+  presentNpcIds?: readonly string[]
 ): DormantCandidatePools {
   const liveSceneNpcIds = collectLiveSceneNpcIds(campaign, activeSceneId);
+  for (const id of presentNpcIds ?? []) liveSceneNpcIds.add(id);
   return {
     npc: collectOffstageNpcs(campaign, liveSceneNpcIds),
     secret: collectLoadedGunSecrets(campaign),
@@ -212,8 +219,8 @@ function pickIndex(random: () => number, bucketLength: number): number {
  * have anything to offer, and `[]` when the campaign has nothing dormant.
  */
 export function sampleDormantMaterial(options: DormantMaterialOptions): DormantPiece[] {
-  const { campaign, activeSceneId, count, random = Math.random } = options;
-  const pools = collectDormantCandidates(campaign, activeSceneId);
+  const { campaign, activeSceneId, presentNpcIds, count, random = Math.random } = options;
+  const pools = collectDormantCandidates(campaign, activeSceneId, presentNpcIds);
 
   const available = DORMANT_KIND_ORDER.filter((kind) => pools[kind].length > 0);
   if (available.length === 0) return [];

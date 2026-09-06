@@ -436,6 +436,15 @@ const App: FC = () => {
     resetSelections();
   };
 
+  // The near-zero-prep on-ramp (docs/design/unstructured-play.md): mint a
+  // freeform session and go straight to the table through the same goLive
+  // path the prep wizard uses.
+  const handleQuickStart = () => {
+    const sessionLogId = campaignService.createFreeformSession();
+    if (!sessionLogId) return;
+    handleGoLive(sessionLogId);
+  };
+
   const handleEndSession = () => {
     campaignService.endSession();
     setActiveView('session-logs');
@@ -587,6 +596,7 @@ const App: FC = () => {
                       onSetSelectedPlotId={setSelectedPlotId}
                       onSetSelectedNoteId={setSelectedNoteId}
                       onGoLive={handleGoLive}
+                      onQuickStart={handleQuickStart}
                       onImportPC={handleImportPC}
                       onAddToast={addToast}
                     />

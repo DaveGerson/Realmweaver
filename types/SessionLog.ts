@@ -14,7 +14,33 @@ export type SessionStatus = 'planned' | 'active' | 'completed';
 
 export type PlotSessionStatus = 'advanced' | 'stalled' | 'unchanged';
 
-export type SessionLogEntryType = 'manual' | 'scene-transition' | 'combat' | 'npc-created' | 'dice-roll' | 'coach-used';
+// `entity-created` is the auto entry for a Location/Item/Note promoted from a
+// note via "Make this canon" (a promoted NPC uses `npc-created`, which the
+// roster tooling already understands). Auto entries are never themselves
+// offered for promotion, so a promotion note can't be re-canonised.
+export type SessionLogEntryType = 'manual' | 'scene-transition' | 'combat' | 'npc-created' | 'entity-created' | 'dice-roll' | 'coach-used' | 'world-moved';
+
+/**
+ * The Stage — where the party is and who is with them RIGHT NOW, independent
+ * of any prepped Scene. It is the live, DM-edited truth of the table: a
+ * freeform session runs entirely on it, and a scene-driven session layers it
+ * over the active scene (scene cast ∪ stage cast). Entering a prepped scene
+ * clears it; leaving a scene seeds it from that scene so the room persists
+ * when the script ends. Session-scoped, so it lives on the SessionLog.
+ *
+ * `locationId` and `npcIds` are id-bearing: they are swept by
+ * `_purgeEntityReferences` and remapped by both id-remap passes.
+ */
+export interface SessionStage {
+  /** A campaign Location the party is at, when one is linked. */
+  locationId?: string;
+  /** A freeform place ("a nameless roadside shrine") when nothing is linked. */
+  place?: string;
+  /** NPCs the DM has put on stage, beyond the active scene's own cast. */
+  npcIds: string[];
+  /** One line: what is happening right now. */
+  focus?: string;
+}
 
 export interface SessionLogEntry {
   id: string;
@@ -59,6 +85,9 @@ export interface SessionLog {
 
   // Beats (lightweight freeform planning checklist)
   beats?: Beat[];
+
+  // The Stage — live where/who/what, independent of prepped scenes (unstructured play)
+  stage?: SessionStage;
 
   // Session Timer
   startedAt?: string; // ISO string, persisted on first go-live so timer survives re-mounts

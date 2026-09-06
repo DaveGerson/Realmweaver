@@ -2,7 +2,7 @@
 import type { NPC, Location, Faction, RollableTable, Item, Scene, SceneType, AdventureForBatchAdd, Article, PointOfInterest, PlayerCharacter, RealmChatResponse, ChatMessage, DraftEntity, ModelTier, Campaign } from '../../types/index';
 import type { BatchAddData } from '../../types/index';
 import type { WorldEvent } from './worldSimulation';
-import type { CallbackComplicationRequest, ColdOpenRequest } from './dmCoach';
+import type { CallbackComplicationRequest, ColdOpenRequest, ExtraNpc, SceneMenuDraft, StrongStartRequest } from './dmCoach';
 import { hasColdOpenMaterial } from './dmCoach';
 import type { SecretDraft } from './realmWeaver';
 import type { AudioTranscriptionConfig, AudioTranscriptionSession } from './audioTranscription';
@@ -52,6 +52,12 @@ const mockLocationData: Omit<Location, 'id' | 'parentLocationId' | 'subLocationI
       }
   ],
   history: [],
+  // Lazy DM step 5 ("develop fantastic locations") — every newly generated
+  // location arrives with 2-3 sensory one-liners alongside its description.
+  aspects: [
+    "Cold mist beads on every surface and smells faintly of moss.",
+    "The falls swallow every other sound but a low, constant roar.",
+  ],
 };
 
 const mockFactionData: Omit<Faction, 'id' | 'leaderId' | 'memberIds'> = {
@@ -812,4 +818,153 @@ const MOCK_SECRET_DRAFTS: SecretDraft[] = [
 export const generateSecretBatch = async (prompt: string, campaignContext?: string): Promise<SecretDraft[]> => {
     await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
     return MOCK_SECRET_DRAFTS.map(d => ({ ...d }));
+};
+
+/// --- Lazy DM step 5: "develop fantastic locations" -------------------------
+
+const MOCK_LOCATION_ASPECTS: string[] = [
+    "Cold mist beads on every surface and smells faintly of moss.",
+    "The falls swallow every other sound but a low, constant roar.",
+    "Slick stone underfoot makes every step feel provisional.",
+];
+
+/**
+ * Mock counterpart of `realmWeaver.generateLocationAspects`. Retrofits a
+ * fixed, well-formed set of sensory one-liners onto an existing location —
+ * never touches the provider stack, same MOCK_DELAY as every other mock.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const generateLocationAspects = async (
+    location: { name: string; description: string },
+    campaignContext?: string,
+): Promise<string[]> => {
+    console.log(`[MOCK MODE] Called generateLocationAspects for: "${location.name}"`);
+    logContext(campaignContext);
+    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    return [...MOCK_LOCATION_ASPECTS];
+};
+
+/// --- §4.2: GM Intrusion (zero-precondition live complication) --------------
+
+const MOCK_GM_INTRUSION = 'A side door bangs open and a stranger stumbles in, already mid-sentence to someone who is not there.';
+
+/**
+ * Mock counterpart of `dmCoach.generateGmIntrusion`. Mock parity is
+ * mandatory (services/ai/CLAUDE.md) — never touches the provider stack.
+ * Unlike `generateCallbackComplication`'s mock, this never rejects: the
+ * whole point of GM Intrusion is that it has no material precondition to
+ * enforce, on an empty campaign or otherwise.
+ */
+export const generateGmIntrusion = async (
+    campaignContext?: string,
+    sceneSummary?: string,
+    useLiteModel: boolean = false,
+): Promise<string> => {
+    console.log('[MOCK MODE] Called generateGmIntrusion');
+    logContext(campaignContext);
+    void useLiteModel;
+    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    return sceneSummary ? `${MOCK_GM_INTRUSION} (${sceneSummary})` : MOCK_GM_INTRUSION;
+};
+
+/// --- §4.8: Extras & spear-carriers ------------------------------------------
+
+const MOCK_EXTRAS: ExtraNpc[] = [
+    { name: 'Bram Kettle', detail: 'Talks with his hands full even when they are empty.' },
+    { name: 'Sela Voss', detail: 'A scar through one eyebrow she never explains the same way twice.' },
+    { name: 'Old Tam', detail: 'Smells faintly of pipe smoke and complains about the weather, constantly.' },
+    { name: 'Ivo Renn', detail: 'A nervous laugh that arrives half a second before anything is funny.' },
+    { name: 'Ushka', detail: 'Wears a hat two sizes too large and refuses every offer to fix it.' },
+    { name: 'Corwin Dale', detail: 'Counts coins twice, out loud, every single time.' },
+];
+
+/**
+ * Mock counterpart of `dmCoach.generateExtras`. Mock parity is mandatory
+ * (services/ai/CLAUDE.md) — resolves a fixed, well-formed roster of distinct
+ * name + one-line-detail pairs, sized to the caller's requested count.
+ */
+export const generateExtras = async (
+    count: number,
+    campaignContext?: string,
+    useLiteModel: boolean = false,
+): Promise<ExtraNpc[]> => {
+    console.log(`[MOCK MODE] Called generateExtras with count: ${count}`);
+    logContext(campaignContext);
+    void useLiteModel;
+    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    const n = Number.isFinite(count) ? Math.min(MOCK_EXTRAS.length, Math.max(1, Math.floor(count))) : 5;
+    return MOCK_EXTRAS.slice(0, n).map(e => ({ ...e }));
+};
+
+/// --- Table Pulse §4.3: "Ask the Table" check-in questions -------------------
+
+const MOCK_CHECK_IN_QUESTIONS: string[] = [
+    'What does your character want most right now?',
+    'What moment from last session stuck with you?',
+    'Anything you wish had gone differently?',
+    'Who do you want to see again soon?',
+    'What kind of scene are you hoping for next time?',
+];
+
+/**
+ * Mock counterpart of `dmCoach.generateCheckInQuestions`. Mock parity is
+ * mandatory (services/ai/CLAUDE.md). Like the real path, this has no material
+ * precondition — it never throws, even for a brand-new campaign with an empty
+ * roster. Accepts the same request shape as `dmCoach.CheckInQuestionsRequest`
+ * (typed structurally here rather than imported, so this file's append-only
+ * edit never has to touch the shared import block at the top).
+ */
+export const generateCheckInQuestions = async (
+    request: { campaign?: Campaign; campaignContext?: string; useLiteModel?: boolean } = {},
+): Promise<string[]> => {
+    console.log(`[MOCK MODE] Called generateCheckInQuestions for campaign: "${request.campaign?.title ?? '(none)'}"`);
+    logContext(request.campaignContext);
+    void request.useLiteModel;
+    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    return MOCK_CHECK_IN_QUESTIONS.map(q => q);
+};
+
+/// --- §4.1 Scene Menu Generator (Session Prep Wizard bundle) -----------------
+
+const MOCK_SCENE_MENU_DRAFTS: SceneMenuDraft[] = [
+    { title: 'A stranger buys the whole bar a round', hook: 'They are fishing for information about the party, not celebrating anything.' },
+    { title: 'The watch closes the bridge without explanation', hook: 'Guards are turning away every wagon, no reason given.' },
+    { title: 'A courier collapses at the door', hook: 'The letter in their satchel is addressed to someone in the party.' },
+    { title: 'Something is wrong at the shrine', hook: 'The bell has not rung at dusk for three nights running.' },
+    { title: 'An old contact wants to meet, quietly' },
+    { title: 'A rival crew is asking the same questions the party is' },
+];
+
+/**
+ * Mock counterpart of `dmCoach.generateSceneMenu`. Mock parity is mandatory
+ * (services/ai/CLAUDE.md) — resolves a fixed, well-formed roster of distinct
+ * drafts after the standard mock delay, the same shape as the real path.
+ */
+export const generateSceneMenu = async (campaignContext?: string): Promise<SceneMenuDraft[]> => {
+    console.log(`[MOCK MODE] Called generateSceneMenu`);
+    logContext(campaignContext);
+    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    return MOCK_SCENE_MENU_DRAFTS.map(d => ({ ...d }));
+};
+
+/// --- §4.6 Strong Start Styles (Session Prep Wizard bundle) ------------------
+
+/**
+ * Mock counterpart of `dmCoach.generateStrongStart`. Same "reincorporate
+ * needs a sampled piece" guard as the real path, so the two paths cannot
+ * drift.
+ */
+export const generateStrongStart = async (request: StrongStartRequest): Promise<string> => {
+    const { style, campaign, dormantPiece } = request;
+    if (style === 'reincorporate' && !dormantPiece) {
+        throw new Error(
+            'generateStrongStart needs a sampled dormant piece for the "reincorporate" style; none was supplied.'
+        );
+    }
+    console.log(`[MOCK MODE] Called generateStrongStart with style: "${style}" for campaign: "${campaign.title}"`);
+    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    if (style === 'reincorporate' && dormantPiece) {
+        return `The scene opens already in motion, built around ${dormantPiece.label}: ${dormantPiece.reason.toLowerCase()} — and tonight it finally matters again.`;
+    }
+    return `Drop the party straight into motion: doors already breaking, voices already raised, no time to catch their breath before the first decision is theirs to make.`;
 };
