@@ -165,6 +165,20 @@ describe('contextBuilder — player appetites (Table Pulse)', () => {
     const ctx = buildCampaignContext({ variant: 'generation', campaign });
     expect(ctx).toContain('Player Characters: Torvald (player wants more of: tactical combat; romance plots), Mira');
   });
+
+  it('tolerates a non-array playerFlags from a hand-edited save — never throws, ignores the junk', () => {
+    // Context building runs before essentially every AI call; a bad optional
+    // field on one PC must not take every AI feature down with it.
+    const campaign = makeCampaign({
+      playerCharacters: [
+        { id: 'pc-1', playerName: 'Dana', playerFlags: 'wants more combat', characterSocial: { characterName: 'Torvald' } },
+        { id: 'pc-2', playerName: 'Lee', playerFlags: ['mystery', 42, null], characterSocial: { characterName: 'Mira' } },
+      ] as unknown as Campaign['playerCharacters'],
+    });
+    let ctx = '';
+    expect(() => { ctx = buildCampaignContext({ variant: 'generation', campaign }); }).not.toThrow();
+    expect(ctx).toContain('Player Characters: Torvald, Mira (player wants more of: mystery)');
+  });
 });
 
 describe('contextBuilder — plot pressure', () => {

@@ -1,6 +1,6 @@
 # CLAUDE.md — `tests/`
 
-Vitest unit + component tests. **210 files, 2285 tests, all green.** Playwright specs live in `e2e/` (see
+Vitest unit + component tests. **210 files, 2300 tests, all green.** Playwright specs live in `e2e/` (see
 `e2e/CLAUDE.md`) and are excluded from this run.
 
 ```bash

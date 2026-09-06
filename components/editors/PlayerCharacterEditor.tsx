@@ -142,7 +142,10 @@ export const PlayerCharacterEditor: React.FC<PlayerCharacterEditorProps> = ({ pc
     const cleaned = (formData.playerFlags ?? []).map(line => line.trim()).filter(Boolean);
     const nextFlags = cleaned.length > 0 ? cleaned : undefined;
     setFormData(prev => ({ ...prev, playerFlags: nextFlags }));
-    if ((pc.playerFlags ?? []).join('\n') !== cleaned.join('\n')) {
+    // `pc` is the raw prop (formData is the normalised copy), so tolerate a
+    // non-array here too.
+    const committed = Array.isArray(pc.playerFlags) ? pc.playerFlags : [];
+    if (committed.join('\n') !== cleaned.join('\n')) {
       onUpdate(pc.id, { playerFlags: nextFlags });
     }
   };

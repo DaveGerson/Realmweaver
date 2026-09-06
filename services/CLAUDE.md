@@ -63,9 +63,14 @@ Tests use `{ persist: false }` (init then just sets `appStatus: 'welcome'`).
   calls it again). `createFreeformSession(title?)` mints a planned freeform log with an empty Stage and does NOT go live.
 - `tickPlotClock(plotId, delta = 1)` clamps `Plot.clock.filled` to `[0, segments]` and logs a `world-moved` entry.
 - Integrity: `stage.locationId` / `stage.npcIds` are in `_purgeEntityReferences`, `duplicateCampaign`'s remap and
-  `importTemplateData`'s remap (unknown ids dropped); `importExportService.normaliseRequiredArrays` guarantees
-  `stage.npcIds`. `Plot.clock` / `Plot.ifIgnored` are non-id-bearing; `importTemplateData` validates them the way it
-  validates `Secret.isVital` / `cluesNeeded`.
+  `importTemplateData`'s remap (unknown ids dropped); `importExportService.normaliseRequiredArrays` and
+  `migrateCampaignsData` (lockstep) guarantee `stage.npcIds` on an object Stage and DROP a Stage that is not a plain
+  object, and `_ensureStage` replaces rather than patches one that slipped through. `goLive` clears `activeSceneId`
+  when the new session has no scene to open on, so a scene-less session never inherits the previous live session's
+  scene. `Plot.clock` / `Plot.ifIgnored` are non-id-bearing; `importTemplateData` validates them the way it validates
+  `Secret.isVital` / `cluesNeeded`, and validates `PlayerCharacter.playerFlags` the way it validates
+  `Location.aspects` (strings only, absent when empty) — every reader of `playerFlags` (`contextBuilder`,
+  `dmCoach.generateCheckInQuestions`, `normalizePlayerCharacter`) also tolerates a non-array.
 
 ### Cascade deletion
 

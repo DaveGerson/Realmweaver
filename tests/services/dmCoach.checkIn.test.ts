@@ -168,6 +168,18 @@ describe('reads player appetites from campaign.playerCharacters[].playerFlags', 
     expect(sentInstructions()).not.toContain('Players have said they want more of');
   });
 
+  it('tolerates a non-array playerFlags from a hand-edited save instead of throwing', async () => {
+    const campaign = makeCampaign([
+      makePc({ playerFlags: 'wants more combat' as unknown as string[] }),
+      makePc({ playerFlags: ['mystery', 42 as unknown as string] }),
+    ]);
+    await expect(dmCoach.generateCheckInQuestions({ campaign })).resolves.toBeDefined();
+    const instructions = sentInstructions();
+    expect(instructions).toContain('Players have said they want more of:');
+    expect(instructions).toContain('mystery');
+    expect(instructions).not.toContain('wants more combat');
+  });
+
   it('never reaches into contextBuilder.ts — this is a separate, later change', async () => {
     // No `services/contextBuilder` mock is registered in this file at all;
     // if `generateCheckInQuestions` imported and called it, this test file

@@ -268,4 +268,15 @@ describe('Promote to NPC creates a minimal NPC and links it', () => {
     fireEvent.click(screen.getByRole('button', { name: /added/i }));
     expect(h.createNpc).toHaveBeenCalledTimes(1);
   });
+
+  it('names each Promote button after its extra, so no two share an accessible name', async () => {
+    renderPanel();
+    fireEvent.click(toggle());
+    fireEvent.click(generateButton());
+    await screen.findByText('Bram Kettle');
+
+    const names = screen.getAllByRole('button', { name: /promote to npc/i }).map(b => b.getAttribute('aria-label'));
+    expect(names).toContain('Promote to NPC: Bram Kettle');
+    expect(new Set(names).size).toBe(names.length);
+  });
 });

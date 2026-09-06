@@ -408,3 +408,63 @@ describe('Plot clocks — tickPlotClock', () => {
         expect(campaign().plots.find(p => p.id === plotId)!.clock).toEqual({ segments: 4, filled: 1 });
     });
 });
+
+describe('goLive — a scene-less session never inherits another session\'s scene', () => {
+    it('clears activeSceneId when the newly live session has no planned scenes', () => {
+        const { service, campaign, sceneIdsA } = setup();
+        const scenic = service.createSessionLog({
+            title: 'Scenic', status: 'planned', sessionDate: '2026-02-01', plannedSceneIds: [sceneIdsA[0]], prepNotes: '',
+            runningNotes: '', structuredNotes: [], relatedPlotIds: [], encounterLog: [], recap: '', notableEvents: '', looseEnds: '',
+        });
+        service.goLive(scenic);
+        expect(campaign().activeSceneId).toBe(sceneIdsA[0]);
+
+        // A different, scene-less session goes live straight from its editor
+        // (that Go Live button is not gated on another session being live).
+        // Without the clear, this session's runner would adopt the scenic
+        // session's first scene — cast, location, Done / Set Aside and all.
+        const freeform = service.createSessionLog({
+            title: 'Improv night', status: 'planned', sessionDate: '2026-02-08', plannedSceneIds: [], prepNotes: '',
+            runningNotes: '', structuredNotes: [], relatedPlotIds: [], encounterLog: [], recap: '', notableEvents: '', looseEnds: '',
+        });
+        service.goLive(freeform);
+        expect(campaign().activeSessionId).toBe(freeform);
+        expect(campaign().activeSceneId).toBeUndefined();
+    });
+});
+
+describe('importTemplateData — playerFlags is validated like a location\'s aspects', () => {
+    it('keeps a string array (blanks and non-strings dropped), drops a bare string, omits an empty result', () => {
+        const { service, campaign } = setup();
+        service.importTemplateData({
+            playerCharacters: [
+                { id: 'pc-a', playerName: 'Dana', characterSocial: { characterName: 'Torvald' }, playerFlags: ['tactical combat', '  ', 7] },
+                { id: 'pc-b', playerName: 'Lee', characterSocial: { characterName: 'Mira' }, playerFlags: 'wants more combat' },
+                { id: 'pc-c', playerName: 'Kim', characterSocial: { characterName: 'Ash' } },
+            ],
+        });
+        const byName = (n: string) => campaign().playerCharacters.find(p => p.characterSocial?.characterName === n)!;
+        expect(byName('Torvald').playerFlags).toEqual(['tactical combat']);
+        expect(byName('Mira')).not.toHaveProperty('playerFlags');
+        expect(byName('Ash')).not.toHaveProperty('playerFlags');
+    });
+});
+
+describe('the Stage tolerates a malformed saved value', () => {
+    it('replaces a primitive stage instead of throwing, and removeNpcFromStage no-ops on it', () => {
+        const { service, activeSession, serahId } = setup();
+        liveSession(service);
+        // What a hand-edited save can look like: `"stage": "none"`.
+        service._updateState(draft => {
+            const c = draft.campaigns[0];
+            const s = c.sessionLogs.find(l => l.id === c.activeSessionId)!;
+            (s as unknown as { stage: unknown }).stage = 'none';
+        });
+
+        expect(() => service.removeNpcFromStage(serahId)).not.toThrow();
+        expect(() => service.setStageFocus('Torches gutter in the nave')).not.toThrow();
+        expect(activeSession().stage).toEqual({ npcIds: [], focus: 'Torches gutter in the nave' });
+        expect(service.addNpcToStage(serahId)).toBe(true);
+        expect(activeSession().stage?.npcIds).toEqual([serahId]);
+    });
+});

@@ -64,16 +64,29 @@ function migrateCampaignsData(campaignsData: any[]): Campaign[] {
             subArticleIds: a.subArticleIds || [],
             relatedEntityIds: a.relatedEntityIds || [],
         })),
-        sessionLogs: (c.sessionLogs || []).map((l: any) => ({
-            ...l,
-            structuredNotes: l.structuredNotes || [],
-            relatedPlotIds: l.relatedPlotIds || [],
-            // Backfilled in lockstep with importExportService.normaliseRequiredArrays
-            // (finding #35) — goLive()/advanceScene() dereference plannedSceneIds
-            // unconditionally once an adventureId is set.
-            plannedSceneIds: l.plannedSceneIds || [],
-            encounterLog: l.encounterLog || [],
-        })),
+        sessionLogs: (c.sessionLogs || []).map((l: any) => {
+            const log = {
+                ...l,
+                structuredNotes: l.structuredNotes || [],
+                relatedPlotIds: l.relatedPlotIds || [],
+                // Backfilled in lockstep with importExportService.normaliseRequiredArrays
+                // (finding #35) — goLive()/advanceScene() dereference plannedSceneIds
+                // unconditionally once an adventureId is set.
+                plannedSceneIds: l.plannedSceneIds || [],
+                encounterLog: l.encounterLog || [],
+            };
+            // The Stage is optional, but when present it must be a plain object
+            // with a cast array — in lockstep with normaliseRequiredArrays. A
+            // primitive or array Stage is meaningless and is dropped.
+            if ('stage' in log) {
+                if (l.stage && typeof l.stage === 'object' && !Array.isArray(l.stage)) {
+                    log.stage = { ...l.stage, npcIds: Array.isArray(l.stage.npcIds) ? l.stage.npcIds : [] };
+                } else {
+                    delete log.stage;
+                }
+            }
+            return log;
+        }),
         playerCharacters: c.playerCharacters || [],
         // Backfilled in lockstep with importExportService.normaliseRequiredArrays —
         // ItemDashboard/createItem/duplicateCampaign dereference `items` unconditionally.
@@ -428,7 +441,12 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
 
     /** Returns the session's Stage, creating an empty one on first use. */
     const _ensureStage = (session: SessionLog): SessionStage => {
-        if (!session.stage) session.stage = { npcIds: [] };
+        // A Stage that is not a plain object (a hand-edited save's `"stage":
+        // "none"`, say) is replaced, not patched — assigning `.npcIds` onto a
+        // primitive throws inside the producer and the click silently dies.
+        if (!session.stage || typeof session.stage !== 'object' || Array.isArray(session.stage)) {
+            session.stage = { npcIds: [] };
+        }
         if (!Array.isArray(session.stage.npcIds)) session.stage.npcIds = [];
         return session.stage;
     };
@@ -1647,10 +1665,17 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 // --- Player Characters ---
                 rawPlayerCharacters.forEach((pc: any) => {
                     if (!campaign.playerCharacters) campaign.playerCharacters = [];
-                    campaign.playerCharacters.push({
-                        ...pc,
-                        id: remapRequired(pc.id),
-                    });
+                    // `playerFlags` (Table Pulse) is validated the way a
+                    // location's `aspects` is above: strings only, blanks
+                    // dropped, absent when empty. A template that writes it as
+                    // a bare string must never reach the AI context builder.
+                    const playerFlags = Array.isArray(pc.playerFlags)
+                        ? (pc.playerFlags as unknown[]).filter((f): f is string => typeof f === 'string' && f.trim().length > 0)
+                        : [];
+                    const imported = { ...pc, id: remapRequired(pc.id) };
+                    if (playerFlags.length > 0) imported.playerFlags = playerFlags;
+                    else delete imported.playerFlags;
+                    campaign.playerCharacters.push(imported);
                 });
 
                 // --- Plots ---
@@ -2428,6 +2453,12 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                             found.scene.status = found.scene.status === 'completed' ? 'completed' : 'planned';
                         }
                     }
+                } else {
+                    // No scene to open on: clear whatever the PREVIOUS live
+                    // session left active, or this session's runner would
+                    // adopt another session's scene as its own (cast,
+                    // location, Done / Set Aside included).
+                    campaign.activeSceneId = undefined;
                 }
 
                 // Log session start event
@@ -2811,7 +2842,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
                 const session = _getActiveSession(draft);
-                if (!campaign || !session?.stage) return;
+                if (!campaign || !session?.stage || !Array.isArray(session.stage.npcIds)) return;
                 if (!session.stage.npcIds.includes(npcId)) return;
                 session.stage.npcIds = session.stage.npcIds.filter(id => id !== npcId);
                 const name = campaign.npcs.find(n => n.id === npcId)?.name;

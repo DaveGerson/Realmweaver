@@ -1,5 +1,5 @@
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import type { Campaign } from '@/types/index';
 import { Icons } from '@/components/common/Icons';
 import { Button } from '@/components/common/Button';
@@ -31,7 +31,15 @@ export const SceneMenuSuggestions: React.FC<SceneMenuSuggestionsProps> = ({ camp
   const [drafts, setDrafts] = useState<SceneMenuDraft[] | null>(null);
   const [checked, setChecked] = useState<Set<number>>(new Set());
 
+  // Synchronous re-entry latch, like every other zero-prompt tool in the
+  // runner: the `generating` state alone reads a render closure, so two
+  // presses landing before React commits would both pass it and the second
+  // response would silently replace a list the DM is already ticking through.
+  const inFlightRef = useRef(false);
+
   const handleGenerate = useCallback(async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     setGenerating(true);
     setError(null);
     try {
@@ -48,6 +56,7 @@ export const SceneMenuSuggestions: React.FC<SceneMenuSuggestionsProps> = ({ camp
       setDrafts(null);
       setError(err instanceof Error ? err.message : 'Generation failed.');
     } finally {
+      inFlightRef.current = false;
       setGenerating(false);
     }
   }, [campaign, isMockMode]);

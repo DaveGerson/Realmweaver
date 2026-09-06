@@ -166,6 +166,16 @@ active scene, and the scene list is a **menu**:
 - `StagePanel` owns the place picker (search + freeform "Name a place" + "Clear the place" + "Save as a location"),
   the cast chips (scene cast fixed, Stage cast removable — `aria-label="Take <name> off stage"`) and the focus input
   (commits on Enter/blur, only when changed). Its copy is an invitation when empty; it never shows an error state.
+  Focus handoff: choosing or clearing a place closes the picker and focuses the "Set the place" / "Change place"
+  control (a `ref` on `<Button>` — `ButtonProps` extends `ComponentPropsWithRef<'button'>` for exactly this);
+  adding someone keeps the cast picker open and refocuses its search. The clicked option unmounts either way, so
+  without the handoff focus falls to `<body>`.
+- Per-item and per-tool controls carry distinct accessible names, because several render at once in one column:
+  `Spend this: <piece>` (`DormantShelf`), `Promote to NPC: <name>` / `Added: <name>` (`ExtrasPanel`), and the
+  Use It / Another pairs — `Use it — this complication` / `Another complication` (Complicate This),
+  `Use it — this intrusion` / `Another intrusion` (GM Intrusion), `Use it — from the shelf` (the shelf's result card).
+  The visible text stays "Use It" / "Another"; tests match on `/use it/i`, `/another/i`, `/spend this/i`,
+  `/promote to npc/i`, so keep those words when renaming.
 - `SceneListPanel`: a started, non-active scene shows the paused glyph (`aria-label="Started — come back any time"`);
   `onAddScene` enables **Pull a scene from the shelf** (over `deriveSceneShelf`), `onRemoveScene` the per-scene
   **Put "<title>" back on the shelf** control (never on a completed scene), `onPlayBeat` the per-beat play control,

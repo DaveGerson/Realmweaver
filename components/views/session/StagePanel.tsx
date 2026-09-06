@@ -11,7 +11,7 @@
 // verbs, no data words, no exclamation marks. Nothing here is a required
 // field and nothing nags — an empty Stage is an invitation, not a gap.
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Campaign, Location, NPC, SessionStage } from '@/types';
 import { Icons } from '@/components/common/Icons';
 import { Button } from '@/components/common/Button';
@@ -65,6 +65,14 @@ export const StagePanel: React.FC<StagePanelProps> = ({
     const [castQuery, setCastQuery] = useState('');
     const [focusDraft, setFocusDraft] = useState(stage.focus ?? '');
 
+    // Focus handoff for keyboard users: the option they click inside a picker
+    // unmounts with it (or drops out of the list once that NPC is present), so
+    // focus would otherwise fall to <body> and the next Tab restarts from the
+    // top of the page. The place picker hands focus back to the control that
+    // opened it; the cast picker stays open, so it hands focus to its search.
+    const placeTriggerRef = useRef<HTMLButtonElement>(null);
+    const castSearchRef = useRef<HTMLInputElement>(null);
+
     // The focus box mirrors the store but is edited locally, so a store update
     // from elsewhere (a beat played from the scene list, a Stage reset on
     // entering a scene) lands in the box without clobbering a half-typed line
@@ -106,25 +114,34 @@ export const StagePanel: React.FC<StagePanelProps> = ({
         onSetFocus(focusDraft);
     };
 
-    const choosePlace = (locationId: string) => {
-        onSetLocation(locationId);
+    const closePlacePicker = () => {
         setPlacePickerOpen(false);
         setPlaceQuery('');
         setFreeformPlace('');
+        placeTriggerRef.current?.focus();
+    };
+
+    const choosePlace = (locationId: string) => {
+        onSetLocation(locationId);
+        closePlacePicker();
     };
 
     const chooseFreeformPlace = () => {
         const text = freeformPlace.trim();
         if (!text) return;
         onSetLocation(null, text);
-        setPlacePickerOpen(false);
-        setPlaceQuery('');
-        setFreeformPlace('');
+        closePlacePicker();
+    };
+
+    const clearPlace = () => {
+        onSetLocation(null);
+        closePlacePicker();
     };
 
     const addNpc = (npcId: string) => {
         onAddNpc(npcId);
         setCastQuery('');
+        castSearchRef.current?.focus();
     };
 
     return (
@@ -163,6 +180,7 @@ export const StagePanel: React.FC<StagePanelProps> = ({
                     <span className="text-sm text-slate-500 italic">Nowhere in particular yet</span>
                 )}
                 <Button
+                    ref={placeTriggerRef}
                     variant="ghost"
                     size="sm"
                     onClick={() => setPlacePickerOpen(o => !o)}
@@ -233,7 +251,7 @@ export const StagePanel: React.FC<StagePanelProps> = ({
                         <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => { onSetLocation(null); setPlacePickerOpen(false); }}
+                            onClick={clearPlace}
                             className="text-xs text-slate-500 hover:text-slate-300"
                         >
                             Clear the place
@@ -293,6 +311,7 @@ export const StagePanel: React.FC<StagePanelProps> = ({
             {castPickerOpen && (
                 <div className="rounded-md border border-slate-700 bg-slate-900/60 p-3 space-y-2">
                     <input
+                        ref={castSearchRef}
                         type="text"
                         value={castQuery}
                         onChange={e => setCastQuery(e.target.value)}

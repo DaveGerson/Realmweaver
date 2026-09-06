@@ -201,6 +201,19 @@ describe('collapsed by default', () => {
   });
 });
 
+// --- 1b. each Spend this names its piece -------------------------------------
+
+describe('each Spend this names its piece', () => {
+  it('no two Spend buttons share an accessible name, and each carries the piece label', () => {
+    renderShelf();
+    fireEvent.click(toggle());
+    const names = spendButtons().map(b => b.getAttribute('aria-label'));
+    expect(names.length).toBeGreaterThan(1);
+    expect(new Set(names).size).toBe(names.length);
+    for (const name of names) expect(name).toMatch(/^Spend this: .+/);
+  });
+});
+
 // --- 2. expanding lists every bucket -----------------------------------------
 
 describe('expanding lists every non-empty bucket', () => {

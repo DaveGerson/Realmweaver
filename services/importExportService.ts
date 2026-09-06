@@ -220,10 +220,17 @@ const normaliseRequiredArrays = (data: Record<string, unknown>): void => {
       ensureArrayField(log, 'relatedPlotIds');
       ensureArrayField(log, 'structuredNotes');
       ensureArrayField(log, 'encounterLog');
-      // The Stage is optional, but when present its cast array is required.
-      const stage = log['stage'];
-      if (isPlainObject(stage)) {
-        ensureArrayField(stage, 'npcIds');
+      // The Stage is optional, but when present it must be a plain object with
+      // a cast array (in lockstep with campaignService.migrateCampaignsData).
+      // A primitive or array Stage is meaningless — drop it rather than let
+      // `_ensureStage` try to hang `.npcIds` off a string later.
+      if ('stage' in log) {
+        const stage = log['stage'];
+        if (isPlainObject(stage)) {
+          ensureArrayField(stage, 'npcIds');
+        } else {
+          delete log['stage'];
+        }
       }
     }
   }

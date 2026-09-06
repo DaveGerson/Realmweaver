@@ -92,6 +92,16 @@ describe('PlayerCharacterEditor — "What This Player Wants More Of" (Table Puls
         expect(field.value).toBe('wants more tactical combat\ncame for the mystery');
     });
 
+    it('tolerates a hand-edited save where playerFlags is not an array — renders empty, never crashes, never writes', () => {
+        const pc = makePc({ playerFlags: 'wants more combat' as unknown as string[] });
+
+        const { field, onUpdate } = renderEditor(pc);
+
+        expect(field.value).toBe('');
+        fireEvent.blur(field);
+        expect(onUpdate).not.toHaveBeenCalled();
+    });
+
     it('commits a trimmed, blank-dropped array on blur', () => {
         const onUpdate = vi.fn();
         const pc = makePc();

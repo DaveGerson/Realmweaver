@@ -201,6 +201,29 @@ describe('2. Putting the party somewhere', () => {
         expect(handlers.onSetStageLocation).toHaveBeenCalledWith(null);
     });
 
+    it('hands focus back to the place control when the picker closes, so keyboard navigation continues from the Stage', () => {
+        const handlers = makeHandlers();
+        renderStaged(handlers);
+        fireEvent.click(screen.getByRole('button', { name: 'Set the place' }));
+        // The chosen option unmounts with the picker — focus must not fall to <body>.
+        fireEvent.click(screen.getByRole('button', { name: 'The Drowned Chapel' }));
+        expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Set the place' }));
+
+        fireEvent.click(screen.getByRole('button', { name: 'Set the place' }));
+        const nameInput = screen.getByLabelText('Name a place');
+        fireEvent.change(nameInput, { target: { value: 'a nameless roadside shrine' } });
+        fireEvent.keyDown(nameInput, { key: 'Enter' });
+        expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Set the place' }));
+    });
+
+    it('hands focus back to the place control after Clear the place', () => {
+        const handlers = makeHandlers();
+        renderStaged(handlers, { stage: { npcIds: [], locationId: 'loc-1' }, presentLocation: tavern });
+        fireEvent.click(screen.getByRole('button', { name: 'Change place' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Clear the place' }));
+        expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Change place' }));
+    });
+
     it('renders the location card for the place in effect even with no scene', () => {
         renderStaged(makeHandlers(), { stage: { npcIds: [], locationId: 'loc-1' }, presentLocation: tavern });
         expect(screen.getByText('A crooked tavern on stilts.')).toBeTruthy();
@@ -227,6 +250,9 @@ describe('3. Who is here', () => {
         fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'pell' } });
         fireEvent.click(within(list).getByRole('button', { name: /Old Pell/ }));
         expect(handlers.onAddNpcToStage).toHaveBeenCalledWith('npc-3');
+        // The clicked row leaves the list once they are present; focus returns to
+        // the search so the DM can keep adding people without reaching for the mouse.
+        expect(document.activeElement).toBe(screen.getByLabelText('Search NPCs'));
     });
 
     it('scene cast chips are fixed; Stage chips can be taken off stage', () => {

@@ -156,6 +156,7 @@ export const DormantShelf: React.FC<DormantShelfProps> = ({
                                             onClick={() => handleSpend(piece)}
                                             disabled={spend.status === 'loading'}
                                             className="flex-shrink-0"
+                                            aria-label={`Spend this: ${piece.label}`}
                                         >
                                             {spend.status === 'loading' && spend.pieceId === piece.id ? (
                                                 <Icons.Loader className="w-3.5 h-3.5 animate-spin" />
@@ -183,7 +184,8 @@ export const DormantShelf: React.FC<DormantShelfProps> = ({
                                 Complication
                             </h4>
                             <p className="text-sm text-slate-200 leading-relaxed">{spend.complication}</p>
-                            <Button variant="secondary" size="sm" onClick={handleUseIt}>
+                            {/* Named per tool: Complicate This's own Use It can be on screen at the same time. */}
+                            <Button variant="secondary" size="sm" onClick={handleUseIt} aria-label="Use it — from the shelf">
                                 <Icons.Check className="w-3.5 h-3.5 mr-1.5" />
                                 Use It
                             </Button>

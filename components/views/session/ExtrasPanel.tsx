@@ -161,6 +161,7 @@ export const ExtrasPanel: React.FC<ExtrasPanelProps> = ({ campaign, activeScene,
                                             onClick={() => handlePromote(i)}
                                             disabled={promoted.has(i)}
                                             className="flex-shrink-0"
+                                            aria-label={promoted.has(i) ? `Added: ${extra.name}` : `Promote to NPC: ${extra.name}`}
                                         >
                                             {promoted.has(i) ? (
                                                 <>

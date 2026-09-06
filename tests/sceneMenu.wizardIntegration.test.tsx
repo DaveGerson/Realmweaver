@@ -25,7 +25,7 @@
 
 import React from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, cleanup, screen, fireEvent, within, waitFor } from '@testing-library/react';
+import { render, cleanup, screen, fireEvent, within, waitFor, act } from '@testing-library/react';
 import type { Campaign, SessionLog, Beat } from '../types/index';
 
 const h = vi.hoisted(() => ({
@@ -113,6 +113,33 @@ beforeEach(() => {
 });
 
 afterEach(cleanup);
+
+// ── 0. one request per press ──────────────────────────────────────────────────
+
+describe('Scene Menu Generator — one request per press', () => {
+  it('two presses landing before React commits fetch once; the latch releases when the response lands', async () => {
+    let resolveMenu!: (value: Awaited<ReturnType<typeof h.generateSceneMenu>>) => void;
+    h.generateSceneMenu.mockImplementationOnce(() => new Promise(resolve => { resolveMenu = resolve; }));
+    openBeats();
+
+    // Two clicks inside one act(): neither sees the other's disabled re-render,
+    // exactly like a double-click at the table — only the ref latch stands.
+    const button = suggestButton();
+    act(() => {
+      button.click();
+      button.click();
+    });
+    expect(h.generateSceneMenu).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveMenu([{ title: 'Ambush at the ford' }]);
+    });
+    await screen.findByRole('checkbox', { name: 'Ambush at the ford' });
+
+    fireEvent.click(suggestButton());
+    expect(h.generateSceneMenu).toHaveBeenCalledTimes(2);
+  });
+});
 
 // ── 1. the button ─────────────────────────────────────────────────────────────
 

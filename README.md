@@ -190,7 +190,7 @@ npm run test:e2e:ui      # Playwright interactive UI mode
 
 | Layer | Framework | Tests | Scope |
 |-------|-----------|-------|-------|
-| Unit + component | Vitest | 2285 across 210 files | Services, storage/migration, linking engine, utilities, context builder, AI adapters, archetype scenarios, plus jsdom render tests (`@testing-library/react`) for editors, dialogs and hooks |
+| Unit + component | Vitest | 2300 across 210 files | Services, storage/migration, linking engine, utilities, context builder, AI adapters, archetype scenarios, plus jsdom render tests (`@testing-library/react`) for editors, dialogs and hooks |
 | E2E | Playwright | 114 per project × 2 projects (chromium, mobile-chrome); 2 permanently skipped + 4 runtime skip guards | Campaign lifecycle, entity CRUD, navigation, generators, dialogs, session runner, DM tools, visualizers, mobile, RealmChat |
 | Smoke | Built-in (`smokeTest.ts`) | ~20 checks | Service availability + entity CRUD; **opt-in**, dev-only, requires `VITE_RUN_SMOKE_TESTS=true` |
 | Mock | Built-in | Full app | Every AI function has a mock — all features work without API key or network |

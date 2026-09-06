@@ -725,7 +725,10 @@ const MAX_CHECK_IN_QUESTIONS = 6;
 function gatherPlayerFlags(campaign?: Campaign): string[] {
   const flags: string[] = [];
   for (const pc of campaign?.playerCharacters ?? []) {
-    for (const flag of pc.playerFlags ?? []) {
+    // Tolerate a hand-edited save / template where this is not an array.
+    const pcFlags = Array.isArray(pc.playerFlags) ? pc.playerFlags : [];
+    for (const flag of pcFlags) {
+      if (typeof flag !== 'string') continue;
       const trimmed = flag.trim();
       if (trimmed) flags.push(trimmed);
     }

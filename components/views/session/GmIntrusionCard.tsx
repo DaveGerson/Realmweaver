@@ -149,11 +149,12 @@ export const GmIntrusionResult: React.FC<{ api: GmIntrusionApi }> = ({ api }) =>
                     </h4>
                     <p className="text-sm text-slate-200 leading-relaxed">{phase.complication}</p>
                     <div className="flex flex-wrap items-center gap-2 pt-1">
-                        <Button variant="secondary" size="sm" onClick={useIt}>
+                        {/* Named per tool: Complicate This's own Use It / Another can sit right beside these. */}
+                        <Button variant="secondary" size="sm" onClick={useIt} aria-label="Use it — this intrusion">
                             <Icons.Check className="w-3.5 h-3.5 mr-1.5" />
                             Use It
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={run}>
+                        <Button variant="ghost" size="sm" onClick={run} aria-label="Another intrusion">
                             <Icons.RefreshCw className="w-3.5 h-3.5 mr-1.5" />
                             Another
                         </Button>

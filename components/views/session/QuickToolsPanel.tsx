@@ -348,11 +348,12 @@ export const QuickToolsPanel: React.FC<QuickToolsPanelProps> = ({
                                 ))}
                             </ul>
                             <div className="flex flex-wrap items-center gap-2 pt-1">
-                                <Button variant="secondary" size="sm" onClick={handleUseIt}>
+                                {/* Named per tool: GM Intrusion's own Use It / Another can sit right beside these. */}
+                                <Button variant="secondary" size="sm" onClick={handleUseIt} aria-label="Use it — this complication">
                                     <Icons.Check className="w-3.5 h-3.5 mr-1.5" />
                                     Use It
                                 </Button>
-                                <Button variant="ghost" size="sm" onClick={runCallback}>
+                                <Button variant="ghost" size="sm" onClick={runCallback} aria-label="Another complication">
                                     <Icons.RefreshCw className="w-3.5 h-3.5 mr-1.5" />
                                     Another
                                 </Button>

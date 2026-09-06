@@ -683,7 +683,12 @@ export function buildCampaignContext(options: ContextOptions): string {
     if (hasPlayerCharacters && hasBudget()) {
       const pcNames = campaign.playerCharacters!.map(pc => {
         const name = pc.characterSocial?.characterName ?? '?';
-        const wants = (pc.playerFlags ?? []).map(f => f.trim()).filter(Boolean);
+        // Tolerate a hand-edited save / template where this is not an array —
+        // context building runs before every AI call and must never throw.
+        const wants = (Array.isArray(pc.playerFlags) ? pc.playerFlags : [])
+          .filter((f): f is string => typeof f === 'string')
+          .map(f => f.trim())
+          .filter(Boolean);
         return wants.length > 0 ? `${name} (player wants more of: ${trunc(wants.join('; '), 120)})` : name;
       });
       tryAddJoined('Player Characters:', pcNames, nextTier3Quota());
