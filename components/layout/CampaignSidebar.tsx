@@ -416,6 +416,8 @@ const CampaignSidebarComponent: React.FC<CampaignSidebarProps> = ({
                         </div>
                     </div>
 
+                    {!debouncedFilter && <NavItem label="AI Dungeon Master" icon="Combat" active={activeView === 'ai-dm'} onClick={() => onSelectView('ai-dm')} />}
+
                     {!debouncedFilter && showCombatTracker && (
                     <NavItem
                         label="Combat Tracker"
@@ -765,3 +767,4 @@ const NavItem = ({ icon, label, active, onClick }: { icon: keyof typeof Icons, l
     </button>
   );
 };
+

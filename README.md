@@ -17,6 +17,12 @@
 
 RealmWeaver is a single-page application for tabletop RPG Game Masters who want to create, manage, and run campaigns with AI assistance. It combines deep world-building tools, real-time session support, and conversational AI into one unified experience.
 
+### AI Dungeon Master preview (SRD 5.2.1)
+
+Open **AI Dungeon Master** in a campaign's sidebar. Play with the offline demo or the existing Claude Code provider, review creatures, resolve supported actions with deterministic rules, and search all 364 pages of the current 5.5e SRD. Results persist with the campaign.
+
+**Full source coverage is available; full mechanical coverage is not yet complete.** The preview automates core mechanics and 17 spell profiles. Unsupported mechanics pause for a table ruling. See [implementation, exact coverage, setup and completion gates](docs/ai-dungeon-master.md).
+
 ### Core Features
 
 | Category | Features |
@@ -223,3 +229,6 @@ ship-readiness hardening pass.**
 
 Proprietary. All rights reserved. There is no separate `LICENSE` file — this section is the single
 source of truth, and `package.json` records it as `"license": "UNLICENSED"`.
+
+Included SRD material is separately licensed under CC-BY-4.0; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+

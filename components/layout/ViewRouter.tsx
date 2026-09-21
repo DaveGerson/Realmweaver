@@ -34,6 +34,8 @@ import { CombatTracker } from '@/components/tools/CombatTracker';
 import { SecretsTracker } from '@/components/tools/SecretsTracker';
 import { Icons } from '@/components/common/Icons';
 
+const AiDungeonMaster = React.lazy(() => import('@/components/views/AiDungeonMaster').then(m => ({ default: m.AiDungeonMaster })));
+
 // Lazy-loaded RelationshipGraph — pulls in D3
 const RelationshipGraph = React.lazy(() => import('@/components/visualizers/RelationshipGraph').then(m => ({ default: m.RelationshipGraph })));
 
@@ -134,6 +136,8 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
     (type: string, id: string) => onNavigate(type, id),
     [onNavigate]
   );
+
+  if (activeView === 'ai-dm') return <Suspense fallback={<VisualizerFallback />}><AiDungeonMaster key={campaign.id} campaign={campaign} isMockMode={isMockMode} /></Suspense>;
 
   // Session Runner takes priority when active
   if (activeView === 'session-runner' && campaign.activeSessionId) {
@@ -569,3 +573,4 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
     </ContentWrapper>
   );
 };
+

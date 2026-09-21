@@ -13,10 +13,12 @@ import type { Encounter } from './Encounter';
 import type { Note } from './Note';
 import type { Secret } from './Secret';
 import type { DmStyle } from './CampaignSetting';
+import type { DungeonMasterState } from './DungeonMaster';
 
 export type SettingType = 'custom' | 'official';
 
 export interface Campaign {
+  dungeonMaster?: DungeonMasterState;
   id: string;
   title: string;
   settingType: SettingType;

@@ -288,3 +288,11 @@ export const generateWorldEvents = (
     }
     return aiWorldSimulation.generateWorldEvents(campaign, daysPassed, campaignContext);
 };
+import type { DmProposal, DungeonMasterState } from '../types/index';
+import * as aiDungeonMaster from './ai/dungeonMaster';
+
+export const proposeDungeonMasterTurn = (campaign: Campaign, state: DungeonMasterState, input: string, actingActorId: string, isMockMode = false): Promise<DmProposal> =>
+  isMockMode ? mockService.proposeDungeonMasterTurn(campaign, state, input, actingActorId) : aiDungeonMaster.proposeDungeonMasterTurn(campaign, state, input, actingActorId);
+
+export const narrateDungeonMasterResolution = (campaign: Campaign, state: DungeonMasterState, events: import('../types/index').DmEvent[], isMockMode = false): Promise<string> =>
+  isMockMode ? mockService.narrateDungeonMasterResolution(campaign, state, events) : aiDungeonMaster.narrateDungeonMasterResolution(campaign, state, events);

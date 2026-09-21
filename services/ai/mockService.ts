@@ -756,3 +756,33 @@ export const startAudioTranscription = (
 
     return Promise.resolve({ stop });
 };
+export async function proposeDungeonMasterTurn(
+  _campaign: import('../../types/index').Campaign,
+  state: import('../../types/index').DungeonMasterState,
+  input: string,
+  actingActorId: string,
+): Promise<import('../../types/index').DmProposal> {
+  const actor = state.actors.find(a => a.id === actingActorId);
+  const target = state.actors.find(a => a.side !== actor?.side && !a.dead);
+  const text = input.toLowerCase();
+  let action: import('../../types/index').DmAction | null = null;
+  let narration = 'Demo mode: rain taps against a shuttered watchhouse. Someone inside slides a bolt into place. What do you do?';
+  let pages = [5];
+  if (/start.*combat|roll initiative/.test(text)) { action = { kind: 'start-combat' }; narration = 'The confrontation turns into a fight. Roll initiative.'; pages = [13]; }
+  else if (/end.*turn/.test(text) && actor) { action = { kind: 'end-turn', actorId: actor.id }; narration = 'You finish your turn.'; pages = [13]; }
+  else if (/dodge/.test(text) && actor) { action = { kind: 'dodge', actorId: actor.id }; narration = 'You focus on avoiding the next blow.'; pages = [180]; }
+  else if (/attack|run.*opponent|enemy.*turn/.test(text) && actor && target) { action = { kind: 'attack', actorId: actor.id, targetId: target.id, weaponId: actor.weapons[0].id }; narration = `${actor.name} attempts to strike ${target.name}.`; pages = [14, 16]; }
+  else if (/perception|look|search/.test(text) && actor) { action = { kind: 'check', actorId: actor.id, ability: 'wisdom', skill: 'perception', dc: 15 }; narration = 'You listen and search for signs of movement.'; pages = [6, 187]; }
+  return { narration, action, rulePages: pages, needsRuling: null, suggestedOptions: ['I search the watchhouse.', 'Start combat.', 'I attack the opponent.', 'End my turn.'] };
+}
+export async function narrateDungeonMasterResolution(
+  _campaign: import('../../types/index').Campaign,
+  _state: import('../../types/index').DungeonMasterState,
+  events: import('../../types/index').DmEvent[],
+): Promise<string> {
+  const roll = events.find(e => e.roll)?.roll;
+  if (roll?.kind === 'perception') return roll.success
+    ? 'Through a gap in the shutters, you spot muddy bootprints leading to a cellar door. Someone has been moving supplies after dark. Do you follow the tracks or knock at the front door?'
+    : 'Rain and darkness hide whatever is happening inside. You can still knock at the front door or look for another entrance.';
+  return 'The outcome is recorded in the game log. The watchhouse door remains ahead. What do you do next?';
+}

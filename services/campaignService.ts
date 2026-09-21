@@ -1,5 +1,6 @@
 
 import { produce } from 'immer';
+import { validateDungeonMasterState } from './rules/validation';
 import type {
     Campaign,
     Adventure,
@@ -1038,6 +1039,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 // Reset session / encounter state — don't clone live state
                 activeSceneId: undefined,
                 activeSessionId: undefined,
+                dungeonMaster: undefined,
                 activeEncounter: { id: crypto.randomUUID(), round: 1, turnIndex: 0, combatants: [] },
                 wizardDismissed: true, // Copied campaign is not "new"
                 pinnedEntities: [],
@@ -1209,6 +1211,19 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 console.error("Import failed:", error);
                 throw error;
             }
+        },
+        /** Compare-and-swap prevents an old AI result overwriting a newer turn or another campaign. */
+        commitDungeonMaster(campaignId: string, expectedRevision: number, next: import('../types/index').DungeonMasterState): boolean {
+            const current = state.campaigns.find(c => c.id === campaignId);
+            if (!current || state.activeCampaignId !== campaignId || state.conflictDetected || (current.dungeonMaster?.revision ?? 0) !== expectedRevision) return false;
+            validateDungeonMasterState(next);
+            if (next.revision <= expectedRevision) throw new Error('Dungeon Master revision must advance.');
+            updateState(draft => {
+                const target = draft.campaigns.find(c => c.id === campaignId);
+                if (target) target.dungeonMaster = next;
+            });
+            flushPendingSaveSync();
+            return true;
         },
         updateCampaign(updatedData: Partial<Campaign>) {
             updateState(draft => {
@@ -2728,3 +2743,4 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
 }
 
 export const campaignService = createCampaignStore({ persist: true });
+

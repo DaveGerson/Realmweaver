@@ -365,3 +365,9 @@ const ctx = buildCampaignContext({
 | New entity type / data model | `high-level-design.md` + `CLAUDE.md` (type system) |
 | New AI service function | `CLAUDE.md` (AI Service Integration) |
 | Major feature | `README.md` |
+
+
+
+## AI Dungeon Master integration
+
+`Campaign.dungeonMaster?` holds the versioned AI DM session. `AiDungeonMaster` is a lazy `ai-dm` view. Components call `proposeDungeonMasterTurn` and `narrateDungeonMasterResolution` only through `aiService.ts`; both have offline mocks. Rules code lives under `services/rules/` and does not call a model. Persist through `commitDungeonMaster(campaignId, expectedRevision, next)` to preserve revision/conflict protection. See `docs/ai-dungeon-master.md` before extending mechanics. Full SRD reference coverage is shipped; full rules automation is an outstanding release gate.

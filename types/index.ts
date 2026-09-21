@@ -22,3 +22,4 @@ export * from './Note';
 export * from './DiceRoll';
 export * from './Secret';
 export * from './CampaignSetting';
+export * from './DungeonMaster';

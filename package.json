@@ -2,7 +2,7 @@
   "name": "realmweaver",
   "private": true,
   "version": "0.0.0",
-  "description": "AI-native campaign cockpit for tabletop RPG Game Masters — build worlds, craft stories, run sessions.",
+  "description": "AI-native campaign cockpit for tabletop RPG Game Masters \u2014 build worlds, craft stories, run sessions.",
   "license": "UNLICENSED",
   "repository": {
     "type": "git",
@@ -18,7 +18,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "test:rules": "vitest run tests/srdRules.test.ts tests/srdSpellEffects.test.ts tests/dungeonMaster.test.ts tests/components/AiDungeonMaster.test.tsx"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

@@ -396,7 +396,7 @@ export function useEntitySelection({ activeCampaign, onSidebarClose }: UseEntity
       items: 'Items', adventures: 'Adventures', lorebook: 'Lorebook',
       'session-logs': 'Sessions', 'player-characters': 'Characters', plots: 'Plots',
       combat: 'Combat Tracker', relationships: 'World Graph', 'session-runner': 'Session Live',
-      secrets: 'Secrets & Clues', notes: 'Notes',
+      secrets: 'Secrets & Clues', notes: 'Notes', 'ai-dm': 'AI Dungeon Master',
     };
 
     const categoryCrumb: BreadcrumbSegment = {
@@ -453,3 +453,4 @@ export function useEntitySelection({ activeCampaign, onSidebarClose }: UseEntity
     setSelectedPlayerCharacterId, setSelectedPlotId, setSelectedNoteId, setActiveView,
   };
 }
+
