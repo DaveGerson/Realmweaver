@@ -33,6 +33,7 @@ import { CampaignSettingEditor } from '@/components/editors/CampaignSettingEdito
 import { CombatTracker } from '@/components/tools/CombatTracker';
 import { SecretsTracker } from '@/components/tools/SecretsTracker';
 import { Icons } from '@/components/common/Icons';
+import { TonightsTable } from '@/components/views/TonightsTable';
 
 // Lazy-loaded RelationshipGraph — pulls in D3
 const RelationshipGraph = React.lazy(() => import('@/components/visualizers/RelationshipGraph').then(m => ({ default: m.RelationshipGraph })));
@@ -84,6 +85,8 @@ export interface ViewRouterProps {
   onSetSelectedPlotId: (id: string | null) => void;
   onSetSelectedNoteId: (id: string | null) => void;
   onGoLive: (sessionLogId: string) => void;
+  /** The near-zero-prep on-ramp: start a freeform session with no wizard (unstructured play). */
+  onQuickStart?: () => void;
   onImportPC: (file: File) => Promise<string>;
   onAddToast: (message: string, variant?: 'success' | 'error' | 'info') => void;
 }
@@ -124,6 +127,7 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
   onSetSelectedPlotId,
   onSetSelectedNoteId,
   onGoLive,
+  onQuickStart,
   onImportPC,
   onAddToast,
 }) => {
@@ -150,6 +154,13 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
         />
       );
     }
+  }
+
+  // Tonight's Table — the story-first campaign home. Sits below the live
+  // Session Runner (which always wins, above) and above every editor branch
+  // (nothing is selected when a GM navigates here via the sidebar).
+  if (activeView === 'tonight') {
+    return <TonightsTable campaign={campaign} onNavigate={onNavigate} onGoLive={onGoLive} onQuickStart={onQuickStart} isMockMode={isMockMode} />;
   }
 
   // Render Generators
@@ -395,6 +406,7 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
           }
         }}
         onGoLive={onGoLive}
+        onQuickStart={onQuickStart}
         isMockMode={isMockMode}
       />
     );
@@ -550,7 +562,7 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
   if (activeView === 'secrets') {
     return (
       <ContentWrapper title="Secrets & Clues" icon="Lock">
-        <SecretsTracker campaign={campaign} />
+        <SecretsTracker campaign={campaign} isMockMode={isMockMode} />
       </ContentWrapper>
     );
   }

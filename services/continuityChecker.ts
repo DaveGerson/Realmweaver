@@ -3,6 +3,7 @@
 // Rule-based continuity checker — pure function, no side effects, no API calls.
 
 import type { Campaign } from '@/types/Campaign';
+import { normalizePlotClock } from '@/utils/plotClock';
 
 export type IssueSeverity = 'error' | 'warning' | 'info';
 
@@ -161,6 +162,27 @@ function checkBrokenReferences(campaign: Campaign, makeId: MakeId): ContinuityIs
         entityIds: [location.id],
         entityTypes: ['location'],
         suggestedFix: 'Open the location editor and clear or reassign the controlling faction.',
+      });
+    }
+  }
+
+  // Secret.revealsSecretId → Secret (E1 mystery edge, the fifth stop of the
+  // N-place integrity contract in semantic-model.html §7). The field targets
+  // a SECRET specifically — an id that resolves against some other entity
+  // collection (e.g. an NPC) is still broken — and it is validated wherever
+  // it appears, whatever the holder's own category.
+  const secretIds = new Set((campaign.secrets ?? []).map(s => s.id));
+  for (const secret of campaign.secrets ?? []) {
+    if (secret.revealsSecretId && !secretIds.has(secret.revealsSecretId)) {
+      issues.push({
+        id: makeId('broken-ref'),
+        severity: 'error',
+        ruleId: 'broken-ref',
+        title: 'Secret points at a missing revelation',
+        description: `"${secret.title}" points at a secret (ID: ${secret.revealsSecretId.slice(0, 8)}…) that no longer exists.`,
+        entityIds: [secret.id],
+        entityTypes: ['secret'],
+        suggestedFix: 'Open the secrets tracker and clear or reassign "Supports revelation" on this entry.',
       });
     }
   }
@@ -472,6 +494,165 @@ function checkDuplicateNames(campaign: Campaign, makeId: MakeId): ContinuityIssu
   return issues;
 }
 
+// ─── Rule 9: Mystery Edges (E1/E2) ────────────────────────────────────────────
+
+/**
+ * Four lints over the `Secret.revealsSecretId` mystery-edge ontology (E1) and
+ * its Three-Clue Rule amendment (E2, Option 3's per-revelation `cluesNeeded`).
+ *
+ * Shared definitions, identical to `utils/backlinkUtils.ts`'s inbound-clue
+ * sweep and `SecretsTracker`'s inbound-clue badge:
+ *   - "revelation" = a secret with `category === 'revelation'`.
+ *   - "inbound clue of S" = any secret whose `revealsSecretId === S.id`,
+ *     whatever its own category. A self-reference never counts.
+ *   - unrevealed = `isRevealed` falsy (`undefined` counts as unrevealed).
+ *   - the three-clue threshold of a revelation R is `R.cluesNeeded ?? 3`.
+ *
+ * Silent on a campaign with no `secrets` array, an empty one, or a secret
+ * that is already revealed. `three-clue` and `revelation-without-revealed-
+ * clues` additionally require actual use of the new fields (`isVital` /
+ * `revealsSecretId`) to fire at all. `unreachable-revelation` and
+ * `undeliverable-secret`, though, key off fields that predate this stage
+ * (`category`, `isRevealed`, `linkedEntityIds`): an old save's unrevealed
+ * revelation with no inbound clue, or an unrevealed secret with no
+ * `linkedEntityIds`, reports one of these on first open even though the GM
+ * never touched a new field. That is deliberate — both are real gaps in the
+ * world as authored, not artifacts of adopting the new schema.
+ */
+function checkMysteryEdges(campaign: Campaign, makeId: MakeId): ContinuityIssue[] {
+  const issues: ContinuityIssue[] = [];
+  const secrets = campaign.secrets ?? [];
+  if (secrets.length === 0) return issues;
+
+  // Inbound-clue counts, computed once: any secret whose revealsSecretId
+  // points at another secret counts toward THAT secret's inbound total,
+  // never its own (a self-reference is excluded here, at the source).
+  const inboundCounts = new Map<string, number>();
+  for (const s of secrets) {
+    if (s.revealsSecretId && s.revealsSecretId !== s.id) {
+      inboundCounts.set(s.revealsSecretId, (inboundCounts.get(s.revealsSecretId) ?? 0) + 1);
+    }
+  }
+  const inboundCountOf = (id: string): number => inboundCounts.get(id) ?? 0;
+
+  for (const secret of secrets) {
+    const unrevealed = !secret.isRevealed;
+    const isRevelation = secret.category === 'revelation';
+    const inbound = inboundCountOf(secret.id);
+
+    if (isRevelation && unrevealed) {
+      if (inbound === 0) {
+        // unreachable-revelation (error) — nothing in the campaign can lead
+        // the party here, vital or not.
+        issues.push({
+          id: makeId('unreachable-revelation'),
+          severity: 'error',
+          ruleId: 'unreachable-revelation',
+          title: 'Revelation has no clues pointing at it',
+          description: `"${secret.title}" is an unrevealed revelation with no clues pointing at it. Nothing in the campaign can lead the party to it.`,
+          entityIds: [secret.id],
+          entityTypes: ['secret'],
+          suggestedFix: 'Open the secrets tracker and set "Supports revelation" to this entry on at least one clue.',
+        });
+      } else if (secret.isVital) {
+        // three-clue (warning) — zero inbound is deliberately excluded above
+        // so this rule and the unreachable error never double-report the
+        // same revelation.
+        const threshold = secret.cluesNeeded ?? 3;
+        if (inbound < threshold) {
+          issues.push({
+            id: makeId('three-clue'),
+            severity: 'warning',
+            ruleId: 'three-clue',
+            title: 'Vital revelation is short on clues',
+            description: `"${secret.title}" is marked vital but only has ${inbound} of the ${threshold} clue(s) it needs pointing at it.`,
+            entityIds: [secret.id],
+            entityTypes: ['secret'],
+            suggestedFix: 'Add another clue and set its "Supports revelation" to this entry, or lower the clues-needed threshold.',
+          });
+        }
+      }
+    }
+
+    if (isRevelation && !unrevealed && inbound > 0) {
+      // revelation-without-revealed-clues (info) — the party learned it some
+      // other way; worth a glance, never an error.
+      const anyClueRevealed = secrets.some(
+        s => s.id !== secret.id && s.revealsSecretId === secret.id && s.isRevealed
+      );
+      if (!anyClueRevealed) {
+        issues.push({
+          id: makeId('revelation-without-revealed-clues'),
+          severity: 'info',
+          ruleId: 'revelation-without-revealed-clues',
+          title: 'Revealed revelation has only hidden clues',
+          description: `"${secret.title}" has been revealed, but none of the clues pointing at it have been revealed. The party may have learned it another way — worth confirming.`,
+          entityIds: [secret.id],
+          entityTypes: ['secret'],
+          suggestedFix: 'Reveal one of the supporting clues, or leave it as-is if the party found this out some other way.',
+        });
+      }
+    }
+
+    if (unrevealed) {
+      // undeliverable-secret (warning) — any category. May co-fire with
+      // unreachable-revelation on the same brand-new revelation: different
+      // findings (no anchor in the world vs. no clue structure), both
+      // actionable.
+      const linked = secret.linkedEntityIds ?? [];
+      if (linked.length === 0 && inbound === 0) {
+        issues.push({
+          id: makeId('undeliverable-secret'),
+          severity: 'warning',
+          ruleId: 'undeliverable-secret',
+          title: 'Secret has no way to reach the players',
+          description: `"${secret.title}" is unrevealed, is not linked to any entity, and has no clue pointing at it. No NPC, location, item, or clue in the world can ever surface it.`,
+          entityIds: [secret.id],
+          entityTypes: ['secret'],
+          suggestedFix: 'Link this entry to an NPC, location, item, or plot, or point a clue at it.',
+        });
+      }
+    }
+  }
+
+  return issues;
+}
+
+// ─── Rule 10: Expired Plot Clocks (info) ─────────────────────────────────────
+//
+// A plot's countdown clock (types/Plot.ts `PlotClock`, unstructured play) is
+// the DM's own promise that the world moves when the party looks away. When
+// every segment is filled and the plot is still active, the promised move is
+// due — an `info` nudge, never an error: the clock is optional and a DM who
+// never sets one is never told about it.
+
+function checkExpiredClocks(campaign: Campaign, makeId: MakeId): ContinuityIssue[] {
+  const issues: ContinuityIssue[] = [];
+
+  for (const plot of campaign.plots ?? []) {
+    if (plot.status !== 'active') continue;
+    const clock = normalizePlotClock(plot.clock);
+    if (!clock || clock.filled < clock.segments) continue;
+    const move = plot.ifIgnored?.trim();
+    issues.push({
+      id: makeId('clock-expired'),
+      severity: 'info',
+      ruleId: 'clock-expired',
+      title: 'A plot clock has run out',
+      description: move
+        ? `The clock on "${plot.title}" is full (${clock.filled}/${clock.segments}). Its move is due: ${move}`
+        : `The clock on "${plot.title}" is full (${clock.filled}/${clock.segments}) and the plot is still active.`,
+      entityIds: [plot.id],
+      entityTypes: ['plot'],
+      suggestedFix: move
+        ? 'Make the move at the table, then reset the clock or resolve the plot.'
+        : 'Decide what the world does now — write it as the plot\'s "if ignored" move, then reset the clock or resolve the plot.',
+    });
+  }
+
+  return issues;
+}
+
 // ─── Main entry point ─────────────────────────────────────────────────────────
 
 /**
@@ -494,5 +675,7 @@ export function checkContinuity(campaign: Campaign): ContinuityIssue[] {
     ...checkScenesWithoutContent(campaign, makeId),
     ...checkAdventuresWithoutScenes(campaign, makeId),
     ...checkDuplicateNames(campaign, makeId),
+    ...checkMysteryEdges(campaign, makeId),
+    ...checkExpiredClocks(campaign, makeId),
   ];
 }

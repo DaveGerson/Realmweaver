@@ -9,7 +9,7 @@ AI lives in `services/ai/` — see `services/ai/CLAUDE.md`.
 | `storageService.ts` | `createStorageService()` + `storageService` singleton. localStorage writes, IndexedDB quota fallback, rotating backups, cross-tab conflict events. |
 | `importExportService.ts` | `validateImportedCampaign`, `validateExportRoundTrip`, `exportCampaignAsJson`, `exportCampaignAsObsidian`, `importCampaignFromJsonValidated`, `importCampaignFromJson`, `CURRENT_CAMPAIGN_VERSION`. |
 | `contextBuilder.ts` | `buildCampaignContext(options)` — tiered, token-budget-aware `campaignContext` string. |
-| `continuityChecker.ts` | `checkContinuity(campaign)` — pure, 8 rule functions, returns `ContinuityIssue[]`. |
+| `continuityChecker.ts` | `checkContinuity(campaign)` — pure, 10 rule functions emitting 13 distinct `ruleId`s (`checkMysteryEdges` alone emits four E1/E2 mystery lints; `checkExpiredClocks` emits the `info`-only `clock-expired` nudge for an active plot whose countdown is full), returns `ContinuityIssue[]`. |
 | `aiService.ts` | The AI facade. See `services/ai/CLAUDE.md`. |
 | `linking/autoLinker.ts` | `autoLinkScenes`, `autoLinkNpcFactions` — name-in-prose → id linking, used by `importTemplateData`. |
 | `linking/matchingEngine.ts` | `MatchingEngine` + `TextMatchingEngine` (Unicode word-boundary regex, longest-name-first, min 3 chars). |
@@ -42,13 +42,43 @@ Tests use `{ persist: false }` (init then just sets `appStatus: 'welcome'`).
 - **`migrateCampaignsData`** is the single migration mapper shared by `init()`, the backup-recovery path, `resolveConflict('reload')`, and
   `importCampaign`. Add every new required-array backfill here *and* in `importExportService.normaliseRequiredArrays` — they are kept in lockstep.
 
+### The Stage & the scene menu (unstructured play)
+
+`docs/design/unstructured-play.md`. The live where/who/what of the table lives on the ACTIVE session as
+`SessionLog.stage?: SessionStage` (`{ locationId?, place?, npcIds, focus? }`), independent of any prepped scene.
+
+- Stage writers (all target the active session; the ones that change table truth auto-log a `scene-transition`
+  entry): `updateStage(partial)` (silent), `setStageLocation(locationId | null, place?)` ("Moved to: …"; an unknown
+  id is treated as null; a linked location clears the freeform place), `addNpcToStage(id): boolean` ("… enters the
+  scene"; false when already there or unknown), `removeNpcFromStage(id)` ("… leaves the scene"), `setStageFocus(text)`
+  ("Now: …", only when changed and non-empty).
+- Scene menu: `enterScene(sceneId)` (previous scene stays `in-progress`; a completed scene is reopened; the Stage is
+  reset), `leaveScene({ complete })` ("Done" / "Set Aside"; seeds the Stage from the scene via the same roster rule
+  the runner renders with — `plannedNpcIds` / `plannedLocationIds` win when present, finding #26 — merged with the
+  prior Stage cast), `addPlannedScene(id): boolean` / `removePlannedScene(id)` (put back on the shelf: reopens an
+  in-progress scene as `planned`, clears `activeSceneId` if it was live). `goLive` and `advanceScene` resolve scenes
+  **campaign-wide** through `utils/storyDerivations.resolveSceneById` — `plannedSceneIds` may hold scenes from several
+  adventures — and `advanceScene` past the last scene seeds the Stage instead of leaving `activeSceneId` empty.
+- `goLive` is idempotent for the session that is already live (the prep wizard calls it and then `App.handleGoLive`
+  calls it again). `createFreeformSession(title?)` mints a planned freeform log with an empty Stage and does NOT go live.
+- `tickPlotClock(plotId, delta = 1)` clamps `Plot.clock.filled` to `[0, segments]` and logs a `world-moved` entry.
+- Integrity: `stage.locationId` / `stage.npcIds` are in `_purgeEntityReferences`, `duplicateCampaign`'s remap and
+  `importTemplateData`'s remap (unknown ids dropped); `importExportService.normaliseRequiredArrays` and
+  `migrateCampaignsData` (lockstep) guarantee `stage.npcIds` on an object Stage and DROP a Stage that is not a plain
+  object, and `_ensureStage` replaces rather than patches one that slipped through. `goLive` clears `activeSceneId`
+  when the new session has no scene to open on, so a scene-less session never inherits the previous live session's
+  scene. `Plot.clock` / `Plot.ifIgnored` are non-id-bearing; `importTemplateData` validates them the way it validates
+  `Secret.isVital` / `cluesNeeded`, and validates `PlayerCharacter.playerFlags` the way it validates
+  `Location.aspects` (strings only, absent when empty) — every reader of `playerFlags` (`contextBuilder`,
+  `dmCoach.generateCheckInQuestions`, `normalizePlayerCharacter`) also tolerates a non-array.
+
 ### Cascade deletion
 
 `_purgeEntityReferences(draftCampaign, entityId)` sweeps NPC relationships/mentions, location
 connections/mentions, NPC/location `history[].referenceId` (nulled + `referenceType: 'manual'` — the timeline row
 itself stays), faction `leaderId`/`headquartersLocationId`/mentions, scene mentions, plot and article
 `relatedEntityIds`/mentions, session-log `relatedPlotIds`/`plotProgressions`/`structuredNotes[].taggedEntityIds`/
-`plannedNpcIds`/`plannedLocationIds`, secret `linkedEntityIds`/`revealedInSessionId`, and `campaign.pinnedEntities`.
+`plannedNpcIds`/`plannedLocationIds`/`stage.locationId`/`stage.npcIds`, secret `linkedEntityIds`/`revealedInSessionId`/`revealsSecretId`, and `campaign.pinnedEntities`.
 
 All twelve entity deletes call it: `deleteNpc`, `deleteLocation`, `deleteFaction`, `deleteItem`, `deleteArticle`,
 `deleteAdventure`, `deleteScene`, `deleteSessionLog`, `deletePlayerCharacter`, `deletePlot`, `deleteNote`,
@@ -105,9 +135,17 @@ UI. `importCampaignFromJson` is the throw-on-error wrapper. `exportCampaignAsJso
 
 `buildCampaignContext({ variant, campaign, activeSceneId, activeSessionId, maxTokenEstimate, focusEntityId,
 focusEntityType, focusSelection })` — an **options object**, not positional args. `maxTokenEstimate` defaults to
-4000, converted at 1 token ≈ 4 chars. Tier 1 (identity, setting, `styleProfile`, active session/scene) always tries
-first; Tier 2 adds scene participants, active location, plots, focus entity, and — `coach` only — the active
-encounter; Tier 3 fills the remainder with roster overviews (skipped for `coach`). Lists fill **entry-by-entry**
+4000, converted at 1 token ≈ 4 chars. `variant` is `'generation' | 'coach' | 'chat' | 'player-safe'` — the last
+one (ontology element **E3**) is the player-facing build: it emits no GM-authored private prose (`NPC.secrets`,
+`Location.secrets`, `Scene.gmNotes`, session prep/running notes, the plot-threads section) and no unrevealed
+`Secret`, while `'generation'` / `'coach'` gain a Tier-2 GM-ONLY section of unrevealed secrets linked to the active
+scene's entities. Revealed secrets appear as established party knowledge in all three; `'chat'` gains neither
+section. Tier 1 (identity, setting, `styleProfile`, active session/scene, and — when the active session has a
+non-empty Stage — an **On Stage Now** section: place and present cast in every variant, the DM's `focus` line
+GM-only) always tries first; Tier 2 adds scene participants (the scene's cast ∪ the Stage's cast, deduplicated; the
+Stage's ids also count as scene-relevant for the GM-ONLY secrets section), the active location (skipped when the
+Stage already named a place), plots (each line carries `[clock n/m]` and `— if ignored: …` when set), focus entity,
+and — `coach` only — the active encounter; Tier 3 fills the remainder with roster overviews (skipped for `coach`). Lists fill **entry-by-entry**
 (`tryAddList` / `tryAddJoined`, with an "…and N more" marker), and each Tier-3 section takes a fair share via
 `nextTier3Quota()` so a greedy roster cannot starve the sections after it. Add new Tier-3 sections through the
 same quota helper.

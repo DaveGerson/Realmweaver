@@ -13,6 +13,13 @@ interface QuickNpcGeneratorProps {
     adventure: Adventure | null;
     isMockMode: boolean;
     onNpcSaved: () => void;
+    /**
+     * Called with the new NPC's id right after it is created, before
+     * `onNpcSaved`. The Session Runner uses it to put an improvised NPC on
+     * the Stage when no prepped scene is active (unstructured play) — with a
+     * scene active the NPC is linked to the scene below and this still fires.
+     */
+    onNpcCreated?: (npcId: string) => void;
 }
 
 export const QuickNpcGenerator: React.FC<QuickNpcGeneratorProps> = ({
@@ -21,6 +28,7 @@ export const QuickNpcGenerator: React.FC<QuickNpcGeneratorProps> = ({
     adventure,
     isMockMode,
     onNpcSaved,
+    onNpcCreated,
 }) => {
     const [npcPrompt, setNpcPrompt] = useState('');
     const [npcGenerating, setNpcGenerating] = useState(false);
@@ -63,11 +71,13 @@ export const QuickNpcGenerator: React.FC<QuickNpcGeneratorProps> = ({
         const savedName = npcEditMode ? npcEditData.name : npcPreview.name;
         campaignService.addAutoEvent('npc-created', `NPC created: ${savedName}`);
 
+        onNpcCreated?.(newNpcId);
+
         setNpcPreview(null);
         setNpcEditMode(false);
         setNpcPrompt('');
         onNpcSaved();
-    }, [npcPreview, npcEditMode, npcEditData, activeScene, adventure, onNpcSaved]);
+    }, [npcPreview, npcEditMode, npcEditData, activeScene, adventure, onNpcSaved, onNpcCreated]);
 
     const handleEditPreviewNpc = useCallback(() => {
         if (!npcPreview) return;

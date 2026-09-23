@@ -4,7 +4,7 @@ import type { Campaign } from '@/types/index';
 export interface BacklinkEntry {
   id: string;
   name: string;
-  entityType: string; // 'npc' | 'location' | 'faction' | 'scene' | 'article' | 'plot' | 'adventure' | 'session-log'
+  entityType: string; // 'npc' | 'location' | 'faction' | 'scene' | 'article' | 'plot' | 'adventure' | 'session-log' | 'secret'
   relationshipLabel: string; // Human-readable: "Member", "Leader", "Set in", "Features", etc.
 }
 
@@ -495,6 +495,59 @@ function computeBacklinksForPlot(entityId: string, campaign: Campaign): GroupedB
   return finalise(acc);
 }
 
+/**
+ * E1 mystery edge — the fourth stop of the N-place integrity contract
+ * (`docs/architecture/semantic-model.html` §7). An "inbound clue" of a
+ * secret S is any secret whose `revealsSecretId === S.id`, WHATEVER its own
+ * `category` — a mis-categorised import must not make the edge invisible.
+ * This is the same definition `continuityChecker`'s mystery lints and
+ * `SecretsTracker`'s inbound-clue badge use. A self-reference never counts.
+ *
+ * Secrets are never an @-mention SOURCE (`MentionInput` has no secret
+ * candidates) or TARGET via `scanAllMentionSources`, so this function does
+ * not call it — only the inbound-clue sweep plus the generic
+ * article/plot `relatedEntityIds` sweep.
+ */
+function computeBacklinksForSecret(entityId: string, campaign: Campaign): GroupedBacklinks {
+  const acc = new Map<string, BacklinkEntry[]>();
+
+  for (const secret of campaign.secrets ?? []) {
+    if (secret.id === entityId) continue;
+    if (secret.revealsSecretId === entityId) {
+      addEntry(acc, 'secret', {
+        id: secret.id,
+        name: secret.title,
+        entityType: 'secret',
+        relationshipLabel: 'Clue for',
+      });
+    }
+  }
+
+  for (const article of campaign.articles) {
+    if (article.relatedEntityIds?.includes(entityId)) {
+      addEntry(acc, 'article', {
+        id: article.id,
+        name: article.title,
+        entityType: 'article',
+        relationshipLabel: 'Referenced by',
+      });
+    }
+  }
+
+  for (const plot of campaign.plots) {
+    if (plot.relatedEntityIds?.includes(entityId)) {
+      addEntry(acc, 'plot', {
+        id: plot.id,
+        name: plot.title,
+        entityType: 'plot',
+        relationshipLabel: 'Referenced by',
+      });
+    }
+  }
+
+  return finalise(acc);
+}
+
 function computeBacklinksForScene(entityId: string, campaign: Campaign): GroupedBacklinks {
   const acc = new Map<string, BacklinkEntry[]>();
 
@@ -530,7 +583,7 @@ function computeBacklinksForScene(entityId: string, campaign: Campaign): Grouped
  * @param entityId   - The ID of the entity whose inbound references to find.
  * @param entityType - One of: 'npc' | 'location' | 'faction' | 'item' |
  *                    'adventure' | 'article' | 'plot' | 'scene' |
- *                    'session-log' | 'player-character' | 'note'
+ *                    'session-log' | 'player-character' | 'note' | 'secret'
  * @param campaign   - The full campaign data object.
  */
 export function computeBacklinks(
@@ -555,6 +608,8 @@ export function computeBacklinks(
       return computeBacklinksForPlot(entityId, campaign);
     case 'scene':
       return computeBacklinksForScene(entityId, campaign);
+    case 'secret':
+      return computeBacklinksForSecret(entityId, campaign);
     // Types that BacklinksPanel mounts for but can never be a mention/
     // relationship SOURCE themselves — surface generic relatedEntityIds
     // references instead of the always-false "no references" state

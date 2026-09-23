@@ -391,3 +391,75 @@ win; P5 must precede P6's charter-dependent checks; P7 is the capstone that cons
 nearly everything above it. None of it blocks, or is blocked by, E1–E12 — the two
 tracks meet in the middle: the ontology work makes the data trustworthy, and this
 track makes the data *tell the DM a story*.
+
+> **Superseded in part:** the integrated sequencing below (added 2026-08-26 after the
+> Lazy DM lens analysis) is the current plan of record.
+
+---
+
+## Lazy DM lens integration (2026-08-26)
+
+[`lazy-dm-lens.md`](lazy-dm-lens.md) audited this document against the two "lazy"
+prep schools (Michael E. Shea's eight-step Lazy DM method and Monte Cook's
+player-driven prep posture — distinct schools, both covered there with correct
+attribution). Its findings fold into this plan as follows:
+
+**Re-ranking for the lazy persona.** Through that lens the order is
+**P2 > P1 > P4 > P8 > P3 > P5 > P6 > P7** — P2 (the Callback Machine) is Shea's
+"little dishes of pre-cooked food" implemented as a button, and rises to
+co-headliner alongside P1. The overall build order below reflects this: P1 and P2
+ship in the same wave (P2 consumes P1's derivations).
+
+**The P5 constraint is confirmed.** The lens flagged `hooks[].status` cycling as the
+one item in this document that brushes anti-lazy territory (a ledger the DM must
+keep current). The constraint is now part of P5's definition: pillars and player
+flags ship first; hooks ship only strictly optional — never surfaced as a gap,
+never a nag, filled by players at session zero.
+
+**Five refinements join the track** as first-class items (full specs in
+`lazy-dm-lens.md` §4):
+
+| # | Refinement | Size | Schema |
+|---|-----------|:----:|--------|
+| R1 | Lazy prep path in the Session Prep Wizard (Strong Start → Beats → Secrets check → Go); surfaces the shipped `beats` mechanism at prep time | M | none preferred (reuse `prepNotes`; `SessionLog.strongStart?` is a fallback CANDIDATE) |
+| R2 | "Generate ten, keep what you like" in the Secrets Tracker | M | none |
+| R3 | One-page session prep sheet (the Prep Document, per session) | M | none |
+| R4 | "Here now" filter in the Secrets Tracker (active scene's cast + location) | S | none |
+| R5 | Carry unfinished beats forward at session end | S | none |
+
+**Integrated sequencing (plan of record):**
+
+- **Wave 1** — P1 + P2 + R4 + R5, alongside E3 (party-knowledge AI wiring). Zero
+  schema across the board. P1's derivations are shared infrastructure for P2.
+- **Wave 2** — R1 + P4 + P3 + R2 + R3, alongside E1/E2 (mystery lints sharpen P1's
+  loaded-guns panel and P2's sampler).
+- **Gate** — the P5 scope decision (pillars/flags now; hooks strictly-optional or
+  deferred). Then P5 alongside E7 (same editor, same Tier-1 injection point).
+- **Wave 3** — P6 Tier 1, E4 (escalation; also fixes the world simulator's
+  memorylessness), then P6 Tier 2.
+- **Capstone** — P7 when a real campaign approaches its ending; E6/E8/E9/E12/E13 ride
+  opportunistically in whichever wave touches their files.
+
+**Toolkit riders from the Option 4 (DND-AO) evaluation, 2026-08-26** — features, not
+tracker elements (full rationale in the evaluation doc's Option 4 addendum): **T1** —
+widen R4's "here now" filter by one hop (the active location's controlling faction and
+parent-location chain, reusing E10's derivations; S, zero schema); **T2** — a
+RelationshipGraph focus lens (dim outside a selected node's 2-hop neighborhood, optional
+unrevealed-clue count badge; M, zero schema). Slot opportunistically from Wave 3 —
+T1's file (`SecretsTracker.tsx`) is owned by the Wave 2 build until it lands.
+
+---
+
+## Unstructured-play addendum (2026-09-06)
+
+Waves 1 and 2 shipped as planned. The next pass —
+[`unstructured-play.md`](unstructured-play.md) — turned from **prep** to **play**: the
+Session Runner gained the **Stage** (a scene-optional live where/who/what), the scene list
+became a **menu** that can draw from any adventure with a shelf to pull from and put back,
+plots gained **pressure** (a countdown clock and an "if ignored" move — the smallest useful
+form of E4), the party **spotlight** is read off the running log, and a session can start with
+one click. The P5 gate moved by one field: `PlayerCharacter.playerFlags?` (player appetites)
+shipped as Table Pulse; `Campaign.pillars?` and `PlayerCharacter.hooks?` remain gated. Ten
+Lazy DM / Monte Cook capabilities from a fresh research pass landed alongside (GM Intrusion,
+browse the shelf, Extras, Quick Tables, scene-menu suggestions, Lazy DM checklist, strong-start
+styles, Ask the Table, location aspects, Make this canon).

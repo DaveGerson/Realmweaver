@@ -310,7 +310,7 @@ export const createDefaultPlayerCharacter = (): Omit<PlayerCharacter, 'id'> => (
  */
 export function normalizePlayerCharacter(pc: PlayerCharacter): PlayerCharacter {
     const defaults = createDefaultPlayerCharacter();
-    return {
+    const normalized: PlayerCharacter = {
         ...defaults,
         ...pc,
         id: pc.id,
@@ -325,4 +325,16 @@ export function normalizePlayerCharacter(pc: PlayerCharacter): PlayerCharacter {
             specialActions: pc.characterStatistics?.specialActions ?? defaults.characterStatistics.specialActions,
         },
     };
+    // `playerFlags` (Table Pulse) is optional, but when present it must be a
+    // string array — a hand-edited save can carry a bare string, and every
+    // reader `.map`s / `.join`s it. Anything else is dropped, not coerced.
+    if ('playerFlags' in pc) {
+        const raw: unknown = pc.playerFlags;
+        if (!Array.isArray(raw)) {
+            delete normalized.playerFlags;
+        } else if (raw.some(f => typeof f !== 'string')) {
+            normalized.playerFlags = raw.filter((f): f is string => typeof f === 'string');
+        }
+    }
+    return normalized;
 }

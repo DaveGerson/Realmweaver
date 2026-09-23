@@ -33,7 +33,7 @@ import { useModalState } from '@/hooks/useModalState';
 import { useEntitySelection } from '@/hooks/useEntitySelection';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 
-export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'notes' | 'combat' | 'relationships' | 'session-runner' | 'secrets';
+export type EditorView = 'tonight' | 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'notes' | 'combat' | 'relationships' | 'session-runner' | 'secrets';
 export type GeneratorType = 'npc' | 'location' | 'faction' | 'item' | 'scene' | 'article';
 
 export interface NavStackEntry {
@@ -436,6 +436,15 @@ const App: FC = () => {
     resetSelections();
   };
 
+  // The near-zero-prep on-ramp (docs/design/unstructured-play.md): mint a
+  // freeform session and go straight to the table through the same goLive
+  // path the prep wizard uses.
+  const handleQuickStart = () => {
+    const sessionLogId = campaignService.createFreeformSession();
+    if (!sessionLogId) return;
+    handleGoLive(sessionLogId);
+  };
+
   const handleEndSession = () => {
     campaignService.endSession();
     setActiveView('session-logs');
@@ -587,6 +596,7 @@ const App: FC = () => {
                       onSetSelectedPlotId={setSelectedPlotId}
                       onSetSelectedNoteId={setSelectedNoteId}
                       onGoLive={handleGoLive}
+                      onQuickStart={handleQuickStart}
                       onImportPC={handleImportPC}
                       onAddToast={addToast}
                     />

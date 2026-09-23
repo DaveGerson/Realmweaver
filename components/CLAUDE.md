@@ -10,8 +10,8 @@ Every React component in the app. Hooks live in `hooks/` (see `hooks/CLAUDE.md`)
 | `generators/` | AI creation forms (`*Generator.tsx`) + `EntityChatGenerator` + `PlayerCharacterImporter`. |
 | `editors/` | Detail views. Tabbed, inline AI-assist, per-field store writes. |
 | `layout/` | `Header`, `CampaignSidebar` (+ `sidebar/`), `ContentWrapper`, `ViewRouter`, `StatusBanners`. |
-| `dialogs/` | Multi-step / long-running modals: `DmCoach`, `EvocationWizard`, `WorldSimulationWizard`, `ContinuityChecker`, `SessionPrepWizard`, `SessionEndWizard`, `ExportModal`. |
-| `views/` | Top-level screens: `WelcomeScreen`, `CampaignCreator`, `FirstCampaignWizard`, `CrossCampaignDashboard`, `SessionRunner` (+ `session/`). |
+| `dialogs/` | Multi-step / long-running modals: `DmCoach` (+ `DmCoachCheckIn` — the zero-prompt "Ask the Table" tab body), `EvocationWizard`, `WorldSimulationWizard`, `ContinuityChecker`, `SessionPrepWizard` (+ `prep/`: `SceneMenuSuggestions` "Suggest a few" → check → "Add N" / "Discard", `StrongStartStyles` chip row — "Draft it from last session" / "Drop into action" / "Reincorporate", `LazyChecklist` — collapsed-by-default, never-red mirror of Shea's eight steps on Review & Go Live), `SessionEndWizard`, `ExportModal`. |
+| `views/` | Top-level screens: `TonightsTable`, `WelcomeScreen`, `CampaignCreator`, `FirstCampaignWizard`, `CrossCampaignDashboard`, `SessionRunner` (+ `session/`: `SceneListPanel`, `ActiveScenePanel`, `StagePanel`, `QuickToolsPanel` — which hosts the Callback Machine's zero-prompt "Complicate This" flow, GM Intrusion, the dormant shelf, Extras and Quick Tables — `QuickNpcGenerator`, `RunningLog`). |
 | `tools/` | `CombatTracker`, `DiceRoller`, `SecretsTracker`. |
 | `visualizers/` | `RelationshipGraph`, `PlotTimeline` — heavy dep (D3); `RelationshipGraph` is `React.lazy`-loaded from `ViewRouter`. |
 | `RealmChat/` | `RealmChatWidget` — the only place indigo is allowed. |
@@ -141,7 +141,48 @@ conditionally hidden.
 | `ToastContainer` | Presentational; `useToast`'s provider owns the queue. Each toast auto-dismisses after 4 s and is `role="alert" aria-live="polite"`. |
 | `CommandPalette` | Global entity/action search; `RecentItem` / `CommandPaletteEntityType` are exported from here and consumed by `useEntitySelection`. |
 | `SkeletonCard` | `SkeletonCard`, `SkeletonCardGrid`, `SkeletonGeneratorOverlay` — loading placeholders for dashboards and generators. |
+| `ClockPips` | A `Plot.clock` as a row of pips (static yellow classes — the plot accent). Read-only by default (`role="img"`, name `"<label>: clock n of m"`); with `onSetFilled` each pip is a toggle button named `"<label>: segment i of m"` whose pressed state is "filled" — pressing the last filled pip empties it (the undo). Reads through `utils/plotClock.normalizePlotClock`, so a malformed clock renders nothing. |
+| `CanonCapturePicker` | Shared "Make this canon" inline picker (kind radiogroup + editable name pre-filled from `utils/canonCapture`'s `splitCanonNote` + Save/Cancel), used by `RunningLog` (live: scene link or `addNpcToStage`) and `SessionLogEditor` (post-hoc: the promotion note is appended to the log being reviewed). Purely presentational — `onSave(kind, name)` is the host's cue to build a draft and call `campaignService.create*` itself. Offered only on MANUAL notes, never on auto-generated entries. |
 | `SceneResourcesPanel`, `SceneSmartLinkBar`, `LinkSuggestionsPanel`, `EntityHistoryManager`, `DmStylePanel`, `GenerateHerePanel`, `StepIndicator`, `Breadcrumbs`, `KeyboardShortcutsHelp` | Single-purpose panels; each documents its own contract in its file docblock. |
+
+### The Session Runner and the Stage (`views/SessionRunner.tsx`, `views/session/`)
+
+`docs/design/unstructured-play.md`. The runner derives everything from the session's **Stage** as well as the
+active scene, and the scene list is a **menu**:
+
+- `SessionRunner` resolves `plannedSceneIds` and `activeSceneId` campaign-wide (`resolveSceneById`), never through
+  the session's `adventureId` alone. `presentNpcs = activeSceneNpcs ∪ stageNpcs` (the roster rule from finding #26
+  still decides `activeSceneNpcs`); `presentLocation = stageLocation ?? activeSceneLocation`. Every consumer — the
+  relationship map, cast dynamics, the Combat Tracker auto-roster, `QuickToolsPanel`'s `stageSummary` /
+  `presentNpcIds`, the NPC cards — reads the union. Table actions route to the store's Stage / scene-menu methods
+  (`enterScene`, `leaveScene`, `addPlannedScene`, `removePlannedScene`, `setStageLocation`, `addNpcToStage`,
+  `removeNpcFromStage`, `setStageFocus`, `tickPlotClock`); a Quick NPC made with no scene active goes to
+  `addNpcToStage` via `QuickNpcGenerator`'s `onNpcCreated`.
+- `ActiveScenePanel` renders `StagePanel` only when `stage` AND all four stage handlers are supplied; a legacy caller
+  (or an older test) that passes the scene-only props gets the original panel including its "No active scene"
+  empty state. New scene controls: **Done** (`onFinishScene`), **Next Scene** (hidden when `hasNextScene` is false),
+  **Set Aside** (`onSetAsideScene`). The recap banner and the location / NPC cards render whether or not a scene is
+  active.
+- `StagePanel` owns the place picker (search + freeform "Name a place" + "Clear the place" + "Save as a location"),
+  the cast chips (scene cast fixed, Stage cast removable — `aria-label="Take <name> off stage"`) and the focus input
+  (commits on Enter/blur, only when changed). Its copy is an invitation when empty; it never shows an error state.
+  Focus handoff: choosing or clearing a place closes the picker and focuses the "Set the place" / "Change place"
+  control (a `ref` on `<Button>` — `ButtonProps` extends `ComponentPropsWithRef<'button'>` for exactly this);
+  adding someone keeps the cast picker open and refocuses its search. The clicked option unmounts either way, so
+  without the handoff focus falls to `<body>`.
+- Per-item and per-tool controls carry distinct accessible names, because several render at once in one column:
+  `Spend this: <piece>` (`DormantShelf`), `Promote to NPC: <name>` / `Added: <name>` (`ExtrasPanel`), and the
+  Use It / Another pairs — `Use it — this complication` / `Another complication` (Complicate This),
+  `Use it — this intrusion` / `Another intrusion` (GM Intrusion), `Use it — from the shelf` (the shelf's result card).
+  The visible text stays "Use It" / "Another"; tests match on `/use it/i`, `/another/i`, `/spend this/i`,
+  `/promote to npc/i`, so keep those words when renaming.
+- `SceneListPanel`: a started, non-active scene shows the paused glyph (`aria-label="Started — come back any time"`);
+  `onAddScene` enables **Pull a scene from the shelf** (over `deriveSceneShelf`), `onRemoveScene` the per-scene
+  **Put "<title>" back on the shelf** control (never on a completed scene), `onPlayBeat` the per-beat play control,
+  `spotlightTonight` the strip under Beats. Without those props the panel's original surface is unchanged.
+- `QuickToolsPanel`'s Active Plots rows carry `ClockPips` + a tick control (`aria-label="Tick the clock for <title>"`,
+  disabled when full) and the plot's "If ignored" line. The cycle-status control is a sibling button, not a parent —
+  never nest a button in a button.
 
 ## Styling
 

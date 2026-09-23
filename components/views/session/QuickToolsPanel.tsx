@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import type { Campaign, SessionLog, Scene, Adventure, PlotSessionStatus } from '@/types';
 import { Icons } from '@/components/common/Icons';
 import { Button } from '@/components/common/Button';
@@ -8,6 +8,16 @@ import { campaignService } from '@/services/campaignService';
 import { DiceRoller } from '@/components/tools/DiceRoller';
 import { SecretsTracker } from '@/components/tools/SecretsTracker';
 import { QuickNpcGenerator } from './QuickNpcGenerator';
+import { sampleDormantMaterial } from '@/utils/dormantMaterial';
+import type { DormantPiece } from '@/utils/dormantMaterial';
+import { generateCallbackComplication } from '@/services/aiService';
+import { buildCampaignContext } from '@/services/contextBuilder';
+import { ClockPips } from '@/components/common/ClockPips';
+import { normalizePlotClock, isPlotClockExpired } from '@/utils/plotClock';
+import { useGmIntrusion, GmIntrusionButton, GmIntrusionResult } from './GmIntrusionCard';
+import { DormantShelf } from './DormantShelf';
+import { ExtrasPanel } from './ExtrasPanel';
+import { QuickTablesPanel } from './QuickTablesPanel';
 
 interface QuickToolsPanelProps {
     campaign: Campaign;
@@ -24,7 +34,44 @@ interface QuickToolsPanelProps {
     onOpenCombat: () => void;
     onCyclePlotStatus: (plotId: string) => void;
     onNavigate?: (entityType: string, entityId: string) => void;
+    /**
+     * Unstructured play (docs/design/unstructured-play.md): one derived line
+     * about what is on stage right now — scene, place, who is present, what is
+     * happening — built by the Session Runner from the Stage as well as the
+     * active scene. When given it replaces the scene-only summary below, so
+     * "Complicate This" works in a freeform session with no scene at all.
+     */
+    stageSummary?: string;
+    /** Everyone on stage right now (scene cast ∪ Stage cast) — not "offstage" for the dormant sampler. */
+    presentNpcIds?: string[];
+    /** Forwarded to the Quick NPC generator; the runner puts the new NPC on the Stage. */
+    onNpcCreated?: (npcId: string) => void;
+    /** Ticks a plot's countdown clock by one; when absent, clocks render read-only. */
+    onTickPlotClock?: (plotId: string) => void;
 }
+
+/**
+ * P2 — the Callback Machine. Distinct from `onOpenCoach`'s DM Coach (which
+ * looks *forward* from a DM-typed situation): this looks *backward* into the
+ * campaign's own dormant inventory and spends it, with nothing typed. See
+ * `docs/design/storyteller-first-design.md` P2 and `lazy-dm-lens.md` §5's
+ * no-crafted-prompt rule.
+ */
+type CallbackPhase =
+    | { status: 'idle' }
+    | { status: 'loading' }
+    | { status: 'empty'; message: string }
+    | { status: 'error'; message: string }
+    | {
+          status: 'result';
+          material: DormantPiece[];
+          complication: string;
+          /** True once "Use It" has been pressed at least once — gates the reveal flip. */
+          usedPressed: boolean;
+          /** Set only once `addAutoEvent` actually landed — a false return must not claim success. */
+          usedMessage: string | null;
+          secretRevealed: boolean;
+      };
 
 const plotStatusBadge = (status: PlotSessionStatus) => {
     switch (status) {
@@ -57,6 +104,7 @@ export const QuickToolsPanel: React.FC<QuickToolsPanelProps> = ({
     sessionLog,
     activeScene,
     adventure,
+    activeSceneNpcs,
     plotSessionStatus,
     isMockMode,
     mobileTab,
@@ -65,10 +113,111 @@ export const QuickToolsPanel: React.FC<QuickToolsPanelProps> = ({
     onOpenCoach,
     onOpenCombat,
     onCyclePlotStatus,
+    stageSummary,
+    presentNpcIds,
+    onNpcCreated,
+    onTickPlotClock,
 }) => {
     const [showDiceRoller, setShowDiceRoller] = useState(false);
     const [showSecrets, setShowSecrets] = useState(false);
     const [showQuickNpc, setShowQuickNpc] = useState(false);
+    const [callback, setCallback] = useState<CallbackPhase>({ status: 'idle' });
+    // Synchronous in-flight latch: the state-based guard below reads a render
+    // closure, so two presses landing before React commits would both pass it.
+    const callbackInFlightRef = useRef(false);
+
+    // §4.2 — GM Intrusion. See components/views/session/GmIntrusionCard.tsx
+    // for why this is a hook plus two presentational pieces rather than one
+    // component: the trigger button lives in the tool list below and the
+    // result card renders separately, mirroring every other Quick Tools
+    // control (Dice Roller, Quick NPC, Secrets & Clues).
+    const gmIntrusion = useGmIntrusion({
+        campaign,
+        isMockMode,
+        stageSummary,
+        activeScene,
+        activeSceneNpcs,
+    });
+
+    // Zero-prompt by construction: nothing here is DM-typed. The panel samples
+    // the campaign's own dormant material and derives the scene summary and
+    // campaign context itself.
+    const runCallback = async () => {
+        if (callbackInFlightRef.current || callback.status === 'loading') return;
+        callbackInFlightRef.current = true;
+        setCallback({ status: 'loading' });
+
+        const sample = sampleDormantMaterial({
+            campaign,
+            activeSceneId: activeScene?.id ?? null,
+            presentNpcIds,
+        });
+
+        if (sample.length === 0) {
+            callbackInFlightRef.current = false;
+            setCallback({
+                status: 'empty',
+                message: "Nothing dormant to spend right now — maybe it's time to write something new.",
+            });
+            return;
+        }
+
+        // The Stage-aware line wins when the runner supplies one (it covers a
+        // freeform session with no scene); the scene-only line is the fallback.
+        const sceneSummary = stageSummary?.trim()
+            ? stageSummary.trim()
+            : activeScene
+                ? `The current scene is "${activeScene.title}"${activeSceneNpcs.length ? `, with ${activeSceneNpcs.map(n => n.name).join(', ')} present` : ''}.`
+                : undefined;
+
+        const campaignContext = buildCampaignContext({
+            variant: 'coach',
+            campaign,
+            activeSceneId: campaign.activeSceneId,
+            activeSessionId: campaign.activeSessionId,
+        });
+
+        try {
+            const complication = await generateCallbackComplication(
+                { material: sample, sceneSummary, campaignContext },
+                isMockMode
+            );
+            setCallback({
+                status: 'result',
+                material: sample,
+                complication,
+                usedPressed: false,
+                usedMessage: null,
+                secretRevealed: false,
+            });
+        } catch (err) {
+            setCallback({
+                status: 'error',
+                message: err instanceof Error ? err.message : 'Something went wrong generating that complication.',
+            });
+        } finally {
+            callbackInFlightRef.current = false;
+        }
+    };
+
+    const handleUseIt = () => {
+        if (callback.status !== 'result' || callback.usedMessage) return;
+        const logged = campaignService.addAutoEvent('coach-used', `Complication: ${callback.complication}`);
+        // The reveal flip is gated on usedPressed, so only latch it when the
+        // entry actually landed — otherwise a DM whose session already ended
+        // would be offered a reveal against a session that never logged it.
+        setCallback({ ...callback, usedPressed: logged, usedMessage: logged ? 'Logged to the running log.' : null });
+    };
+
+    const handleRevealSecret = () => {
+        if (callback.status !== 'result' || callback.secretRevealed) return;
+        const secretPiece = callback.material.find(p => p.kind === 'secret');
+        if (!secretPiece) return;
+        campaignService.revealSecret(secretPiece.id, campaign.activeSessionId);
+        setCallback({ ...callback, secretRevealed: true });
+    };
+
+    const spentSecret = callback.status === 'result' ? callback.material.find(p => p.kind === 'secret') : undefined;
 
     return (
         <div className={twMerge(
@@ -90,6 +239,17 @@ export const QuickToolsPanel: React.FC<QuickToolsPanelProps> = ({
                     <Icons.Coach className="w-4 h-4 mr-2 text-amber-400" />
                     DM Coach
                 </Button>
+                <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={runCallback}
+                    disabled={callback.status === 'loading'}
+                    className="w-full justify-start"
+                >
+                    <Icons.Zap className="w-4 h-4 mr-2 text-amber-400" />
+                    Complicate This
+                </Button>
+                <GmIntrusionButton api={gmIntrusion} />
                 {canShowCombatTracker && (
                     <Button
                         variant="secondary"
@@ -114,6 +274,7 @@ export const QuickToolsPanel: React.FC<QuickToolsPanelProps> = ({
                 {showDiceRoller && (
                     <DiceRoller onLogRoll={(roll) => campaignService.addDiceRollToSession(roll)} />
                 )}
+                <QuickTablesPanel />
                 <Button
                     variant="secondary"
                     size="sm"
@@ -126,6 +287,13 @@ export const QuickToolsPanel: React.FC<QuickToolsPanelProps> = ({
                     <Icons.UserPlus className="w-4 h-4 mr-2 text-emerald-400" />
                     Quick NPC
                 </Button>
+                <ExtrasPanel
+                    campaign={campaign}
+                    activeScene={activeScene}
+                    adventure={adventure}
+                    isMockMode={isMockMode}
+                    onNpcCreated={onNpcCreated}
+                />
                 {canShowSecretsTracker && (
                     <Button
                         variant="secondary"
@@ -143,6 +311,85 @@ export const QuickToolsPanel: React.FC<QuickToolsPanelProps> = ({
                 )}
             </div>
 
+            {/* Callback Machine — zero-prompt reincorporation (P2) */}
+            {callback.status !== 'idle' && (
+                <div className="border-t border-slate-800 p-3">
+                    {callback.status === 'loading' && (
+                        <p className="text-xs text-slate-500 flex items-center gap-2">
+                            <Icons.Loader className="w-3.5 h-3.5 animate-spin" />
+                            Sampling the world for something to spend...
+                        </p>
+                    )}
+                    {callback.status === 'empty' && (
+                        <p role="status" className="text-xs text-slate-400 italic">{callback.message}</p>
+                    )}
+                    {callback.status === 'error' && (
+                        <p role="alert" className="text-xs text-red-400 flex items-start gap-2">
+                            <Icons.AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                            {callback.message}
+                        </p>
+                    )}
+                    {callback.status === 'result' && (
+                        <div className="rounded-md border border-amber-700/40 bg-amber-900/10 p-3 space-y-2">
+                            <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                                <Icons.Zap className="w-3 h-3" />
+                                Complication
+                            </h4>
+                            <p className="text-sm text-slate-200 leading-relaxed">{callback.complication}</p>
+                            <ul className="space-y-0.5">
+                                {/* A piece the complication already names outright needs no
+                                    restating here — this list calls out what got spent that
+                                    isn't otherwise visible in the read-aloud text above. */}
+                                {callback.material.filter(piece => !callback.complication.includes(piece.label)).map(piece => (
+                                    <li key={piece.id} className="text-[11px] text-slate-500">
+                                        <span className="text-slate-300 font-medium">{piece.label}</span>
+                                        {' — '}{piece.reason}
+                                    </li>
+                                ))}
+                            </ul>
+                            <div className="flex flex-wrap items-center gap-2 pt-1">
+                                {/* Named per tool: GM Intrusion's own Use It / Another can sit right beside these. */}
+                                <Button variant="secondary" size="sm" onClick={handleUseIt} aria-label="Use it — this complication">
+                                    <Icons.Check className="w-3.5 h-3.5 mr-1.5" />
+                                    Use It
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={runCallback} aria-label="Another complication">
+                                    <Icons.RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                                    Another
+                                </Button>
+                                {callback.usedPressed && spentSecret && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={handleRevealSecret}
+                                        disabled={callback.secretRevealed}
+                                    >
+                                        <Icons.Eye className="w-3.5 h-3.5 mr-1.5" />
+                                        {callback.secretRevealed ? 'Secret revealed' : 'Mark secret revealed'}
+                                    </Button>
+                                )}
+                            </div>
+                            {callback.usedMessage && (
+                                <p className="text-[11px] text-emerald-400">{callback.usedMessage}</p>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* §4.2 — GM Intrusion result card, sibling of the Callback Machine's above */}
+            <GmIntrusionResult api={gmIntrusion} />
+
+            {/* §4.7 — Browse the Shelf: the same dormant inventory, made choosable */}
+            <DormantShelf
+                campaign={campaign}
+                activeScene={activeScene}
+                activeSceneNpcs={activeSceneNpcs}
+                presentNpcIds={presentNpcIds}
+                stageSummary={stageSummary}
+                isMockMode={isMockMode}
+            />
+
             {/* Quick NPC Inline Form */}
             {showQuickNpc && (
                 <QuickNpcGenerator
@@ -151,6 +398,7 @@ export const QuickToolsPanel: React.FC<QuickToolsPanelProps> = ({
                     adventure={adventure}
                     isMockMode={isMockMode}
                     onNpcSaved={() => setShowQuickNpc(false)}
+                    onNpcCreated={onNpcCreated}
                 />
             )}
 
@@ -160,6 +408,7 @@ export const QuickToolsPanel: React.FC<QuickToolsPanelProps> = ({
                     <SecretsTracker
                         campaign={campaign}
                         activeSessionId={campaign.activeSessionId}
+                        isMockMode={isMockMode}
                     />
                 </div>
             )}
@@ -175,27 +424,61 @@ export const QuickToolsPanel: React.FC<QuickToolsPanelProps> = ({
                         {sessionLog.relatedPlotIds.map(plotId => {
                             const plot = campaign.plots.find(p => p.id === plotId);
                             const status = plotSessionStatus[plotId] || 'unchanged';
-                            return plot ? (
-                                <button
-                                    key={plot.id}
-                                    onClick={() => onCyclePlotStatus(plot.id)}
-                                    className="w-full text-left border-l-2 border-amber-600/50 pl-2.5 py-1 hover:bg-slate-800/50 rounded-r transition-colors group"
-                                >
-                                    <p className="text-sm text-amber-200 font-medium">{plot.title}</p>
-                                    {plot.description && (
-                                        <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">
-                                            {plot.description.substring(0, 120)}{plot.description.length > 120 ? '...' : ''}
+                            if (!plot) return null;
+                            const clock = normalizePlotClock(plot.clock);
+                            const expired = isPlotClockExpired(clock);
+                            const ifIgnored = plot.ifIgnored?.trim();
+                            return (
+                                <div key={plot.id} className="border-l-2 border-amber-600/50 pl-2.5 py-1 rounded-r">
+                                    <button
+                                        onClick={() => onCyclePlotStatus(plot.id)}
+                                        className="w-full text-left hover:bg-slate-800/50 rounded transition-colors group"
+                                    >
+                                        <p className="text-sm text-amber-200 font-medium">{plot.title}</p>
+                                        {plot.description && (
+                                            <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">
+                                                {plot.description.substring(0, 120)}{plot.description.length > 120 ? '...' : ''}
+                                            </p>
+                                        )}
+                                        <div className="flex items-center justify-between mt-1">
+                                            {plotStatusBadge(status)}
+                                            <span className="text-[10px] text-slate-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+                                                <Icons.RefreshCw className="w-2.5 h-2.5" />
+                                                Click to cycle
+                                            </span>
+                                        </div>
+                                    </button>
+                                    {/* Pressure (unstructured play): the plot's own move when the
+                                        party looks away, and the clock that says when it's due. */}
+                                    {ifIgnored && (
+                                        <p className="text-[11px] text-slate-500 italic mt-1 line-clamp-2">
+                                            <span className="not-italic font-semibold text-slate-400 mr-1">If ignored:</span>
+                                            {ifIgnored}
                                         </p>
                                     )}
-                                    <div className="flex items-center justify-between mt-1">
-                                        {plotStatusBadge(status)}
-                                        <span className="text-[10px] text-slate-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
-                                            <Icons.RefreshCw className="w-2.5 h-2.5" />
-                                            Click to cycle
-                                        </span>
-                                    </div>
-                                </button>
-                            ) : null;
+                                    {clock && (
+                                        <div className="flex items-center gap-1.5 mt-1">
+                                            <ClockPips clock={clock} label={plot.title} />
+                                            <span className="text-[10px] text-slate-500 font-mono">{clock.filled}/{clock.segments}</span>
+                                            {onTickPlotClock && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onTickPlotClock(plot.id)}
+                                                    disabled={expired}
+                                                    aria-label={`Tick the clock for ${plot.title}`}
+                                                    title={expired ? 'The clock has run out' : 'The world moves: tick the clock'}
+                                                    className="p-0.5 rounded text-yellow-400/80 hover:text-yellow-300 hover:bg-yellow-900/30 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+                                                >
+                                                    <Icons.ChevronRight className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                            {expired && (
+                                                <span className="text-[10px] font-semibold text-yellow-300 uppercase tracking-wider">Time's up</span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            );
                         })}
                     </div>
                 ) : (

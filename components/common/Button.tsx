@@ -2,7 +2,11 @@
 import React from 'react';
 import { twMerge } from 'tailwind-merge';
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+// `ComponentPropsWithRef` (not `ButtonHTMLAttributes`) so callers can pass a
+// `ref` — React 19 hands it to a function component as an ordinary prop, and
+// the `...props` spread below puts it on the real <button>. Used to return
+// focus to a control after an inline picker it opened closes.
+interface ButtonProps extends React.ComponentPropsWithRef<'button'> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'icon';
   size?: 'sm' | 'md' | 'lg';
   children: React.ReactNode;

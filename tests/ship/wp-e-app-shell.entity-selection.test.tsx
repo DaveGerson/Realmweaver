@@ -118,3 +118,15 @@ describe('wp-e-app-shell #54 — a sidebar scene click is a single navigation', 
         expect(result.current.navStack).toHaveLength(1);
     });
 });
+
+describe('Stage 1 review finding #4 — the "tonight" view has a breadcrumb label', () => {
+    it('renders "Tonight\'s Table" instead of the raw view key', () => {
+        const { result } = setup();
+
+        act(() => { result.current.handleSelectView('tonight'); });
+
+        const labels = result.current.breadcrumbSegments.map(s => s.label);
+        expect(labels).toContain("Tonight's Table");
+        expect(labels).not.toContain('tonight');
+    });
+});

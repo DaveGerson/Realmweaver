@@ -359,6 +359,20 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                 regenerateButton={<RegenerateButton fieldName="exampleQuote" currentValue={formData.exampleQuote} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('exampleQuote')} isMockMode={isMockMode} campaignContext={campaignContext} />}
               />
 
+              {/* Voice (Wave 2 / P3) — how they sound, next to what they say.
+                  `AiTextarea`'s <label> isn't linked via htmlFor/id, so an explicit
+                  aria-label is required for an accessible name of "Voice". */}
+              <AiTextarea
+                label="Voice"
+                name="voiceNotes"
+                aria-label="Voice"
+                value={formData.voiceNotes ?? ''}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                rows={2}
+                placeholder="How do they sound? Accent, cadence, verbal tics, a phrase they always fall back on — the details that keep their voice the same session to session."
+              />
+
               {/* Backstory */}
               <div>
                 <div className="flex justify-between items-center mb-1.5">

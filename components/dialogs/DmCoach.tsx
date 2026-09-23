@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import type { Campaign, NPC, RollableTable, RollableTableEntry } from '../../types/index';
+import type { Campaign, Faction, NPC, RollableTable, RollableTableEntry } from '../../types/index';
 import { generateNarration, generateImprovisation, generateRollableTable, generateNpcRoleplay } from '../../services/aiService';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
@@ -9,17 +9,23 @@ import { LinkedText } from '../common/LinkedText';
 import { twMerge } from 'tailwind-merge';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
 import { buildCampaignContext } from '../../services/contextBuilder';
+import { campaignService } from '../../services/campaignService';
+import { logNpcQuote, selectRecentQuoteLines } from '../views/session/ActiveScenePanel';
+import { CheckInPanel } from './DmCoachCheckIn';
 
-type CoachTool = 'narrate' | 'improvise' | 'table' | 'roleplay';
+type CoachTool = 'narrate' | 'improvise' | 'table' | 'roleplay' | 'checkin';
 
 interface RoleplayMessage {
     id: string;
     role: 'user' | 'npc';
     text: string;
     moodCue?: string;
+    /** True once this NPC reply has been logged to the quote ledger — the log
+     * action disables itself so a fumbled second press can't log it twice. */
+    logged?: boolean;
 }
 
-const TEMPLATE_PROMPTS: Record<Exclude<CoachTool, 'roleplay'>, string[]> = {
+const TEMPLATE_PROMPTS: Record<Exclude<CoachTool, 'roleplay' | 'checkin'>, string[]> = {
     narrate: [
         "Describe the party arriving at [location]",
         "Set the scene for a tense negotiation",
@@ -67,6 +73,43 @@ function resolveChipLabel(label: string, tokens: { locationName?: string; npcNam
     }
     return resolved;
 }
+
+/**
+ * The hand-built NPC brief handed to `generateNpcRoleplay` as its `npcContext`.
+ *
+ * Wave 2 / P3: this is the ONLY place the voice work reaches the AI. The
+ * provider function's signature is unchanged — the enrichment happens here, at
+ * the call site, by widening the context string with the NPC's `voiceNotes` and
+ * the most recent lines from their quote ledger. The AI then answers in the
+ * voice the table has actually heard, not the one written on the sheet months
+ * ago.
+ */
+export const buildNpcRoleplayContext = (npc: NPC, faction?: Faction | null): string => {
+    const voiceNotes = npc.voiceNotes?.trim();
+    const recentLines = selectRecentQuoteLines(npc);
+
+    return [
+        `Name: ${npc.name}`,
+        npc.description ? `Description: ${npc.description}` : '',
+        npc.traits ? `Traits: ${npc.traits}` : '',
+        npc.motivations ? `Motivations: ${npc.motivations}` : '',
+        npc.secrets ? `Secrets (known to the NPC, not easily revealed): ${npc.secrets}` : '',
+        npc.exampleQuote ? `Example Quote: "${npc.exampleQuote}"` : '',
+        faction ? `Faction: ${faction.name}` : '',
+        // Wave 2 / P3: the voice work. Placed ahead of Backstory so the model
+        // reads "how they sound" before "what happened to them" — both sections
+        // vanish entirely (not even a header) when there is nothing to say, so
+        // an old save never teaches the model the character has gone silent.
+        voiceNotes ? `Voice: ${voiceNotes}` : '',
+        recentLines.length > 0
+            ? [
+                'Lines actually spoken at the table (most recent first):',
+                ...recentLines.map(line => `- "${line}"`),
+              ].join('\n')
+            : '',
+        npc.backstory ? `Backstory: ${npc.backstory}` : '',
+    ].filter(Boolean).join('\n');
+};
 
 interface DmCoachProps {
   campaign: Campaign;
@@ -151,7 +194,7 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
     }, [roleplayMessages, activeTool]);
 
     const contextTokens = extractContextTokens(activeContext);
-    const chips = activeTool !== 'roleplay'
+    const chips = (activeTool !== 'roleplay' && activeTool !== 'checkin')
         ? TEMPLATE_PROMPTS[activeTool].map(label => resolveChipLabel(label, contextTokens))
         : [];
 
@@ -179,7 +222,7 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
         }
     }
 
-    const currentTool = activeTool !== 'roleplay' ? toolConfig[activeTool] : null;
+    const currentTool = (activeTool !== 'roleplay' && activeTool !== 'checkin') ? toolConfig[activeTool] : null;
 
     const handleGenerate = async () => {
         if (!prompt.trim()) {
@@ -242,20 +285,15 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
 
     const selectedNpc: NPC | undefined = campaign.npcs.find(n => n.id === selectedNpcId);
 
-    const buildNpcContext = (npc: NPC): string => {
-        const faction = npc.factionId
-            ? campaign.factions.find(f => f.id === npc.factionId)
-            : undefined;
-        return [
-            `Name: ${npc.name}`,
-            npc.description ? `Description: ${npc.description}` : '',
-            npc.traits ? `Traits: ${npc.traits}` : '',
-            npc.motivations ? `Motivations: ${npc.motivations}` : '',
-            npc.secrets ? `Secrets (known to the NPC, not easily revealed): ${npc.secrets}` : '',
-            npc.exampleQuote ? `Example Quote: "${npc.exampleQuote}"` : '',
-            faction ? `Faction: ${faction.name}` : '',
-            npc.backstory ? `Backstory: ${npc.backstory}` : '',
-        ].filter(Boolean).join('\n');
+    // Once pressed, logging a reply disables itself for that message (finding:
+    // "a fumbled second press cannot log the line twice"). logNpcQuote reads
+    // the live store at press time, so this never depends on this render's
+    // `campaign` prop.
+    const handleLogRoleplayLine = (message: RoleplayMessage) => {
+        if (!selectedNpc || message.logged) return;
+        const wasLogged = logNpcQuote(selectedNpc.id, message.text, campaignService);
+        if (!wasLogged) return;
+        setRoleplayMessages(prev => prev.map(m => (m.id === message.id ? { ...m, logged: true } : m)));
     };
 
     const handleRoleplaySend = async () => {
@@ -278,7 +316,10 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
             text: m.text,
         }));
 
-        const npcContext = buildNpcContext(selectedNpc);
+        const npcFaction = selectedNpc.factionId
+            ? campaign.factions.find(f => f.id === selectedNpc.factionId)
+            : undefined;
+        const npcContext = buildNpcRoleplayContext(selectedNpc, npcFaction);
         const campaignContext = buildCampaignContext({
           variant: 'coach',
           campaign,
@@ -387,7 +428,7 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
             </header>
 
             <div className="p-4 flex-shrink-0">
-                 <div className="grid grid-cols-4 gap-1.5 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                 <div className="grid grid-cols-5 gap-1.5 bg-slate-950 p-1 rounded-lg border border-slate-800">
                     <ToolButton
                         label="Narrate"
                         icon={Icons.Scenes}
@@ -411,6 +452,12 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
                         icon={Icons.Roleplay}
                         isActive={activeTool === 'roleplay'}
                         onClick={() => handleSwitchTool('roleplay')}
+                    />
+                    <ToolButton
+                        label="Ask the Table"
+                        icon={Icons.Chat}
+                        isActive={activeTool === 'checkin'}
+                        onClick={() => handleSwitchTool('checkin')}
                     />
                 </div>
             </div>
@@ -436,8 +483,11 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
                     onClearError={() => setRoleplayError(null)}
                     onClear={handleClearConversation}
                     onSendToNotes={onSendToNotes ? handleSendConversationToNotes : undefined}
+                    onLogLine={handleLogRoleplayLine}
                     messagesEndRef={messagesEndRef}
                 />
+            ) : activeTool === 'checkin' ? (
+                <CheckInPanel campaign={campaign} isMockMode={isMockMode} />
             ) : currentTool && (
                 <div className="flex-1 flex flex-col p-4 pt-0 overflow-y-auto custom-scrollbar">
                     {/* Active Context Hint */}
@@ -536,6 +586,7 @@ interface RoleplayPanelProps {
     onClearError: () => void;
     onClear: () => void;
     onSendToNotes?: () => void;
+    onLogLine: (message: RoleplayMessage) => void;
     messagesEndRef: React.RefObject<HTMLDivElement>;
 }
 
@@ -555,6 +606,7 @@ const RoleplayPanel: React.FC<RoleplayPanelProps> = ({
     onClearError,
     onClear,
     onSendToNotes,
+    onLogLine,
     messagesEndRef,
 }) => {
     const faction = selectedNpc?.factionId
@@ -685,7 +737,19 @@ const RoleplayPanel: React.FC<RoleplayPanelProps> = ({
                             {msg.text}
                         </div>
                         {msg.role === 'npc' && selectedNpc && (
-                            <span className="text-xs text-slate-600 mt-1 px-1">{selectedNpc.name}</span>
+                            <div className="flex items-center gap-2 mt-1 px-1">
+                                <span className="text-xs text-slate-600">{selectedNpc.name}</span>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => onLogLine(msg)}
+                                    disabled={msg.logged}
+                                    className="gap-1 px-1.5 py-0.5 text-[10px] text-slate-500 hover:text-amber-400"
+                                >
+                                    {msg.logged ? <Icons.Check className="w-3 h-3 text-green-400" /> : <Icons.Mic className="w-3 h-3" />}
+                                    Log this line
+                                </Button>
+                            </div>
                         )}
                     </div>
                 ))}

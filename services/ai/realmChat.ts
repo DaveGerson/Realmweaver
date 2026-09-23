@@ -179,7 +179,9 @@ ${npcContext}
 4. Reference campaign events and other known characters organically if relevant.
 5. Keep your dialogue concise: 2-4 sentences maximum.
 6. Provide a mood cue that describes your physical action or emotional subtext (e.g., "drums fingers on the table, eyes darting to the door"). Do not include brackets.
-7. Return JSON with exactly two fields: "dialogue" and "moodCue".`;
+7. Return JSON with exactly two fields: "dialogue" and "moodCue".
+8. If a "Voice" section is documented above, that accent, cadence, and set of verbal tics are binding for this reply — not optional color.
+9. If lines the NPC has actually spoken at the table are listed above, stay consistent with them: you are continuing a voice this table has already heard, not starting fresh from the character sheet.`;
 
     const historyLines = conversationHistory
         .map(msg => `${msg.role === 'user' ? 'Player' : 'NPC'}: ${msg.text}`)

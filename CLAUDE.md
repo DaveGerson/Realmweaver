@@ -1,6 +1,6 @@
 # CLAUDE.md - AI Assistant Guide for Realmweaver
 
-> **Last Updated:** 2026-08-14
+> **Last Updated:** 2026-09-06
 
 ---
 
@@ -82,16 +82,20 @@ Realmweaver/
 │   │                  LinkSuggestionsPanel, CommandPalette, Breadcrumbs, RegenerateButton,
 │   │                  SkeletonCard, TabLayout, DmStylePanel, StepIndicator,
 │   │                  KeyboardShortcutsHelp, GenerateHerePanel, SceneResourcesPanel,
-│   │                  SceneSmartLinkBar
+│   │                  SceneSmartLinkBar, ClockPips (plot countdown pips),
+│   │                  CanonCapturePicker ("Make this canon" note → entity)
 │   ├── layout/      # Header, CampaignSidebar, ContentWrapper, ViewRouter,
 │   │                  StatusBanners (ConflictBanner + BackupRecoveryBanner) + sidebar/
-│   ├── views/       # WelcomeScreen, CampaignCreator, FirstCampaignWizard,
-│   │                  CrossCampaignDashboard, SessionRunner + session/ sub-components
+│   ├── views/       # TonightsTable, WelcomeScreen, CampaignCreator, FirstCampaignWizard,
+│   │                  CrossCampaignDashboard, SessionRunner + session/ (SceneListPanel,
+│   │                  ActiveScenePanel, StagePanel, QuickToolsPanel + GmIntrusionCard,
+│   │                  DormantShelf, ExtrasPanel, QuickTablesPanel, QuickNpcGenerator, RunningLog)
 │   ├── dashboards/  # One per entity type (NPC, Location, Faction, Item, Adventure, Article, etc.)
 │   ├── generators/  # AI creation forms per entity type + EntityChatGenerator
 │   ├── editors/     # Detail editors per entity type + CampaignSettingEditor, PrepDocumentView
-│   ├── dialogs/     # DmCoach, EvocationWizard, WorldSimulationWizard, ContinuityChecker,
-│   │                  SessionPrepWizard, SessionEndWizard, ExportModal
+│   ├── dialogs/     # DmCoach (+ DmCoachCheckIn), EvocationWizard, WorldSimulationWizard,
+│   │                  ContinuityChecker, SessionPrepWizard (+ prep/ sub-panels),
+│   │                  SessionEndWizard, ExportModal
 │   ├── tools/       # CombatTracker, DiceRoller, SecretsTracker
 │   ├── visualizers/ # RelationshipGraph, PlotTimeline
 │   └── RealmChat/   # RealmChatWidget (indigo accent ONLY here)
@@ -111,7 +115,13 @@ Realmweaver/
 ├── types/           # One file per entity, barrel export via index.ts
 ├── utils/           # entityUtils.ts (factories + ENTITY_TYPE_CONFIG), backlinkUtils,
 │                      dmStyleUtils, entityFieldSave, formReconciliation, demoTemplates,
-│                      diceUtils, keyboardShortcuts, popoverPosition, entityDetailExtractors
+│                      diceUtils, keyboardShortcuts, popoverPosition, entityDetailExtractors,
+│                      storyDerivations (Tonight's Table derivations, campaign-wide scene
+│                      lookup, scene shelf, PC spotlight), dormantMaterial (Callback Machine
+│                      sampler), strongStartFormat (strong-start marker encoding shared by
+│                      prep wizard + Session Runner), plotClock (countdown normalisation),
+│                      canonCapture (note → entity drafts), lazyChecklist (prep checklist rows)
+├── data/            # templates/ (4 campaign JSONs), randomTables.ts (canned Quick Tables)
 ├── tests/           # Vitest — top-level suites + components/, services/, helpers/,
 │                      and ship/ (the ship-readiness regression suite, wp-*.test.ts[x])
 └── e2e/             # Playwright specs (port 4200 is hardcoded in playwright.config.ts)
@@ -165,6 +175,11 @@ including `audioTranscription` (use `startAudioTranscription({ ...config, isMock
 - Model tiers: `lite` (haiku), `standard` (sonnet), `quality` (opus). `core.ts` maps legacy
   Gemini model names to tiers automatically; `modelConfig.resolveModelName()` maps a tier or
   legacy name to the active provider's model id (CLI alias vs. API model id).
+- Zero-prompt table tools (`docs/design/lazy-dm-lens.md` §5): `generateCallbackComplication`,
+  `generateGmIntrusion`, `generateExtras`, `generateSceneMenu`, `generateStrongStart`,
+  `generateCheckInQuestions` (all `ai/dmCoach.ts`) and `generateLocationAspects` (`ai/realmWeaver.ts`)
+  take campaign context plus a click — never a typed prompt — and each has a `mockService.ts` twin.
+  Quick Tables (`data/randomTables.ts`) roll with no AI call at all.
 - Retry: `withRetry({ maxAttempts })` — `REALMWEAVER_MAX_RETRIES` is an **attempts count**
   (minimum 1, default 3), not an "extra tries after the first" count.
 - `modelConfig`'s `ENV` object uses live getters, not a snapshot, so Node-side callers that
@@ -220,6 +235,21 @@ would create a parent cycle is rejected, leaving state unchanged).
 Lifecycle methods: `init`, `destroy`, `saveCampaign`, `flushPendingSave`, `resolveConflict`,
 `dismissBackupRecoveryNotice`.
 
+**Live-session methods (the Stage & the scene menu — `docs/design/unstructured-play.md`).** A session
+does not need a scene track. `SessionLog.stage?: SessionStage` (`{ locationId?, place?, npcIds, focus? }`)
+is the live where/who/what of the table, layered over — or replacing — the active prepped scene:
+`setStageLocation(locationId | null, place?)`, `addNpcToStage(id)`, `removeNpcFromStage(id)`,
+`setStageFocus(text)`, `updateStage(partial)`. The scene list is a menu that may draw from ANY
+adventure: `enterScene(id)` (previous scene stays `in-progress`, Stage cleared), `leaveScene({ complete })`
+("Done" / "Set Aside" — the Stage inherits the scene's place and cast), `addPlannedScene(id)` /
+`removePlannedScene(id)` (the shelf), plus the pre-existing `advanceScene()` ("Next Scene") and `goLive(id)`
+(idempotent for the live session), both now resolving scenes campaign-wide via
+`utils/storyDerivations.resolveSceneById`. `createFreeformSession(title?)` is the one-click on-ramp
+(mints a planned freeform log; the caller routes it through `goLive`). `tickPlotClock(plotId, delta?)`
+moves a plot's countdown and logs a `world-moved` entry. Every Stage change auto-logs a
+`scene-transition` running-log entry. Consumers must read `presentNpcs = sceneCast ∪ stage.npcIds` and
+`presentLocation = stage location ?? scene location` — never the scene alone.
+
 ---
 
 ## Component Patterns
@@ -234,7 +264,7 @@ Lifecycle methods: `init`, `destroy`, `saveCampaign`, `flushPendingSave`, `resol
 
 Defined in `App.tsx`. New views need entries in BOTH `App.tsx` and `ViewRouter.tsx`:
 ```typescript
-export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' |
+export type EditorView = 'tonight' | 'setting' | 'npcs' | 'locations' | 'factions' | 'items' |
   'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'notes' |
   'combat' | 'relationships' | 'session-runner' | 'secrets';
 ```
@@ -244,6 +274,13 @@ export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items'
 ## Type System
 
 All entities require `id: string` + `name: string`. Each has its own file in `types/`, re-exported via `types/index.ts`.
+
+Optional, non-array fields added by the storyteller / unstructured-play waves (see `types/CLAUDE.md` for the
+integrity contract each one carries): `NPC.voiceNotes?`, `Secret.revealsSecretId?` / `isVital?` /
+`cluesNeeded?`, `SessionLog.stage?` (**id-bearing** — in the purge sweep and both remap passes),
+`Plot.clock?` / `Plot.ifIgnored?` (read through `utils/plotClock`), `PlayerCharacter.playerFlags?`,
+`Location.aspects?`. Every one of them is optional on every surface and never lints as a gap; an old save
+without them is exactly as valid as a new one.
 
 ### Adding a New Entity Type (13 Steps)
 
@@ -316,12 +353,17 @@ sessionLog=rose, playerCharacter=teal, plot=yellow, note=slate, **scene=blue**
 ```typescript
 import { buildCampaignContext } from '@/services/contextBuilder';
 const ctx = buildCampaignContext({
-  variant: 'generation',        // 'generation' | 'coach' | 'chat'
+  variant: 'generation',        // 'generation' | 'coach' | 'chat' | 'player-safe'
   campaign,
   maxTokenEstimate: 4000,       // default 4000 (≈16 000 chars)
   // optional: activeSceneId, activeSessionId, focusEntityId, focusEntityType, focusSelection
 });
 ```
+
+Pass `activeSessionId` whenever a session is live: the builder reads the session's Stage from it ("On
+Stage Now" — place, present cast, and, GM-only, what is happening), so the AI knows who is in the room
+even when no prepped scene is active. Plot lines carry `[clock n/m]` and `— if ignored: …`; the
+Player Characters roster carries each player's `playerFlags`.
 
 ---
 

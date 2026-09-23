@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useCallback, useEffect, useRef, Suspense } from 'react';
-import type { Campaign, Scene, SessionLog, NPC, Combatant, CombatantType, Encounter, PlotSessionStatus } from '@/types';
+import type { Campaign, Scene, SessionLog, NPC, Combatant, CombatantType, Encounter, PlotSessionStatus, SessionStage, Beat } from '@/types';
 import { Icons } from '@/components/common/Icons';
 import { Button } from '@/components/common/Button';
 import { twMerge } from 'tailwind-merge';
@@ -9,10 +9,12 @@ import { CombatTracker } from '@/components/tools/CombatTracker';
 import { DialogShell } from '@/components/common/DialogShell';
 // Lazy-loaded — only bundled when the session end flow is triggered
 const SessionEndWizard = React.lazy(() => import('@/components/dialogs/SessionEndWizard').then(m => ({ default: m.SessionEndWizard })));
-import { estimatePcHp } from '@/utils/entityUtils';
+import { estimatePcHp, createDefaultLocation } from '@/utils/entityUtils';
 import { isFeatureVisible } from '@/utils/dmStyleUtils';
+import { resolveSceneById, countPcSpotlightInSession } from '@/utils/storyDerivations';
 import type { QuickCardEntityType } from '@/components/common/EntityQuickCard';
 import { SceneListPanel } from './session/SceneListPanel';
+import type { SpotlightTonightEntry } from './session/SceneListPanel';
 import { ActiveScenePanel } from './session/ActiveScenePanel';
 import { QuickToolsPanel } from './session/QuickToolsPanel';
 import { RunningLog } from './session/RunningLog';
@@ -23,6 +25,9 @@ const parseHpFromStats = (stats: string | undefined): number | null => {
     const match = stats.match(/(?:hp|hit\s*points)\s*[:=\-–—]?\s*(\d+)/i);
     return match ? parseInt(match[1], 10) : null;
 };
+
+/** A session log written before the Stage existed reads as an empty Stage. */
+const EMPTY_STAGE: SessionStage = { npcIds: [] };
 
 interface SessionRunnerProps {
     campaign: Campaign;
@@ -133,6 +138,9 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
 
     // --- Derived data ---
 
+    // Tonight's main adventure (the header). It is context, not a constraint:
+    // scenes in tonight's list and the active scene are resolved campaign-wide
+    // (docs/design/unstructured-play.md — the scene menu).
     const adventure = useMemo(() =>
         sessionLog.adventureId
             ? campaign.adventures.find(a => a.id === sessionLog.adventureId) || null
@@ -140,17 +148,25 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
         [campaign.adventures, sessionLog.adventureId]
     );
 
-    const plannedScenes = useMemo(() => {
-        if (!adventure) return [];
-        return sessionLog.plannedSceneIds
-            .map(id => adventure.scenes.find(s => s.id === id))
-            .filter((s): s is Scene => !!s);
-    }, [adventure, sessionLog.plannedSceneIds]);
+    const plannedScenes = useMemo(() =>
+        sessionLog.plannedSceneIds
+            .map(id => resolveSceneById(campaign, id)?.scene)
+            .filter((s): s is Scene => !!s),
+        // resolveSceneById reads only campaign.adventures.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [campaign.adventures, sessionLog.plannedSceneIds]
+    );
 
-    const activeScene = useMemo(() => {
-        if (!campaign.activeSceneId || !adventure) return null;
-        return adventure.scenes.find(s => s.id === campaign.activeSceneId) || null;
-    }, [campaign.activeSceneId, adventure]);
+    const activeSceneResolved = useMemo(
+        () => resolveSceneById(campaign, campaign.activeSceneId),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [campaign.adventures, campaign.activeSceneId]
+    );
+    const activeScene = activeSceneResolved?.scene ?? null;
+    const activeSceneAdventureTitle =
+        activeSceneResolved && activeSceneResolved.adventure.id !== sessionLog.adventureId
+            ? activeSceneResolved.adventure.title
+            : null;
 
     // Finding #26: the prep wizard's step-3 curation is persisted as
     // plannedNpcIds / plannedLocationIds on the session log. When present
@@ -172,11 +188,41 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
             .filter((n): n is NPC => !!n);
     }, [activeScene, campaign.npcs, sessionLog.plannedNpcIds]);
 
+    // --- The Stage (unstructured play) ---
+    // The live where/who/what of the table, layered over the scene: the
+    // Stage's place wins when set, and everyone the DM put on stage joins the
+    // scene's own cast. A freeform session runs on the Stage alone.
+    const stage = sessionLog.stage ?? EMPTY_STAGE;
+
+    const stageLocation = useMemo(
+        () => (stage.locationId ? campaign.locations.find(l => l.id === stage.locationId) ?? null : null),
+        [campaign.locations, stage.locationId]
+    );
+    const presentLocation = stageLocation ?? activeSceneLocation;
+
+    const stageNpcs = useMemo(
+        () => stage.npcIds.map(id => campaign.npcs.find(n => n.id === id)).filter((n): n is NPC => !!n),
+        [campaign.npcs, stage.npcIds]
+    );
+
+    const presentNpcs = useMemo(() => {
+        const seen = new Set<string>();
+        const out: NPC[] = [];
+        for (const npc of [...activeSceneNpcs, ...stageNpcs]) {
+            if (seen.has(npc.id)) continue;
+            seen.add(npc.id);
+            out.push(npc);
+        }
+        return out;
+    }, [activeSceneNpcs, stageNpcs]);
+
+    const presentNpcIds = useMemo(() => presentNpcs.map(n => n.id), [presentNpcs]);
+
     const sceneNpcRelationshipMap = useMemo(() => {
-        const sceneNpcIds = new Set(activeSceneNpcs.map(n => n.id));
+        const presentIds = new Set(presentNpcs.map(n => n.id));
         const map = new Map<string, { relationType: string; targetId: string; targetName: string }[]>();
-        for (const npc of activeSceneNpcs) {
-            const rels = (npc.relationships ?? []).filter(r => sceneNpcIds.has(r.targetId));
+        for (const npc of presentNpcs) {
+            const rels = (npc.relationships ?? []).filter(r => presentIds.has(r.targetId));
             if (rels.length > 0) {
                 map.set(npc.id, rels.map(r => ({
                     relationType: r.relationType,
@@ -186,20 +232,47 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
             }
         }
         return map;
-    }, [activeSceneNpcs, campaign.npcs]);
+    }, [presentNpcs, campaign.npcs]);
 
     const castDynamicsSummary = useMemo(() => {
         if (sceneNpcRelationshipMap.size === 0) return null;
         const parts: string[] = [];
         for (const [npcId, rels] of sceneNpcRelationshipMap) {
-            const npcName = activeSceneNpcs.find(n => n.id === npcId)?.name ?? npcId;
+            const npcName = presentNpcs.find(n => n.id === npcId)?.name ?? npcId;
             for (const r of rels) {
                 parts.push(`${npcName} ${r.relationType.toLowerCase()}s ${r.targetName}`);
             }
         }
         if (parts.length === 0) return null;
         return 'Cast dynamics: ' + parts.join('. ') + '.';
-    }, [sceneNpcRelationshipMap, activeSceneNpcs]);
+    }, [sceneNpcRelationshipMap, presentNpcs]);
+
+    // One line about what is on stage right now, for the zero-prompt tools
+    // (Complicate This, GM Intrusion). Built from the Stage as well as the
+    // scene, so it exists in a freeform session with no scene at all.
+    const stageSummary = useMemo(() => {
+        const parts: string[] = [];
+        if (activeScene) parts.push(`The current scene is "${activeScene.title}".`);
+        const placeName = presentLocation?.name ?? (stage.place?.trim() || null);
+        if (placeName) parts.push(`The party is at ${placeName}.`);
+        if (presentNpcs.length > 0) parts.push(`Present: ${presentNpcs.map(n => n.name).join(', ')}.`);
+        if (stage.focus?.trim()) parts.push(`Right now: ${stage.focus.trim()}`);
+        return parts.length > 0 ? parts.join(' ') : undefined;
+    }, [activeScene, presentLocation, presentNpcs, stage.place, stage.focus]);
+
+    const activeSceneIndex = sessionLog.plannedSceneIds.indexOf(campaign.activeSceneId ?? '');
+    const hasNextScene = activeSceneIndex !== -1 && activeSceneIndex < sessionLog.plannedSceneIds.length - 1;
+
+    const spotlightTonight = useMemo<SpotlightTonightEntry[]>(() => {
+        const pcs = campaign.playerCharacters ?? [];
+        if (pcs.length === 0) return [];
+        const counts = countPcSpotlightInSession(campaign, sessionLog);
+        return pcs.map(pc => ({
+            pcId: pc.id,
+            pcName: pc.characterSocial?.characterName?.trim() || 'Unnamed character',
+            count: counts.get(pc.id) ?? 0,
+        }));
+    }, [campaign, sessionLog]);
 
     const previousSession = useMemo(() => {
         const completed = campaign.sessionLogs
@@ -210,18 +283,76 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
 
     // --- Handlers ---
 
+    // A menu, not a track: entering a scene leaves the previous one started
+    // (not finished) and clears the Stage — the scene now says where we are.
     const handleSelectScene = (sceneId: string) => {
-        if (!adventure) return;
-        if (campaign.activeSceneId && campaign.activeSceneId !== sceneId) {
-            campaignService.setSceneStatus(adventure.id, campaign.activeSceneId, 'completed');
-        }
-        campaignService.setSceneStatus(adventure.id, sceneId, 'in-progress');
-        campaignService.setActiveScene(sceneId);
+        campaignService.enterScene(sceneId);
     };
 
     const handleAdvanceScene = () => {
         campaignService.advanceScene();
     };
+
+    const handleFinishScene = useCallback(() => {
+        campaignService.leaveScene({ complete: true });
+    }, []);
+
+    const handleSetAsideScene = useCallback(() => {
+        campaignService.leaveScene({ complete: false });
+    }, []);
+
+    const handleAddScene = useCallback((sceneId: string) => {
+        campaignService.addPlannedScene(sceneId);
+    }, []);
+
+    const handleRemoveScene = useCallback((sceneId: string) => {
+        campaignService.removePlannedScene(sceneId);
+    }, []);
+
+    const handlePlayBeat = useCallback((beat: Beat) => {
+        campaignService.setStageFocus(beat.title);
+    }, []);
+
+    const handleSetStageLocation = useCallback((locationId: string | null, place?: string) => {
+        campaignService.setStageLocation(locationId, place);
+    }, []);
+
+    const handleAddNpcToStage = useCallback((npcId: string) => {
+        campaignService.addNpcToStage(npcId);
+    }, []);
+
+    const handleRemoveNpcFromStage = useCallback((npcId: string) => {
+        campaignService.removeNpcFromStage(npcId);
+    }, []);
+
+    const handleSetStageFocus = useCallback((focus: string) => {
+        campaignService.setStageFocus(focus);
+    }, []);
+
+    // Improv becomes canon: a place typed at the table turns into a Location
+    // the party can come back to, and the Stage now points at it.
+    const handleSaveFreeformPlace = useCallback(() => {
+        const place = stage.place?.trim();
+        if (!place) return;
+        const { id: _unusedId, ...defaults } = createDefaultLocation();
+        void _unusedId;
+        const newId = campaignService.createLocation({
+            ...defaults,
+            name: place,
+            description: stage.focus?.trim() ?? '',
+        });
+        campaignService.setStageLocation(newId);
+    }, [stage.place, stage.focus]);
+
+    // A Quick NPC made with no scene active walks straight onto the Stage;
+    // with a scene active the generator already linked them to the scene.
+    const handleNpcCreated = useCallback((npcId: string) => {
+        if (!activeScene) campaignService.addNpcToStage(npcId);
+    }, [activeScene]);
+
+    const handleTickPlotClock = useCallback((plotId: string) => {
+        campaignService.tickPlotClock(plotId);
+    }, []);
 
     const handleEndSession = () => {
         setShowEndWizard(true);
@@ -231,7 +362,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
         const encounter = campaign.activeEncounter;
         if (!encounter || encounter.combatants.length === 0) {
             const autoCombatants: Combatant[] = [
-                ...activeSceneNpcs.map(npc => {
+                ...presentNpcs.map(npc => {
                     const parsedHp = parseHpFromStats(npc.stats);
                     return {
                         id: crypto.randomUUID(),
@@ -267,7 +398,7 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
             campaignService.updateEncounter(newEncounter);
         }
         setShowCombatPanel(true);
-    }, [activeSceneNpcs, campaign.activeEncounter, campaign.playerCharacters, campaign.activeSceneId, sessionLog.id]);
+    }, [presentNpcs, campaign.activeEncounter, campaign.playerCharacters, campaign.activeSceneId, sessionLog.id]);
 
     const handleUpdateEncounter = useCallback((updatedEncounter: Encounter) => {
         campaignService.updateEncounter(updatedEncounter);
@@ -368,6 +499,10 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                     mobileTab={mobileTab}
                     onSelectScene={handleSelectScene}
                     onNavigate={onNavigate}
+                    onAddScene={handleAddScene}
+                    onRemoveScene={handleRemoveScene}
+                    onPlayBeat={handlePlayBeat}
+                    spotlightTonight={spotlightTonight}
                 />
 
                 <ActiveScenePanel
@@ -381,14 +516,27 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                     mobileTab={mobileTab}
                     onAdvanceScene={handleAdvanceScene}
                     onNavigate={onNavigate}
+                    stage={stage}
+                    stageNpcs={stageNpcs}
+                    presentNpcs={presentNpcs}
+                    presentLocation={presentLocation}
+                    activeSceneAdventureTitle={activeSceneAdventureTitle}
+                    hasNextScene={hasNextScene}
+                    onFinishScene={handleFinishScene}
+                    onSetAsideScene={handleSetAsideScene}
+                    onSetStageLocation={handleSetStageLocation}
+                    onAddNpcToStage={handleAddNpcToStage}
+                    onRemoveNpcFromStage={handleRemoveNpcFromStage}
+                    onSetStageFocus={handleSetStageFocus}
+                    onSaveFreeformPlace={handleSaveFreeformPlace}
                 />
 
                 <QuickToolsPanel
                     campaign={campaign}
                     sessionLog={sessionLog}
                     activeScene={activeScene}
-                    adventure={adventure}
-                    activeSceneNpcs={activeSceneNpcs}
+                    adventure={activeSceneResolved?.adventure ?? adventure}
+                    activeSceneNpcs={presentNpcs}
                     plotSessionStatus={plotSessionStatus}
                     isMockMode={isMockMode}
                     mobileTab={mobileTab}
@@ -398,6 +546,10 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
                     onOpenCombat={handleOpenCombat}
                     onCyclePlotStatus={cyclePlotStatus}
                     onNavigate={onNavigate}
+                    stageSummary={stageSummary}
+                    presentNpcIds={presentNpcIds}
+                    onNpcCreated={handleNpcCreated}
+                    onTickPlotClock={handleTickPlotClock}
                 />
             </div>
 
