@@ -123,6 +123,15 @@ const ENTITY_CONFIG: Record<CommandPaletteEntityType, { label: string; colorClas
   note:             makePaletteConfig('note'),
 };
 
+/**
+ * Global cap on rendered entity results (roadmap N4). A broad query over a
+ * large campaign (150+ NPCs, 80+ locations…) used to render every match as a
+ * live option on every keystroke. Beyond this many matches the palette
+ * renders the first N (in the usual type-grouped order) plus a
+ * "N more — refine your search" row. Quick actions are never capped.
+ */
+export const MAX_ENTITY_RESULTS = 50;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -304,6 +313,16 @@ const ResultGroup: React.FC<ResultGroupProps> = ({ label, results, activeIndex, 
   );
 };
 
+const OverflowRow: React.FC<{ count: number }> = ({ count }) => (
+  <div
+    role="presentation"
+    data-testid="command-palette-overflow"
+    className="px-4 py-2 text-xs text-slate-500 italic border-t border-slate-800"
+  >
+    {count} more — refine your search
+  </div>
+);
+
 // ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
@@ -409,7 +428,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   }, [npcs, locations, factions, items, adventures, articles, sessionLogs, plots, playerCharacters, notes]);
 
   // Filter results based on query
-  const { recentResults, entityResults, actionResults } = useMemo(() => {
+  const { recentResults, entityResults, actionResults, hiddenEntityCount } = useMemo(() => {
     const trimmed = query.trim();
 
     if (!trimmed) {
@@ -430,7 +449,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         .filter((r): r is PaletteResult => r !== null); // drop deleted entities
 
       const actionResults: PaletteResult[] = actions.map(a => ({ kind: 'action' as const, data: a }));
-      return { recentResults, entityResults: [], actionResults };
+      return { recentResults, entityResults: [], actionResults, hiddenEntityCount: 0 };
     }
 
     // With query: search entities + actions
@@ -439,14 +458,17 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       return fuzzyMatch(searchText, trimmed);
     });
 
-    // Group by type for display
-    const entityResults: PaletteResult[] = filteredEntities.map(e => ({ kind: 'entity' as const, data: e }));
+    // Global cap (N4): keep the DOM bounded however broad the query is.
+    const hiddenEntityCount = Math.max(0, filteredEntities.length - MAX_ENTITY_RESULTS);
+    const entityResults: PaletteResult[] = filteredEntities
+      .slice(0, MAX_ENTITY_RESULTS)
+      .map(e => ({ kind: 'entity' as const, data: e }));
 
     const filteredActions: PaletteResult[] = actions
       .filter(a => fuzzyMatch(`${a.label} ${a.description || ''}`, trimmed))
       .map(a => ({ kind: 'action' as const, data: a }));
 
-    return { recentResults: [], entityResults, actionResults: filteredActions };
+    return { recentResults: [], entityResults, actionResults: filteredActions, hiddenEntityCount };
   }, [query, allEntities, recentItems, actions]);
 
   // Build flat list for keyboard navigation
@@ -609,7 +631,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         {/* Screen-reader announcement of the result count (finding #98) */}
         <div aria-live="polite" className="sr-only">
           {hasQuery
-            ? `${flatResults.length} results for "${query}"`
+            ? `${flatResults.length} results for "${query}"${hiddenEntityCount > 0 ? `, ${hiddenEntityCount} more not shown` : ''}`
             : `${flatResults.length} results`}
         </div>
 
@@ -628,17 +650,27 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           )}
 
           {groupOffsets.map(({ label, results, offset }) => (
-            <ResultGroup
-              key={label}
-              label={label}
-              results={results}
-              activeIndex={activeIndex}
-              globalOffset={offset}
-              listboxId={listboxId}
-              onSelect={handleSelect}
-              onSetActive={setActiveIndex}
-            />
+            <React.Fragment key={label}>
+              {/* The overflow row sits after the last entity group, before
+                  Actions. role="presentation" keeps it out of the option
+                  list, so arrow-key navigation skips it. */}
+              {label === 'Actions' && hiddenEntityCount > 0 && (
+                <OverflowRow count={hiddenEntityCount} />
+              )}
+              <ResultGroup
+                label={label}
+                results={results}
+                activeIndex={activeIndex}
+                globalOffset={offset}
+                listboxId={listboxId}
+                onSelect={handleSelect}
+                onSetActive={setActiveIndex}
+              />
+            </React.Fragment>
           ))}
+          {hiddenEntityCount > 0 && actionResults.length === 0 && (
+            <OverflowRow count={hiddenEntityCount} />
+          )}
         </div>
 
         {/* Footer hint */}

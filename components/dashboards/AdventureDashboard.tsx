@@ -1,6 +1,8 @@
 
 import React, { useMemo } from 'react';
 import { useRovingTabIndex, type RovingProps } from '../../hooks/useRovingTabIndex';
+import { useIncrementalList } from '../../hooks/useIncrementalList';
+import { IncrementalListFooter } from '../common/IncrementalListFooter';
 import { useEntitySearch } from '@/hooks/useEntitySearch';
 import type { Adventure, AdventureForBatchAdd, Campaign } from '../../types/index';
 import { AdventureGenerator } from '../generators/AdventureGenerator';
@@ -83,7 +85,6 @@ interface AdventureDashboardProps {
 }
 
 export const AdventureDashboard: React.FC<AdventureDashboardProps> = ({ adventures, onAdventureCreated, onSelectAdventure, isMockMode, isOfficialSetting, campaignContext }) => {
-  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: { base: 1, md: 2, xl: 3 } });
 
   // Normalize: adventure uses `title`, hook needs `name`
   const normalizedAdventures = useMemo(
@@ -101,6 +102,14 @@ export const AdventureDashboard: React.FC<AdventureDashboardProps> = ({ adventur
     const ids = new Set(filteredNormalized.map(a => a.id));
     return adventures.filter(a => ids.has(a.id));
   }, [filteredNormalized, adventures]);
+  const incremental = useIncrementalList(filteredAdventures, { resetKey: searchTerm });
+  const { getRovingProps } = useRovingTabIndex({
+    direction: 'both', columns: { base: 1, md: 2, xl: 3 },
+    // N4: above ~100 cards the grid renders a growing prefix; let arrow /
+    // End navigation reach past it (the window grows, then focus lands).
+    itemCount: filteredAdventures.length,
+    onRequestIndex: incremental.ensureIndexVisible,
+  });
 
   const handleAdventureCreated = (data: any) => {
     const { id, ...advData } = data;
@@ -175,7 +184,7 @@ export const AdventureDashboard: React.FC<AdventureDashboardProps> = ({ adventur
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredAdventures.map((adv, index) => (
+          {incremental.visibleItems.map((adv, index) => (
             <AdventureCard
               key={adv.id}
               adv={adv}
@@ -198,6 +207,15 @@ export const AdventureDashboard: React.FC<AdventureDashboardProps> = ({ adventur
             </div>
           )}
         </div>
+        <IncrementalListFooter
+          hasMore={incremental.hasMore}
+          remaining={incremental.remaining}
+          visibleCount={incremental.visibleCount}
+          totalCount={incremental.totalCount}
+          showMore={incremental.showMore}
+          sentinelRef={incremental.sentinelRef}
+          noun="adventures"
+        />
       </div>
     </div>
   );

@@ -74,13 +74,16 @@ describe('useConfirmDialog settles every promise it hands out', () => {
             </ConfirmDialogProvider>
         );
 
-        let pending!: Promise<boolean | typeof PENDING>;
+        let pending!: Promise<boolean>;
         await act(async () => {
-            pending = settledOr(confirmFn!('Clear encounter?', 'This removes all combatants.'));
+            pending = confirmFn!('Clear encounter?', 'This removes all combatants.');
         });
 
         await act(async () => { unmount(); });
 
-        await expect(pending).resolves.toBe(false);
+        // Start the PENDING timer only after unmount: racing from the confirm()
+        // call made the 20ms window include render/unmount time, which flaked
+        // under load even though the promise does settle on unmount.
+        await expect(settledOr(pending)).resolves.toBe(false);
     });
 });

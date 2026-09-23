@@ -3,6 +3,8 @@ import React, { useMemo } from 'react';
 import type { Note } from '../../types/index';
 import { useEntitySearch } from '@/hooks/useEntitySearch';
 import { useRovingTabIndex } from '@/hooks/useRovingTabIndex';
+import { useIncrementalList } from '@/hooks/useIncrementalList';
+import { IncrementalListFooter } from '@/components/common/IncrementalListFooter';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 
@@ -82,8 +84,14 @@ export const NoteDashboard: React.FC<NoteDashboardProps> = ({ notes, onNoteCreat
     const ids = new Set(filteredNormalized.map(n => n.id));
     return normalizedNotes.filter(n => ids.has(n.id));
   }, [filteredNormalized, normalizedNotes]);
-
-  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: { base: 1, sm: 2 } });
+  const incremental = useIncrementalList(filteredNotes, { resetKey: searchTerm });
+  const { getRovingProps } = useRovingTabIndex({
+    direction: 'both', columns: { base: 1, sm: 2 },
+    // N4: above ~100 cards the grid renders a growing prefix; let arrow /
+    // End navigation reach past it (the window grows, then focus lands).
+    itemCount: filteredNotes.length,
+    onRequestIndex: incremental.ensureIndexVisible,
+  });
 
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
@@ -106,7 +114,7 @@ export const NoteDashboard: React.FC<NoteDashboardProps> = ({ notes, onNoteCreat
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {filteredNotes.map((note, index) => {
+            {incremental.visibleItems.map((note, index) => {
               const pct = noteCompleteness(note);
               return (
                 <button
@@ -154,6 +162,15 @@ export const NoteDashboard: React.FC<NoteDashboardProps> = ({ notes, onNoteCreat
                 </div>
             )}
           </div>
+          <IncrementalListFooter
+            hasMore={incremental.hasMore}
+            remaining={incremental.remaining}
+            visibleCount={incremental.visibleCount}
+            totalCount={incremental.totalCount}
+            showMore={incremental.showMore}
+            sentinelRef={incremental.sentinelRef}
+            noun="notes"
+          />
         </div>
       </div>
     </div>

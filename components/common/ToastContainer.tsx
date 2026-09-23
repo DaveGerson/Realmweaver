@@ -1,6 +1,8 @@
 
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { twMerge } from 'tailwind-merge';
+import { MODAL_INERT_EXEMPT_ATTR } from '@/utils/modalStack';
 import { Icons } from '@/components/common/Icons';
 
 export type ToastVariant = 'success' | 'error' | 'info';
@@ -70,15 +72,22 @@ interface ToastContainerProps {
 
 export const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onDismiss }) => {
   if (toasts.length === 0) return null;
+  if (typeof document === 'undefined') return null;
 
-  return (
+  // Portaled into <body> as a sibling of the app root and of any portaled
+  // DialogShell, and exempt from the modal-stack background inert: toasts sit
+  // ABOVE dialogs on the z-index ladder (z-[90] vs z-[80]) and their dismiss
+  // button must stay reachable while a dialog is open (roadmap X4).
+  return createPortal(
     <div
       className="fixed bottom-5 right-5 z-[90] flex flex-col gap-2 items-end"
       aria-label="Notifications"
+      {...{ [MODAL_INERT_EXEMPT_ATTR]: '' }}
     >
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} onDismiss={onDismiss} />
       ))}
-    </div>
+    </div>,
+    document.body
   );
 };
