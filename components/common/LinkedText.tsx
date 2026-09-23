@@ -1,27 +1,42 @@
-
 /**
  * LinkedText — Scans text content for entity name matches and renders them
  * as inline EntityLinks with hover popovers and click-to-navigate.
  *
- * Uses exact (case-insensitive) name matching against all entities in the
- * active campaign. Pre-builds a Map for O(1) lookups per render pass.
+ * Matching is delegated to the shared linking engine
+ * (`services/linking/engineRegistry` → `getMatchingEngine()`), the same engine
+ * behind SceneSmartLinkBar / LinkSuggestionsPanel / autoLinker, so inline
+ * links and "Detected" suggestions can never disagree on the same text
+ * (roadmap L7). The engine supplies case-insensitive, Unicode-aware word
+ * boundaries, longest-match-first at a shared offset, non-overlapping spans,
+ * the 3-character minimum name length, and ambiguity info when several
+ * entities share a name.
  *
  * Design decisions:
  * - Reads campaign data directly from campaignService so callers only need
- *   to provide text and an onNavigate callback. No prop-drilling of entity
- *   arrays required.
- * - Names shorter than 3 characters are excluded to avoid false positives
- *   with common abbreviations (e.g. "Al", "Bo").
- * - When multiple entity names could match at the same offset we scan
- *   longest-first so "The Great Library" wins before "Great".
- * - Rendered as an inline <span> so it composes naturally inside paragraphs,
- *   list items, or anywhere body text appears.
+ *   to provide text and an onNavigate callback.
+ * - The candidate array is cached per campaign object in a module-level
+ *   WeakMap, so every mounted LinkedText for the same campaign hands the
+ *   engine the SAME array identity and hits its compiled-index cache —
+ *   rendering many paragraphs costs one index build per campaign change, not
+ *   one per paragraph or per keystroke.
+ * - No `confidence` filtering: every engine match is rendered, exactly as
+ *   before the engine unification. Ambiguous matches (two NPCs named
+ *   "Marcus") link to the first candidate and get a wavy underline plus a
+ *   tooltip naming every candidate.
+ * - Rendered as an inline <span> so it composes naturally inside paragraphs.
  */
 
 import React, { useMemo, useSyncExternalStore } from 'react';
 import { EntityLink } from '@/components/common/EntityLink';
 import { campaignService } from '@/services/campaignService';
+import { getMatchingEngine } from '@/services/linking/engineRegistry';
+import type {
+  EntityCandidate,
+  EntityMatch,
+  EntityMatchCandidate,
+} from '@/services/linking/matchingEngine';
 import type { QuickCardEntityType } from '@/components/common/EntityQuickCard';
+import type { Campaign } from '@/types';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -34,180 +49,120 @@ export interface LinkedTextProps {
   className?: string;
 }
 
-interface EntityEntry {
-  id: string;
-  type: QuickCardEntityType;
-  /** Original name, used only for sort order and debugging. */
-  name: string;
-  /**
-   * Case-insensitive, Unicode-aware word-boundary regex matching this
-   * entity's name directly against the ORIGINAL text (no intermediate
-   * lowercased copy — see the offset-drift note on `tokenize` below).
-   */
-  matcher: RegExp;
-}
-
-/** Escape a string for literal use inside a RegExp. */
-function escapeRegExp(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
- * Build a case-insensitive, Unicode-aware word-boundary matcher for a name.
- * `\p{L}\p{N}` (letters/numbers in any script) are word characters — this
- * matches services/linking/matchingEngine.ts's definition exactly, so e.g.
- * "Ana" never matches inside "Anaïs" (the 'ï' is a word char, not a
- * boundary) and "_" IS a boundary (underscore is not \p{L}/\p{N}).
- */
-function buildMatcher(name: string): RegExp {
-  const escaped = escapeRegExp(name);
-  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'giu');
-}
-
-// ─── Text-segment types ───────────────────────────────────────────────────────
-
 type PlainSegment = { kind: 'plain'; text: string };
-type LinkSegment  = { kind: 'link';  text: string; entity: EntityEntry };
-type Segment = PlainSegment | LinkSegment;
+type LinkSegment = {
+  kind: 'link';
+  text: string;
+  entityId: string;
+  entityType: QuickCardEntityType;
+  /** Other entities sharing the matched name (empty when unambiguous). */
+  alternatives: EntityMatchCandidate[];
+};
+export type LinkedTextSegment = PlainSegment | LinkSegment;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Candidates ──────────────────────────────────────────────────────────────
 
-const MIN_NAME_LENGTH = 3;
+/** Entity types LinkedText links, with a label for ambiguity tooltips. */
+const LINKABLE_TYPE_LABEL: Partial<Record<QuickCardEntityType, string>> = {
+  npc: 'NPC',
+  location: 'Location',
+  faction: 'Faction',
+  item: 'Item',
+  adventure: 'Adventure',
+  article: 'Article',
+  plot: 'Plot',
+};
 
-/**
- * Collect all linkable entities from a campaign and return them
- * sorted longest-name-first so greedy matching prefers longer names.
- */
-function buildEntityEntries(campaign: NonNullable<ReturnType<typeof campaignService.getState>['campaigns'][number]> | undefined): EntityEntry[] {
-  if (!campaign) return [];
-
-  const entries: EntityEntry[] = [];
-
-  for (const npc of campaign.npcs) {
-    if (npc.name.length >= MIN_NAME_LENGTH)
-      entries.push({ id: npc.id, type: 'npc', name: npc.name, matcher: buildMatcher(npc.name) });
-  }
-  for (const loc of campaign.locations) {
-    if (loc.name.length >= MIN_NAME_LENGTH)
-      entries.push({ id: loc.id, type: 'location', name: loc.name, matcher: buildMatcher(loc.name) });
-  }
-  for (const fac of campaign.factions) {
-    if (fac.name.length >= MIN_NAME_LENGTH)
-      entries.push({ id: fac.id, type: 'faction', name: fac.name, matcher: buildMatcher(fac.name) });
-  }
-  for (const item of campaign.items) {
-    if (item.name.length >= MIN_NAME_LENGTH)
-      entries.push({ id: item.id, type: 'item', name: item.name, matcher: buildMatcher(item.name) });
-  }
-  for (const adv of campaign.adventures) {
-    if (adv.title.length >= MIN_NAME_LENGTH)
-      entries.push({ id: adv.id, type: 'adventure', name: adv.title, matcher: buildMatcher(adv.title) });
-  }
-  for (const art of campaign.articles) {
-    if (art.title.length >= MIN_NAME_LENGTH)
-      entries.push({ id: art.id, type: 'article', name: art.title, matcher: buildMatcher(art.title) });
-  }
-  for (const plot of campaign.plots) {
-    if (plot.title.length >= MIN_NAME_LENGTH)
-      entries.push({ id: plot.id, type: 'plot', name: plot.title, matcher: buildMatcher(plot.title) });
-  }
-
-  // Sort longest name first for greedy matching
-  entries.sort((a, b) => b.name.length - a.name.length);
-  return entries;
+function isLinkableType(type: string): type is QuickCardEntityType {
+  return Object.prototype.hasOwnProperty.call(LINKABLE_TYPE_LABEL, type);
 }
 
+const candidateCache = new WeakMap<Campaign, EntityCandidate[]>();
+const NO_CANDIDATES: EntityCandidate[] = [];
+
 /**
- * Scan `text` from `searchStart` and return the first entity that matches at
- * the earliest position in the remaining string. When multiple entities would
- * match at the same position, the longest is selected (guaranteed by the
- * sorted order of `entries`).
- *
- * Matches run directly against the ORIGINAL text via each entry's
- * Unicode-aware, case-insensitive `matcher` regex — there is no intermediate
- * lowercased copy of `text`, so there is no possibility of an offset drifting
- * out of sync with a character (like 'İ' U+0130) that changes length under
- * `toLowerCase()` (finding #100).
+ * All linkable entities of a campaign as engine candidates. Cached per
+ * campaign object (Immer gives the campaign a new identity on every change),
+ * so all LinkedText instances share one array and one compiled engine index.
  */
-function findNextMatch(
-  text: string,
-  entries: EntityEntry[],
-  searchStart: number
-): { entity: EntityEntry; matchStart: number; matchEnd: number } | null {
-  let best: { entity: EntityEntry; matchStart: number; matchEnd: number } | null = null;
+export function getCampaignLinkCandidates(campaign: Campaign | undefined): EntityCandidate[] {
+  if (!campaign) return NO_CANDIDATES;
+  const cached = candidateCache.get(campaign);
+  if (cached) return cached;
 
-  for (const entry of entries) {
-    entry.matcher.lastIndex = searchStart;
-    const m = entry.matcher.exec(text);
-    if (!m) continue;
+  const out: EntityCandidate[] = [];
+  for (const e of campaign.npcs ?? []) out.push({ id: e.id, name: e.name, type: 'npc' });
+  for (const e of campaign.locations ?? []) out.push({ id: e.id, name: e.name, type: 'location' });
+  for (const e of campaign.factions ?? []) out.push({ id: e.id, name: e.name, type: 'faction' });
+  for (const e of campaign.items ?? []) out.push({ id: e.id, name: e.name, type: 'item' });
+  for (const e of campaign.adventures ?? []) out.push({ id: e.id, name: e.title, type: 'adventure' });
+  for (const e of campaign.articles ?? []) out.push({ id: e.id, name: e.title, type: 'article' });
+  for (const e of campaign.plots ?? []) out.push({ id: e.id, name: e.title, type: 'plot' });
 
-    const matchStart = m.index;
-    const matchEnd = matchStart + m[0].length;
-
-    if (best === null || matchStart < best.matchStart) {
-      best = { entity: entry, matchStart, matchEnd };
-    }
-    // If same start position but longer (can't happen since entries are
-    // sorted longest-first and we only update when matchStart < best), skip.
-  }
-  return best;
+  candidateCache.set(campaign, out);
+  return out;
 }
 
-/**
- * Convert a plain text string into an array of plain/link segments.
- */
-function tokenize(text: string, entries: EntityEntry[]): Segment[] {
-  if (!text || entries.length === 0) return [{ kind: 'plain', text }];
+// ─── Segmentation ────────────────────────────────────────────────────────────
 
-  const segments: Segment[] = [];
+/**
+ * Convert engine matches into plain/link segments covering all of `text`.
+ * Defensive against custom engines: spans are sorted, overlapping or
+ * out-of-range spans are dropped, and unknown entity types stay plain text.
+ */
+export function segmentsFromMatches(text: string, matches: EntityMatch[]): LinkedTextSegment[] {
+  const sorted = [...matches].sort((a, b) => a.matchSpan[0] - b.matchSpan[0]);
+  const segments: LinkedTextSegment[] = [];
   let cursor = 0;
 
-  while (cursor < text.length) {
-    const match = findNextMatch(text, entries, cursor);
-    if (!match) {
-      segments.push({ kind: 'plain', text: text.slice(cursor) });
-      break;
-    }
+  for (const m of sorted) {
+    const [start, end] = m.matchSpan;
+    if (start < cursor || end <= start || end > text.length) continue;
+    if (!isLinkableType(m.entityType)) continue;
 
-    // Plain text before the match
-    if (match.matchStart > cursor) {
-      segments.push({ kind: 'plain', text: text.slice(cursor, match.matchStart) });
-    }
-
-    // The matched entity name (use the original casing from the text)
+    if (start > cursor) segments.push({ kind: 'plain', text: text.slice(cursor, start) });
     segments.push({
       kind: 'link',
-      text: text.slice(match.matchStart, match.matchEnd),
-      entity: match.entity,
+      text: text.slice(start, end), // original casing from the source text
+      entityId: m.entityId,
+      entityType: m.entityType,
+      alternatives: m.ambiguous
+        ? (m.candidates ?? []).filter(c => c.entityId !== m.entityId)
+        : [],
     });
-
-    cursor = match.matchEnd;
+    cursor = end;
   }
 
+  if (cursor < text.length) segments.push({ kind: 'plain', text: text.slice(cursor) });
   return segments;
+}
+
+function describeCandidate(c: { entityName: string; entityType: string }): string {
+  const label = isLinkableType(c.entityType) ? LINKABLE_TYPE_LABEL[c.entityType] : c.entityType;
+  return `${c.entityName} (${label})`;
+}
+
+function ambiguityTitle(seg: LinkSegment): string {
+  const others = seg.alternatives.map(describeCandidate).join(', ');
+  return `Ambiguous: ${seg.alternatives.length + 1} entities are named "${seg.text}". ` +
+    `Linked to the first; also: ${others}`;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const LinkedText: React.FC<LinkedTextProps> = ({ text, onNavigate, className = '' }) => {
-  // Subscribe to campaign state so the entity map stays current when entities
-  // are renamed or deleted (Fix A-1).
+  // Subscribe to campaign state so links stay current when entities are
+  // renamed or deleted (Fix A-1).
   const state = useSyncExternalStore(campaignService.subscribe, campaignService.getState);
   const campaign = state.campaigns.find(c => c.id === state.activeCampaignId);
 
-  // Entries (and their compiled matchers) only depend on the CAMPAIGN, not on
-  // the text being scanned — keying this memo on `[text, campaign]` meant
-  // every one of the ~7 entity arrays was walked and a fresh RegExp compiled
-  // per entity on every keystroke, in every mounted LinkedText instance
-  // (finding #45). Recompute only when `campaign` itself changes; sharing the
-  // matchers across tokenize() calls is safe because findNextMatch resets
-  // `lastIndex` before every `exec`.
-  const entries = useMemo(() => buildEntityEntries(campaign), [campaign]);
+  const candidates = getCampaignLinkCandidates(campaign);
 
-  const segments = useMemo(() => {
+  const segments = useMemo<LinkedTextSegment[]>(() => {
     if (!text) return [];
-    return tokenize(text, entries);
-  }, [text, entries]);
+    if (candidates.length === 0) return [{ kind: 'plain', text }];
+    return segmentsFromMatches(text, getMatchingEngine().findMatches(text, candidates));
+  }, [text, candidates]);
 
   if (!text) return null;
 
@@ -217,14 +172,30 @@ export const LinkedText: React.FC<LinkedTextProps> = ({ text, onNavigate, classN
         if (seg.kind === 'plain') {
           return <React.Fragment key={i}>{seg.text}</React.Fragment>;
         }
+        if (seg.alternatives.length === 0) {
+          return (
+            <EntityLink
+              key={i}
+              entityType={seg.entityType}
+              entityId={seg.entityId}
+              label={seg.text}
+              onNavigate={onNavigate}
+            />
+          );
+        }
+        // Ambiguous: wavy underline (EntityLink's is dotted) + a tooltip
+        // naming every entity that shares the name. No extra text, so the
+        // rendered textContent still equals `text`.
         return (
-          <EntityLink
-            key={i}
-            entityType={seg.entity.type}
-            entityId={seg.entity.id}
-            label={seg.text}
-            onNavigate={onNavigate}
-          />
+          <span key={i} data-ambiguous="true" title={ambiguityTitle(seg)}>
+            <EntityLink
+              entityType={seg.entityType}
+              entityId={seg.entityId}
+              label={seg.text}
+              onNavigate={onNavigate}
+              className="decoration-wavy decoration-slate-400"
+            />
+          </span>
         );
       })}
     </span>

@@ -102,7 +102,7 @@ autocomplete. Also exports `findMentionedIdsInText`, `resolveMentionCandidates`,
 - Every report is the **union** of freshly parsed ids and the seeded set, so renaming an entity doesn't drop a backlink
   from prose that still spells the old name. Accepted trade-off: deleting the prose alone no longer untracks a mention.
 - Matching is longest-name-first with consumed spans and a Unicode-aware trailing boundary
-  (`@Name(?![\p{L}\p{N}])`), mirroring `services/linking/matchingEngine.ts` and `LinkedText`. Keep the three in sync.
+  (`@Name(?![\p{L}\p{N}])`), mirroring `services/linking/matchingEngine.ts` (which `LinkedText` now calls). Keep the two in sync.
 - Candidates are read from `campaignService.getState()` when the dropdown opens (not from props), so newly created
   entities appear without a remount.
 - ARIA: the input is a `combobox`; `aria-expanded` / `aria-controls` / `aria-activedescendant` are only set when the
@@ -131,7 +131,7 @@ conditionally hidden.
 |-----------|----------|
 | `Button` | `variant`: primary / secondary / ghost / danger / icon; `size`: sm / md / lg (ignored by `icon`, which is fixed `p-2` and circular). Extra classes merge via `twMerge`. |
 | `EntityLink` | Inline entity name → hover (200 ms) / tap `EntityQuickCard` popover; `onNavigate(type, id)` is the caller's job. Colour per type comes from a local `ENTITY_TEXT_CLASS` map that includes `scene` (blue). |
-| `LinkedText` | Scans prose for entity names and renders `EntityLink`s. Subscribes to the store itself; `entries` (and their compiled RegExps) memo on **`campaign` only**, never on `text` — keying on text recompiled every matcher on every keystroke. Names shorter than 3 chars are ignored; matching is longest-first against the ORIGINAL text (no lowercased copy — offsets would drift on characters that change length under `toLowerCase()`). |
+| `LinkedText` | Scans prose for entity names and renders `EntityLink`s via the shared `getMatchingEngine()` (no private matcher). Subscribes to the store itself; the candidate array is cached per **campaign object** in a module-level WeakMap (`getCampaignLinkCandidates`), so every mounted paragraph passes the same array and the engine compiles its index once per campaign change — never per keystroke or per instance. Renders every match regardless of `confidence`; an ambiguous name links to the first candidate, with a wavy underline and a `title` naming all candidates (`data-ambiguous="true"` wrapper, no extra text). `segmentsFromMatches` is defensive against custom engines (sorts, drops overlaps / bad spans / unknown types). |
 | `EntityQuickCard` | Portal popover positioned via `utils/popoverPosition.ts`; type config derived from `ENTITY_TYPE_CONFIG` with `scene` defined card-locally. Inline field edits go through `utils/entityFieldSave.ts`. |
 | `BacklinksPanel` | Reads the store, calls `computeBacklinks`, groups results, caps each group at 5 with a "Show all" expander. |
 | `TabLayout` | `tabs: TabDefinition[]`, `activeTab`, `onTabChange`; renders `role="tablist"` / `role="tab"` / `role="tabpanel"`. The caller renders the active panel's children. |

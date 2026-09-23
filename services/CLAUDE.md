@@ -11,8 +11,8 @@ AI lives in `services/ai/` — see `services/ai/CLAUDE.md`.
 | `contextBuilder.ts` | `buildCampaignContext(options)` — tiered, token-budget-aware `campaignContext` string. |
 | `continuityChecker.ts` | `checkContinuity(campaign)` — pure, 10 rule functions emitting 13 distinct `ruleId`s (`checkMysteryEdges` alone emits four E1/E2 mystery lints; `checkExpiredClocks` emits the `info`-only `clock-expired` nudge for an active plot whose countdown is full), returns `ContinuityIssue[]`. |
 | `aiService.ts` | The AI facade. See `services/ai/CLAUDE.md`. |
-| `linking/autoLinker.ts` | `autoLinkScenes`, `autoLinkNpcFactions` — name-in-prose → id linking, used by `importTemplateData`. |
-| `linking/matchingEngine.ts` | `MatchingEngine` + `TextMatchingEngine` (Unicode word-boundary regex, longest-name-first, min 3 chars). |
+| `linking/autoLinker.ts` | `autoLinkScenes`, `autoLinkNpcFactions` — name-in-prose → id linking, used by `importTemplateData`. Applies a match only when `confidence >= minConfidence` (default 0.9) **and** `!ambiguous`. |
+| `linking/matchingEngine.ts` | `MatchingEngine` + `TextMatchingEngine` (Unicode word-boundary regex, longest-name-first, min 3 chars, optional `aliases`). **The single entity-name matcher** — `LinkedText`, `SceneSmartLinkBar`, `LinkSuggestionsPanel`, `autoLinker`, and `utils/storyDerivations.textNamesCharacter` all route through `getMatchingEngine()`. `confidence` is scored by `scoreMatch` (exact-case name 1.0 > case-insensitive 0.9 > alias 0.85; penalties for short names ≤4 chars, common words, a capitalised one-word name seen lowercase; ×0.6 when ambiguous). Names shared by several entities (case-folded, names + aliases) produce ONE match with `ambiguous: true` and every entity in `candidates` (canonical-name owners first); `entityId` stays the first candidate for backward compatibility — use `expandAmbiguousMatch` to offer each. The compiled index is cached per candidate-array identity (WeakMap, validated against in-place mutation), so pass a memoized array. |
 | `linking/engineRegistry.ts` | `getMatchingEngine` / `setMatchingEngine` / `resetMatchingEngine` — swap the engine in tests. |
 
 ## campaignService.ts
@@ -162,7 +162,7 @@ same quota helper.
 | Await `SaveResult.pending` before claiming "saved" | Quota-fallback writes are async. |
 | Don't `remove()` unparseable saved data | Backup recovery depends on it still being there. |
 | `services/` imports `aiService.ts`, not `ai/*` | Mock mode is enforced at the facade. |
-| `linking/matchingEngine` must mirror `components/common/LinkedText.tsx`'s matcher | The two systems disagree otherwise (Unicode boundaries, longest-match). |
+| Match entity names in prose via `getMatchingEngine()`, never a private regex | One matcher means inline links, suggestions and auto-linking can't disagree (roadmap L7). Pass a stable candidate array to hit the index cache. |
 | Tests: `createCampaignStore({ persist: false })`, and `destroy()` any `persist: true` store | Init registers real window listeners. |
 
 Ship-hardening rationale for most of the above lives in `docs/ship-readiness/remediation-plan.md`; regression tests

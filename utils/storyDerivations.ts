@@ -9,6 +9,8 @@
 // Machine sampler and P6's story-health checks reuse the same functions.
 
 import type { Campaign, SessionLog, Scene, Secret, Adventure, PlayerCharacter } from '../types/index';
+import { getMatchingEngine } from '../services/linking/engineRegistry';
+import type { EntityCandidate } from '../services/linking/matchingEngine';
 
 // ---------------------------------------------------------------------------
 // Scene lookup — a session may pull scenes from ANY adventure (the scene
@@ -374,10 +376,6 @@ export interface PcSpotlight {
 
 const MIN_SPOTLIGHT_NAME_LENGTH = 3;
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 /** The name forms a note is scanned for: the full name, plus a first name long enough to be unambiguous. */
 function spotlightNameForms(fullName: string): string[] {
   const trimmed = fullName.trim();
@@ -388,13 +386,35 @@ function spotlightNameForms(fullName: string): string[] {
   return forms;
 }
 
-/** True when `text` names the character, on Unicode word boundaries, ignoring case. */
+/**
+ * One stable candidate array per character name, so the shared matching
+ * engine's per-array index cache compiles each name's matchers once instead
+ * of on every running-log note. Bounded: cleared wholesale past 256 names.
+ */
+const spotlightCandidateCache = new Map<string, EntityCandidate[]>();
+
+function spotlightCandidates(characterName: string): EntityCandidate[] {
+  let cached = spotlightCandidateCache.get(characterName);
+  if (!cached) {
+    const [full, ...aliases] = spotlightNameForms(characterName);
+    cached = full ? [{ id: 'pc', name: full, type: 'player-character', aliases }] : [];
+    if (spotlightCandidateCache.size >= 256) spotlightCandidateCache.clear();
+    spotlightCandidateCache.set(characterName, cached);
+  }
+  return cached;
+}
+
+/**
+ * True when `text` names the character, on Unicode word boundaries, ignoring
+ * case. Routed through the shared linking engine (`services/linking`) so the
+ * spotlight heuristic can never disagree with LinkedText / link suggestions
+ * about what counts as a name occurrence (roadmap L7).
+ */
 export function textNamesCharacter(text: string, characterName: string): boolean {
   if (!text) return false;
-  return spotlightNameForms(characterName).some((form) => {
-    const pattern = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(form)}(?![\\p{L}\\p{N}])`, 'iu');
-    return pattern.test(text);
-  });
+  const candidates = spotlightCandidates(characterName);
+  if (candidates.length === 0) return false;
+  return getMatchingEngine().findMatches(text, candidates).length > 0;
 }
 
 function pcDisplayName(pc: PlayerCharacter): string {

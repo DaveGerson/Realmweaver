@@ -2,6 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { Icons } from '@/components/common/Icons';
 import { getMatchingEngine } from '@/services/linking/engineRegistry';
+import { expandAmbiguousMatch } from '@/services/linking/matchingEngine';
 import type { EntityCandidate } from '@/services/linking/matchingEngine';
 import { ENTITY_TYPE_CONFIG } from '@/utils/entityUtils';
 import type { QuickCardEntityType } from './EntityQuickCard';
@@ -13,6 +14,8 @@ interface Suggestion {
   entityType: string;
   entityName: string;
   actionLabel: string;
+  /** Number of entities sharing the matched name; > 1 means ambiguous. */
+  sharedNameCount: number;
 }
 
 export interface LinkSuggestionsPanelProps {
@@ -75,7 +78,9 @@ export const LinkSuggestionsPanel: React.FC<LinkSuggestionsPanelProps> = ({
     if (!combinedText.trim() || allCandidates.length === 0) return [];
 
     const engine = getMatchingEngine();
-    const matches = engine.findMatches(combinedText, allCandidates);
+    // Ambiguous spans (two NPCs both named "Marcus") become one suggestion
+    // per candidate, flagged, so the GM picks rather than array order.
+    const matches = engine.findMatches(combinedText, allCandidates).flatMap(expandAmbiguousMatch);
 
     const seen = new Set<string>();
     const results: Suggestion[] = [];
@@ -97,6 +102,7 @@ export const LinkSuggestionsPanel: React.FC<LinkSuggestionsPanelProps> = ({
         entityType: match.entityType,
         entityName: match.entityName,
         actionLabel: getActionLabel(match.entityType),
+        sharedNameCount: match.ambiguous ? (match.candidates?.length ?? 1) : 1,
       });
     }
 
@@ -155,6 +161,14 @@ export const LinkSuggestionsPanel: React.FC<LinkSuggestionsPanelProps> = ({
                   <span className="ml-1.5 text-slate-500 font-normal">
                     ({suggestion.actionLabel})
                   </span>
+                  {suggestion.sharedNameCount > 1 && (
+                    <span
+                      className="ml-1.5 text-amber-500/80 font-normal"
+                      title={`${suggestion.sharedNameCount} entities share this name — check you're linking the right one`}
+                    >
+                      · ambiguous
+                    </span>
+                  )}
                 </span>
                 <span className="flex items-center gap-1.5 flex-shrink-0">
                   <button
