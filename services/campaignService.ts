@@ -2390,13 +2390,17 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 if (session) {
                     session.status = 'completed';
 
-                    // Archive the active encounter if one exists
+                    // Archive the active encounter if it holds a fight. An empty
+                    // encounter (e.g. the fresh one endCombat() leaves behind)
+                    // is just cleared, so the log never gains blank entries.
                     if (campaign.activeEncounter) {
-                        if (!session.encounterLog) session.encounterLog = [];
-                        session.encounterLog.push({
-                            ...campaign.activeEncounter,
-                            sessionId: session.id,
-                        });
+                        if (campaign.activeEncounter.combatants.length > 0) {
+                            if (!session.encounterLog) session.encounterLog = [];
+                            session.encounterLog.push({
+                                ...campaign.activeEncounter,
+                                sessionId: session.id,
+                            });
+                        }
                         campaign.activeEncounter = undefined;
                     }
                 }

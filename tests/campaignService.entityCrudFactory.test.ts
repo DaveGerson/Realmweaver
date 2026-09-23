@@ -236,6 +236,24 @@ describe('endCombat (X6)', () => {
         expect(campaign().activeEncounter!.combatants).toEqual([]);
     });
 
+    it('endSession after endCombat does not archive the blank encounter endCombat left behind', () => {
+        const { service, campaign, sessionId } = liveSession();
+        service.updateEncounter(fight(sessionId));
+        service.endCombat();
+        service.endSession();
+
+        const log = campaign().sessionLogs.find(s => s.id === sessionId)!;
+        expect(log.encounterLog.map(e => e.id)).toEqual(['enc-1']);
+        expect(campaign().activeEncounter).toBeUndefined();
+    });
+
+    it('endSession still archives a fight that is live when the session ends', () => {
+        const { service, campaign, sessionId } = liveSession();
+        service.updateEncounter(fight(sessionId));
+        service.endSession();
+        expect(campaign().sessionLogs.find(s => s.id === sessionId)!.encounterLog).toHaveLength(1);
+    });
+
     it('archived entry is independent of later activeEncounter edits', () => {
         const { service, campaign, sessionId } = liveSession();
         service.updateEncounter(fight(sessionId));
