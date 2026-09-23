@@ -8,6 +8,8 @@ import { campaignService } from '../../services/campaignService';
 import { DialogShell } from '../common/DialogShell';
 import { textareaBaseClasses } from '../common/Textarea';
 import { useEntitySearch } from '@/hooks/useEntitySearch';
+import { computeContinuityThreads, formatThreadsForPrep, CONTINUITY_THREAD_LABELS } from '@/utils/continuityThreads';
+import { ContinuityThreadIcon } from '../common/ContinuityThreadIcon';
 import { generateColdOpen, hasColdOpenMaterial, generateStrongStart } from '@/services/aiService';
 import { buildCampaignContext } from '@/services/contextBuilder';
 import type { DormantPiece } from '@/utils/dormantMaterial';
@@ -66,6 +68,30 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
 }) => {
     // ── Step tracking ─────────────────────────────────────────────────────────
     const [currentStep, setCurrentStep] = useState<WizardStep>('adventure');
+
+    // ── Step 1a: "Previously on…" — loose ends carried forward (roadmap L3) ──
+    // Threads come from utils/continuityThreads (built on storyDerivations) and
+    // are computed once per campaign snapshot. Carrying is opt-in (nothing
+    // starts checked; "All" is one click), so a DM who ignores the panel gets a
+    // byte-identical Go Live payload. On Go Live the checked threads
+    // are appended to prepNotes as plain text (which contextBuilder already
+    // feeds to every AI call made during the live session) and their plot ids
+    // are merged into relatedPlotIds. Both the standard and lazy flows open on
+    // the Adventure step, so the panel serves both.
+    const continuityThreads = useMemo(() => computeContinuityThreads(campaign), [campaign]);
+    const [carriedThreadIds, setCarriedThreadIds] = useState<Set<string>>(() => new Set());
+    const carriedThreads = useMemo(
+        () => continuityThreads.filter(t => carriedThreadIds.has(t.id)),
+        [continuityThreads, carriedThreadIds]
+    );
+    const toggleCarriedThread = (id: string) => {
+        setCarriedThreadIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
 
     // ── Step 1: Adventure selection ───────────────────────────────────────────
     const [selectedAdventureId, setSelectedAdventureId] = useState<string | null>(null);
@@ -446,9 +472,15 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
         // when lazy prep is on — `composeStrongStartPrepNotes('', prepNotes)`
         // is just `prepNotes.trim()`, so a `null`/blank draft here already
         // ships no markers at all.
+        // L3: checked loose ends ride along AFTER the DM's own notes (and after
+        // any strong-start block, which must stay first — see strongStartFormat).
+        const carriedText = formatThreadsForPrep(carriedThreads);
+        const notesWithCarried = [prepNotes.trim(), carriedText].filter(Boolean).join('\n\n');
+        const relatedPlotIds = new Set(selectedPlotIds);
+        carriedThreads.forEach(t => { if (t.kind === 'plot') relatedPlotIds.add(t.entityId); });
         const finalPrepNotes = lazyPrepOn
-            ? composeStrongStartPrepNotes(strongStart, prepNotes)
-            : composeStrongStartPrepNotes(goLiveColdOpen ?? '', prepNotes);
+            ? composeStrongStartPrepNotes(strongStart, notesWithCarried)
+            : composeStrongStartPrepNotes(goLiveColdOpen ?? '', notesWithCarried);
         const finalBeats: Beat[] = lazyPrepOn
             ? lazyBeats
                 .map(b => ({
@@ -471,7 +503,7 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
             plannedLocationIds: Array.from(activeLocationIds),
             runningNotes: '',
             structuredNotes: [],
-            relatedPlotIds: Array.from(selectedPlotIds),
+            relatedPlotIds: Array.from(relatedPlotIds),
             encounterLog: [],
             beats: finalBeats,
             recap: '',
@@ -486,7 +518,7 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
         hasGoneLiveRef.current = true;
         campaignService.goLive(newId);
         onComplete(newId);
-    }, [effectiveTitle, selectedAdventureId, selectedSceneIds, selectedPlotIds, prepNotes, activeNpcIds, activeLocationIds, lazyPrepOn, strongStart, goLiveColdOpen, lazyBeats, onComplete]);
+    }, [effectiveTitle, selectedAdventureId, selectedSceneIds, selectedPlotIds, prepNotes, activeNpcIds, activeLocationIds, lazyPrepOn, strongStart, goLiveColdOpen, lazyBeats, carriedThreads, onComplete]);
 
     // ── Status badge colour ───────────────────────────────────────────────────
     const sceneStatusBadge = (status: Scene['status']) => {
@@ -564,6 +596,53 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
                     {/* ── STEP 1: Adventure ─────────────────────────────── */}
                     {currentStep === 'adventure' && (
                         <div className="space-y-4">
+                            {continuityThreads.length > 0 && (
+                                <section
+                                    aria-labelledby="prep-loose-ends-heading"
+                                    className="bg-slate-800/60 border border-slate-700 rounded-lg p-4 space-y-3"
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <h3 id="prep-loose-ends-heading" className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">
+                                                <Icons.SessionLog className="w-4 h-4 text-amber-400" />
+                                                Previously on… Loose ends
+                                            </h3>
+                                            <p className="text-xs text-slate-400">
+                                                Check the threads to pick back up — they're added to this session's prep notes.
+                                            </p>
+                                        </div>
+                                        <div className="flex gap-2 flex-shrink-0">
+                                            <Button onClick={() => setCarriedThreadIds(new Set(continuityThreads.map(t => t.id)))} variant="secondary" size="sm" aria-label="Carry all loose ends">All</Button>
+                                            <Button onClick={() => setCarriedThreadIds(new Set())} variant="secondary" size="sm" aria-label="Carry no loose ends">None</Button>
+                                        </div>
+                                    </div>
+                                    <ul className="space-y-1.5 max-h-56 overflow-y-auto">
+                                        {continuityThreads.map(thread => (
+                                            <li key={thread.id}>
+                                                <label className="flex items-start gap-2.5 rounded-md px-2 py-1.5 hover:bg-slate-800 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={carriedThreadIds.has(thread.id)}
+                                                        onChange={() => toggleCarriedThread(thread.id)}
+                                                        className="mt-0.5 accent-amber-500 flex-shrink-0"
+                                                    />
+                                                    <ContinuityThreadIcon kind={thread.kind} className="mt-0.5" />
+                                                    <span className="flex flex-col min-w-0">
+                                                        <span className="text-sm text-slate-200">
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mr-1.5">
+                                                                {CONTINUITY_THREAD_LABELS[thread.kind]}
+                                                            </span>
+                                                            {thread.title}
+                                                        </span>
+                                                        <span className="text-xs text-slate-400 line-clamp-2">{thread.summary}</span>
+                                                    </span>
+                                                </label>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </section>
+                            )}
+
                             <div>
                                 <h3 className="text-sm font-bold text-white mb-1">Select an Adventure</h3>
                                 <p className="text-xs text-slate-400">Choose the adventure this session will follow, or run a freeform session.</p>
@@ -1299,6 +1378,23 @@ export const SessionPrepWizard: React.FC<SessionPrepWizardProps> = ({
                                             />
                                         </div>
                                     )}
+                                </div>
+                            )}
+
+                            {carriedThreads.length > 0 && (
+                                <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+                                        <Icons.SessionLog className="w-3.5 h-3.5" /> Carried Forward
+                                    </h4>
+                                    <ul className="space-y-1">
+                                        {carriedThreads.map(t => (
+                                            <li key={t.id} className="text-sm text-slate-300 flex items-center gap-2">
+                                                <ContinuityThreadIcon kind={t.kind} />
+                                                <span className="truncate">{t.title}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                    <p className="text-xs text-slate-600 mt-2">Appended to your prep notes on Go Live.</p>
                                 </div>
                             )}
 

@@ -7,6 +7,7 @@ import { twMerge } from 'tailwind-merge';
 import { campaignService } from '@/services/campaignService';
 import { EntityLink } from '@/components/common/EntityLink';
 import type { QuickCardEntityType } from '@/components/common/EntityQuickCard';
+import { LooseEndsPanel } from './LooseEndsPanel';
 // Strong start (docs/design/lazy-dm-lens.md §4 R1) is zero-new-schema: it is
 // written by the Session Prep Wizard as a leading delimited section of
 // `prepNotes`. Reuse the wizard's own encoder/decoder so the write side and
@@ -253,6 +254,9 @@ export const SceneListPanel: React.FC<SceneListPanelProps> = ({
                     </p>
                 </div>
             )}
+
+            {/* Loose ends carried forward (roadmap L3) */}
+            <LooseEndsPanel campaign={campaign} onNavigate={onNavigate} />
 
             {/* Beats Section */}
             <div className="mt-6">
