@@ -284,7 +284,8 @@ function buildCallbackComplicationPrompt(request: CallbackComplicationRequest): 
 }
 
 export const generateCallbackComplication = async (
-  request: CallbackComplicationRequest
+  request: CallbackComplicationRequest,
+  signal?: AbortSignal
 ): Promise<string> => {
   const material = request?.material ?? [];
   if (material.length === 0) {
@@ -294,7 +295,7 @@ export const generateCallbackComplication = async (
   }
   const tier = request.useLiteModel ? 'lite' : 'standard';
   const prompt = buildCallbackComplicationPrompt(request);
-  const result = await generateText(prompt, tier, request.campaignContext);
+  const result = await generateText(prompt, tier, request.campaignContext, signal);
   return result.trim();
 };
 
@@ -324,11 +325,12 @@ function buildGmIntrusionPrompt(sceneSummary?: string): string {
 export const generateGmIntrusion = async (
   campaignContext?: string,
   sceneSummary?: string,
-  useLiteModel: boolean = false
+  useLiteModel: boolean = false,
+  signal?: AbortSignal
 ): Promise<string> => {
   const tier = useLiteModel ? 'lite' : 'standard';
   const prompt = buildGmIntrusionPrompt(sceneSummary);
-  const result = await generateText(prompt, tier, campaignContext);
+  const result = await generateText(prompt, tier, campaignContext, signal);
   return result.trim();
 };
 
@@ -387,12 +389,13 @@ function normalizeExtras(raw: unknown): ExtraNpc[] {
 export const generateExtras = async (
   count: number,
   campaignContext?: string,
-  useLiteModel: boolean = false
+  useLiteModel: boolean = false,
+  signal?: AbortSignal
 ): Promise<ExtraNpc[]> => {
   const tier = useLiteModel ? 'lite' : 'standard';
   const requested = Number.isFinite(count) ? Math.min(8, Math.max(1, Math.floor(count))) : 5;
   const instructions = `You are a Dungeon Master's assistant. Generate ${requested} throwaway background characters for a crowd scene — just a name and ONE vivid one-line detail each (an accent, a scar, a nervous habit). These are not major characters; do not give them backstories or motivations.`;
-  const result = await generateWithSchema(`Generate ${requested} extras.`, extrasSchema, instructions, {}, tier, campaignContext);
+  const result = await generateWithSchema(`Generate ${requested} extras.`, extrasSchema, instructions, {}, tier, campaignContext, signal);
   return normalizeExtras(result?.extras);
 };
 
@@ -452,7 +455,7 @@ export const hasColdOpenMaterial = (campaign: Campaign): boolean => {
   return hasRecap || hasLooseEnds || gatherEngravedMoments(campaign).length > 0;
 };
 
-export const generateColdOpen = async (request: ColdOpenRequest): Promise<string> => {
+export const generateColdOpen = async (request: ColdOpenRequest, signal?: AbortSignal): Promise<string> => {
   const { campaign, campaignContext, useLiteModel } = request;
 
   if (!hasColdOpenMaterial(campaign)) {
@@ -479,7 +482,7 @@ export const generateColdOpen = async (request: ColdOpenRequest): Promise<string
 
   const prompt = sections.join('\n\n');
   const tier = useLiteModel ? 'lite' : 'standard';
-  const result = await generateText(prompt, tier, campaignContext);
+  const result = await generateText(prompt, tier, campaignContext, signal);
   return result.trim();
 };
 
@@ -580,8 +583,8 @@ function normalizeSceneMenuDrafts(raw: unknown): SceneMenuDraft[] {
  * timeout, bad JSON after retries) propagates rather than being swallowed
  * into `[]`.
  */
-export const generateSceneMenu = async (campaignContext?: string): Promise<SceneMenuDraft[]> => {
-  const raw = await generateWithSchema(SCENE_MENU_PROMPT, sceneMenuSchema, SCENE_MENU_INSTRUCTIONS, {}, 'standard', campaignContext);
+export const generateSceneMenu = async (campaignContext?: string, signal?: AbortSignal): Promise<SceneMenuDraft[]> => {
+  const raw = await generateWithSchema(SCENE_MENU_PROMPT, sceneMenuSchema, SCENE_MENU_INSTRUCTIONS, {}, 'standard', campaignContext, signal);
   return normalizeSceneMenuDrafts(raw);
 };
 
@@ -634,7 +637,7 @@ function buildReincorporateStrongStartPrompt(campaign: Campaign, dormantPiece: D
  * a caller mistake this refuses rather than papering over (same posture as
  * `generateCallbackComplication`'s empty-material guard above).
  */
-export const generateStrongStart = async (request: StrongStartRequest): Promise<string> => {
+export const generateStrongStart = async (request: StrongStartRequest, signal?: AbortSignal): Promise<string> => {
   const { style, campaign, campaignContext, dormantPiece, useLiteModel } = request;
 
   let prompt: string;
@@ -650,7 +653,7 @@ export const generateStrongStart = async (request: StrongStartRequest): Promise<
   }
 
   const tier = useLiteModel ? 'lite' : 'standard';
-  const result = await generateText(prompt, tier, campaignContext);
+  const result = await generateText(prompt, tier, campaignContext, signal);
   return result.trim();
 };
 
@@ -763,7 +766,7 @@ function normalizeCheckInQuestions(raw: unknown): string[] {
   return questions;
 }
 
-export const generateCheckInQuestions = async (request: CheckInQuestionsRequest = {}): Promise<string[]> => {
+export const generateCheckInQuestions = async (request: CheckInQuestionsRequest = {}, signal?: AbortSignal): Promise<string[]> => {
   const { campaign, campaignContext, useLiteModel } = request;
   const flags = gatherPlayerFlags(campaign);
 
@@ -776,6 +779,6 @@ export const generateCheckInQuestions = async (request: CheckInQuestionsRequest 
   ].filter(Boolean).join('\n\n');
 
   const tier = useLiteModel ? 'lite' : 'standard';
-  const raw = await generateWithSchema(CHECK_IN_QUESTIONS_PROMPT, checkInQuestionsSchema, instructions, {}, tier, campaignContext);
+  const raw = await generateWithSchema(CHECK_IN_QUESTIONS_PROMPT, checkInQuestionsSchema, instructions, {}, tier, campaignContext, signal);
   return normalizeCheckInQuestions(raw);
 };

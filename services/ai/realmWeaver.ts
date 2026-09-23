@@ -343,39 +343,40 @@ const poiConfig: EntityGenerationConfig = {
 // --- Unified generator ---
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function generateEntity(config: EntityGenerationConfig, prompt: string, campaignContext?: string): Promise<any> {
+async function generateEntity(config: EntityGenerationConfig, prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<any> {
   const instructions = config.customPreamble
     ? `You are ${config.personaVariant}\n\n${config.fieldInstructions}`
     : `You are The Prep Architect, an expert TTRPG ${config.personaVariant}. Your task is to generate a detailed, ready-to-run ${config.entityLabel} based on the user's prompt, conforming to the specified JSON schema.\n\n${config.fieldInstructions}`;
-  const data = await generateWithSchema(prompt, config.schema, instructions, {}, 'standard', campaignContext);
+  const data = await generateWithSchema(prompt, config.schema, instructions, {}, 'standard', campaignContext, signal);
   return config.postProcess ? config.postProcess(data) : data;
 }
 
-// --- Generator Functions (public API — signatures unchanged) ---
+// --- Generator Functions (public API) ---
+// Each accepts an optional trailing AbortSignal for cancellation.
 
-export const generateNpc = async (prompt: string, campaignContext?: string): Promise<Omit<NPC, 'id' | 'factionId'>> =>
-  generateEntity(npcConfig, prompt, campaignContext);
+export const generateNpc = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<Omit<NPC, 'id' | 'factionId'>> =>
+  generateEntity(npcConfig, prompt, campaignContext, signal);
 
-export const generateLocation = async (prompt: string, campaignContext?: string): Promise<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>> =>
-  generateEntity(locationConfig, prompt, campaignContext);
+export const generateLocation = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>> =>
+  generateEntity(locationConfig, prompt, campaignContext, signal);
 
-export const generateFaction = async (prompt: string, campaignContext?: string): Promise<Omit<Faction, 'id' | 'leaderId' | 'memberIds'>> =>
-  generateEntity(factionConfig, prompt, campaignContext);
+export const generateFaction = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<Omit<Faction, 'id' | 'leaderId' | 'memberIds'>> =>
+  generateEntity(factionConfig, prompt, campaignContext, signal);
 
-export const generateItem = async (prompt: string, campaignContext?: string): Promise<Omit<Item, 'id'>> =>
-  generateEntity(itemConfig, prompt, campaignContext);
+export const generateItem = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<Omit<Item, 'id'>> =>
+  generateEntity(itemConfig, prompt, campaignContext, signal);
 
-export const generateScene = async (prompt: string, campaignContext?: string): Promise<Omit<Scene, 'id' | 'locationId' | 'npcIds'>> =>
-  generateEntity(sceneConfig, prompt, campaignContext);
+export const generateScene = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<Omit<Scene, 'id' | 'locationId' | 'npcIds'>> =>
+  generateEntity(sceneConfig, prompt, campaignContext, signal);
 
-export const generateAdventure = async (prompt: string, campaignContext?: string): Promise<AdventureForBatchAdd> =>
-  generateEntity(adventureConfig, prompt, campaignContext) as Promise<AdventureForBatchAdd>;
+export const generateAdventure = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<AdventureForBatchAdd> =>
+  generateEntity(adventureConfig, prompt, campaignContext, signal) as Promise<AdventureForBatchAdd>;
 
-export const generateArticle = async (prompt: string, campaignContext?: string): Promise<Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds'>> =>
-  generateEntity(articleConfig, prompt, campaignContext);
+export const generateArticle = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds'>> =>
+  generateEntity(articleConfig, prompt, campaignContext, signal);
 
-export const generatePoiFromLoot = async (prompt: string, campaignContext?: string): Promise<Omit<PointOfInterest, 'id'>> =>
-  generateEntity(poiConfig, prompt, campaignContext);
+export const generatePoiFromLoot = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<Omit<PointOfInterest, 'id'>> =>
+  generateEntity(poiConfig, prompt, campaignContext, signal);
 
 // --- Lazy DM step 5: "develop fantastic locations" -------------------------
 
@@ -407,9 +408,10 @@ const LOCATION_ASPECTS_INSTRUCTIONS = `You are The Prep Architect, an expert TTR
 export const generateLocationAspects = async (
   location: { name: string; description: string },
   campaignContext?: string,
+  signal?: AbortSignal,
 ): Promise<string[]> => {
   const prompt = `Location Name: ${location.name}\nDescription: ${location.description || 'Not specified'}`;
-  const data = await generateWithSchema(prompt, locationAspectsSchema, LOCATION_ASPECTS_INSTRUCTIONS, {}, 'standard', campaignContext);
+  const data = await generateWithSchema(prompt, locationAspectsSchema, LOCATION_ASPECTS_INSTRUCTIONS, {}, 'standard', campaignContext, signal);
   return normalizeAspects((data as { aspects?: unknown })?.aspects) ?? [];
 };
 
@@ -515,7 +517,7 @@ function normalizeSecretDrafts(raw: unknown): SecretDraft[] {
  * array (possibly empty). A provider-level rejection (network, timeout, bad
  * JSON after retries) propagates rather than being swallowed into `[]`.
  */
-export const generateSecretBatch = async (prompt: string, campaignContext?: string): Promise<SecretDraft[]> => {
-  const raw = await generateWithSchema(prompt, secretBatchSchema, SECRET_BATCH_INSTRUCTIONS, {}, 'standard', campaignContext);
+export const generateSecretBatch = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<SecretDraft[]> => {
+  const raw = await generateWithSchema(prompt, secretBatchSchema, SECRET_BATCH_INSTRUCTIONS, {}, 'standard', campaignContext, signal);
   return normalizeSecretDrafts(raw);
 };

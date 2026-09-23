@@ -404,11 +404,15 @@ describe('No hardcoded Gemini model strings in services', () => {
   });
 
   it('exempt files (core.ts, modelConfig.ts) contain Gemini names only as mapping entries', () => {
-    // Confirm the mapping files DO contain the legacy names, validating the exemption
+    // Roadmap X2: modelConfig.ts owns the ONE legacy/tier mapping table
+    // (`toModelTier` / `resolveGeminiModelName`). core.ts used to carry a
+    // private duplicate; it now delegates, so it must NOT re-grow a copy.
     const corePath = path.join(AI_DIR, 'core.ts');
     const modelConfigPath = path.join(AI_DIR, 'modelConfig.ts');
 
-    expect(readFile(corePath)).toContain('gemini-2.5-flash');
     expect(readFile(modelConfigPath)).toContain('gemini-2.5-flash');
+    const core = readFile(corePath);
+    expect(core).toContain('toModelTier');
+    expect(core).not.toContain('gemini-2.5-flash');
   });
 });

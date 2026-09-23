@@ -1,5 +1,5 @@
 
-import type { NPC, Location, Faction, RollableTable, Item, Scene, Adventure, Article, PointOfInterest, PlayerCharacter, RealmChatResponse, ChatMessage, DraftEntity, ModelTier, Campaign } from '../types/index';
+import type { NPC, Location, Faction, RollableTable, Item, Scene, Adventure, Article, PointOfInterest, PlayerCharacter, RealmChatResponse, ChatMessage, DraftEntity, ModelTier, LegacyRealmChatTier, Campaign } from '../types/index';
 import type { BatchAddData, AdventureForBatchAdd, SceneType, SceneStatus } from '../types/index';
 import type { WorldEvent } from './ai/worldSimulation';
 import type { AudioTranscriptionConfig, AudioTranscriptionSession } from './ai/audioTranscription';
@@ -42,46 +42,52 @@ export type { AudioTranscriptionConfig, AudioTranscriptionSession };
 // importing `services/ai/*` (CLAUDE.md).
 export { isValidSuggestedUpdate } from './ai/worldSimulation';
 
-export const generateNpc = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<NPC, 'id' | 'factionId'>> => {
+/*
+ * Quick-generate facades. Each takes an optional trailing `signal`
+ * (AbortSignal): aborting cancels the in-flight request (real or mock),
+ * stops retries, and rejects with an `AbortError`. Prefer driving these via
+ * `hooks/useAiRequest`, which owns the controller and aborts on unmount.
+ */
+export const generateNpc = (prompt: string, isMockMode: boolean = false, campaignContext?: string, signal?: AbortSignal): Promise<Omit<NPC, 'id' | 'factionId'>> => {
   if (isMockMode) {
-    return mockService.generateNpc(prompt, false, campaignContext);
+    return mockService.generateNpc(prompt, false, campaignContext, signal);
   }
-  return aiRealmWeaver.generateNpc(prompt, campaignContext);
+  return aiRealmWeaver.generateNpc(prompt, campaignContext, signal);
 };
 
-export const generateLocation = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>> => {
+export const generateLocation = (prompt: string, isMockMode: boolean = false, campaignContext?: string, signal?: AbortSignal): Promise<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>> => {
     if (isMockMode) {
-        return mockService.generateLocation(prompt, campaignContext);
+        return mockService.generateLocation(prompt, campaignContext, signal);
     }
-    return aiRealmWeaver.generateLocation(prompt, campaignContext);
+    return aiRealmWeaver.generateLocation(prompt, campaignContext, signal);
 };
 
-export const generateFaction = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<Faction, 'id' | 'leaderId' | 'memberIds'>> => {
+export const generateFaction = (prompt: string, isMockMode: boolean = false, campaignContext?: string, signal?: AbortSignal): Promise<Omit<Faction, 'id' | 'leaderId' | 'memberIds'>> => {
     if (isMockMode) {
-        return mockService.generateFaction(prompt, campaignContext);
+        return mockService.generateFaction(prompt, campaignContext, signal);
     }
-    return aiRealmWeaver.generateFaction(prompt, campaignContext);
+    return aiRealmWeaver.generateFaction(prompt, campaignContext, signal);
 };
 
-export const generateItem = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<Item, 'id'>> => {
+export const generateItem = (prompt: string, isMockMode: boolean = false, campaignContext?: string, signal?: AbortSignal): Promise<Omit<Item, 'id'>> => {
     if (isMockMode) {
-        return mockService.generateItem(prompt, campaignContext);
+        return mockService.generateItem(prompt, campaignContext, signal);
     }
-    return aiRealmWeaver.generateItem(prompt, campaignContext);
+    return aiRealmWeaver.generateItem(prompt, campaignContext, signal);
 };
 
-export const generateScene = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<Scene, 'id' | 'locationId' | 'npcIds'>> => {
+export const generateScene = (prompt: string, isMockMode: boolean = false, campaignContext?: string, signal?: AbortSignal): Promise<Omit<Scene, 'id' | 'locationId' | 'npcIds'>> => {
     if (isMockMode) {
-        return mockService.generateScene(prompt, campaignContext);
+        return mockService.generateScene(prompt, campaignContext, signal);
     }
-    return aiRealmWeaver.generateScene(prompt, campaignContext);
+    return aiRealmWeaver.generateScene(prompt, campaignContext, signal);
 };
 
-export const generateAdventure = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<AdventureForBatchAdd> => {
+export const generateAdventure = (prompt: string, isMockMode: boolean = false, campaignContext?: string, signal?: AbortSignal): Promise<AdventureForBatchAdd> => {
     if (isMockMode) {
-        return mockService.generateAdventure(prompt, campaignContext);
+        return mockService.generateAdventure(prompt, campaignContext, signal);
     }
-    return aiRealmWeaver.generateAdventure(prompt, campaignContext);
+    return aiRealmWeaver.generateAdventure(prompt, campaignContext, signal);
 };
 
 /**
@@ -89,11 +95,11 @@ export const generateAdventure = (prompt: string, isMockMode: boolean = false, c
  * call proposes roughly ten secrets/clues from the campaign context; the caller
  * shows them as checkable preview cards and only creates the checked ones.
  */
-export const generateSecretBatch = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<SecretDraft[]> => {
+export const generateSecretBatch = (prompt: string, isMockMode: boolean = false, campaignContext?: string, signal?: AbortSignal): Promise<SecretDraft[]> => {
     if (isMockMode) {
-        return mockService.generateSecretBatch(prompt, campaignContext);
+        return mockService.generateSecretBatch(prompt, campaignContext, signal);
     }
-    return aiRealmWeaver.generateSecretBatch(prompt, campaignContext);
+    return aiRealmWeaver.generateSecretBatch(prompt, campaignContext, signal);
 };
 
 /**
@@ -106,18 +112,19 @@ export const generateLocationAspects = (
     location: { name: string; description: string },
     isMockMode: boolean = false,
     campaignContext?: string,
+    signal?: AbortSignal,
 ): Promise<string[]> => {
     if (isMockMode) {
-        return mockService.generateLocationAspects(location, campaignContext);
+        return mockService.generateLocationAspects(location, campaignContext, signal);
     }
-    return aiRealmWeaver.generateLocationAspects(location, campaignContext);
+    return aiRealmWeaver.generateLocationAspects(location, campaignContext, signal);
 };
 
-export const generateArticle = (prompt: string, isMockMode: boolean = false, campaignContext?: string): Promise<Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds'>> => {
+export const generateArticle = (prompt: string, isMockMode: boolean = false, campaignContext?: string, signal?: AbortSignal): Promise<Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds'>> => {
     if (isMockMode) {
-        return mockService.generateArticle(prompt, campaignContext);
+        return mockService.generateArticle(prompt, campaignContext, signal);
     }
-    return aiRealmWeaver.generateArticle(prompt, campaignContext);
+    return aiRealmWeaver.generateArticle(prompt, campaignContext, signal);
 };
 
 export const generateNarration = (prompt: string, campaignContext?: string, useLiteModel: boolean = false, isMockMode: boolean = false): Promise<string> => {
@@ -142,12 +149,13 @@ export const generateImprovisation = (prompt: string, campaignContext?: string, 
  */
 export const generateCallbackComplication = (
     request: aiDmCoach.CallbackComplicationRequest,
-    isMockMode: boolean = false
+    isMockMode: boolean = false,
+    signal?: AbortSignal
 ): Promise<string> => {
     if (isMockMode) {
-        return mockService.generateCallbackComplication(request);
+        return mockService.generateCallbackComplication(request, signal);
     }
-    return aiDmCoach.generateCallbackComplication(request);
+    return aiDmCoach.generateCallbackComplication(request, signal);
 };
 
 /**
@@ -162,12 +170,13 @@ export const generateGmIntrusion = (
     isMockMode: boolean = false,
     campaignContext?: string,
     sceneSummary?: string,
-    useLiteModel: boolean = false
+    useLiteModel: boolean = false,
+    signal?: AbortSignal
 ): Promise<string> => {
     if (isMockMode) {
-        return mockService.generateGmIntrusion(campaignContext, sceneSummary, useLiteModel);
+        return mockService.generateGmIntrusion(campaignContext, sceneSummary, useLiteModel, signal);
     }
-    return aiDmCoach.generateGmIntrusion(campaignContext, sceneSummary, useLiteModel);
+    return aiDmCoach.generateGmIntrusion(campaignContext, sceneSummary, useLiteModel, signal);
 };
 
 /**
@@ -179,12 +188,13 @@ export const generateExtras = (
     count: number,
     campaignContext?: string,
     useLiteModel: boolean = false,
-    isMockMode: boolean = false
+    isMockMode: boolean = false,
+    signal?: AbortSignal
 ): Promise<aiDmCoach.ExtraNpc[]> => {
     if (isMockMode) {
-        return mockService.generateExtras(count, campaignContext, useLiteModel);
+        return mockService.generateExtras(count, campaignContext, useLiteModel, signal);
     }
-    return aiDmCoach.generateExtras(count, campaignContext, useLiteModel);
+    return aiDmCoach.generateExtras(count, campaignContext, useLiteModel, signal);
 };
 
 /**
@@ -195,12 +205,13 @@ export const generateExtras = (
  */
 export const generateColdOpen = (
     request: aiDmCoach.ColdOpenRequest,
-    isMockMode: boolean = false
+    isMockMode: boolean = false,
+    signal?: AbortSignal
 ): Promise<string> => {
     if (isMockMode) {
-        return mockService.generateColdOpen(request);
+        return mockService.generateColdOpen(request, signal);
     }
-    return aiDmCoach.generateColdOpen(request);
+    return aiDmCoach.generateColdOpen(request, signal);
 };
 
 // §4.1 Scene Menu Generator — the proposal wire shape. Nothing is persisted
@@ -219,12 +230,13 @@ export type { StrongStartRequest } from './ai/dmCoach';
  */
 export const generateSceneMenu = (
     campaignContext?: string,
-    isMockMode: boolean = false
+    isMockMode: boolean = false,
+    signal?: AbortSignal
 ): Promise<aiDmCoach.SceneMenuDraft[]> => {
     if (isMockMode) {
-        return mockService.generateSceneMenu(campaignContext);
+        return mockService.generateSceneMenu(campaignContext, signal);
     }
-    return aiDmCoach.generateSceneMenu(campaignContext);
+    return aiDmCoach.generateSceneMenu(campaignContext, signal);
 };
 
 /**
@@ -234,12 +246,13 @@ export const generateSceneMenu = (
  */
 export const generateStrongStart = (
     request: aiDmCoach.StrongStartRequest,
-    isMockMode: boolean = false
+    isMockMode: boolean = false,
+    signal?: AbortSignal
 ): Promise<string> => {
     if (isMockMode) {
-        return mockService.generateStrongStart(request);
+        return mockService.generateStrongStart(request, signal);
     }
-    return aiDmCoach.generateStrongStart(request);
+    return aiDmCoach.generateStrongStart(request, signal);
 };
 
 export const generateRollableTable = (prompt: string, campaignContext?: string, useLiteModel: boolean = false, isMockMode: boolean = false): Promise<RollableTable> => {
@@ -296,14 +309,15 @@ export const chatWithRealmWeaver = (
     currentDrafts: DraftEntity[],
     approvedEntitiesLog: string[],
     campaignContext: string,
-    tier: ModelTier,
+    tier: ModelTier | LegacyRealmChatTier,
     isMockMode: boolean = false,
-    focusedEntityType?: 'npc' | 'location' | 'faction' | 'item' | 'adventure' | 'article' | 'scene'
+    focusedEntityType?: 'npc' | 'location' | 'faction' | 'item' | 'adventure' | 'article' | 'scene',
+    signal?: AbortSignal
 ): Promise<RealmChatResponse> => {
     if (isMockMode) {
-        return mockService.chatWithRealmWeaver(history, currentDrafts, approvedEntitiesLog, campaignContext, tier, focusedEntityType);
+        return mockService.chatWithRealmWeaver(history, currentDrafts, approvedEntitiesLog, campaignContext, tier, focusedEntityType, signal);
     }
-    return aiRealmChat.chatWithRealmWeaver(history, currentDrafts, approvedEntitiesLog, campaignContext, tier, focusedEntityType);
+    return aiRealmChat.chatWithRealmWeaver(history, currentDrafts, approvedEntitiesLog, campaignContext, tier, focusedEntityType, signal);
 };
 
 export const analyzeSessionNotes = (notes: string, knownEntityNames: string[], campaignContext?: string, isMockMode: boolean = false): Promise<{entries: {content: string, relatedEntityNames: string[]}[]}> => {
@@ -334,12 +348,13 @@ export const generateNpcRoleplay = (
  */
 export const generateCheckInQuestions = (
     request: aiDmCoach.CheckInQuestionsRequest = {},
-    isMockMode: boolean = false
+    isMockMode: boolean = false,
+    signal?: AbortSignal
 ): Promise<string[]> => {
     if (isMockMode) {
-        return mockService.generateCheckInQuestions(request);
+        return mockService.generateCheckInQuestions(request, signal);
     }
-    return aiDmCoach.generateCheckInQuestions(request);
+    return aiDmCoach.generateCheckInQuestions(request, signal);
 };
 
 export const generateSessionRecap = (

@@ -1,5 +1,7 @@
 
-import type { NPC, Location, Faction, RollableTable, Item, Scene, SceneType, AdventureForBatchAdd, Article, PointOfInterest, PlayerCharacter, RealmChatResponse, ChatMessage, DraftEntity, ModelTier, Campaign } from '../../types/index';
+import type { NPC, Location, Faction, RollableTable, Item, Scene, SceneType, AdventureForBatchAdd, Article, PointOfInterest, PlayerCharacter, RealmChatResponse, ChatMessage, DraftEntity, Campaign } from '../../types/index';
+import type { ModelTier, LegacyRealmChatTier } from './modelConfig';
+import { abortableDelay } from '@/utils/abort';
 import type { BatchAddData } from '../../types/index';
 import type { WorldEvent } from './worldSimulation';
 import type { CallbackComplicationRequest, ColdOpenRequest, ExtraNpc, SceneMenuDraft, StrongStartRequest } from './dmCoach';
@@ -176,52 +178,52 @@ const logContext = (context?: string) => {
 
 // --- Mock Service Functions ---
 
-export const generateNpc = async (prompt: string, useGroundedSearch: boolean, campaignContext?: string): Promise<Omit<NPC, 'id' | 'factionId'>> => {
+export const generateNpc = async (prompt: string, useGroundedSearch: boolean, campaignContext?: string, signal?: AbortSignal): Promise<Omit<NPC, 'id' | 'factionId'>> => {
   console.log(`[MOCK MODE] Called generateNpc with prompt: "${prompt}" and useGroundedSearch: ${useGroundedSearch}`);
   logContext(campaignContext);
-  await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+  await abortableDelay(MOCK_DELAY, signal);
   return Promise.resolve(mockNpcData);
 };
 
-export const generateLocation = async (prompt: string, campaignContext?: string): Promise<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>> => {
+export const generateLocation = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>> => {
   console.log(`[MOCK MODE] Called generateLocation with prompt: "${prompt}"`);
   logContext(campaignContext);
-  await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+  await abortableDelay(MOCK_DELAY, signal);
   return Promise.resolve(mockLocationData);
 };
 
-export const generateFaction = async (prompt: string, campaignContext?: string): Promise<Omit<Faction, 'id' | 'leaderId' | 'memberIds'>> => {
+export const generateFaction = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<Omit<Faction, 'id' | 'leaderId' | 'memberIds'>> => {
   console.log(`[MOCK MODE] Called generateFaction with prompt: "${prompt}"`);
   logContext(campaignContext);
-  await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+  await abortableDelay(MOCK_DELAY, signal);
   return Promise.resolve(mockFactionData);
 };
 
-export const generateItem = async (prompt: string, campaignContext?: string): Promise<Omit<Item, 'id'>> => {
+export const generateItem = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<Omit<Item, 'id'>> => {
   console.log(`[MOCK MODE] Called generateItem with prompt: "${prompt}"`);
   logContext(campaignContext);
-  await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+  await abortableDelay(MOCK_DELAY, signal);
   return Promise.resolve(mockItemData);
 };
 
-export const generateScene = async (prompt: string, campaignContext?: string): Promise<Omit<Scene, 'id' | 'locationId' | 'npcIds'>> => {
+export const generateScene = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<Omit<Scene, 'id' | 'locationId' | 'npcIds'>> => {
   console.log(`[MOCK MODE] Called generateScene with prompt: "${prompt}"`);
   logContext(campaignContext);
-  await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+  await abortableDelay(MOCK_DELAY, signal);
   return Promise.resolve({ ...mockSceneData, npcIds: [] });
 };
 
-export const generateAdventure = async (prompt: string, campaignContext?: string): Promise<AdventureForBatchAdd> => {
+export const generateAdventure = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<AdventureForBatchAdd> => {
   console.log(`[MOCK MODE] Called generateAdventure with prompt: "${prompt}"`);
   logContext(campaignContext);
-  await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+  await abortableDelay(MOCK_DELAY, signal);
   return Promise.resolve(mockAdventureData);
 };
 
-export const generateArticle = async (prompt: string, campaignContext?: string): Promise<Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds'>> => {
+export const generateArticle = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds'>> => {
   console.log(`[MOCK MODE] Called generateArticle with prompt: "${prompt}"`);
   logContext(campaignContext);
-  await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+  await abortableDelay(MOCK_DELAY, signal);
   return Promise.resolve(mockArticleData);
 };
 
@@ -240,7 +242,7 @@ export const generateImprovisation = async (prompt: string, campaignContext?: st
 }
 
 /** P2 — the Callback Machine's mock counterpart. Same empty-material rejection as the real path. */
-export const generateCallbackComplication = async (request: CallbackComplicationRequest): Promise<string> => {
+export const generateCallbackComplication = async (request: CallbackComplicationRequest, signal?: AbortSignal): Promise<string> => {
     const material = request?.material ?? [];
     if (material.length === 0) {
         throw new Error(
@@ -249,12 +251,12 @@ export const generateCallbackComplication = async (request: CallbackComplication
     }
     const names = material.map((piece) => piece.label).join(', ');
     console.log(`[MOCK MODE] Called generateCallbackComplication with material: ${names}`);
-    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    await abortableDelay(MOCK_DELAY, signal);
     return `This is a mock complication reincorporating ${names}: it ties them back into the current scene.`;
 }
 
 /** P4 — mock parity for the cold open. Same empty-campaign refusal as the real path. */
-export const generateColdOpen = async (request: ColdOpenRequest): Promise<string> => {
+export const generateColdOpen = async (request: ColdOpenRequest, signal?: AbortSignal): Promise<string> => {
     const { campaign } = request;
     if (!hasColdOpenMaterial(campaign)) {
         throw new Error(
@@ -262,7 +264,7 @@ export const generateColdOpen = async (request: ColdOpenRequest): Promise<string
         );
     }
     console.log(`[MOCK MODE] Called generateColdOpen for campaign: "${campaign.title}"`);
-    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    await abortableDelay(MOCK_DELAY, signal);
     return `Previously on ${campaign.title}: the party's choices from last session are still echoing, and the table is about to find out what they cost.`;
 };
 
@@ -383,12 +385,13 @@ export const chatWithRealmWeaver = async (
     currentDrafts: DraftEntity[],
     approvedEntitiesLog: string[],
     campaignContext: string,
-    tier: ModelTier,
-    focusedEntityType?: 'npc' | 'location' | 'faction' | 'item' | 'adventure' | 'article' | 'scene'
+    tier: ModelTier | LegacyRealmChatTier,
+    focusedEntityType?: 'npc' | 'location' | 'faction' | 'item' | 'adventure' | 'article' | 'scene',
+    signal?: AbortSignal
 ): Promise<RealmChatResponse> => {
     console.log(`[MOCK MODE] Called chatWithRealmWeaver. Tier: ${tier}, Focused Type: ${focusedEntityType}`);
     logContext(campaignContext);
-    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    await abortableDelay(MOCK_DELAY, signal);
 
     const lastMsg = history[history.length - 1].text.toLowerCase();
     const newDrafts = [...currentDrafts];
@@ -815,8 +818,8 @@ const MOCK_SECRET_DRAFTS: SecretDraft[] = [
  * roster of distinct drafts after the standard mock delay.
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export const generateSecretBatch = async (prompt: string, campaignContext?: string): Promise<SecretDraft[]> => {
-    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+export const generateSecretBatch = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<SecretDraft[]> => {
+    await abortableDelay(MOCK_DELAY, signal);
     return MOCK_SECRET_DRAFTS.map(d => ({ ...d }));
 };
 
@@ -837,10 +840,11 @@ const MOCK_LOCATION_ASPECTS: string[] = [
 export const generateLocationAspects = async (
     location: { name: string; description: string },
     campaignContext?: string,
+    signal?: AbortSignal,
 ): Promise<string[]> => {
     console.log(`[MOCK MODE] Called generateLocationAspects for: "${location.name}"`);
     logContext(campaignContext);
-    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    await abortableDelay(MOCK_DELAY, signal);
     return [...MOCK_LOCATION_ASPECTS];
 };
 
@@ -859,11 +863,12 @@ export const generateGmIntrusion = async (
     campaignContext?: string,
     sceneSummary?: string,
     useLiteModel: boolean = false,
+    signal?: AbortSignal,
 ): Promise<string> => {
     console.log('[MOCK MODE] Called generateGmIntrusion');
     logContext(campaignContext);
     void useLiteModel;
-    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    await abortableDelay(MOCK_DELAY, signal);
     return sceneSummary ? `${MOCK_GM_INTRUSION} (${sceneSummary})` : MOCK_GM_INTRUSION;
 };
 
@@ -887,11 +892,12 @@ export const generateExtras = async (
     count: number,
     campaignContext?: string,
     useLiteModel: boolean = false,
+    signal?: AbortSignal,
 ): Promise<ExtraNpc[]> => {
     console.log(`[MOCK MODE] Called generateExtras with count: ${count}`);
     logContext(campaignContext);
     void useLiteModel;
-    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    await abortableDelay(MOCK_DELAY, signal);
     const n = Number.isFinite(count) ? Math.min(MOCK_EXTRAS.length, Math.max(1, Math.floor(count))) : 5;
     return MOCK_EXTRAS.slice(0, n).map(e => ({ ...e }));
 };
@@ -916,11 +922,12 @@ const MOCK_CHECK_IN_QUESTIONS: string[] = [
  */
 export const generateCheckInQuestions = async (
     request: { campaign?: Campaign; campaignContext?: string; useLiteModel?: boolean } = {},
+    signal?: AbortSignal,
 ): Promise<string[]> => {
     console.log(`[MOCK MODE] Called generateCheckInQuestions for campaign: "${request.campaign?.title ?? '(none)'}"`);
     logContext(request.campaignContext);
     void request.useLiteModel;
-    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    await abortableDelay(MOCK_DELAY, signal);
     return MOCK_CHECK_IN_QUESTIONS.map(q => q);
 };
 
@@ -940,10 +947,10 @@ const MOCK_SCENE_MENU_DRAFTS: SceneMenuDraft[] = [
  * (services/ai/CLAUDE.md) — resolves a fixed, well-formed roster of distinct
  * drafts after the standard mock delay, the same shape as the real path.
  */
-export const generateSceneMenu = async (campaignContext?: string): Promise<SceneMenuDraft[]> => {
+export const generateSceneMenu = async (campaignContext?: string, signal?: AbortSignal): Promise<SceneMenuDraft[]> => {
     console.log(`[MOCK MODE] Called generateSceneMenu`);
     logContext(campaignContext);
-    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    await abortableDelay(MOCK_DELAY, signal);
     return MOCK_SCENE_MENU_DRAFTS.map(d => ({ ...d }));
 };
 
@@ -954,7 +961,7 @@ export const generateSceneMenu = async (campaignContext?: string): Promise<Scene
  * needs a sampled piece" guard as the real path, so the two paths cannot
  * drift.
  */
-export const generateStrongStart = async (request: StrongStartRequest): Promise<string> => {
+export const generateStrongStart = async (request: StrongStartRequest, signal?: AbortSignal): Promise<string> => {
     const { style, campaign, dormantPiece } = request;
     if (style === 'reincorporate' && !dormantPiece) {
         throw new Error(
@@ -962,7 +969,7 @@ export const generateStrongStart = async (request: StrongStartRequest): Promise<
         );
     }
     console.log(`[MOCK MODE] Called generateStrongStart with style: "${style}" for campaign: "${campaign.title}"`);
-    await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
+    await abortableDelay(MOCK_DELAY, signal);
     if (style === 'reincorporate' && dormantPiece) {
         return `The scene opens already in motion, built around ${dormantPiece.label}: ${dormantPiece.reason.toLowerCase()} — and tonight it finally matters again.`;
     }

@@ -1,5 +1,7 @@
 
-import type { ChatMessage, RealmChatResponse, ModelTier, DraftEntity } from '../../types/index';
+import type { ChatMessage, RealmChatResponse, DraftEntity } from '../../types/index';
+import type { ModelTier, LegacyRealmChatTier } from './modelConfig';
+import { toModelTier } from './modelConfig';
 import { generateWithSchema } from './core';
 import { npcSchema, locationSchema, factionSchema, itemSchema, adventureWithScenesSchema, articleSchema } from './realmWeaver';
 
@@ -38,24 +40,18 @@ const realmChatResponseSchema = {
     required: ['message', 'suggestions', 'draftEntities']
 };
 
-const mapTierToModel = (tier: ModelTier): string => {
-    switch (tier) {
-        case 'performance': return 'lite';
-        case 'medium': return 'standard';
-        case 'quality': return 'quality';
-        default: return 'standard';
-    }
-};
-
 export const chatWithRealmWeaver = async (
     history: ChatMessage[],
     currentDrafts: DraftEntity[],
     approvedEntitiesLog: string[],
     campaignContext: string,
-    tier: ModelTier,
-    focusedEntityType?: 'npc' | 'location' | 'faction' | 'item' | 'adventure' | 'article' | 'scene'
+    tier: ModelTier | LegacyRealmChatTier,
+    focusedEntityType?: 'npc' | 'location' | 'faction' | 'item' | 'adventure' | 'article' | 'scene',
+    signal?: AbortSignal
 ): Promise<RealmChatResponse> => {
-    const modelName = mapTierToModel(tier);
+    // Single tier table lives in modelConfig; legacy 'performance'/'medium'
+    // values are normalised there.
+    const modelName: ModelTier = toModelTier(tier);
     
     let specificInstruction = "";
     if (focusedEntityType) {
@@ -101,7 +97,7 @@ ${approvedEntitiesLog.join('\n')}
     const prompt = `Conversation History:\n${transcript}\n\nUser's Last Input: "${lastUserMessage.text}"\n\nRespond to the user and update any drafts.`;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rawResponse: any = await generateWithSchema(prompt, realmChatResponseSchema, systemInstruction, {}, modelName, campaignContext);
+    const rawResponse: any = await generateWithSchema(prompt, realmChatResponseSchema, systemInstruction, {}, modelName, campaignContext, signal);
 
     // Post-process to flatten the data structure for the app.
     // The model may return entity data in several formats:

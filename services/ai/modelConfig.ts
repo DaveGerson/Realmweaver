@@ -27,6 +27,14 @@
 export type ModelTier = 'lite' | 'standard' | 'quality';
 
 /**
+ * Retired RealmChat-only tier names (`types/RealmChat.ts` used to declare its
+ * own conflicting `ModelTier = 'performance' | 'medium' | 'quality'`). Still
+ * accepted at the facade boundary and normalised via `toModelTier` so any
+ * persisted/legacy caller keeps selecting the same model.
+ */
+export type LegacyRealmChatTier = 'performance' | 'medium';
+
+/**
  * Supported AI provider back-ends.
  *
  * - `claude-cli`     — Invokes the Claude Code CLI binary; suitable for local
@@ -145,6 +153,27 @@ export function resolveGeminiModelName(geminiName: string): ModelTier {
     }
 }
 
+/**
+ * Normalises any tier-like string to a canonical `ModelTier`:
+ * canonical tiers pass through, retired RealmChat tiers map
+ * (`performance` → `lite`, `medium` → `standard`), legacy Gemini model names
+ * go through `resolveGeminiModelName`, and anything else is `'standard'`.
+ *
+ * This is the single tier-mapping table for the app — callers must not keep
+ * a private copy.
+ */
+export function toModelTier(value: string | null | undefined): ModelTier {
+    switch (value) {
+        case 'lite':
+        case 'standard':
+        case 'quality':
+            return value;
+        case 'performance': return 'lite';
+        case 'medium':      return 'standard';
+        default:            return resolveGeminiModelName(value ?? '');
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Active provider detection
 // ---------------------------------------------------------------------------
@@ -191,9 +220,7 @@ const VALID_TIERS: ReadonlySet<string> = new Set<ModelTier>(['lite', 'standard',
  * @returns The provider-specific model identifier (CLI alias or API model ID).
  */
 export function resolveModelName(tierOrLegacy: string): string {
-    const tier: ModelTier = VALID_TIERS.has(tierOrLegacy)
-        ? (tierOrLegacy as ModelTier)
-        : resolveGeminiModelName(tierOrLegacy);
+    const tier: ModelTier = toModelTier(tierOrLegacy);
 
     const provider = getActiveProvider();
 
