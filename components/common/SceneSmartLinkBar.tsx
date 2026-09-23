@@ -1,12 +1,18 @@
 import React, { useMemo } from 'react';
 import { Icons } from './Icons';
 import { getMatchingEngine } from '../../services/linking/engineRegistry';
+import { expandAmbiguousMatch } from '../../services/linking/matchingEngine';
 import type { EntityCandidate, EntityMatch } from '../../services/linking/matchingEngine';
 
 // ─── Re-export EntityMatch for consumers ─────────────────────────────────────
 export type { EntityMatch };
 
 // ─── Detection Function (exported for testing) ────────────────────────────────
+
+function ambiguityNote(match: EntityMatch): string {
+  const n = match.candidates?.length ?? 0;
+  return match.ambiguous && n > 1 ? ` (ambiguous — ${n} entities share this name)` : '';
+}
 
 export function findUnlinkedEntities(
   readAloudText: string,
@@ -24,7 +30,10 @@ export function findUnlinkedEntities(
   const engine = getMatchingEngine();
 
   // Find NPC matches, filter out already-linked, deduplicate by entityId
-  const npcMatches = engine.findMatches(combinedText, allNpcs);
+  // An ambiguous span (two NPCs both named "Marcus") is expanded into one
+  // entry per candidate so the GM chooses, instead of the engine silently
+  // picking by array order.
+  const npcMatches = engine.findMatches(combinedText, allNpcs).flatMap(expandAmbiguousMatch);
   const seenNpcIds = new Set<string>();
   const unlinkedNpcs: EntityMatch[] = [];
   for (const match of npcMatches) {
@@ -35,7 +44,7 @@ export function findUnlinkedEntities(
   }
 
   // Find location matches, filter out already-linked, deduplicate by entityId
-  const locationMatches = engine.findMatches(combinedText, allLocations);
+  const locationMatches = engine.findMatches(combinedText, allLocations).flatMap(expandAmbiguousMatch);
   const seenLocationIds = new Set<string>();
   const unlinkedLocations: EntityMatch[] = [];
   for (const match of locationMatches) {
@@ -111,10 +120,11 @@ export const SceneSmartLinkBar: React.FC<SceneSmartLinkBarProps> = ({
           type="button"
           onClick={() => onAddNpc(match.entityId)}
           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border bg-amber-900/40 text-amber-300 border-amber-700/50 hover:bg-amber-800/60 hover:border-amber-600/60 transition-colors"
-          title={`Add NPC: ${match.entityName}`}
+          title={`Add NPC: ${match.entityName}${ambiguityNote(match)}`}
         >
           <Icons.NPCs className="w-3 h-3" />
           {match.entityName}
+          {match.ambiguous && <span className="text-amber-500/70" aria-hidden="true">?</span>}
           <span className="ml-0.5 text-amber-400 font-bold">+</span>
         </button>
       ))}
@@ -125,10 +135,11 @@ export const SceneSmartLinkBar: React.FC<SceneSmartLinkBarProps> = ({
           type="button"
           onClick={() => onSetLocation(match.entityId)}
           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border bg-emerald-900/40 text-emerald-300 border-emerald-700/50 hover:bg-emerald-800/60 hover:border-emerald-600/60 transition-colors"
-          title={`Set location: ${match.entityName}`}
+          title={`Set location: ${match.entityName}${ambiguityNote(match)}`}
         >
           <Icons.MapPin className="w-3 h-3" />
           {match.entityName}
+          {match.ambiguous && <span className="text-emerald-500/70" aria-hidden="true">?</span>}
           <span className="ml-0.5 text-emerald-400 font-bold">+</span>
         </button>
       ))}

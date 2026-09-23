@@ -122,4 +122,29 @@ describe('campaignService.init(): IndexedDB fallback recovery', () => {
 
         loadSpy.mockRestore();
     });
+
+    it('normalises the Stage on session logs in lockstep with import: an object gets npcIds, a primitive is dropped', async () => {
+        for (const k in store) delete store[k];
+
+        const baseLog = { status: 'planned', sessionDate: '', prepNotes: '', runningNotes: '', recap: '', notableEvents: '', looseEnds: '' };
+        const saved = {
+            id: 'camp-stage', title: 'Stage Campaign', setting: '', npcs: [], locations: [], factions: [], items: [],
+            adventures: [], plots: [], notes: [], secrets: [], articles: [], playerCharacters: [],
+            sessionLogs: [
+                { ...baseLog, id: 'sl-obj', title: 'Object stage', stage: { locationId: 'loc-1' } },
+                { ...baseLog, id: 'sl-str', title: 'String stage', stage: 'none' },
+                { ...baseLog, id: 'sl-none', title: 'No stage' },
+            ],
+        };
+        store['realmweaver-campaigns'] = JSON.stringify([saved]);
+        store['realmweaver-active-campaign-id'] = 'camp-stage';
+
+        const service = trackStore(createCampaignStore({ persist: true }));
+        await flushMicrotasks();
+
+        const logs = service.getState().campaigns.find(c => c.id === 'camp-stage')!.sessionLogs;
+        expect(logs.find(l => l.id === 'sl-obj')!.stage).toEqual({ locationId: 'loc-1', npcIds: [] });
+        expect(logs.find(l => l.id === 'sl-str')!).not.toHaveProperty('stage');
+        expect(logs.find(l => l.id === 'sl-none')!).not.toHaveProperty('stage');
+    });
 });

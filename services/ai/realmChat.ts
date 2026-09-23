@@ -1,5 +1,7 @@
 
-import type { ChatMessage, RealmChatResponse, ModelTier, DraftEntity } from '../../types/index';
+import type { ChatMessage, RealmChatResponse, DraftEntity } from '../../types/index';
+import type { ModelTier, LegacyRealmChatTier } from './modelConfig';
+import { toModelTier } from './modelConfig';
 import { generateWithSchema } from './core';
 import { npcSchema, locationSchema, factionSchema, itemSchema, adventureWithScenesSchema, articleSchema } from './realmWeaver';
 
@@ -38,24 +40,18 @@ const realmChatResponseSchema = {
     required: ['message', 'suggestions', 'draftEntities']
 };
 
-const mapTierToModel = (tier: ModelTier): string => {
-    switch (tier) {
-        case 'performance': return 'lite';
-        case 'medium': return 'standard';
-        case 'quality': return 'quality';
-        default: return 'standard';
-    }
-};
-
 export const chatWithRealmWeaver = async (
     history: ChatMessage[],
     currentDrafts: DraftEntity[],
     approvedEntitiesLog: string[],
     campaignContext: string,
-    tier: ModelTier,
-    focusedEntityType?: 'npc' | 'location' | 'faction' | 'item' | 'adventure' | 'article' | 'scene'
+    tier: ModelTier | LegacyRealmChatTier,
+    focusedEntityType?: 'npc' | 'location' | 'faction' | 'item' | 'adventure' | 'article' | 'scene',
+    signal?: AbortSignal
 ): Promise<RealmChatResponse> => {
-    const modelName = mapTierToModel(tier);
+    // Single tier table lives in modelConfig; legacy 'performance'/'medium'
+    // values are normalised there.
+    const modelName: ModelTier = toModelTier(tier);
     
     let specificInstruction = "";
     if (focusedEntityType) {
@@ -101,7 +97,7 @@ ${approvedEntitiesLog.join('\n')}
     const prompt = `Conversation History:\n${transcript}\n\nUser's Last Input: "${lastUserMessage.text}"\n\nRespond to the user and update any drafts.`;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rawResponse: any = await generateWithSchema(prompt, realmChatResponseSchema, systemInstruction, {}, modelName, campaignContext);
+    const rawResponse: any = await generateWithSchema(prompt, realmChatResponseSchema, systemInstruction, {}, modelName, campaignContext, signal);
 
     // Post-process to flatten the data structure for the app.
     // The model may return entity data in several formats:
@@ -179,7 +175,9 @@ ${npcContext}
 4. Reference campaign events and other known characters organically if relevant.
 5. Keep your dialogue concise: 2-4 sentences maximum.
 6. Provide a mood cue that describes your physical action or emotional subtext (e.g., "drums fingers on the table, eyes darting to the door"). Do not include brackets.
-7. Return JSON with exactly two fields: "dialogue" and "moodCue".`;
+7. Return JSON with exactly two fields: "dialogue" and "moodCue".
+8. If a "Voice" section is documented above, that accent, cadence, and set of verbal tics are binding for this reply — not optional color.
+9. If lines the NPC has actually spoken at the table are listed above, stay consistent with them: you are continuing a voice this table has already heard, not starting fresh from the character sheet.`;
 
     const historyLines = conversationHistory
         .map(msg => `${msg.role === 'user' ? 'Player' : 'NPC'}: ${msg.text}`)

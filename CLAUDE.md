@@ -1,6 +1,6 @@
 # CLAUDE.md - AI Assistant Guide for Realmweaver
 
-> **Last Updated:** 2026-08-14
+> **Last Updated:** 2026-09-23
 
 ---
 
@@ -74,7 +74,8 @@ All code lives at the **project root**. Import alias: `@/` maps to root.
 Realmweaver/
 ├── App.tsx, index.tsx, index.html, index.css, vite.config.ts, vite-plugin-ai-proxy.ts
 ├── hooks/           # useEntitySelection, useModalState, useConfirmDialog, useToast,
-│                      useEntitySearch, useRovingTabIndex, useDebouncedFieldCommit
+│                      useEntitySearch, useRovingTabIndex, useDebouncedFieldCommit,
+│                      useAiRequest (abortable AI calls), useIncrementalList (bounded big lists)
 ├── components/
 │   ├── common/      # Button, Icons, Textarea, DialogShell, ConfirmDialog, ToastContainer,
 │   │                  ErrorBoundary, EntityCreationPanel, EntityLink, EntityQuickCard,
@@ -82,16 +83,23 @@ Realmweaver/
 │   │                  LinkSuggestionsPanel, CommandPalette, Breadcrumbs, RegenerateButton,
 │   │                  SkeletonCard, TabLayout, DmStylePanel, StepIndicator,
 │   │                  KeyboardShortcutsHelp, GenerateHerePanel, SceneResourcesPanel,
-│   │                  SceneSmartLinkBar
+│   │                  SceneSmartLinkBar, ClockPips (plot countdown pips),
+│   │                  CanonCapturePicker ("Make this canon" note → entity),
+│   │                  ContinuityThreadIcon (loose-end kind → entity accent)
 │   ├── layout/      # Header, CampaignSidebar, ContentWrapper, ViewRouter,
 │   │                  StatusBanners (ConflictBanner + BackupRecoveryBanner) + sidebar/
-│   ├── views/       # WelcomeScreen, CampaignCreator, FirstCampaignWizard,
-│   │                  CrossCampaignDashboard, SessionRunner + session/ sub-components
+│   ├── views/       # TonightsTable, WelcomeScreen, CampaignCreator, FirstCampaignWizard,
+│   │                  CrossCampaignDashboard, SessionRunner + session/ (SceneListPanel,
+│   │                  ActiveScenePanel, StagePanel, QuickToolsPanel + GmIntrusionCard,
+│   │                  DormantShelf, ExtrasPanel, QuickTablesPanel, QuickNpcGenerator, RunningLog,
+│   │                  LooseEndsPanel)
 │   ├── dashboards/  # One per entity type (NPC, Location, Faction, Item, Adventure, Article, etc.)
-│   ├── generators/  # AI creation forms per entity type + EntityChatGenerator
+│   ├── generators/  # QuickGeneratorForm (shared, cancellable) + 7 thin per-type configs,
+│   │                  EntityChatGenerator
 │   ├── editors/     # Detail editors per entity type + CampaignSettingEditor, PrepDocumentView
-│   ├── dialogs/     # DmCoach, EvocationWizard, WorldSimulationWizard, ContinuityChecker,
-│   │                  SessionPrepWizard, SessionEndWizard, ExportModal
+│   ├── dialogs/     # DmCoach (+ DmCoachCheckIn), EvocationWizard, WorldSimulationWizard,
+│   │                  ContinuityChecker, SessionPrepWizard (+ prep/ sub-panels),
+│   │                  SessionEndWizard, ExportModal
 │   ├── tools/       # CombatTracker, DiceRoller, SecretsTracker
 │   ├── visualizers/ # RelationshipGraph, PlotTimeline
 │   └── RealmChat/   # RealmChatWidget (indigo accent ONLY here)
@@ -111,7 +119,15 @@ Realmweaver/
 ├── types/           # One file per entity, barrel export via index.ts
 ├── utils/           # entityUtils.ts (factories + ENTITY_TYPE_CONFIG), backlinkUtils,
 │                      dmStyleUtils, entityFieldSave, formReconciliation, demoTemplates,
-│                      diceUtils, keyboardShortcuts, popoverPosition, entityDetailExtractors
+│                      diceUtils, keyboardShortcuts, popoverPosition, entityDetailExtractors,
+│                      storyDerivations (Tonight's Table derivations, campaign-wide scene
+│                      lookup, scene shelf, PC spotlight), dormantMaterial (Callback Machine
+│                      sampler), strongStartFormat (strong-start marker encoding shared by
+│                      prep wizard + Session Runner), plotClock (countdown normalisation),
+│                      canonCapture (note → entity drafts), lazyChecklist (prep checklist rows),
+│                      continuityThreads (ranked loose ends for prep/runner), encounterDifficulty
+│                      (5e XP budget), abort (AbortError helpers), modalStack (dialog inert stack)
+├── data/            # templates/ (4 campaign JSONs), randomTables.ts (canned Quick Tables)
 ├── tests/           # Vitest — top-level suites + components/, services/, helpers/,
 │                      and ship/ (the ship-readiness regression suite, wp-*.test.ts[x])
 └── e2e/             # Playwright specs (port 4200 is hardcoded in playwright.config.ts)
@@ -146,6 +162,12 @@ React integration via `useSyncExternalStore(campaignService.subscribe, campaignS
 - `destroy()` disposes everything `init()` registered — call it in `afterEach` for
   `persist: true` stores. `flushPendingSave()` is the public sync flush (used by ErrorBoundary).
 - `init()` is idempotent: a second call disposes the first registration set.
+- **CRUD factory:** create/update/delete for the 11 flat collections come from a private
+  `makeEntityCrud(key, spec)`. A spec only declares per-type rules (`build`, `onCreate`, `canUpdate`,
+  `prepareUpdate`, `onUpdate`, `onDelete`); the factory enforces the rest centrally — every delete
+  runs `onDelete → _purgeEntityReferences → remove`, unknown ids are no-ops, a vetoed update leaves
+  state untouched. Location/Article trees share `makeHierarchy()`. Scenes (nested under adventures)
+  stay bespoke.
 
 `ConflictBanner` / `BackupRecoveryBanner` (`components/layout/StatusBanners.tsx`) are the UI for
 `conflictDetected` and `recoveredFromBackup`, wired in `App.tsx`.
@@ -165,14 +187,30 @@ including `audioTranscription` (use `startAudioTranscription({ ...config, isMock
 - Model tiers: `lite` (haiku), `standard` (sonnet), `quality` (opus). `core.ts` maps legacy
   Gemini model names to tiers automatically; `modelConfig.resolveModelName()` maps a tier or
   legacy name to the active provider's model id (CLI alias vs. API model id).
-- Retry: `withRetry({ maxAttempts })` — `REALMWEAVER_MAX_RETRIES` is an **attempts count**
+- Zero-prompt table tools (`docs/design/lazy-dm-lens.md` §5): `generateCallbackComplication`,
+  `generateGmIntrusion`, `generateExtras`, `generateSceneMenu`, `generateStrongStart`,
+  `generateCheckInQuestions` (all `ai/dmCoach.ts`) and `generateLocationAspects` (`ai/realmWeaver.ts`)
+  take campaign context plus a click — never a typed prompt — and each has a `mockService.ts` twin.
+  Quick Tables (`data/randomTables.ts`) roll with no AI call at all.
+- **Cancellation:** facade generate/chat functions take an optional trailing `signal?: AbortSignal`,
+  threaded through `core.ts` → provider `fetch` → `withRetry` (aborts are never retried) → mocks.
+  The ai-proxy kills the spawned `claude` process when the client disconnects. In components, use
+  `hooks/useAiRequest` (`run(signal => …)`, aborts on unmount/re-run, late results come back as
+  `'cancelled'`) — never an `isMountedRef` guard.
+- `modelConfig.toModelTier()` is the one tier mapper (legacy RealmChat `'performance'`/`'medium'` and
+  Gemini names included); there is no second `ModelTier` type.
+- Retry: `withRetry({ maxAttempts, signal })` — `REALMWEAVER_MAX_RETRIES` is an **attempts count**
   (minimum 1, default 3), not an "extra tries after the first" count.
 - `modelConfig`'s `ENV` object uses live getters, not a snapshot, so Node-side callers that
   mutate `process.env` at runtime are honoured.
 
 ### Dialog System
 
-All modals use `DialogShell` (focus trap, Escape, ARIA, scroll lock). Confirmations via
+All modals use `DialogShell` (focus trap, Escape, ARIA, scroll lock). It portals into
+`document.body` and, via `utils/modalStack`, marks everything behind the topmost dialog `inert` +
+`aria-hidden` (restored exactly on close; stacked dialogs handled). Elements that must stay reachable
+opt out with `data-modal-inert-exempt` — toasts (z-[90]) and the conflict/backup banners (z-[85]).
+Z ladder: content < header 60 < drawer 70 < dialogs 80 < banners 85 < toasts 90. Confirmations via
 `useConfirmDialog()`. Toast feedback via `useToast()`.
 
 ### Data Flow
@@ -212,13 +250,34 @@ campaignService.createNpc(data) / updateNpc(id, updates) / deleteNpc(id)
 **Relationships have no dedicated link methods.** Edit the relationship field through the normal
 updater — `updateNpc(id, { factionId })`, `updateLocation(id, { parentLocationId })`,
 `updateArticle(id, { parentArticleId })`, `updateScene(adventureId, sceneId, { locationId, npcIds })` — and the store
-applies bidirectional sync and cycle validation internally via the private
-`_synchronizeNpcFactionLink` / `_synchronizeLocationHierarchy` / `_synchronizeArticleHierarchy`
-helpers and the `_isLocationParentingAllowed` / `_isArticleParentingAllowed` guards (an update that
-would create a parent cycle is rejected, leaving state unchanged).
+applies bidirectional sync and cycle validation internally — `_synchronizeNpcFactionLink` for
+NPC ↔ Faction, and the `locationTree` / `articleTree` instances built by `makeHierarchy()` for the
+two parent hierarchies (an update that would create a parent cycle is vetoed by the spec's
+`canUpdate`, leaving state unchanged).
 
 Lifecycle methods: `init`, `destroy`, `saveCampaign`, `flushPendingSave`, `resolveConflict`,
 `dismissBackupRecoveryNotice`.
+
+**Combat:** `endCombat(campaignId?, sessionId?)` archives a non-empty `activeEncounter` onto the
+session's `encounterLog` and resets it (mid-session fights are never lost); `endSession()` archives a
+still-live fight and never logs an empty one. `Combatant` carries optional `ac`, `cr`, `level`, and
+`conditions[{ name, roundsRemaining? }]` (ticked on round advance); `utils/encounterDifficulty`
+rates a fight from party levels + monster CRs.
+
+**Live-session methods (the Stage & the scene menu — `docs/design/unstructured-play.md`).** A session
+does not need a scene track. `SessionLog.stage?: SessionStage` (`{ locationId?, place?, npcIds, focus? }`)
+is the live where/who/what of the table, layered over — or replacing — the active prepped scene:
+`setStageLocation(locationId | null, place?)`, `addNpcToStage(id)`, `removeNpcFromStage(id)`,
+`setStageFocus(text)`, `updateStage(partial)`. The scene list is a menu that may draw from ANY
+adventure: `enterScene(id)` (previous scene stays `in-progress`, Stage cleared), `leaveScene({ complete })`
+("Done" / "Set Aside" — the Stage inherits the scene's place and cast), `addPlannedScene(id)` /
+`removePlannedScene(id)` (the shelf), plus the pre-existing `advanceScene()` ("Next Scene") and `goLive(id)`
+(idempotent for the live session), both now resolving scenes campaign-wide via
+`utils/storyDerivations.resolveSceneById`. `createFreeformSession(title?)` is the one-click on-ramp
+(mints a planned freeform log; the caller routes it through `goLive`). `tickPlotClock(plotId, delta?)`
+moves a plot's countdown and logs a `world-moved` entry. Every Stage change auto-logs a
+`scene-transition` running-log entry. Consumers must read `presentNpcs = sceneCast ∪ stage.npcIds` and
+`presentLocation = stage location ?? scene location` — never the scene alone.
 
 ---
 
@@ -234,7 +293,7 @@ Lifecycle methods: `init`, `destroy`, `saveCampaign`, `flushPendingSave`, `resol
 
 Defined in `App.tsx`. New views need entries in BOTH `App.tsx` and `ViewRouter.tsx`:
 ```typescript
-export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' |
+export type EditorView = 'tonight' | 'setting' | 'npcs' | 'locations' | 'factions' | 'items' |
   'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'notes' |
   'combat' | 'relationships' | 'session-runner' | 'secrets';
 ```
@@ -245,12 +304,19 @@ export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items'
 
 All entities require `id: string` + `name: string`. Each has its own file in `types/`, re-exported via `types/index.ts`.
 
+Optional, non-array fields added by the storyteller / unstructured-play waves (see `types/CLAUDE.md` for the
+integrity contract each one carries): `NPC.voiceNotes?`, `Secret.revealsSecretId?` / `isVital?` /
+`cluesNeeded?`, `SessionLog.stage?` (**id-bearing** — in the purge sweep and both remap passes),
+`Plot.clock?` / `Plot.ifIgnored?` (read through `utils/plotClock`), `PlayerCharacter.playerFlags?`,
+`Location.aspects?`. Every one of them is optional on every surface and never lints as a gap; an old save
+without them is exactly as valid as a new one.
+
 ### Adding a New Entity Type (13 Steps)
 
 1. Create `types/NewEntity.ts` (must have `id`, `name`)
 2. Export from `types/index.ts`
 3. Add array to `Campaign` interface in `types/Campaign.ts`
-4. Add CRUD methods in `campaignService.ts` (delete must call `_purgeEntityReferences`)
+4. Add the key to `EntityCollectionKey` and a `makeEntityCrud` spec in `campaignService.ts` (the purge runs automatically; add any new id-bearing field to `_purgeEntityReferences`)
 5. Add mock data in `ai/mockService.ts`
 6. Add facade function in `aiService.ts`
 7. Add default factory in `utils/entityUtils.ts`
@@ -286,7 +352,10 @@ Use `inputBaseClasses` / `textareaBaseClasses` from `components/common/Textarea.
 ### Entity Type Colors (via `ENTITY_TYPE_CONFIG`)
 
 npc=amber, location=emerald, faction=violet, item=sky, adventure=orange, article=cyan,
-sessionLog=rose, playerCharacter=teal, plot=yellow, note=slate, **scene=blue**
+sessionLog=rose, playerCharacter=teal, plot=yellow, note=slate, **scene=blue**, secret=fuchsia
+
+`ENTITY_TYPE_CONFIG` is typed against the closed `EntityTypeKey` union — a missing entry is a compile
+error. Look up an arbitrary string with `getEntityTypeConfig` / `isEntityTypeKey`.
 
 (`session-log` / `player-character` kebab aliases map to the same entries.)
 
@@ -316,12 +385,17 @@ sessionLog=rose, playerCharacter=teal, plot=yellow, note=slate, **scene=blue**
 ```typescript
 import { buildCampaignContext } from '@/services/contextBuilder';
 const ctx = buildCampaignContext({
-  variant: 'generation',        // 'generation' | 'coach' | 'chat'
+  variant: 'generation',        // 'generation' | 'coach' | 'chat' | 'player-safe'
   campaign,
   maxTokenEstimate: 4000,       // default 4000 (≈16 000 chars)
   // optional: activeSceneId, activeSessionId, focusEntityId, focusEntityType, focusSelection
 });
 ```
+
+Pass `activeSessionId` whenever a session is live: the builder reads the session's Stage from it ("On
+Stage Now" — place, present cast, and, GM-only, what is happening), so the AI knows who is in the room
+even when no prepped scene is active. Plot lines carry `[clock n/m]` and `— if ignored: …`; the
+Player Characters roster carries each player's `playerFlags`.
 
 ---
 
@@ -349,7 +423,11 @@ const ctx = buildCampaignContext({
 | `slate-*` not `stone-*` | Consistent color tokens |
 | Update `ViewRouter.tsx` | New views need both `App.tsx` and `ViewRouter.tsx` |
 | `EntityCreationPanel` | Required for all dashboard creation UIs |
-| Cascade deletion | Entity delete must call `_purgeEntityReferences` to clean up all relationship references |
+| Cascade deletion | Automatic through `makeEntityCrud`; only bespoke deletes (`deleteScene`, `deleteAdventure`'s scene sweep) call `_purgeEntityReferences` by hand. New id-bearing fields must be added to the sweep |
+| `useAiRequest` for AI calls in components | Aborts on unmount so a stale generation can't create an entity later; show a Cancel `<Button>` while loading |
+| `useIncrementalList` for entity grids | Lists over 100 items render 60 at a time; pass `itemCount`/`onRequestIndex` to `useRovingTabIndex` so keyboard nav still reaches every card |
+| `buildEntityContext` for editor AI context | One builder for every `RegenerateButton`; never inline a template string |
+| Entity names in prose → `getMatchingEngine()` | One matcher for inline links, suggestions and auto-linking; ambiguous shared names are flagged, never auto-applied |
 | No indigo outside RealmChat | Indigo is reserved for the AI assistant widget |
 | `<Button>` for action buttons | Use `Button` component (primary/secondary/ghost/danger/icon variants) for action buttons. Raw `<button>` only for cards, tabs, chips, toggles, semantic role buttons |
 | jsdom is opt-in | Vitest's default environment is `node`; component tests need `// @vitest-environment jsdom` as the file's first line |

@@ -24,14 +24,14 @@ afterEach(() => cleanup());
 
 function setup() {
     const onClose = vi.fn();
-    const { container } = render(
+    render(
         <DialogShell isOpen onClose={onClose} ariaLabel="Test dialog">
             <div>
                 <textarea data-testid="ingest" defaultValue="a long prompt the DM is selecting" />
             </div>
         </DialogShell>
     );
-    const backdrop = container.firstElementChild as HTMLElement;
+    const backdrop = screen.getByRole('dialog').parentElement as HTMLElement;
     return { onClose, backdrop };
 }
 

@@ -69,7 +69,7 @@ RealmWeaver is an AI-native campaign management tool for tabletop RPG Game Maste
 
 2. **Three-layer AI facade** — Components call `aiService.ts` (never `ai/` modules directly). The facade routes to mock or real implementations based on `isMockMode`. Real implementations use `ai/core.ts`, which delegates to the active provider via `providers/registry.ts`.
 
-3. **Provider abstraction layer** — `providers/registry.ts` manages which AI backend is active. Default is `claude-cli` (Claude Code CLI via Vite proxy middleware). A stub `anthropic-api` provider is ready for future production deployment. Legacy Gemini model name strings are mapped to `ModelTier` values by `core.ts` for backward compatibility.
+3. **Provider abstraction layer** — `providers/registry.ts` manages which AI backend is active. Default is `claude-cli` (Claude Code CLI via Vite proxy middleware). A stub `anthropic-api` provider is ready for future production deployment. Legacy Gemini model names and RealmChat's old `'performance'`/`'medium'` tiers are mapped to the one `ModelTier` vocabulary by `modelConfig.toModelTier()`. Every call accepts an optional `AbortSignal`, threaded through `core.ts`, the provider's `fetch`, `withRetry` (aborts are never retried) and the mocks; the proxy kills the spawned `claude` process when the client disconnects. Components drive AI calls through `hooks/useAiRequest`, and the seven quick generators share `generators/QuickGeneratorForm.tsx`.
 
 4. **Tiered context builder** — `contextBuilder.ts` assembles AI context with token-budget awareness. Tier 1 (always): setting, style profile, active scene. Tier 2 (contextual): scene NPCs, location, plots. Tier 3 (on-demand): full entity overviews.
 
@@ -79,9 +79,9 @@ RealmWeaver is an AI-native campaign management tool for tabletop RPG Game Maste
 
 7. **Decomposed App shell** — `App.tsx` delegates view routing to `ViewRouter.tsx`, entity selection state to `useEntitySelection`, and modal lifecycle to `useModalState`. `SessionRunner` and `CampaignSidebar` are each decomposed into focused sub-components under `views/session/` and `layout/sidebar/` respectively.
 
-8. **Accessible dialog system** — All modals compose `DialogShell` for consistent focus trap, Escape-to-close, body scroll lock, and ARIA roles. Confirmations go through `useConfirmDialog` (context-provider); ephemeral feedback through `useToast` (context-provider). Direct use of `window.confirm` / `window.alert` is prohibited. Phase 7 additions: `DmStylePanel` uses `role="radiogroup"` semantics; `BacklinksPanel` exposes collapsed link count to screen readers.
+8. **Accessible dialog system** — All modals compose `DialogShell` for consistent focus trap, Escape-to-close, body scroll lock, and ARIA roles. `DialogShell` portals into `document.body`, and `utils/modalStack.ts` marks everything behind the topmost dialog `inert` + `aria-hidden` (toasts and status banners opt out via `data-modal-inert-exempt`). Confirmations go through `useConfirmDialog` (context-provider); ephemeral feedback through `useToast` (context-provider). Direct use of `window.confirm` / `window.alert` is prohibited. Phase 7 additions: `DmStylePanel` uses `role="radiogroup"` semantics; `BacklinksPanel` exposes collapsed link count to screen readers.
 
-9. **ENTITY_TYPE_CONFIG** — Canonical map in `utils/entityUtils.ts` from entity type key to `{ icon, color, label }`. All components that render entity type metadata (dashboards, quick cards, command palette, sidebar) derive from this config. Colors: npc=amber, location=emerald, faction=violet, item=sky, adventure=orange, article=cyan, sessionLog=rose, playerCharacter=teal, plot=yellow, note=slate, **scene=blue**. Adding a color here also requires extending the `@source inline(...)` safelist in `index.css`, since these classes are composed at runtime and invisible to Tailwind's scanner. There is still no `secret` entry.
+9. **ENTITY_TYPE_CONFIG** — Canonical map in `utils/entityUtils.ts` from entity type key to `{ icon, color, label }`. All components that render entity type metadata (dashboards, quick cards, command palette, sidebar) derive from this config. Colors: npc=amber, location=emerald, faction=violet, item=sky, adventure=orange, article=cyan, sessionLog=rose, playerCharacter=teal, plot=yellow, note=slate, **scene=blue**. Adding a color here also requires extending the `@source inline(...)` safelist in `index.css`, since these classes are composed at runtime and invisible to Tailwind's scanner. **secret=fuchsia**. The record is typed against the closed `EntityTypeKey` union, so a missing entry is a compile error; `getEntityTypeConfig` / `isEntityTypeKey` handle arbitrary strings. Editors build `RegenerateButton` context through the single `buildEntityContext`.
 
 10. **Shared Button component** — `components/common/Button.tsx` provides a unified button abstraction with 5 variants (`primary`, `secondary`, `ghost`, `danger`, `icon`) and 3 sizes (`sm`, `md`, `lg`). `twMerge` handles className composition and override. 219+ instances across the codebase use it. Cards, tabs, and chip elements with semantic roles may stay as raw `<button>` elements.
 
@@ -97,6 +97,14 @@ RealmWeaver is an AI-native campaign management tool for tabletop RPG Game Maste
 
 16. **Localhost-only AI proxy** — `vite-plugin-ai-proxy.ts` registers `/api/ai/generate` and `/api/ai/health` on both the dev server (`configureServer`) and the preview server (`configurePreviewServer`). Requests must arrive from a loopback TCP peer (unforgeable), with `Origin` and `Host` both resolving to localhost; bodies are capped at 4 MB, CLI invocation at 120 s and 1 MB of stdout. A per-session token is injected into the page and validated when present, but is not yet required.
 
+17. **Generic entity CRUD factory** — `campaignService.ts` builds create/update/delete for the 11 flat collections from a private `makeEntityCrud(key, spec)`: specs declare per-type rules (`build`, `onCreate`, `canUpdate`, `prepareUpdate`, `onUpdate`, `onDelete`), the factory enforces purge-on-delete, no-op on unknown ids, and veto-leaves-state-unchanged. `makeHierarchy()` supplies the Location/Article parent trees and their cycle guards. Scenes stay bespoke (nested under adventures).
+
+18. **Bounded rendering for large campaigns** — `hooks/useIncrementalList.ts` engages above 100 items, renders 60 and grows on scroll or "Show more"; `useRovingTabIndex` can request unrendered indices so keyboard navigation still reaches every card. Nine dashboards use it; `CommandPalette` caps entity results at 50.
+
+19. **One entity-name matcher** — `services/linking` is the only name-in-prose matcher (`LinkedText`, suggestions, auto-linking, `storyDerivations`). It scores confidence, honours aliases, and returns names shared by several entities as a single `ambiguous` match with `candidates`, which `autoLinker` never auto-applies.
+
+20. **Continuity & combat utilities** — `utils/continuityThreads.ts` ranks last session's loose ends, unresolved plots, in-progress scenes/adventures and loaded-gun secrets for the prep wizard's opt-in carry-forward and the runner's `LooseEndsPanel`. `utils/encounterDifficulty.ts` rates a fight from party levels and monster CRs for `CombatTracker`, whose combatants now carry `ac` / `cr` / `level` / timed `conditions`; `campaignService.endCombat()` archives mid-session fights to the session's `encounterLog`.
+
 ---
 
 ## 3. Data Model
@@ -105,17 +113,17 @@ All data lives in a single `Campaign` object with arrays of typed entities:
 
 ```
 Campaign
-├── npcs: NPC[]                # Characters with personality, faction links, relationships
+├── npcs: NPC[]                # Characters with personality, faction links, relationships, optional voiceNotes, and a quote ledger kept in history[] (`Said: "…"` rows)
 ├── locations: Location[]      # Places with hierarchy, connections, points of interest
 ├── factions: Faction[]        # Organizations with goals, members, headquarters
 ├── items: Item[]              # Artifacts, equipment, treasures
 ├── adventures: Adventure[]    # Story arcs containing Scene[] (nested)
 ├── articles: Article[]        # Lore entries with parent/child hierarchy
-├── sessionLogs: SessionLog[]  # Session records with notes, beats, recaps
-├── playerCharacters: PC[]     # Imported from PDF or manual entry
-├── plots: Plot[]              # Cross-session storyline threads
+├── sessionLogs: SessionLog[]  # Session records with notes, beats, recaps, and the live `stage?` (where / who / what, scene-optional)
+├── playerCharacters: PC[]     # Imported from PDF or manual entry; optional playerFlags (what the player wants more of)
+├── plots: Plot[]              # Cross-session storyline threads; optional pressure — `clock?` (countdown) + `ifIgnored?` (the plot's move)
 ├── notes: Note[]              # Quick freeform notes
-├── secrets?: Secret[]         # DM secrets/clues with reveal tracking
+├── secrets?: Secret[]         # DM secrets/clues with reveal tracking + the E1 mystery edge (revealsSecretId/isVital/cluesNeeded)
 ├── activeEncounter?: Encounter # Live combat state
 ├── activeSceneId?: string     # Scene currently being played
 ├── activeSessionId?: string   # Session Runner active session
@@ -145,13 +153,19 @@ Scene.npcIds[]                   -> NPC        (features)
 Article.relatedEntityIds[]       -> Any entity (references)
 Plot.relatedEntityIds[]          -> Any entity (involves)
 Secret.linkedEntityIds[]         -> Any entity (concerns)
+Secret.revealsSecretId           -> Secret     (E1 clue -> revelation, optional)
+SessionLog.stage.locationId      -> Location   (the party is here, live; optional)
+SessionLog.stage.npcIds[]        -> NPC        (on stage now, beyond the scene's cast)
+SessionLog.plannedSceneIds[]     -> Scene      (any adventure — resolved campaign-wide)
 *.mentionedEntityIds[]           -> Any entity (@mention backlinks)
 ```
 
 ### Cascade Deletion
 
-Every `deleteX()` does two things: type-specific relationship unwinding, plus a shared
-`_purgeEntityReferences(campaign, id)` sweep so no dangling reference survives anywhere.
+Every `deleteX()` does two things: type-specific relationship unwinding (the spec's `onDelete`), plus a shared
+`_purgeEntityReferences(campaign, id)` sweep so no dangling reference survives anywhere. For the 11 flat
+collections both run through `makeEntityCrud`, so the sweep cannot be forgotten; `deleteScene` and
+`deleteAdventure`'s per-scene sweep call it by hand.
 
 | Deleted entity | Type-specific cascade |
 |----------------|----------------------|
@@ -165,8 +179,8 @@ Every `deleteX()` does two things: type-specific relationship unwinding, plus a 
 `_purgeEntityReferences` additionally strips the deleted id from: `NPC.relationships`,
 `Faction.leaderId` / `headquartersLocationId`, `Location.connections[].targetLocationId`,
 `Plot`/`Article.relatedEntityIds`, `SessionLog.relatedPlotIds` / `plotProgressions` /
-`structuredNotes[].taggedEntityIds` / `plannedNpcIds` / `plannedLocationIds`,
-`Secret.linkedEntityIds` / `revealedInSessionId`, `Campaign.pinnedEntities`, and
+`structuredNotes[].taggedEntityIds` / `plannedNpcIds` / `plannedLocationIds` / `stage.locationId` / `stage.npcIds`,
+`Secret.linkedEntityIds` / `revealedInSessionId` / `revealsSecretId`, `Campaign.pinnedEntities`, and
 `mentionedEntityIds` on every entity type that carries it.
 
 ---
@@ -187,7 +201,7 @@ Every `deleteX()` does two things: type-specific relationship unwinding, plus a 
 | Session End | `dialogs/SessionEndWizard.tsx` | `aiService` -> `ai/dmCoach` |
 | Combat Tracker | `tools/CombatTracker.tsx` | `campaignService` |
 | Dice Roller | `tools/DiceRoller.tsx` | `utils/diceUtils` |
-| Secrets Tracker | `tools/SecretsTracker.tsx` | `campaignService` |
+| Secrets Tracker | `tools/SecretsTracker.tsx` | `campaignService`; `aiService.generateSecretBatch` -> `ai/realmWeaver` for R2 "Generate ten" |
 | Continuity Check | `dialogs/ContinuityChecker.tsx` | `continuityChecker.ts` (pure, no AI) |
 | Plot Timeline | `visualizers/PlotTimeline.tsx` | Pure component |
 | Relationship Graph | `visualizers/RelationshipGraph.tsx` | Pure component (D3) |
@@ -199,6 +213,21 @@ Every `deleteX()` does two things: type-specific relationship unwinding, plus a 
 | First Campaign Wizard | `views/FirstCampaignWizard.tsx` | `aiService` -> `ai/evocationWizard` |
 | Campaign Templates | `views/CampaignCreator.tsx` | `data/templates/` |
 | Cross-Campaign | `views/CrossCampaignDashboard.tsx` (with search/filter) | `campaignService` |
+| Tonight's Table | `views/TonightsTable.tsx` (story-first campaign home: previously on, open threads, offstage cast, loaded guns) | `utils/storyDerivations.ts` |
+| Callback Machine | `views/session/QuickToolsPanel.tsx` ("Complicate This" — zero-prompt reincorporation of dormant campaign material, logged as a `coach-used` entry) | `utils/dormantMaterial.ts` (over `storyDerivations`) -> `aiService.generateCallbackComplication` -> `ai/dmCoach` |
+| Engraved moments & cold open | `views/TonightsTable.tsx` (Moments reel over starred `structuredNotes`, zero schema) + `dialogs/SessionPrepWizard.tsx` ("Draft it from last session", folded into `prepNotes` via `utils/strongStartFormat.ts`) | `aiService.generateColdOpen` / `hasColdOpenMaterial` -> `ai/dmCoach` |
+| The Stage (unstructured play) | `views/session/StagePanel.tsx` inside `ActiveScenePanel.tsx` (place / present cast / what's happening, scene-optional; "Save as a location" promotes a freeform place) | `campaignService` Stage methods (`setStageLocation`, `addNpcToStage`, `removeNpcFromStage`, `setStageFocus`) — every change auto-logged; `contextBuilder` "On Stage Now" |
+| Scene menu & shelf | `views/session/SceneListPanel.tsx` (any-order scenes from any adventure, paused glyph, "Pull a scene from the shelf", put back) + `ActiveScenePanel` Done / Next Scene / Set Aside | `campaignService.enterScene` / `leaveScene` / `addPlannedScene` / `removePlannedScene`; `utils/storyDerivations.resolveSceneById` / `deriveSceneShelf` |
+| Plot pressure (clocks) | `editors/PlotEditor.tsx` (Pressure block), `common/ClockPips.tsx`, `views/session/QuickToolsPanel.tsx` (tick), `views/TonightsTable.tsx` (open threads) | `utils/plotClock.ts`; `campaignService.tickPlotClock` (`world-moved` log entry); `continuityChecker` `clock-expired` (info) |
+| Spotlight | `views/TonightsTable.tsx` (Spotlight panel) + `views/session/SceneListPanel.tsx` ("Spotlight tonight" strip) | `utils/storyDerivations.derivePcSpotlight` / `countPcSpotlightInSession` (running-log text + tags, zero schema) |
+| Freeform start | `views/TonightsTable.tsx` ("Just start playing"), `dashboards/SessionLogDashboard.tsx` ("Start Now") via `App.handleQuickStart` | `campaignService.createFreeformSession` -> `goLive` (idempotent) |
+| GM Intrusion | `views/session/GmIntrusionCard.tsx` in `QuickToolsPanel` (zero-prompt, zero-precondition live complication; "Use It" logs a `coach-used` entry) | `aiService.generateGmIntrusion` -> `ai/dmCoach` |
+| Browse the shelf | `views/session/DormantShelf.tsx` (pick the dormant piece to spend instead of sampling) | `utils/dormantMaterial.collectDormantCandidates` -> `aiService.generateCallbackComplication` |
+| Extras & Quick Tables | `views/session/ExtrasPanel.tsx` (name + one-line throwaway NPCs, promote on demand), `views/session/QuickTablesPanel.tsx` (canned, zero-latency tables) | `aiService.generateExtras` -> `ai/dmCoach`; `data/randomTables.ts` + `utils/diceUtils` |
+| Prep wizard: scene menu, checklist, strong-start styles | `dialogs/SessionPrepWizard.tsx` + `dialogs/prep/*` ("Suggest a few" beats, Lazy DM checklist, previously-on / drop-into-action / reincorporate strong starts) | `aiService.generateSceneMenu` / `generateStrongStart` -> `ai/dmCoach`; `utils/lazyChecklist.ts` |
+| Table Pulse | `editors/PlayerCharacterEditor.tsx` (`playerFlags` — "what this player wants more of"), `dialogs/DmCoachCheckIn.tsx` ("Ask the Table" tab) | `aiService.generateCheckInQuestions` -> `ai/dmCoach`; `contextBuilder` PC roster line |
+| Location aspects | `editors/LocationEditor.tsx` (Aspects section + "Suggest aspects"), `views/session/ActiveScenePanel.tsx` location card | `aiService.generateLocationAspects` -> `ai/realmWeaver` (`locationSchema.aspects`); prep sheet line in `importExportService` |
+| Make this canon | `common/CanonCapturePicker.tsx` in `views/session/RunningLog.tsx` (live) and `editors/SessionLogEditor.tsx` (post-hoc) | `utils/canonCapture.ts` -> `campaignService.createNpc/createLocation/createItem/createNote` (+ scene link / `addNpcToStage`) |
 | DM Style Settings | `common/DmStylePanel.tsx` | `utils/dmStyleUtils` |
 
 ---
@@ -284,12 +313,15 @@ Realmweaver/
 │   │   ├── CampaignCreator.tsx
 │   │   ├── FirstCampaignWizard.tsx  # Guided 5-step world-building onboarding
 │   │   ├── CrossCampaignDashboard.tsx
-│   │   ├── SessionRunner.tsx        # Live session orchestrator (~439L)
+│   │   ├── TonightsTable.tsx        # Story-first campaign home (+ Spotlight, plot clocks, "Just start playing")
+│   │   ├── SessionRunner.tsx        # Live session orchestrator — derives everything from the Stage ∪ the active scene
 │   │   └── session/                 # SessionRunner sub-components
-│   │       ├── ActiveScenePanel.tsx
-│   │       ├── SceneListPanel.tsx
-│   │       ├── RunningLog.tsx
-│   │       ├── QuickToolsPanel.tsx
+│   │       ├── ActiveScenePanel.tsx # Stage + scene body; Done / Next Scene / Set Aside
+│   │       ├── StagePanel.tsx       # Where / who / what — scene-optional live truth of the table
+│   │       ├── SceneListPanel.tsx   # Scenes as a menu (any adventure), shelf, beats, spotlight strip
+│   │       ├── RunningLog.tsx       # + "Make this canon"
+│   │       ├── QuickToolsPanel.tsx  # + plot clocks, GM Intrusion, dormant shelf, Extras, Quick Tables
+│   │       ├── GmIntrusionCard.tsx, DormantShelf.tsx, ExtrasPanel.tsx, QuickTablesPanel.tsx
 │   │       └── QuickNpcGenerator.tsx
 │   │
 │   ├── dashboards/                  # Entity list views (10 dashboards, all use EntityCreationPanel)
@@ -305,8 +337,8 @@ Realmweaver/
 │   ├── storageService.ts            # Persistence ladder: localStorage -> IndexedDB, backups, conflict events
 │   ├── aiService.ts                 # AI facade -- the ONLY import for AI in components
 │   ├── contextBuilder.ts            # Tiered token-budget-aware context assembly
-│   ├── continuityChecker.ts         # 8 rule-based consistency checks (pure function)
-│   ├── importExportService.ts       # JSON/Obsidian import-export with validation warnings
+│   ├── continuityChecker.ts         # 13 rule-based consistency checks, incl. the E2 mystery lints and the expired-clock nudge (pure function)
+│   ├── importExportService.ts       # JSON/Obsidian import-export with validation warnings; generateSessionPrepSheetMarkdown/exportSessionPrepSheet (R3 one-page session prep sheet)
 │   ├── linking/                     # Smart linking: matchingEngine, engineRegistry, autoLinker
 │   └── ai/                          # AI implementation layer
 │       ├── core.ts                  # Backward-compat adapter (preserves 3 func signatures)
@@ -333,14 +365,21 @@ Realmweaver/
 │   ├── formReconciliation.ts        # Merge in-progress editor form state with incoming entity prop updates
 │   ├── entityDetailExtractors.ts    # Extract display strings from entity fields
 │   ├── entityFieldSave.ts           # Dispatch field saves by entity type
-│   ├── backlinkUtils.ts             # Compute inbound cross-references
+│   ├── backlinkUtils.ts             # Compute inbound cross-references (incl. the E1 clue -> revelation edge)
 │   ├── dmStyleUtils.ts              # Feature visibility per DM Style mode
 │   ├── demoTemplates.ts             # Starter campaign demo data
 │   ├── diceUtils.ts                 # Dice formula parsing and rolling
 │   ├── keyboardShortcuts.ts         # Shortcut definitions and matching
-│   └── popoverPosition.ts           # Popover screen coordinate calculation
+│   ├── popoverPosition.ts           # Popover screen coordinate calculation
+│   ├── storyDerivations.ts          # Tonight's Table derivations, campaign-wide scene lookup, scene shelf, PC spotlight
+│   ├── dormantMaterial.ts           # Callback Machine sampler (Stage cast counts as present)
+│   ├── strongStartFormat.ts         # Strong-start marker encoding inside prepNotes
+│   ├── plotClock.ts                 # Plot countdown normalisation shared by every clock surface
+│   ├── canonCapture.ts              # Running-log note -> entity drafts ("Make this canon")
+│   └── lazyChecklist.ts             # Lazy DM checklist rows derived from prep-wizard state
 │
 ├── data/templates/                  # 4 campaign templates (JSON)
+├── data/randomTables.ts             # Hand-authored Quick Tables (RollableTable shape, zero latency)
 ├── data/testCampaigns.ts            # Loader for local-only test campaigns dropped into data/test-campaigns/ (gitignored; no-op on a fresh clone)
 ├── e2e/                             # Playwright E2E tests
 ├── tests/                           # Vitest unit tests

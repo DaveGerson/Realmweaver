@@ -7,6 +7,7 @@ import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { AiTextarea } from '../common/Textarea';
 import { RegenerateButton } from '../common/RegenerateButton';
+import { buildEntityContext } from '../../utils/entityUtils';
 import { BacklinksPanel } from '../common/BacklinksPanel';
 import { campaignService } from '@/services/campaignService';
 import type { QuickCardEntityType } from '../common/EntityQuickCard';
@@ -120,7 +121,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete
     onUpdate(note.id, { [field]: newValue });
   };
 
-  const noteEntityContext = `Title: ${formData.title}${formData.tags.length > 0 ? `\nTags: ${formData.tags.join(', ')}` : ''}${formData.content ? `\nContent: ${formData.content.substring(0, 300)}` : ''}`;
+  const noteEntityContext = buildEntityContext('note', formData);
 
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">

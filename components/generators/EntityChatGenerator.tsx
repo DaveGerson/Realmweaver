@@ -4,6 +4,8 @@ import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import type { ChatMessage, DraftEntity, NPC, Location, Faction, Item, Adventure, Article } from '../../types/index';
 import { chatWithRealmWeaver } from '../../services/aiService';
+import type { RealmChatResponse } from '../../types/index';
+import { useAiRequest } from '../../hooks/useAiRequest';
 import { twMerge } from 'tailwind-merge';
 
 interface EntityChatGeneratorProps {
@@ -27,21 +29,12 @@ export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
 }) => {
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const { run, cancel, isLoading } = useAiRequest<RealmChatResponse>();
   const [draftData, setDraftData] = useState<any>(initialData);
   const [draftId, setDraftId] = useState<string>(crypto.randomUUID()); // Local session ID for the draft
   const [isFinalizing, setIsFinalizing] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const isMountedRef = useRef(true);
-  useEffect(() => {
-    // Set true in the effect body (not just via the initial ref value) so the
-    // guard survives StrictMode's mount -> cleanup -> remount cycle in dev.
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -87,7 +80,6 @@ export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
 
     setHistory(prev => [...prev, newUserMsg]);
     setInput('');
-    setIsLoading(true);
 
     // Construct current draft object to send to AI so it knows the current state
     const currentDraft: DraftEntity = {
@@ -99,44 +91,40 @@ export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
 
     const context = `${campaignContext || ''}\nUser is using the "Create via Chat" tool for a specific ${entityType}.`;
 
-    try {
-      const response = await chatWithRealmWeaver(
+    // useAiRequest aborts this on unmount (and on Cancel), and reports a
+    // response that lands afterwards as 'cancelled' so it is never applied.
+    const outcome = await run(signal => chatWithRealmWeaver(
         [...history, newUserMsg],
         [currentDraft],
         [], // No approved log needed for focused session
         context,
-        'medium', // Use Flash for reasonable speed/quality balance
+        'standard', // balanced speed/quality tier
         isMockMode,
-        entityType
-      );
+        entityType,
+        signal
+    ));
 
-      // Component may have unmounted (e.g. user navigated away) while this request was in flight.
-      if (!isMountedRef.current) return;
-
-      const newAiMsg: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'model',
-        text: response.message,
-        suggestions: response.suggestions,
-        timestamp: Date.now()
-      };
-
-      setHistory(prev => [...prev, newAiMsg]);
-
-      // Update local draft if the AI returned an update for our ID
-      const updatedDraft = response.draftEntities.find(d => d.id === draftId && d.type === entityType);
-      if (updatedDraft) {
-          setDraftData((prev: any) => ({ ...prev, ...updatedDraft.data }));
-      }
-
-    } catch (error) {
-      if (!isMountedRef.current) return;
-      console.error(error);
+    if (outcome.status === 'cancelled') return;
+    if (outcome.status === 'error') {
+      console.error(outcome.error);
       setHistory(prev => [...prev, { id: crypto.randomUUID(), role: 'model', text: "Sorry, I encountered an error talking to the Weave.", timestamp: Date.now() }]);
-    } finally {
-      if (isMountedRef.current) {
-        setIsLoading(false);
-      }
+      return;
+    }
+    const response = outcome.data;
+    const newAiMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'model',
+      text: response.message,
+      suggestions: response.suggestions,
+      timestamp: Date.now()
+    };
+
+    setHistory(prev => [...prev, newAiMsg]);
+
+    // Update local draft if the AI returned an update for our ID
+    const updatedDraft = response.draftEntities.find(d => d.id === draftId && d.type === entityType);
+    if (updatedDraft) {
+        setDraftData((prev: any) => ({ ...prev, ...updatedDraft.data }));
     }
   };
 
@@ -186,10 +174,13 @@ export const EntityChatGenerator: React.FC<EntityChatGeneratorProps> = ({
                         </div>
                     ))}
                      {isLoading && (
-                        <div className="self-start bg-slate-800 p-3 rounded-lg border border-slate-700 w-16 flex justify-center">
-                            <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce mr-1" style={{ animationDelay: '0s' }}></div>
-                            <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce mr-1" style={{ animationDelay: '0.1s' }}></div>
-                            <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        <div className="flex items-center gap-2">
+                            <div className="self-start bg-slate-800 p-3 rounded-lg border border-slate-700 w-16 flex justify-center">
+                                <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce mr-1" style={{ animationDelay: '0s' }}></div>
+                                <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce mr-1" style={{ animationDelay: '0.1s' }}></div>
+                                <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                            </div>
+                            <Button variant="ghost" size="sm" onClick={cancel}>Cancel</Button>
                         </div>
                     )}
                     <div ref={chatEndRef} />

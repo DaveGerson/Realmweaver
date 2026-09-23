@@ -7,18 +7,18 @@ two modules end up holding structurally-identical-but-separately-imported types.
 | File | Declares |
 |------|----------|
 | `Campaign.ts` | `Campaign`, `SettingType` — the root aggregate; every entity array hangs off it. |
-| `NPC.ts` | `NPC`, `EntityRelationship`; re-exports `HistoryEntry` / `HistoryReferenceType` from `common`. |
-| `Location.ts` | `Location`, `LocationConnection`, `PointOfInterest`, `PoiInteraction`, `LootItem`. |
+| `NPC.ts` | `NPC` (incl. optional `voiceNotes?` — non-id-bearing, read as `?? ''`), `EntityRelationship`; re-exports `HistoryEntry` / `HistoryReferenceType` from `common`. |
+| `Location.ts` | `Location` (incl. optional `aspects?` — Lazy DM step 5's sensory one-liners, non-id-bearing, read as `?? []`, empty is `undefined` never `[]`), `LocationConnection`, `PointOfInterest`, `PoiInteraction`, `LootItem`. |
 | `Faction.ts` | `Faction`. |
 | `Item.ts` | `Item`, `ItemRarity`, `ItemType`. |
 | `Adventure.ts` | `Adventure` — a container of `Scene[]`. |
 | `Scene.ts` | `Scene`, `SceneType`, `SceneStatus`. |
 | `Article.ts` | `Article`, `ArticleCategory`. |
-| `Plot.ts` | `Plot`, `PlotStatus`. |
+| `Plot.ts` | `Plot`, `PlotStatus`, `PlotClock` — incl. the optional pressure fields `clock?` (`{ segments, filled }`, non-id-bearing; always read through `utils/plotClock.normalizePlotClock`) and `ifIgnored?` (the plot's own move when the party does nothing). |
 | `Note.ts` | `Note`. |
-| `Secret.ts` | `Secret`. |
-| `SessionLog.ts` | `SessionLog`, `SessionLogEntry`, `SessionLogEntryType`, `SessionStatus`, `PlotSessionStatus`, `Beat`. |
-| `PlayerCharacter.ts` | `PlayerCharacter`, `CharacterSocial`, `CharacterStatistics`, `AbilityScores`, `Skills`, `ProficiencyLevel`, `ClassLevel`. |
+| `Secret.ts` | `Secret` — incl. the optional E1/E2 mystery-edge fields: `revealsSecretId?` (id-bearing clue→revelation FK — in the purge-sweep / both-remap-passes / backlink / broken-ref contract), `isVital?`, and `cluesNeeded?` (read as `cluesNeeded ?? 3`). |
+| `SessionLog.ts` | `SessionLog`, `SessionLogEntry`, `SessionLogEntryType` (incl. `'world-moved'` — a plot clock ticked), `SessionStatus`, `PlotSessionStatus`, `Beat`, `SessionStage` — the optional `SessionLog.stage?` is the live where/who/what of the table (unstructured play); its `locationId` / `npcIds` are **id-bearing** and in the purge-sweep / both-remap-passes contract, `npcIds` is backfilled by `normaliseRequiredArrays` when a stage is present. |
+| `PlayerCharacter.ts` | `PlayerCharacter` (incl. optional `playerFlags?: string[]` — Table Pulse, "what this player wants more of", non-id-bearing, top-level, read as `?? []`; survives `normalizePlayerCharacter`, `duplicateCampaign` and template import via the wholesale spread), `CharacterSocial`, `CharacterStatistics`, `AbilityScores`, `Skills`, `ProficiencyLevel`, `ClassLevel`. |
 | `Encounter.ts` | `Encounter`, `Combatant`, `CombatantType` — live combat state, distinct from a `'combat'` Scene's prep data. |
 | `SkillCheck.ts` | `SkillCheck`. |
 | `DiceRoll.ts` | `DiceRoll`. |

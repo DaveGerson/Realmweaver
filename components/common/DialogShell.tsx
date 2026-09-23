@@ -1,6 +1,8 @@
 
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { twMerge } from 'tailwind-merge';
+import { pushModalLayer } from '@/utils/modalStack';
 
 const FOCUSABLE_SELECTORS = [
   'a[href]',
@@ -122,6 +124,20 @@ interface DialogShellProps {
  *   - Backdrop click to close
  *   - Body scroll lock while open
  *   - Dark backdrop (bg-black/60)
+ *   - Portaled into `document.body` (roadmap X4), so an ancestor with
+ *     `overflow-hidden` / `transform` / `filter` can never clip or
+ *     re-anchor the `fixed inset-0` backdrop. Stacking follows the z-index
+ *     ladder: content < header z-[60] < drawer z-[70] < dialogs z-[80] <
+ *     toasts z-[90].
+ *   - Background inert: while open, every other top-level node in <body>
+ *     (the app root, lower dialogs) gets `inert` + `aria-hidden="true"` via
+ *     `utils/modalStack` — only the TOPMOST dialog's background is hidden,
+ *     attributes are restored exactly on close, and nodes marked
+ *     `data-modal-inert-exempt` (the toast region, the conflict / backup
+ *     StatusBanners) stay reachable — even when nested inside the app root.
+ *   - Nested DialogShells each portal to <body> as siblings; React events
+ *     still bubble through the React tree, so the inner dialog's
+ *     `stopPropagation()` on Escape keeps the outer one open.
  */
 export const DialogShell: React.FC<DialogShellProps> = ({
   isOpen,
@@ -155,10 +171,31 @@ export const DialogShell: React.FC<DialogShellProps> = ({
   // (browsers always fire one; some callers/tests may not) still closes.
   const backdropReleaseMissedBackdropRef = useRef(false);
 
-  useEffect(() => {
+  const backdropRef = useRef<HTMLDivElement>(null);
+
+  // Background inert + focus capture/restore. A LAYOUT effect on purpose:
+  //  - the previously-focused element must be captured BEFORE the app root
+  //    goes inert (browsers blur focus inside a subtree that becomes inert);
+  //  - on close, the background must be un-inerted BEFORE focus is handed
+  //    back to it, or `.focus()` on an inert element silently no-ops.
+  useLayoutEffect(() => {
     if (!isOpen) return;
 
     previousFocusRef.current = document.activeElement;
+    const release = backdropRef.current ? pushModalLayer(backdropRef.current) : () => {};
+
+    return () => {
+      release();
+      const prev = previousFocusRef.current;
+      if (prev && 'focus' in prev && (prev as HTMLElement).isConnected) {
+        (prev as HTMLElement).focus();
+      }
+    };
+  }, [isOpen]);
+
+  // Focus the first reachable element once the dialog has painted.
+  useEffect(() => {
+    if (!isOpen) return;
 
     const frame = requestAnimationFrame(() => {
       if (!dialogRef.current) return;
@@ -176,9 +213,6 @@ export const DialogShell: React.FC<DialogShellProps> = ({
 
     return () => {
       cancelAnimationFrame(frame);
-      if (previousFocusRef.current && 'focus' in previousFocusRef.current) {
-        (previousFocusRef.current as HTMLElement).focus();
-      }
     };
   }, [isOpen]);
 
@@ -263,14 +297,19 @@ export const DialogShell: React.FC<DialogShellProps> = ({
   );
 
   if (!isOpen) return null;
+  if (typeof document === 'undefined') return null;
 
-  return (
+  return createPortal(
     <div
+      ref={backdropRef}
       className="fixed inset-0 bg-black/60 z-[80] flex items-center justify-center"
       onMouseDown={handleBackdropMouseDown}
       onMouseUp={handleBackdropMouseUp}
       onClick={handleBackdropClick}
-      // Keyboard events bubble up from children inside the portal
+      // React synthetic events still bubble through the React tree (not
+      // the DOM tree) across the portal boundary, so a nested DialogShell's
+      // clicks/keys reach this backdrop's handlers exactly as they did when
+      // dialogs rendered inline — the target checks below keep that inert.
     >
       <div
         ref={dialogRef}
@@ -283,6 +322,7 @@ export const DialogShell: React.FC<DialogShellProps> = ({
       >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -1,13 +1,16 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { reconcileEntityFormData } from '../../utils/formReconciliation';
-import type { Plot, PlotStatus, SessionLog, Campaign } from '../../types/index';
+import type { Plot, PlotStatus, PlotClock, SessionLog, Campaign } from '../../types/index';
+import { ClockPips } from '../common/ClockPips';
+import { normalizePlotClock, isPlotClockExpired, PLOT_CLOCK_SIZES } from '../../utils/plotClock';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { MentionInput, resolveMentionCandidates, findMentionedIdsInText } from '../common/MentionInput';
 import { generateScene } from '../../services/aiService';
 import { RegenerateButton } from '../common/RegenerateButton';
+import { buildEntityContext } from '../../utils/entityUtils';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
 import { EntityLink } from '../common/EntityLink';
 import { LinkedText } from '../common/LinkedText';
@@ -139,7 +142,34 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, campaign, onUpdate
     onUpdate(plot.id, { [field]: newValue });
   };
 
-  const plotEntityContext = `Title: ${formData.title}\nStatus: ${formData.status}${formData.description ? `\nDescription: ${formData.description}` : ''}`;
+  // --- Pressure: the countdown clock + "if ignored" move (unstructured play) ---
+  // A clock is optional and never auto-ticks; the DM fills it when the fiction
+  // says the world moved. `ifIgnored` is a plain text field committed on blur
+  // through the shared handleBlur above (its `name` is the Plot key).
+  const currentClock = normalizePlotClock(formData.clock);
+  const clockExpired = isPlotClockExpired(currentClock);
+
+  const commitClock = (clock: PlotClock | undefined) => {
+    setFormData(prev => ({ ...prev, clock }));
+    onUpdate(plot.id, { clock });
+  };
+
+  const handleClockSegments = (value: string) => {
+    if (!value) {
+      commitClock(undefined);
+      return;
+    }
+    const segments = parseInt(value, 10);
+    if (!Number.isInteger(segments) || segments < 1) return;
+    commitClock({ segments, filled: Math.min(currentClock?.filled ?? 0, segments) });
+  };
+
+  const handleClockFilled = (filled: number) => {
+    if (!currentClock) return;
+    commitClock({ segments: currentClock.segments, filled: Math.min(Math.max(filled, 0), currentClock.segments) });
+  };
+
+  const plotEntityContext = buildEntityContext('plot', formData);
 
   // --- Generate Scene Advancing this Plot ---
   const targetAdventure = campaign.adventures[campaign.adventures.length - 1] ?? null;
@@ -261,6 +291,78 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, campaign, onUpdate
                     <LinkedText text={formData.description} onNavigate={onNavigate} />
                 </p>
             )}
+
+            {/* Pressure — what the world does when the party looks away */}
+            <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-800/50 space-y-4">
+                <div>
+                    <label htmlFor="plot-if-ignored" className="block text-sm font-medium text-slate-400 mb-1">
+                        What happens if the party ignores this?
+                    </label>
+                    <p className="text-xs text-slate-500 mb-2">
+                        The plot's own next move. It shows up at the table so the world can move without you scripting it.
+                    </p>
+                    <textarea
+                        id="plot-if-ignored"
+                        name="ifIgnored"
+                        value={formData.ifIgnored ?? ''}
+                        onChange={handleChange}
+                        onBlur={handleBlur}
+                        rows={3}
+                        placeholder="e.g. The cult finishes the ritual and the river runs black by the next full moon."
+                        className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600"
+                    />
+                </div>
+                <div>
+                    <label htmlFor="plot-clock-segments" className="block text-sm font-medium text-slate-400 mb-1">
+                        Countdown clock
+                    </label>
+                    <p className="text-xs text-slate-500 mb-2">
+                        Optional. Tick it when the fiction says time passed; when it runs out, the move above is due.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <select
+                            id="plot-clock-segments"
+                            value={currentClock ? String(currentClock.segments) : ''}
+                            onChange={e => handleClockSegments(e.target.value)}
+                            className="bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all"
+                        >
+                            <option value="">No clock</option>
+                            {PLOT_CLOCK_SIZES.map(size => (
+                                <option key={size} value={String(size)}>{size} segments</option>
+                            ))}
+                            {currentClock && !PLOT_CLOCK_SIZES.includes(currentClock.segments) && (
+                                <option value={String(currentClock.segments)}>{currentClock.segments} segments</option>
+                            )}
+                        </select>
+                        {currentClock && (
+                            <>
+                                <ClockPips clock={currentClock} size="md" label={formData.title} onSetFilled={handleClockFilled} />
+                                <span className="text-sm font-mono text-slate-400">{currentClock.filled}/{currentClock.segments}</span>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => handleClockFilled(currentClock.filled + 1)}
+                                    disabled={clockExpired}
+                                    title="The world moves: fill one segment"
+                                >
+                                    <Icons.ChevronRight className="w-3.5 h-3.5 mr-1" />
+                                    Tick
+                                </Button>
+                                {currentClock.filled > 0 && (
+                                    <Button variant="ghost" size="sm" onClick={() => handleClockFilled(0)} className="text-slate-500">
+                                        Reset
+                                    </Button>
+                                )}
+                            </>
+                        )}
+                    </div>
+                    {clockExpired && (
+                        <p role="status" className="text-xs text-yellow-300 mt-2">
+                            The clock has run out — time for the world to make its move.
+                        </p>
+                    )}
+                </div>
+            </div>
 
             {/* Entity Tagging */}
             <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-800/50">

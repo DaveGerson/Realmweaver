@@ -9,6 +9,8 @@ import { EntityCreationPanel } from '../common/EntityCreationPanel';
 import { createDefaultItem } from '../../utils/entityUtils';
 import { useEntitySearch } from '../../hooks/useEntitySearch';
 import { useRovingTabIndex, type RovingProps } from '../../hooks/useRovingTabIndex';
+import { useIncrementalList } from '../../hooks/useIncrementalList';
+import { IncrementalListFooter } from '../common/IncrementalListFooter';
 
 const ITEM_PROMPT_CHIPS = [
   'A cursed weapon',
@@ -69,7 +71,14 @@ interface ItemDashboardProps {
 
 export const ItemDashboard: React.FC<ItemDashboardProps> = ({ items, onItemCreated, onSelectItem, isMockMode, isOfficialSetting, campaignContext }) => {
   const { filteredEntities: filteredItems, searchTerm, setSearchTerm } = useEntitySearch(items, ['name', 'description', 'properties']);
-  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: { base: 1, md: 2, xl: 3 } });
+  const incremental = useIncrementalList(filteredItems, { resetKey: searchTerm });
+  const { getRovingProps } = useRovingTabIndex({
+    direction: 'both', columns: { base: 1, md: 2, xl: 3 },
+    // N4: above ~100 cards the grid renders a growing prefix; let arrow /
+    // End navigation reach past it (the window grows, then focus lands).
+    itemCount: filteredItems.length,
+    onRequestIndex: incremental.ensureIndexVisible,
+  });
 
   const handleItemCreated = (data: any) => {
     const { id, ...itemData } = data;
@@ -125,7 +134,7 @@ export const ItemDashboard: React.FC<ItemDashboardProps> = ({ items, onItemCreat
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredItems.map((item, index) => (
+          {incremental.visibleItems.map((item, index) => (
             <ItemCard
               key={item.id}
               item={item}
@@ -148,6 +157,15 @@ export const ItemDashboard: React.FC<ItemDashboardProps> = ({ items, onItemCreat
             </div>
           )}
         </div>
+        <IncrementalListFooter
+          hasMore={incremental.hasMore}
+          remaining={incremental.remaining}
+          visibleCount={incremental.visibleCount}
+          totalCount={incremental.totalCount}
+          showMore={incremental.showMore}
+          sentinelRef={incremental.sentinelRef}
+          noun="items"
+        />
       </div>
     </div>
   );

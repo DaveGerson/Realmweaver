@@ -1,6 +1,19 @@
 import React from 'react';
 import { Button } from '../common/Button';
 import { Icons } from '../common/Icons';
+import { MODAL_INERT_EXEMPT_ATTR } from '@/utils/modalStack';
+
+/**
+ * Both banners guard data safety (autosave is PAUSED while a conflict is
+ * unresolved), so an open dialog must never hide them (roadmap X4):
+ *  - `data-modal-inert-exempt` keeps them out of DialogShell's background
+ *    `inert` / `aria-hidden` sweep (utils/modalStack splits the app root
+ *    around them);
+ *  - `relative z-[85]` lifts them above the dialog backdrop (z-[80]) and
+ *    below toasts (z-[90]) on the z-index ladder, so they stay visible and
+ *    clickable even over e.g. the auto-opened FirstCampaignWizard.
+ */
+const STATUS_BANNER_LAYER = { [MODAL_INERT_EXEMPT_ATTR]: '' } as const;
 
 interface ConflictBannerProps {
   /** campaignService's state.conflictDetected */
@@ -25,7 +38,8 @@ export const ConflictBanner: React.FC<ConflictBannerProps> = ({ isOpen, onResolv
     <div
       role="alert"
       aria-live="assertive"
-      className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2 bg-amber-950/60 border-b border-amber-700/60 text-amber-200 text-sm flex-shrink-0"
+      {...STATUS_BANNER_LAYER}
+      className="relative z-[85] flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2 bg-amber-950/60 border-b border-amber-700/60 text-amber-200 text-sm flex-shrink-0"
     >
       <Icons.AlertTriangle className="w-4 h-4 flex-shrink-0 text-amber-400" aria-hidden="true" />
       <span className="flex-1 min-w-[240px]">
@@ -62,7 +76,8 @@ export const BackupRecoveryBanner: React.FC<BackupRecoveryBannerProps> = ({ isOp
     <div
       role="status"
       aria-live="polite"
-      className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2 bg-amber-950/60 border-b border-amber-700/60 text-amber-200 text-sm flex-shrink-0"
+      {...STATUS_BANNER_LAYER}
+      className="relative z-[85] flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2 bg-amber-950/60 border-b border-amber-700/60 text-amber-200 text-sm flex-shrink-0"
     >
       <Icons.AlertTriangle className="w-4 h-4 flex-shrink-0 text-amber-400" aria-hidden="true" />
       <span className="flex-1 min-w-[240px]">

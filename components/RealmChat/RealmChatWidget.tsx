@@ -31,7 +31,7 @@ export const RealmChatWidget: React.FC<RealmChatWidgetProps> = ({ campaign, onAd
   const [isMinimized, setIsMinimized] = useState(false); // New state for minimized view
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [tier, setTier] = useState<ModelTier>('medium');
+  const [tier, setTier] = useState<ModelTier>('standard');
   const [isEntityPickerOpen, setIsEntityPickerOpen] = useState(false);
   const [entityPickerSearch, setEntityPickerSearch] = useState('');
 
@@ -321,10 +321,11 @@ export const RealmChatWidget: React.FC<RealmChatWidgetProps> = ({ campaign, onAd
                                 <select
                                     value={tier}
                                     onChange={(e) => setTier(e.target.value as ModelTier)}
+                                    aria-label="Model tier"
                                     className="bg-slate-950 border border-slate-700 text-xs text-slate-300 rounded px-2 py-1 outline-none focus:border-indigo-500 max-w-[100px]"
                                 >
-                                    <option value="performance">Fast</option>
-                                    <option value="medium">Smart</option>
+                                    <option value="lite">Fast</option>
+                                    <option value="standard">Smart</option>
                                     <option value="quality">Best</option>
                                 </select>
                              </>

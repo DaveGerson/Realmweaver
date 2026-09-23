@@ -31,6 +31,16 @@ interface UseRovingTabIndexOptions {
    * (e.g. `grid-cols-1 md:grid-cols-2 xl:grid-cols-3` -> `{ base: 1, md: 2, xl: 3 }`).
    */
   columns?: number | ResponsiveColumns;
+  /**
+   * Logical item count when the caller renders only a prefix of the list
+   * (see `useIncrementalList`). When set, End / arrow keys may target an
+   * index past the last *rendered* item (but below `itemCount`); the hook
+   * then calls `onRequestIndex(index)` so the caller can grow its render
+   * window, and moves focus to that item as soon as its ref attaches.
+   * Omit both for a fully-rendered list (behaviour unchanged).
+   */
+  itemCount?: number;
+  onRequestIndex?: (index: number) => void;
 }
 
 interface UseRovingTabIndexReturn {
@@ -76,9 +86,17 @@ export function resolveColumns(columns: number | ResponsiveColumns): number {
 export function useRovingTabIndex(
   options: UseRovingTabIndexOptions = {}
 ): UseRovingTabIndexReturn {
-  const { direction = 'both', columns = 1 } = options;
+  const { direction = 'both', columns = 1, itemCount, onRequestIndex } = options;
   const itemsRef = useRef<(HTMLElement | null)[]>([]);
   const focusedIndexRef = useRef<number>(0);
+  // Index whose element should receive focus as soon as it mounts (keyboard
+  // navigation past an incrementally-rendered prefix).
+  const pendingFocusRef = useRef<number | null>(null);
+  // Latest-value refs so the memoized callbacks below don't churn.
+  const itemCountRef = useRef<number | undefined>(itemCount);
+  itemCountRef.current = itemCount;
+  const onRequestIndexRef = useRef(onRequestIndex);
+  onRequestIndexRef.current = onRequestIndex;
   // Finding #103: `setRef(index)` used to mint a brand-new closure on every
   // render. Even though `setRef` itself was memoized, React treats a changed
   // ref *callback identity* as "this ref changed" and detaches the old
@@ -98,6 +116,16 @@ export function useRovingTabIndex(
     if (cached) return cached;
     const cb = (el: HTMLElement | null) => {
       itemsRef.current[index] = el;
+      if (el !== null && pendingFocusRef.current === index) {
+        // The item keyboard navigation asked for has just been rendered.
+        pendingFocusRef.current = null;
+        focusedIndexRef.current = index;
+        itemsRef.current.forEach((item, i) => {
+          if (item) item.tabIndex = i === index ? 0 : -1;
+        });
+        el.focus();
+        return;
+      }
       if (el === null) {
         // Item unmounted (e.g. a search filter shrank the list). Trim trailing
         // empty slots and, if the tracked focus position fell off the end,
@@ -134,8 +162,13 @@ export function useRovingTabIndex(
 
   const handleKeyDown = useCallback(
     (index: number) => (e: React.KeyboardEvent<HTMLElement>) => {
-      const total = itemsRef.current.length;
-      if (total === 0) return;
+      const rendered = itemsRef.current.length;
+      if (rendered === 0) return;
+      // Logical total: the caller may render only a prefix of the list.
+      const logical = itemCountRef.current;
+      const total = logical !== undefined && onRequestIndexRef.current
+        ? Math.max(rendered, logical)
+        : rendered;
 
       let newIndex = index;
       let handled = false;
@@ -177,7 +210,15 @@ export function useRovingTabIndex(
       if (handled) {
         e.preventDefault();
         if (newIndex >= 0 && newIndex < total) {
-          moveFocus(newIndex);
+          if (newIndex < rendered && itemsRef.current[newIndex]) {
+            pendingFocusRef.current = null;
+            moveFocus(newIndex);
+          } else if (onRequestIndexRef.current) {
+            // Target is beyond the rendered window: ask the caller to grow
+            // it; the ref callback focuses the item once it mounts.
+            pendingFocusRef.current = newIndex;
+            onRequestIndexRef.current(newIndex);
+          }
         }
       }
     },

@@ -24,6 +24,14 @@ export const locationSchema = {
         name: { type: 'string', description: "The name of the location." },
         description: { type: 'string', description: "A vivid description of the location, including sights, sounds, and smells." },
         secrets: { type: 'string', description: "Hidden details, history, or secrets about this location. e.g., 'A loose brick on the north wall reveals a hidden compartment.'" },
+        // Sly Flourish's "develop fantastic locations" step (Lazy DM step 5) —
+        // optional so a model that omits it never breaks the schema; postProcess
+        // below normalises whatever comes back (including nothing at all).
+        aspects: {
+            type: 'array',
+            description: "2-3 short, evocative SENSORY one-liners (sight, sound, smell, texture) a GM can read aloud or paraphrase on the fly — lighter and punchier than the full description. e.g. 'Damp stone smells of tallow smoke', 'A draft hums one low note through the cracks.'",
+            items: { type: 'string' },
+        },
     },
     required: ['name', 'description', 'secrets'],
 };
@@ -158,6 +166,29 @@ function addSkillCheckIds(skillChecks: Omit<SkillCheck, 'id'>[]): any[] {
   return skillChecks.map(sc => ({ ...sc, id: crypto.randomUUID() }));
 }
 
+/** Location aspects (Lazy DM step 5) are capped here defensively; the schema
+ *  prompt asks for 2-3, but a runaway model must not flood the editor's list. */
+const MAX_LOCATION_ASPECTS = 4;
+
+/**
+ * Makes a location's `aspects` structurally safe: a missing/malformed value
+ * from the model (an absent key, `null`, a non-array, non-string entries)
+ * normalises to `undefined` rather than throwing, so every consumer can read
+ * `location.aspects ?? []` with no further guard. Entries are trimmed,
+ * blanks are dropped, and the result is capped at `MAX_LOCATION_ASPECTS`.
+ * Shared by `locationConfig.postProcess` (full location generation) and
+ * `generateLocationAspects` (retrofitting an existing location).
+ */
+function normalizeAspects(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const cleaned = raw
+    .filter((a): a is string => typeof a === 'string')
+    .map(a => a.trim())
+    .filter(Boolean)
+    .slice(0, MAX_LOCATION_ASPECTS);
+  return cleaned.length > 0 ? cleaned : undefined;
+}
+
 const npcConfig: EntityGenerationConfig = {
   entityType: 'npc',
   entityLabel: 'NPC dossier',
@@ -181,7 +212,15 @@ const locationConfig: EntityGenerationConfig = {
   schema: locationSchema,
   fieldInstructions: `- **name:** The name of the location.
 - **description:** A "read-aloud" description focusing on sensory details (sight, sound, smell) to set the scene for players. Keep it evocative but concise.
-- **secrets:** Hidden details, lore, or clues that players can discover through investigation. Frame these as "investigation" opportunities (e.g., "A DC 15 Investigation check on the bookshelf reveals a false book that acts as a lever.").`,
+- **secrets:** Hidden details, lore, or clues that players can discover through investigation. Frame these as "investigation" opportunities (e.g., "A DC 15 Investigation check on the bookshelf reveals a false book that acts as a lever.").
+- **aspects:** 2-3 short, evocative sensory one-liners (sight, sound, smell, texture) a GM can read aloud or paraphrase without consulting the full description — lighter and punchier, distinct from it rather than a restatement.`,
+  // A missing/malformed `aspects` from the model must never crash the
+  // generation flow — normalizeAspects tolerates absence, returning
+  // `undefined` rather than throwing (Lazy DM step 5).
+  postProcess: (data) => {
+    data.aspects = normalizeAspects(data.aspects);
+    return data;
+  },
 };
 
 const factionConfig: EntityGenerationConfig = {
@@ -304,36 +343,181 @@ const poiConfig: EntityGenerationConfig = {
 // --- Unified generator ---
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function generateEntity(config: EntityGenerationConfig, prompt: string, campaignContext?: string): Promise<any> {
+async function generateEntity(config: EntityGenerationConfig, prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<any> {
   const instructions = config.customPreamble
     ? `You are ${config.personaVariant}\n\n${config.fieldInstructions}`
     : `You are The Prep Architect, an expert TTRPG ${config.personaVariant}. Your task is to generate a detailed, ready-to-run ${config.entityLabel} based on the user's prompt, conforming to the specified JSON schema.\n\n${config.fieldInstructions}`;
-  const data = await generateWithSchema(prompt, config.schema, instructions, {}, 'standard', campaignContext);
+  const data = await generateWithSchema(prompt, config.schema, instructions, {}, 'standard', campaignContext, signal);
   return config.postProcess ? config.postProcess(data) : data;
 }
 
-// --- Generator Functions (public API — signatures unchanged) ---
+// --- Generator Functions (public API) ---
+// Each accepts an optional trailing AbortSignal for cancellation.
 
-export const generateNpc = async (prompt: string, campaignContext?: string): Promise<Omit<NPC, 'id' | 'factionId'>> =>
-  generateEntity(npcConfig, prompt, campaignContext);
+export const generateNpc = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<Omit<NPC, 'id' | 'factionId'>> =>
+  generateEntity(npcConfig, prompt, campaignContext, signal);
 
-export const generateLocation = async (prompt: string, campaignContext?: string): Promise<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>> =>
-  generateEntity(locationConfig, prompt, campaignContext);
+export const generateLocation = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<Omit<Location, 'id' | 'parentLocationId' | 'subLocationIds'>> =>
+  generateEntity(locationConfig, prompt, campaignContext, signal);
 
-export const generateFaction = async (prompt: string, campaignContext?: string): Promise<Omit<Faction, 'id' | 'leaderId' | 'memberIds'>> =>
-  generateEntity(factionConfig, prompt, campaignContext);
+export const generateFaction = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<Omit<Faction, 'id' | 'leaderId' | 'memberIds'>> =>
+  generateEntity(factionConfig, prompt, campaignContext, signal);
 
-export const generateItem = async (prompt: string, campaignContext?: string): Promise<Omit<Item, 'id'>> =>
-  generateEntity(itemConfig, prompt, campaignContext);
+export const generateItem = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<Omit<Item, 'id'>> =>
+  generateEntity(itemConfig, prompt, campaignContext, signal);
 
-export const generateScene = async (prompt: string, campaignContext?: string): Promise<Omit<Scene, 'id' | 'locationId' | 'npcIds'>> =>
-  generateEntity(sceneConfig, prompt, campaignContext);
+export const generateScene = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<Omit<Scene, 'id' | 'locationId' | 'npcIds'>> =>
+  generateEntity(sceneConfig, prompt, campaignContext, signal);
 
-export const generateAdventure = async (prompt: string, campaignContext?: string): Promise<AdventureForBatchAdd> =>
-  generateEntity(adventureConfig, prompt, campaignContext) as Promise<AdventureForBatchAdd>;
+export const generateAdventure = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<AdventureForBatchAdd> =>
+  generateEntity(adventureConfig, prompt, campaignContext, signal) as Promise<AdventureForBatchAdd>;
 
-export const generateArticle = async (prompt: string, campaignContext?: string): Promise<Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds'>> =>
-  generateEntity(articleConfig, prompt, campaignContext);
+export const generateArticle = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<Omit<Article, 'id' | 'parentArticleId' | 'subArticleIds'>> =>
+  generateEntity(articleConfig, prompt, campaignContext, signal);
 
-export const generatePoiFromLoot = async (prompt: string, campaignContext?: string): Promise<Omit<PointOfInterest, 'id'>> =>
-  generateEntity(poiConfig, prompt, campaignContext);
+export const generatePoiFromLoot = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<Omit<PointOfInterest, 'id'>> =>
+  generateEntity(poiConfig, prompt, campaignContext, signal);
+
+// --- Lazy DM step 5: "develop fantastic locations" -------------------------
+
+const locationAspectsSchema = {
+  type: 'object',
+  properties: {
+    aspects: {
+      type: 'array',
+      description: "2-3 short, evocative SENSORY one-liners (sight, sound, smell, texture) for this location, ready to read aloud or paraphrase at the table without consulting a full paragraph.",
+      items: { type: 'string' },
+    },
+  },
+  required: ['aspects'],
+};
+
+const LOCATION_ASPECTS_INSTRUCTIONS = `You are The Prep Architect, an expert TTRPG worldbuilder helping a GM sketch a location fast. Given the location's name and description below, propose 2-3 short, evocative SENSORY one-liners (sight, sound, smell, texture) the GM can read aloud or paraphrase at the table — lighter and punchier than a full paragraph. Each aspect should be distinct from the others and from the description already given, not a restatement of it.
+
+- **aspects:** 2-3 short sensory one-liners, ready to read aloud or paraphrase.`;
+
+/**
+ * Retrofits `aspects` onto a location that predates the field (or whose
+ * generated aspects were discarded) — a small standalone `generateWithSchema`
+ * call, not a full re-run of `generateLocation`. Zero-typed-prompt by
+ * construction: the "prompt" is built entirely from the location's own
+ * name/description, mirroring `generateSecretBatch`'s fixed-instructions
+ * convention — the GM never sees or edits a text box. Never throws on
+ * malformed model output: the result is always an array, possibly empty.
+ */
+export const generateLocationAspects = async (
+  location: { name: string; description: string },
+  campaignContext?: string,
+  signal?: AbortSignal,
+): Promise<string[]> => {
+  const prompt = `Location Name: ${location.name}\nDescription: ${location.description || 'Not specified'}`;
+  const data = await generateWithSchema(prompt, locationAspectsSchema, LOCATION_ASPECTS_INSTRUCTIONS, {}, 'standard', campaignContext, signal);
+  return normalizeAspects((data as { aspects?: unknown })?.aspects) ?? [];
+};
+
+// --- R2: "Generate ten, keep what you like" (Secrets Tracker) ---------------
+
+/**
+ * One proposed secret/clue, before the GM keeps it. Deliberately NOT a
+ * `types/` shape: nothing here is persisted until `campaignService.createSecret`
+ * mints the id and `createdAt`. Re-exported as a type by `services/aiService.ts`
+ * so components never import this module directly.
+ */
+export interface SecretDraft {
+  title: string;
+  content: string;
+  category: 'secret' | 'clue' | 'revelation' | 'rumor';
+  notes?: string;
+}
+
+const SECRET_DRAFT_CATEGORIES: SecretDraft['category'][] = ['secret', 'clue', 'revelation', 'rumor'];
+
+/** A runaway model must not flood the preview panel. */
+const MAX_SECRET_DRAFTS = 12;
+
+const secretDraftSchema = {
+  type: 'object',
+  properties: {
+    title: { type: 'string', description: 'A short, evocative label for this entry.' },
+    content: { type: 'string', description: 'The actual secret, clue, revelation, or rumor text — what a GM would write down and use at the table.' },
+    category: {
+      type: 'string',
+      enum: SECRET_DRAFT_CATEGORIES,
+      description: "One of 'secret' (a plain hidden truth), 'clue' (points toward a revelation), 'revelation' (the truth a mystery builds to), or 'rumor' (something overheard, true or not).",
+    },
+    notes: { type: 'string', description: "Optional GM-only notes on how or where to use this entry. Omit if there's nothing to add." },
+  },
+  required: ['title', 'content', 'category'],
+};
+
+const secretBatchSchema = {
+  type: 'object',
+  properties: {
+    secrets: {
+      type: 'array',
+      description: 'Roughly ten distinct secrets, clues, revelations, and rumors for this campaign.',
+      items: secretDraftSchema,
+    },
+  },
+  required: ['secrets'],
+};
+
+const SECRET_BATCH_INSTRUCTIONS = `You are The Prep Architect, an expert TTRPG worldbuilder helping a GM over-prepare cheaply for tonight's table. Propose about ten (10) secrets, clues, revelations, and rumors for this campaign — a mix of plain secrets, clues that point toward a bigger revelation, full revelations, and rumors the party might overhear. Each entry should be distinct, plausible, and ready to drop into play without further editing. The GM will keep the ones they like and discard the rest, so favor variety and specificity over polish.
+
+- **title:** A short, evocative label for this entry.
+- **content:** The actual secret, clue, revelation, or rumor text.
+- **category:** One of secret, clue, revelation, or rumor.
+- **notes:** Optional GM-only notes on how or where to use this entry.`;
+
+/**
+ * Model output is made structurally safe HERE, not downstream: accepts a
+ * `{ secrets: [...] }` envelope or a bare array, drops any entry missing a
+ * non-blank `title`/`content`, falls back an unrecognised `category` to
+ * `'secret'`, omits a blank `notes` rather than storing `''`, and caps the
+ * result at `MAX_SECRET_DRAFTS`. Always returns an array — never throws on
+ * malformed model output (a rejected provider call is a different matter and
+ * is left to propagate).
+ */
+function normalizeSecretDrafts(raw: unknown): SecretDraft[] {
+  let list: unknown[];
+  if (Array.isArray(raw)) {
+    list = raw;
+  } else if (raw && typeof raw === 'object' && Array.isArray((raw as { secrets?: unknown }).secrets)) {
+    list = (raw as { secrets: unknown[] }).secrets;
+  } else {
+    return [];
+  }
+
+  const drafts: SecretDraft[] = [];
+  for (const entry of list) {
+    if (drafts.length >= MAX_SECRET_DRAFTS) break;
+    if (!entry || typeof entry !== 'object') continue;
+
+    const entryObj = entry as Record<string, unknown>;
+    const title = typeof entryObj.title === 'string' ? entryObj.title.trim() : '';
+    const content = typeof entryObj.content === 'string' ? entryObj.content.trim() : '';
+    if (!title || !content) continue;
+
+    const category = SECRET_DRAFT_CATEGORIES.includes(entryObj.category as SecretDraft['category'])
+      ? (entryObj.category as SecretDraft['category'])
+      : 'secret';
+
+    const draft: SecretDraft = { title, content, category };
+    const notes = typeof entryObj.notes === 'string' ? entryObj.notes.trim() : '';
+    if (notes) draft.notes = notes;
+
+    drafts.push(draft);
+  }
+  return drafts;
+}
+
+/**
+ * R2 — proposes roughly ten secrets/clues from campaign context in a SINGLE
+ * model call. Never throws on malformed model output: the result is always an
+ * array (possibly empty). A provider-level rejection (network, timeout, bad
+ * JSON after retries) propagates rather than being swallowed into `[]`.
+ */
+export const generateSecretBatch = async (prompt: string, campaignContext?: string, signal?: AbortSignal): Promise<SecretDraft[]> => {
+  const raw = await generateWithSchema(prompt, secretBatchSchema, SECRET_BATCH_INSTRUCTIONS, {}, 'standard', campaignContext, signal);
+  return normalizeSecretDrafts(raw);
+};

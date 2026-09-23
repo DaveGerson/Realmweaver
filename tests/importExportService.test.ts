@@ -550,6 +550,48 @@ describe('validateExportRoundTrip', () => {
 // CURRENT_CAMPAIGN_VERSION
 // ---------------------------------------------------------------------------
 
+describe('validateImportedCampaign — the Stage on session logs', () => {
+  const log = (stage: unknown): Record<string, unknown> => ({
+    id: 'sl1', title: 'Session 1', status: 'planned', sessionDate: '2026-01-01', prepNotes: '', runningNotes: '',
+    recap: '', notableEvents: '', looseEnds: '', plannedSceneIds: [], relatedPlotIds: [], structuredNotes: [], encounterLog: [],
+    stage,
+  });
+
+  it('backfills npcIds on a Stage object that lacks it', () => {
+    const data = minimalCampaign();
+    data['sessionLogs'] = [log({ locationId: 'loc-1', focus: 'Rain on the roof' })];
+
+    const result = validateImportedCampaign(data);
+
+    expect(result.success).toBe(true);
+    expect(result.campaign?.sessionLogs[0].stage).toEqual({ locationId: 'loc-1', focus: 'Rain on the roof', npcIds: [] });
+  });
+
+  it('drops a Stage that is not a plain object instead of passing it through', () => {
+    // `_ensureStage` would otherwise try to hang `.npcIds` off a string later.
+    for (const bad of ['none', 3, true, ['npc-1'], null]) {
+      const data = minimalCampaign();
+      data['sessionLogs'] = [log(bad)];
+
+      const result = validateImportedCampaign(data);
+
+      expect(result.success).toBe(true);
+      expect(result.campaign?.sessionLogs[0]).not.toHaveProperty('stage');
+    }
+  });
+
+  it('leaves a log without a Stage alone', () => {
+    const data = minimalCampaign();
+    const { stage: _stage, ...noStage } = log(undefined);
+    data['sessionLogs'] = [noStage];
+
+    const result = validateImportedCampaign(data);
+
+    expect(result.success).toBe(true);
+    expect(result.campaign?.sessionLogs[0]).not.toHaveProperty('stage');
+  });
+});
+
 describe('CURRENT_CAMPAIGN_VERSION', () => {
   it('is a positive integer', () => {
     expect(typeof CURRENT_CAMPAIGN_VERSION).toBe('number');

@@ -7,9 +7,10 @@ import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { textareaBaseClasses } from '../common/Textarea';
 import { MentionInput, resolveMentionCandidates, findMentionedIdsInText } from '../common/MentionInput';
-import { generatePoiFromLoot, generateNpc } from '../../services/aiService';
+import { generatePoiFromLoot, generateNpc, generateLocationAspects } from '../../services/aiService';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { RegenerateButton } from '../common/RegenerateButton';
+import { buildEntityContext } from '../../utils/entityUtils';
 import { EntityLink } from '../common/EntityLink';
 import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService';
@@ -41,6 +42,24 @@ const LOCATION_TABS: TabDefinition[] = [
   { id: 'history',      label: 'History',      icon: Icons.Clock },
 ];
 
+// Lazy DM step 5 ("develop fantastic locations") — 2-3 sensory one-liners
+// lighter than the full description; the list is deliberately capped small
+// so it never grows into a second description field.
+const MAX_LOCATION_ASPECTS = 4;
+
+/** Trims, drops blanks, and drops exact-duplicate aspects, preserving order. */
+const dedupeAspects = (list: string[]): string[] => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of list) {
+    const trimmed = item.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    out.push(trimmed);
+  }
+  return out;
+};
+
 export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLocations, allFactions = [], campaign, onUpdate, onDelete, isMockMode, campaignContext, onNavigate }) => {
   const [formData, setFormData] = useState(location);
   const [generatingPoiFor, setGeneratingPoiFor] = useState<string | null>(null);
@@ -49,6 +68,9 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
   const [npcGenerationError, setNpcGenerationError] = useState<string | null>(null);
   const [npcGenerationSuccess, setNpcGenerationSuccess] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
+  const [newAspect, setNewAspect] = useState('');
+  const [isGeneratingAspects, setIsGeneratingAspects] = useState(false);
+  const [aspectsGenerationError, setAspectsGenerationError] = useState<string | null>(null);
   const { confirm } = useConfirmDialog();
   // True when rendering LocationDashboard's unsaved chat-generator draft
   // (synthetic id 'preview'), which must not fire "generate here" writes —
@@ -59,9 +81,27 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
   // updates can be merged field-by-field instead of overwriting formData wholesale.
   const prevLocationRef = useRef(location);
 
+  // Always holds the CURRENTLY displayed entity's id, even though the async
+  // "Suggest aspects" handler below closes over whatever id was current when
+  // it was clicked. Editors are not remounted on navigation (components/CLAUDE.md),
+  // so if the GM clicks Suggest, then navigates to a different location before
+  // the model responds, this lets the handler notice it has been superseded
+  // and skip writing a stale suggestion into the now-displayed location.
+  const locationIdRef = useRef(location.id);
+  useEffect(() => {
+    locationIdRef.current = location.id;
+  }, [location.id]);
+
   // Reset to first tab when the entity changes
   useEffect(() => {
     setActiveTab('overview');
+  }, [location.id]);
+
+  // Aspects-panel local UI state is per-entity, same reasoning as the tab reset above.
+  useEffect(() => {
+    setNewAspect('');
+    setIsGeneratingAspects(false);
+    setAspectsGenerationError(null);
   }, [location.id]);
 
   useEffect(() => {
@@ -167,7 +207,75 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     onUpdate(location.id, { [field]: newValue });
   };
 
-  const locationEntityContext = `Location Name: ${formData.name}\nDescription: ${formData.description || 'Not specified'}\nSecrets: ${formData.secrets || 'Not specified'}`;
+  const locationEntityContext = buildEntityContext('location', formData);
+
+  // --- Aspects (Lazy DM step 5 — "develop fantastic locations") ---
+  // A short list of removable one-liners, lighter than the full description.
+  // An empty list commits `undefined`, never `[]` — Location.aspects is meant
+  // to be entirely absent when the GM hasn't bothered with it (types/Location.ts).
+  const commitAspects = (next: string[]) => {
+    const stored = next.length > 0 ? next : undefined;
+    setFormData(prev => ({ ...prev, aspects: stored }));
+    onUpdate(location.id, { aspects: stored });
+  };
+
+  const handleAddAspect = () => {
+    const trimmed = newAspect.trim();
+    if (!trimmed) return;
+    const current = formData.aspects ?? [];
+    if (current.length >= MAX_LOCATION_ASPECTS) return;
+    commitAspects(dedupeAspects([...current, trimmed]));
+    setNewAspect('');
+  };
+
+  const handleAspectInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddAspect();
+    }
+  };
+
+  const handleRemoveAspect = (index: number) => {
+    commitAspects((formData.aspects ?? []).filter((_, i) => i !== index));
+  };
+
+  // Zero-typed-prompt AI suggestion: the request is built entirely from the
+  // location's own name/description (mirrors SecretsTracker's GenerateTenPanel —
+  // one click, no text box). Guards against the GM navigating to a different
+  // location before the model responds (see locationIdRef above) and merges
+  // against the LATEST form state rather than a stale closure, so a manual
+  // add/remove made while the request is in flight is never clobbered.
+  const handleGenerateAspects = async () => {
+    const requestLocationId = location.id;
+    setIsGeneratingAspects(true);
+    setAspectsGenerationError(null);
+    try {
+      const suggested = await generateLocationAspects(
+        { name: location.name, description: location.description },
+        isMockMode,
+        campaignContext,
+      );
+      if (locationIdRef.current !== requestLocationId) return; // superseded by navigation
+      if (suggested.length === 0) {
+        setAspectsGenerationError('Nothing came back — try again, or add one by hand.');
+        return;
+      }
+      let nextAspects: string[] | undefined;
+      setFormData(prev => {
+        const merged = dedupeAspects([...(prev.aspects ?? []), ...suggested]).slice(0, MAX_LOCATION_ASPECTS);
+        nextAspects = merged.length > 0 ? merged : undefined;
+        return { ...prev, aspects: nextAspects };
+      });
+      onUpdate(requestLocationId, { aspects: nextAspects });
+    } catch (err) {
+      console.error('Failed to suggest location aspects:', err);
+      if (locationIdRef.current === requestLocationId) {
+        setAspectsGenerationError('Failed to suggest aspects. Please try again.');
+      }
+    } finally {
+      if (locationIdRef.current === requestLocationId) setIsGeneratingAspects(false);
+    }
+  };
 
   const handleDelete = async () => {
     const confirmed = await confirm('Delete Location', `Are you sure you want to delete ${location.name}? This action cannot be undone.`, { variant: 'danger' });
@@ -402,6 +510,69 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
                     <p role="status" className="text-xs text-green-400 mt-1.5">{npcGenerationSuccess}</p>
                   )}
                 </div>
+              </div>
+
+              {/* Aspects (Lazy DM step 5 — "develop fantastic locations"): 2-4
+                  short sensory one-liners, lighter than the full description below. */}
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Aspects</label>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleGenerateAspects}
+                    disabled={isGeneratingAspects || (formData.aspects?.length ?? 0) >= MAX_LOCATION_ASPECTS}
+                  >
+                    {isGeneratingAspects ? (
+                      <Icons.Loader className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <Icons.Sparkles className="w-3.5 h-3.5 mr-1.5" />
+                    )}
+                    Suggest aspects
+                  </Button>
+                </div>
+                <p className="text-xs text-slate-500 mb-2">
+                  Two or three sensory one-liners you can read aloud or paraphrase — lighter than the full description.
+                </p>
+                {aspectsGenerationError && (
+                  <p role="alert" className="text-xs text-red-400 mb-1.5">{aspectsGenerationError}</p>
+                )}
+                {(formData.aspects ?? []).length > 0 && (
+                  <ul className="space-y-1.5 mb-2">
+                    {(formData.aspects ?? []).map((aspect, index) => (
+                      <li
+                        key={`${index}-${aspect}`}
+                        className="flex items-start gap-2 bg-slate-950/50 border border-slate-800/50 rounded-md pl-2.5 pr-1.5 py-1.5"
+                      >
+                        <span className="flex-1 text-sm text-slate-300 leading-snug">{aspect}</span>
+                        <Button
+                          variant="icon"
+                          onClick={() => handleRemoveAspect(index)}
+                          className="text-slate-500 hover:text-red-400 flex-shrink-0"
+                          aria-label={`Remove aspect: ${aspect}`}
+                        >
+                          <Icons.X className="w-3.5 h-3.5" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {(formData.aspects?.length ?? 0) < MAX_LOCATION_ASPECTS && (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newAspect}
+                      onChange={(e) => setNewAspect(e.target.value)}
+                      onKeyDown={handleAspectInputKeyDown}
+                      placeholder="A sensory one-liner… (Enter to add)"
+                      aria-label="New aspect"
+                      className="flex-1 bg-slate-950 border border-slate-700 rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600"
+                    />
+                    <Button variant="ghost" size="sm" onClick={handleAddAspect} disabled={!newAspect.trim()}>
+                      <Icons.Plus className="w-3.5 h-3.5 mr-1" /> Add
+                    </Button>
+                  </div>
+                )}
               </div>
 
               <div>

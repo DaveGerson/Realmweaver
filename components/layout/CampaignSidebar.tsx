@@ -283,6 +283,14 @@ const CampaignSidebarComponent: React.FC<CampaignSidebarProps> = ({
             )}
             <nav className="flex-1 p-2 space-y-1 overflow-y-auto custom-scrollbar">
 
+                {/* --- Tonight's Table: the front door, always visible --- */}
+                <NavItem
+                    label="Tonight's Table"
+                    icon="Sparkles"
+                    active={activeView === 'tonight'}
+                    onClick={() => onSelectView('tonight')}
+                />
+
                 {/* --- Active Session Runner Banner --- */}
                 {(() => {
                     // Check activeSessionId first, fall back to status === 'active'

@@ -273,6 +273,24 @@ function registerAiRoutes(server: MiddlewareServer) {
       return;
     }
 
+    // Client-disconnect cancellation (roadmap L1). When the browser aborts
+    // its fetch (AbortController in the SPA — unmount, Cancel button,
+    // campaign switch) the socket closes before we respond; kill the
+    // spawned `claude` process instead of letting it burn tokens and CPU for
+    // a response nobody will read. 'close' also fires after a normal
+    // response, so only a close that precedes 'finish' counts as an abort.
+    const clientAbort = new AbortController();
+    const resEvents = res as unknown as { on?: (event: string, cb: () => void) => void };
+    if (typeof resEvents.on === 'function') {
+      let finished = false;
+      resEvents.on('finish', () => { finished = true; });
+      resEvents.on('close', () => {
+        if (!finished && !clientAbort.signal.aborted) {
+          clientAbort.abort();
+        }
+      });
+    }
+
     readBody(req)
       .then(body => {
         const request: CliRequest = JSON.parse(body);
@@ -285,7 +303,7 @@ function registerAiRoutes(server: MiddlewareServer) {
 
         const startTime = Date.now();
 
-        return invokeClaudeCli(request).then(rawOutput => {
+        return invokeClaudeCli(request, clientAbort.signal).then(rawOutput => {
           const elapsed = Date.now() - startTime;
 
           // Claude CLI with --output-format json returns a result envelope:
@@ -331,6 +349,12 @@ function registerAiRoutes(server: MiddlewareServer) {
       })
       .catch((err: unknown) => {
         const error = err instanceof Error ? err : new Error(String(err));
+        // The client went away and the CLI was killed on its behalf — there
+        // is no one to respond to, and the socket is already closed.
+        if (clientAbort.signal.aborted) {
+          console.info('[ai-proxy] client disconnected; claude CLI request cancelled');
+          return;
+        }
         // Node's execFile/spawn `timeout` option kills the process with
         // SIGTERM and sets `.killed = true` on the resulting error, but
         // does NOT set `.code` to 'ETIMEDOUT' and does NOT put the word
@@ -443,9 +467,13 @@ export function aiProxyPlugin(): Plugin {
  * For larger prompts, the prompt is piped via stdin to avoid ARG_MAX limits.
  * Both paths use execFile/spawn (no shell) to prevent command injection.
  */
-async function invokeClaudeCli(request: CliRequest): Promise<string> {
+async function invokeClaudeCli(request: CliRequest, signal?: AbortSignal): Promise<string> {
   const args = buildCliArgs(request);
   const timeoutMs = resolveTimeoutMs();
+
+  if (signal?.aborted) {
+    throw Object.assign(new Error('claude CLI request aborted by client'), { name: 'AbortError', code: 'ABORT_ERR' });
+  }
 
   if (request.prompt.length <= DIRECT_PROMPT_LIMIT) {
     // Direct invocation: no shell, safe from injection
@@ -453,6 +481,9 @@ async function invokeClaudeCli(request: CliRequest): Promise<string> {
     const { stdout } = await execFileAsync(CLAUDE_CLI_PATH, args, {
       timeout: timeoutMs,
       maxBuffer: MAX_BUFFER,
+      // Node kills the child (killSignal, default SIGTERM) and rejects with
+      // an AbortError when the client disconnects.
+      ...(signal ? { signal } : {}),
     });
     return stdout;
   } else {
@@ -477,13 +508,29 @@ async function invokeClaudeCli(request: CliRequest): Promise<string> {
       const settleResolve = (value: string) => {
         if (settled) return;
         settled = true;
+        signal?.removeEventListener('abort', onAbort);
         resolve(value);
       };
       const settleReject = (err: Error) => {
         if (settled) return;
         settled = true;
+        signal?.removeEventListener('abort', onAbort);
         reject(err);
       };
+
+      // Client disconnected: kill the CLI child explicitly (rather than via
+      // spawn's own `signal` option) so the kill is observable and the
+      // promise settles with a distinct abort error instead of being
+      // misreported as a SIGTERM timeout by the 'close' handler below.
+      function onAbort() {
+        if (settled) return;
+        child.kill();
+        settleReject(Object.assign(
+          new Error('claude CLI request aborted by client'),
+          { name: 'AbortError', code: 'ABORT_ERR' }
+        ));
+      }
+      signal?.addEventListener('abort', onAbort, { once: true });
 
       child.stdout.on('data', (chunk: Buffer) => {
         if (settled) return;

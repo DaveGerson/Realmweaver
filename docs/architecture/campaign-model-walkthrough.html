@@ -556,6 +556,7 @@
         <li>A scene <em>takes place at</em> a location and <em>features</em> NPCs.</li>
         <li>A session <em>plans</em> scenes, NPCs, and locations, and <em>records how each plot moved</em> — advanced, stalled, or unchanged.</li>
         <li>A secret <em>was revealed in</em> a session.</li>
+        <li>A clue <em>supports</em> a revelation — a secret pointing at the bigger secret it helps uncover.</li>
         <li>A fight remembers the session and scene it began from, and <em>is archived into</em> the session's log.</li>
       </ul>
     </div>
@@ -674,7 +675,7 @@
     <summary><span class="dot" style="background:#f59e0b"></span><span class="fname">NPC</span><span class="fhint">amber · Sidebar → NPCs</span></summary>
     <div class="fbody">
       <div class="pc-label">What it holds</div>
-      <p>Name, description, personality traits, backstory, motivations, the secrets they keep to themselves, freeform stats, and an example quote in their own voice.</p>
+      <p>Name, description, personality traits, backstory, motivations, the secrets they keep to themselves, freeform stats, an example quote in their own voice, and voice notes — how they sound when you play them: accent, cadence, the phrases they lean on.</p>
       <div class="pc-label">How it connects</div>
       <p>Belongs to a faction. Has named relationships with NPCs and player characters, each with your own label and description. Keeps a history of what has happened to them — each entry can point at the session or article where it happened. Can @-mention anything.</p>
       <div class="pc-label">In the monastery story</div>
@@ -770,9 +771,9 @@
     <summary><span class="dot hollow"></span><span class="fname">Secret</span><span class="fhint">no accent · Sidebar → Secrets &amp; Clues</span></summary>
     <div class="fbody">
       <div class="pc-label">What it holds</div>
-      <p>Title, the secret itself, a category — secret, clue, revelation, or rumor — whether it has been revealed, and your private notes. One type covers all four; no separate machinery for mysteries.</p>
+      <p>Title, the secret itself, a category — secret, clue, revelation, or rumor — whether it has been revealed, and your private notes. A revelation can be marked vital — one the mystery can't afford to miss — with its own count of how many clues it wants pointing at it (three, unless you say otherwise). One type still covers all four; the only machinery mysteries add is a single optional thread from a clue to its revelation.</p>
       <div class="pc-label">How it connects</div>
-      <p>Concerns the people, places, and things it is linked to. When the moment comes you mark it revealed, and it remembers which session revealed it.</p>
+      <p>Concerns the people, places, and things it is linked to. A clue can name the revelation it supports, and the tracker shows each revelation how many clues point at it. When the moment comes you mark it revealed, and it remembers which session revealed it.</p>
       <div class="pc-label">In the monastery story</div>
       <p class="ftale">"Maren sealed the crypt himself" — concerns Abbot Maren and the Hidden Crypt. Revealed in Session 3, when the flagstone finally moved.</p>
     </div>
@@ -942,6 +943,7 @@
       id: "What the players don't know yet — a secret, clue, revelation, or rumor.",
       s: [
         "A secret <em>concerns</em> the people, places, and things it is linked to.",
+        "A clue <em>supports</em> a revelation — and the tracker shows each revelation how many clues point at it.",
         "A secret <em>is marked revealed</em> when the moment comes — and <em>remembers which session</em> revealed it."
       ],
       ex: "\"Maren sealed the crypt himself\" <em>concerns</em> the abbot and the crypt. When the flagstone finally moves, you mark it revealed — and it remembers Session 3 did it."

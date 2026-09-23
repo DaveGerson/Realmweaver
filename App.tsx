@@ -33,7 +33,7 @@ import { useModalState } from '@/hooks/useModalState';
 import { useEntitySelection } from '@/hooks/useEntitySelection';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 
-export type EditorView = 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'notes' | 'combat' | 'relationships' | 'session-runner' | 'secrets';
+export type EditorView = 'tonight' | 'setting' | 'npcs' | 'locations' | 'factions' | 'items' | 'adventures' | 'lorebook' | 'session-logs' | 'player-characters' | 'plots' | 'notes' | 'combat' | 'relationships' | 'session-runner' | 'secrets';
 export type GeneratorType = 'npc' | 'location' | 'faction' | 'item' | 'scene' | 'article';
 
 export interface NavStackEntry {
@@ -54,6 +54,10 @@ const App: FC = () => {
   const [isMockMode, setIsMockMode] = useState(true);
   // Holds template data loaded in CampaignCreator; imported once campaign transitions to 'editing'
   const [pendingTemplateData, setPendingTemplateData] = useState<Record<string, unknown> | null>(null);
+  // Template picked on the Welcome screen; CampaignCreator auto-loads it on mount.
+  const [initialTemplateId, setInitialTemplateId] = useState<string | null>(null);
+  // Welcome-screen "Lazy DM" path: once the new campaign exists, land on Tonight's Table.
+  const [landOnTonight, setLandOnTonight] = useState(false);
   const [sidebarExpandAll, setSidebarExpandAll] = useState(false);
 
   const activeCampaign = useMemo(
@@ -128,6 +132,25 @@ const App: FC = () => {
     }
   }, [appStatus, activeCampaign]);
 
+  // A Welcome-screen template pick applies to the creator it opened, only once.
+  useEffect(() => {
+    if (appStatus !== 'welcome' && appStatus !== 'creating') {
+      setInitialTemplateId(null);
+    }
+  }, [appStatus]);
+
+  // Lazy DM on-ramp from the Welcome screen: route the freshly created
+  // campaign to Tonight's Table (prep in 15 minutes / go straight to the table).
+  useEffect(() => {
+    if (!landOnTonight) return;
+    if (appStatus === 'editing' && activeCampaign) {
+      setActiveView('tonight');
+      setLandOnTonight(false);
+    } else if (appStatus !== 'welcome' && appStatus !== 'creating') {
+      setLandOnTonight(false);
+    }
+  }, [landOnTonight, appStatus, activeCampaign, setActiveView]);
+
   // When campaign transitions to 'editing' with pending template data, bulk-import the entities
   useEffect(() => {
     if (appStatus === 'editing' && pendingTemplateData) {
@@ -166,7 +189,12 @@ const App: FC = () => {
       return;
     }
     autoWizardRef.current.add(activeCampaign.id);
+    // The Welcome screen's Lazy DM path promises "prep in 15 minutes" and
+    // lands on Tonight's Table — don't bury that under the full 5-step
+    // world-building wizard. (landOnTonight is still true in this commit:
+    // the effect above clears it via setState, visible next render.)
     if (
+      !landOnTonight &&
       !activeCampaign.wizardDismissed &&
       activeCampaign.npcs.length === 0 &&
       activeCampaign.adventures.length === 0 &&
@@ -176,6 +204,7 @@ const App: FC = () => {
     } else {
       setIsFirstCampaignWizardOpen(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- landOnTonight is read at decision time only
   }, [activeCampaign, pendingTemplateData]);
 
   // Global keyboard shortcut handler
@@ -436,6 +465,15 @@ const App: FC = () => {
     resetSelections();
   };
 
+  // The near-zero-prep on-ramp (docs/design/unstructured-play.md): mint a
+  // freeform session and go straight to the table through the same goLive
+  // path the prep wizard uses.
+  const handleQuickStart = () => {
+    const sessionLogId = campaignService.createFreeformSession();
+    if (!sessionLogId) return;
+    handleGoLive(sessionLogId);
+  };
+
   const handleEndSession = () => {
     campaignService.endSession();
     setActiveView('session-logs');
@@ -447,10 +485,31 @@ const App: FC = () => {
   const appContent = () => {
     switch (appStatus) {
       case 'welcome':
-        return <WelcomeScreen onStart={() => campaignService.prepareNewCampaign()} onImportCampaign={handleImportCampaign} />;
+        return (
+          <WelcomeScreen
+            onStart={() => {
+              setInitialTemplateId(null);
+              setLandOnTonight(false);
+              campaignService.prepareNewCampaign();
+            }}
+            onStartFromTemplate={(templateId) => {
+              setInitialTemplateId(templateId);
+              setLandOnTonight(false);
+              campaignService.prepareNewCampaign();
+            }}
+            onStartLazy={() => {
+              setInitialTemplateId(null);
+              setLandOnTonight(true);
+              campaignService.prepareNewCampaign();
+            }}
+            onImportCampaign={handleImportCampaign}
+            isMockMode={isMockMode}
+          />
+        );
       case 'creating':
         return (
           <CampaignCreator
+            initialTemplateId={initialTemplateId ?? undefined}
             onCreateCampaign={campaignService.createCampaign}
             onTemplateSelected={(templateData) => setPendingTemplateData(templateData)}
           />
@@ -587,6 +646,7 @@ const App: FC = () => {
                       onSetSelectedPlotId={setSelectedPlotId}
                       onSetSelectedNoteId={setSelectedNoteId}
                       onGoLive={handleGoLive}
+                      onQuickStart={handleQuickStart}
                       onImportPC={handleImportPC}
                       onAddToast={addToast}
                     />

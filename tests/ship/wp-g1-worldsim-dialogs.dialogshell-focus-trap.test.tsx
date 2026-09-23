@@ -21,6 +21,10 @@
  * `el.closest('[inert], [hidden], [aria-hidden="true"]')` plus
  * `getComputedStyle(el).display === 'none' || visibility === 'hidden'` — and
  * treat layout-based checks as an optional extra only when layout is available.
+ *
+ * Roadmap X4 note: DialogShell now portals into `document.body`, so the
+ * dialog element is looked up on `document` rather than inside RTL's
+ * `container`. The focus-trap contract and assertions are unchanged.
  */
 
 import React from 'react';
@@ -48,8 +52,8 @@ function renderWithHiddenEdges() {
 
 describe('DialogShell focus trap skips unreachable controls', () => {
     it('wraps forward from the last visible control to the first visible control', () => {
-        const { container } = renderWithHiddenEdges();
-        const dialog = container.querySelector('[role="dialog"]') as HTMLElement;
+        renderWithHiddenEdges();
+        const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
         const first = screen.getByTestId('first-visible');
         const last = screen.getByTestId('last-visible');
 
@@ -64,8 +68,8 @@ describe('DialogShell focus trap skips unreachable controls', () => {
     });
 
     it('wraps backward from the first visible control to the last visible control', () => {
-        const { container } = renderWithHiddenEdges();
-        const dialog = container.querySelector('[role="dialog"]') as HTMLElement;
+        renderWithHiddenEdges();
+        const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
         const first = screen.getByTestId('first-visible');
         const last = screen.getByTestId('last-visible');
 
@@ -144,7 +148,7 @@ describe('DialogShell focus trap excludes visually-covered controls when real la
         };
 
         try {
-            const { container } = render(
+            render(
                 <DialogShell isOpen onClose={() => {}} ariaLabel="Wizard">
                     <div>
                         <button data-testid="covered">Behind overlay</button>
@@ -158,7 +162,7 @@ describe('DialogShell focus trap excludes visually-covered controls when real la
             reachable1El = screen.getByTestId('reachable-1');
             reachable2El = screen.getByTestId('reachable-2');
 
-            const dialog = container.querySelector('[role="dialog"]') as HTMLElement;
+            const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
 
             // Tab forward from the last reachable control wraps to the first
             // reachable one — never onto the covered button.

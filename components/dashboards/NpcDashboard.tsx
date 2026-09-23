@@ -9,6 +9,8 @@ import { EntityCreationPanel } from '../common/EntityCreationPanel';
 import { createDefaultNpc } from '../../utils/entityUtils';
 import { useEntitySearch } from '../../hooks/useEntitySearch';
 import { useRovingTabIndex, type RovingProps } from '../../hooks/useRovingTabIndex';
+import { useIncrementalList } from '../../hooks/useIncrementalList';
+import { IncrementalListFooter } from '../common/IncrementalListFooter';
 
 const NPC_PROMPT_CHIPS = [
   'A mysterious merchant',
@@ -64,7 +66,14 @@ interface NpcDashboardProps {
 
 export const NpcDashboard: React.FC<NpcDashboardProps> = ({ npcs, factions = [], onNpcCreated, onSelectNpc, isMockMode, isOfficialSetting, campaignContext }) => {
   const { filteredEntities: filteredNpcs, searchTerm, setSearchTerm } = useEntitySearch(npcs, ['name', 'description', 'traits']);
-  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: { base: 1, md: 2, xl: 3 } });
+  const incremental = useIncrementalList(filteredNpcs, { resetKey: searchTerm });
+  const { getRovingProps } = useRovingTabIndex({
+    direction: 'both', columns: { base: 1, md: 2, xl: 3 },
+    // N4: above ~100 cards the grid renders a growing prefix; let arrow /
+    // End navigation reach past it (the window grows, then focus lands).
+    itemCount: filteredNpcs.length,
+    onRequestIndex: incremental.ensureIndexVisible,
+  });
   const factionsById = React.useMemo(() => new Map(factions.map(f => [f.id, f])), [factions]);
 
   const handleNpcCreated = (data: any) => {
@@ -124,7 +133,7 @@ export const NpcDashboard: React.FC<NpcDashboardProps> = ({ npcs, factions = [],
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredNpcs.map((npc, index) => {
+          {incremental.visibleItems.map((npc, index) => {
             const faction = npc.factionId ? factionsById.get(npc.factionId) : undefined;
             return (
               <NpcCard
@@ -151,6 +160,15 @@ export const NpcDashboard: React.FC<NpcDashboardProps> = ({ npcs, factions = [],
             </div>
           )}
         </div>
+        <IncrementalListFooter
+          hasMore={incremental.hasMore}
+          remaining={incremental.remaining}
+          visibleCount={incremental.visibleCount}
+          totalCount={incremental.totalCount}
+          showMore={incremental.showMore}
+          sentinelRef={incremental.sentinelRef}
+          noun="NPCs"
+        />
       </div>
     </div>
   );

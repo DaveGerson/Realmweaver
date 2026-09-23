@@ -8,6 +8,8 @@ import { createDefaultSession } from '../../utils/entityUtils';
 // Lazy-loaded — only bundled when the prep wizard is opened
 const SessionPrepWizard = React.lazy(() => import('../dialogs/SessionPrepWizard').then(m => ({ default: m.SessionPrepWizard })));
 import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
+import { useIncrementalList } from '../../hooks/useIncrementalList';
+import { IncrementalListFooter } from '../common/IncrementalListFooter';
 
 /** Parses a sessionDate defensively — a corrupted/empty stored value must not produce NaN and scramble sort order. */
 function safeSessionTime(sessionDate: string): number {
@@ -34,6 +36,8 @@ interface SessionLogDashboardProps {
   onSessionLogCreated: (data: Omit<SessionLog, 'id'>) => void;
   onSelectSessionLog: (id: string) => void;
   onGoLive: (sessionLogId: string) => void;
+  /** Start a freeform session now, no wizard (unstructured play). Hidden when absent. */
+  onQuickStart?: () => void;
   isMockMode: boolean;
 }
 
@@ -43,11 +47,10 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
   onSessionLogCreated,
   onSelectSessionLog,
   onGoLive,
+  onQuickStart,
   isMockMode,
 }) => {
   const [isPrepWizardOpen, setIsPrepWizardOpen] = useState(false);
-  const { getRovingProps: getPlannedRovingProps } = useRovingTabIndex({ direction: 'vertical', columns: 1 });
-  const { getRovingProps: getPastRovingProps } = useRovingTabIndex({ direction: 'vertical', columns: 1 });
 
   // SessionLog uses `title` not `name`. Normalize for useEntitySearch.
   const normalizedLogs = useMemo(
@@ -70,6 +73,21 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
   const activeSession = sessionLogs.find(s => s.status === 'active');
   const plannedSessions = filteredSessionLogs.filter(s => s.status === 'planned').sort((a, b) => safeSessionTime(a.sessionDate) - safeSessionTime(b.sessionDate));
   const pastSessions = filteredSessionLogs.filter(s => s.status === 'completed').sort((a, b) => safeSessionTime(b.sessionDate) - safeSessionTime(a.sessionDate));
+
+  // N4: each list renders a growing prefix above ~100 sessions (a long-running
+  // campaign's chronicle); roving navigation grows the window as needed.
+  const plannedWindow = useIncrementalList(plannedSessions, { resetKey: searchTerm });
+  const pastWindow = useIncrementalList(pastSessions, { resetKey: searchTerm });
+  const { getRovingProps: getPlannedRovingProps } = useRovingTabIndex({
+    direction: 'vertical', columns: 1,
+    itemCount: plannedSessions.length,
+    onRequestIndex: plannedWindow.ensureIndexVisible,
+  });
+  const { getRovingProps: getPastRovingProps } = useRovingTabIndex({
+    direction: 'vertical', columns: 1,
+    itemCount: pastSessions.length,
+    onRequestIndex: pastWindow.ensureIndexVisible,
+  });
 
   const handleCreate = () => {
       const def = createDefaultSession();
@@ -110,6 +128,16 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
                 >
                     <Icons.Play className="w-4 h-4 mr-2" /> Prepare Session
                 </Button>
+                {onQuickStart && (
+                    <Button
+                        onClick={onQuickStart}
+                        variant="secondary"
+                        disabled={!!activeSession}
+                        title={activeSession ? 'A session is already live' : 'Skip the wizard — start a freeform session now'}
+                    >
+                        <Icons.Zap className="w-4 h-4 mr-2" /> Start Now
+                    </Button>
+                )}
                 <Button onClick={handleCreate} variant="secondary">
                     <Icons.Plus className="w-4 h-4 mr-2" /> Quick Plan
                 </Button>
@@ -146,7 +174,7 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
                     <Icons.Calendar className="w-5 h-5 text-amber-400" /> Upcoming & Planned
                 </h3>
                 <div className="space-y-3">
-                    {plannedSessions.map((session, index) => {
+                    {plannedWindow.visibleItems.map((session, index) => {
                         const linkedAdventure = session.adventureId
                             ? campaign.adventures?.find(a => a.id === session.adventureId)
                             : undefined;
@@ -197,6 +225,15 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
                         </div>
                     )}
                 </div>
+                <IncrementalListFooter
+                    hasMore={plannedWindow.hasMore}
+                    remaining={plannedWindow.remaining}
+                    visibleCount={plannedWindow.visibleCount}
+                    totalCount={plannedWindow.totalCount}
+                    showMore={plannedWindow.showMore}
+                    sentinelRef={plannedWindow.sentinelRef}
+                    noun="planned sessions"
+                />
             </div>
 
             {/* 3. Past Sessions */}
@@ -205,7 +242,7 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
                     <Icons.BookCopy className="w-5 h-5 text-slate-500" /> Session Chronicle
                 </h3>
                 <div className="space-y-3">
-                    {pastSessions.map((session, index) => {
+                    {pastWindow.visibleItems.map((session, index) => {
                         const linkedAdventure = session.adventureId
                             ? campaign.adventures?.find(a => a.id === session.adventureId)
                             : undefined;
@@ -242,6 +279,15 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
                         </div>
                     )}
                 </div>
+                <IncrementalListFooter
+                    hasMore={pastWindow.hasMore}
+                    remaining={pastWindow.remaining}
+                    visibleCount={pastWindow.visibleCount}
+                    totalCount={pastWindow.totalCount}
+                    showMore={pastWindow.showMore}
+                    sentinelRef={pastWindow.sentinelRef}
+                    noun="past sessions"
+                />
             </div>
         </div>
       </div>
@@ -253,6 +299,7 @@ export const SessionLogDashboard: React.FC<SessionLogDashboardProps> = ({
                   campaign={campaign}
                   onComplete={handleWizardComplete}
                   onClose={() => setIsPrepWizardOpen(false)}
+                  isMockMode={isMockMode}
               />
           </Suspense>
       )}

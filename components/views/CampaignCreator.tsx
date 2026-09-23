@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '../common/Button';
 import { Icons } from '../common/Icons';
 import type { SettingType } from '../../types/index';
@@ -10,6 +10,11 @@ import type { TestCampaignMeta } from '../../data/testCampaigns';
 interface CampaignCreatorProps {
   onCreateCampaign: (title: string, setting: string, settingType: SettingType, officialSetting?: string, dmStyle?: DmStyle) => void;
   onTemplateSelected?: (templateData: Record<string, unknown> | null) => void;
+  /**
+   * Template picked before the creator opened (e.g. on the Welcome screen).
+   * Loaded once on mount through the same path as clicking its card.
+   */
+  initialTemplateId?: string;
 }
 
 const OFFICIAL_SETTINGS = [
@@ -50,6 +55,52 @@ const DM_STYLE_OPTIONS: Array<{
     badge: 'Power',
   },
 ];
+
+// --- Custom World seed questions ---
+
+/** Clickable prompts that scaffold a Custom World description. Exported for tests. */
+export const SEED_QUESTIONS: ReadonlyArray<{ label: string; stub: string }> = [
+  { label: 'Central conflict', stub: "What's the central conflict?" },
+  { label: 'Tone', stub: "What's the tone?" },
+  { label: 'Who holds power', stub: 'Who holds power, and who wants it?' },
+  { label: 'First hook', stub: "What's the first adventure hook?" },
+  { label: 'Something strange', stub: 'What makes this world strange or unique?' },
+  { label: 'Starting place', stub: 'Where do the heroes start?' },
+];
+
+/** Thresholds (characters) for the setting-description quality nudge. */
+export const SETTING_LENGTH_THRESHOLDS = { minimal: 80, solid: 300 } as const;
+
+/**
+ * Appends a question stub to the textarea value on its own line, followed by
+ * a space so the GM can type the answer right after it.
+ */
+export function appendSeedQuestion(current: string, stub: string): string {
+  const trimmedEnd = current.replace(/\s+$/, '');
+  if (!trimmedEnd) return `${stub} `;
+  return `${trimmedEnd}\n${stub} `;
+}
+
+function getSettingNudge(length: number): { tone: 'low' | 'mid' | 'good'; text: string } {
+  if (length < SETTING_LENGTH_THRESHOLDS.minimal) {
+    return { tone: 'low', text: 'A sentence or two gives the AI something to build on — try a seed question.' };
+  }
+  if (length < SETTING_LENGTH_THRESHOLDS.solid) {
+    return { tone: 'mid', text: 'Good start. Answer another seed question or two for richer results.' };
+  }
+  return { tone: 'good', text: 'Plenty of detail for the AI to work with.' };
+}
+
+const NUDGE_TONE_CLASSES: Record<'low' | 'mid' | 'good', string> = {
+  low: 'text-slate-500',
+  mid: 'text-amber-400',
+  good: 'text-emerald-400',
+};
+
+const GOOD_EXAMPLE = `Central conflict: The Salt Crown has shattered, and three river cities each hold a shard — whoever reunites it commands the tides.
+Tone: Gritty and hopeful; low magic, high stakes, lots of banter.
+Who holds power: Merchant-princes of Vessa, the drowned-god priesthood, and a smuggler queen nobody has seen in ten years.
+First hook: A shard surfaces in a fishing net, and every faction learns about it the same night.`;
 
 // --- Template Selector Step ---
 
@@ -202,7 +253,7 @@ const TemplateSelectorStep: React.FC<TemplateSelectorStepProps> = ({
 
 type CreatorStep = 'template-select' | 'campaign-form';
 
-export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampaign, onTemplateSelected }) => {
+export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampaign, onTemplateSelected, initialTemplateId }) => {
   const [step, setStep] = useState<CreatorStep>('template-select');
   const [title, setTitle] = useState('');
   const [settingType, setSettingType] = useState<SettingType>('official');
@@ -211,6 +262,7 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampai
   const [dmStyle, setDmStyle] = useState<DmStyle>('standard');
   const [loadingTemplateId, setLoadingTemplateId] = useState<string | null>(null);
   const [templateError, setTemplateError] = useState<string | null>(null);
+  const settingTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleTemplateChosen = async (templateId: string) => {
     setLoadingTemplateId(templateId);
@@ -250,6 +302,30 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampai
     } finally {
       setLoadingTemplateId(null);
     }
+  };
+
+  // Auto-load a template chosen before the creator opened (Welcome screen).
+  // The ref guard keeps StrictMode's double-invoked effect from loading twice.
+  const initialTemplateHandledRef = useRef(false);
+  useEffect(() => {
+    if (initialTemplateId && !initialTemplateHandledRef.current) {
+      initialTemplateHandledRef.current = true;
+      void handleTemplateChosen(initialTemplateId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only by design
+  }, []);
+
+  const handleInsertSeedQuestion = (stub: string) => {
+    const next = appendSeedQuestion(settingDescription, stub);
+    setSettingDescription(next);
+    // Put the caret at the end so the GM can answer straight away.
+    requestAnimationFrame(() => {
+      const el = settingTextareaRef.current;
+      if (el) {
+        el.focus();
+        el.setSelectionRange(next.length, next.length);
+      }
+    });
   };
 
   // Finding #20 (verifier follow-up): onTemplateSelected(null) stops the
@@ -398,18 +474,72 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ onCreateCampai
           )}
 
           <div>
-            <label className="block text-sm font-medium text-slate-400 mb-1.5">
+            <label htmlFor="campaign-setting-description" className="block text-sm font-medium text-slate-400 mb-1.5">
               {settingType === 'official' ? 'Supplemental Lore & Artifacts' : 'World Setting Description'}
             </label>
+            {settingType === 'custom' && (
+              <div className="mb-2 animate-in fade-in duration-200">
+                <p id="seed-questions-hint" className="text-xs text-slate-500 mb-1.5">
+                  Not sure where to start? Add a question, then answer it:
+                </p>
+                <div role="group" aria-label="Seed questions" className="flex flex-wrap gap-1.5">
+                  {SEED_QUESTIONS.map(q => (
+                    <button
+                      key={q.label}
+                      type="button"
+                      onClick={() => handleInsertSeedQuestion(q.stub)}
+                      aria-label={`Add question: ${q.stub}`}
+                      className="inline-flex items-center gap-1 text-xs rounded-full border border-slate-700 bg-slate-800 text-slate-300 px-2.5 py-1 hover:border-amber-600/60 hover:text-amber-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 transition-colors"
+                    >
+                      <Icons.Plus className="w-3 h-3" aria-hidden="true" />
+                      {q.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <textarea
+              id="campaign-setting-description"
+              ref={settingTextareaRef}
               value={settingDescription}
               onChange={(e) => setSettingDescription(e.target.value)}
-              rows={5}
+              rows={settingType === 'custom' ? 7 : 5}
+              aria-describedby={settingType === 'custom' ? 'setting-length-nudge' : undefined}
               className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600 resize-y"
               placeholder={settingType === 'official'
                 ? "Add your own homebrew lore, artifacts, or deviations from the official canon here..."
                 : "A high-level description of the world, its history, and its current state..."}
             />
+            {settingType === 'custom' && (() => {
+              const nudge = getSettingNudge(settingDescription.trim().length);
+              return (
+                <>
+                  <p
+                    id="setting-length-nudge"
+                    className="mt-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-xs"
+                  >
+                    <span className={NUDGE_TONE_CLASSES[nudge.tone]} aria-live="polite" data-testid="setting-quality-nudge">{nudge.text}</span>
+                    <span className="text-slate-500 tabular-nums" data-testid="setting-char-count">
+                      {settingDescription.length} characters
+                    </span>
+                  </p>
+                  <details className="mt-2 group rounded-md border border-slate-800 bg-slate-900/60">
+                    <summary className="cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-400 hover:text-amber-400">
+                      <Icons.ChevronRight className="w-3.5 h-3.5 transition-transform group-open:rotate-90" aria-hidden="true" />
+                      What good looks like
+                    </summary>
+                    <div className="px-3 pb-3">
+                      <p className="text-xs text-slate-500 mb-1.5">
+                        Short, specific answers beat long history lessons. Something like:
+                      </p>
+                      <p className="text-xs text-slate-300 whitespace-pre-line leading-relaxed border-l-2 border-amber-600/60 pl-2">
+                        {GOOD_EXAMPLE}
+                      </p>
+                    </div>
+                  </details>
+                </>
+              );
+            })()}
           </div>
 
           {/* DM Style Selector */}

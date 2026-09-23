@@ -9,6 +9,7 @@ import { AiTextarea } from '../common/Textarea';
 import { MentionInput, resolveMentionCandidates, findMentionedIdsInText } from '../common/MentionInput';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { RegenerateButton } from '../common/RegenerateButton';
+import { buildEntityContext } from '../../utils/entityUtils';
 import { EntityLink } from '../common/EntityLink';
 import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService';
@@ -163,7 +164,7 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
     onUpdate(npc.id, { [field]: newValue });
   };
 
-  const npcEntityContext = `NPC Name: ${formData.name}\nDescription: ${formData.description || 'Not specified'}\nTraits: ${formData.traits || 'Not specified'}\nBackstory: ${formData.backstory || 'Not specified'}\nMotivations: ${formData.motivations || 'Not specified'}`;
+  const npcEntityContext = buildEntityContext('npc', formData, { factions });
 
   // --- Relationship Handlers ---
   const handleAddRelationship = () => {
@@ -357,6 +358,20 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
                 rows={2}
                 placeholder="A memorable line of dialogue that captures their personality."
                 regenerateButton={<RegenerateButton fieldName="exampleQuote" currentValue={formData.exampleQuote} entityType="NPC" entityContext={npcEntityContext} onRegenerate={handleFieldRegenerate('exampleQuote')} isMockMode={isMockMode} campaignContext={campaignContext} />}
+              />
+
+              {/* Voice (Wave 2 / P3) — how they sound, next to what they say.
+                  `AiTextarea`'s <label> isn't linked via htmlFor/id, so an explicit
+                  aria-label is required for an accessible name of "Voice". */}
+              <AiTextarea
+                label="Voice"
+                name="voiceNotes"
+                aria-label="Voice"
+                value={formData.voiceNotes ?? ''}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                rows={2}
+                placeholder="How do they sound? Accent, cadence, verbal tics, a phrase they always fall back on — the details that keep their voice the same session to session."
               />
 
               {/* Backstory */}

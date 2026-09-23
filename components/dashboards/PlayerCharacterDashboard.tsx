@@ -5,6 +5,8 @@ import { useEntitySearch } from '@/hooks/useEntitySearch';
 import { PlayerCharacterImporter } from '../generators/PlayerCharacterImporter';
 import { Icons } from '../common/Icons';
 import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
+import { useIncrementalList } from '../../hooks/useIncrementalList';
+import { IncrementalListFooter } from '../common/IncrementalListFooter';
 import { ENTITY_TYPE_CONFIG } from '../../utils/entityUtils';
 
 const PC_COLOR = ENTITY_TYPE_CONFIG['playerCharacter'].color;
@@ -70,7 +72,6 @@ interface PlayerCharacterDashboardProps {
 }
 
 export const PlayerCharacterDashboard: React.FC<PlayerCharacterDashboardProps> = ({ playerCharacters, onImport, onPlayerCharacterCreated, onSelectPlayerCharacter, isMockMode }) => {
-  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: { base: 1, md: 2, xl: 3 } });
 
   // Normalize PlayerCharacter nested fields into flat search strings
   const normalizedPCs = useMemo(
@@ -95,6 +96,14 @@ export const PlayerCharacterDashboard: React.FC<PlayerCharacterDashboardProps> =
     const ids = new Set(filteredNormalized.map(pc => pc.id));
     return (playerCharacters || []).filter(pc => ids.has(pc.id));
   }, [filteredNormalized, playerCharacters]);
+  const incremental = useIncrementalList(filteredPCs, { resetKey: searchTerm });
+  const { getRovingProps } = useRovingTabIndex({
+    direction: 'both', columns: { base: 1, md: 2, xl: 3 },
+    // N4: above ~100 cards the grid renders a growing prefix; let arrow /
+    // End navigation reach past it (the window grows, then focus lands).
+    itemCount: filteredPCs.length,
+    onRequestIndex: incremental.ensureIndexVisible,
+  });
 
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto custom-scrollbar space-y-8 animate-fade-in">
@@ -118,7 +127,7 @@ export const PlayerCharacterDashboard: React.FC<PlayerCharacterDashboardProps> =
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filteredPCs.map((pc, index) => {
+            {incremental.visibleItems.map((pc, index) => {
               const charClass = pc.characterStatistics?.classes?.charClass;
               const subclass = pc.characterStatistics?.classes?.subclass;
               const level = pc.characterStatistics?.classes?.level;
@@ -170,6 +179,15 @@ export const PlayerCharacterDashboard: React.FC<PlayerCharacterDashboardProps> =
                 </div>
             )}
           </div>
+          <IncrementalListFooter
+            hasMore={incremental.hasMore}
+            remaining={incremental.remaining}
+            visibleCount={incremental.visibleCount}
+            totalCount={incremental.totalCount}
+            showMore={incremental.showMore}
+            sentinelRef={incremental.sentinelRef}
+            noun="characters"
+          />
         </div>
       </div>
     </div>

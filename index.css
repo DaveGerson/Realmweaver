@@ -35,5 +35,5 @@
  * new template-literal call site using the same palette) doesn't silently
  * regress into unstyled output again.
  */
-@source inline("{text,bg,border,border-l}-{amber,emerald,violet,sky,orange,cyan,rose,teal,yellow,slate,blue}-{300,400,500,700,900}");
-@source inline("{bg,border}-{amber,emerald,violet,sky,orange,cyan,rose,teal,yellow,slate,blue}-{500,700,900}/{10,20,30,40,50,60}");
+@source inline("{text,bg,border,border-l}-{amber,emerald,violet,sky,orange,cyan,rose,teal,yellow,slate,blue,fuchsia}-{300,400,500,700,900}");
+@source inline("{bg,border}-{amber,emerald,violet,sky,orange,cyan,rose,teal,yellow,slate,blue,fuchsia}-{500,700,900}/{10,20,30,40,50,60}");

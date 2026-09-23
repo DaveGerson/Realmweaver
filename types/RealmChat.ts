@@ -26,4 +26,11 @@ export interface RealmChatResponse {
   draftEntities: DraftEntity[]; // Entities created or updated in this turn
 }
 
-export type ModelTier = 'performance' | 'medium' | 'quality';
+/**
+ * RealmChat uses the canonical app-wide model tier (`lite` | `standard` |
+ * `quality`) from `services/ai/modelConfig.ts`. The former RealmChat-only
+ * union (`performance` | `medium` | `quality`) is retired; its values are
+ * still accepted by `aiService.chatWithRealmWeaver` and normalised via
+ * `modelConfig.toModelTier` (`performance` → `lite`, `medium` → `standard`).
+ */
+export type { ModelTier, LegacyRealmChatTier } from '../services/ai/modelConfig';

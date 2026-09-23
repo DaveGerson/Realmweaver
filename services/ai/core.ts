@@ -17,6 +17,7 @@
 
 import { getActiveProvider } from './providers/registry';
 import type { ModelTier } from '@/services/ai/modelConfig';
+import { toModelTier } from '@/services/ai/modelConfig';
 import type { MultimodalPart } from './providers/types';
 
 // ---------------------------------------------------------------------------
@@ -24,21 +25,12 @@ import type { MultimodalPart } from './providers/types';
 // ---------------------------------------------------------------------------
 
 /**
- * Maps legacy Gemini model name strings (and direct tier names) to ModelTier.
+ * Maps legacy Gemini model name strings, retired RealmChat tier names, and
+ * direct tier names to ModelTier via modelConfig's single mapping table.
  * Unrecognised names fall back to 'standard'.
  */
 function mapLegacyModelName(name: string): ModelTier {
-  const map: Record<string, ModelTier> = {
-    'gemini-flash-lite-latest': 'lite',
-    'gemini-2.5-flash':         'standard',
-    'gemini-2.5-pro':           'quality',
-    'gemini-3-pro-preview':     'quality',
-    // Direct tier names pass through
-    'lite':                     'lite',
-    'standard':                 'standard',
-    'quality':                  'quality',
-  };
-  return map[name] || 'standard';
+  return toModelTier(name);
 }
 
 // ---------------------------------------------------------------------------
@@ -55,6 +47,8 @@ function mapLegacyModelName(name: string): ModelTier {
  *   is forwarded; `tools` (Google Search grounding) is silently dropped.
  * @param modelName - A Gemini model name or ModelTier string.
  * @param campaignContext - Optional campaign context for consistency.
+ * @param signal - Optional AbortSignal; aborting cancels the request and
+ *   rejects with an AbortError (no retries).
  * @returns Parsed JSON object matching the schema.
  */
 export const generateWithSchema = async (
@@ -63,7 +57,8 @@ export const generateWithSchema = async (
   instructions: string,
   configOverrides: object = {},
   modelName: string,
-  campaignContext?: string
+  campaignContext?: string,
+  signal?: AbortSignal
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> => {
   const provider = getActiveProvider();
@@ -118,6 +113,7 @@ export const generateWithSchema = async (
     model,
     campaignContext,
     multimodalParts: multimodalParts?.length ? multimodalParts : undefined,
+    ...(signal ? { signal } : {}),
   });
 };
 
@@ -127,18 +123,21 @@ export const generateWithSchema = async (
  * @param fullPrompt - The complete prompt text (instructions included by caller).
  * @param modelName - A Gemini model name or ModelTier string.
  * @param campaignContext - Optional campaign context for consistency.
+ * @param signal - Optional AbortSignal for cancellation.
  * @returns The generated text.
  */
 export const generateText = async (
   fullPrompt: string,
   modelName: string,
-  campaignContext?: string
+  campaignContext?: string,
+  signal?: AbortSignal
 ): Promise<string> => {
   const provider = getActiveProvider();
   return provider.generateText({
     prompt: fullPrompt,
     model: mapLegacyModelName(modelName),
     campaignContext,
+    ...(signal ? { signal } : {}),
   });
 };
 
@@ -149,13 +148,15 @@ export const generateText = async (
  * @param systemInstruction - System-level instruction for the assistant.
  * @param modelName - A Gemini model name or ModelTier string.
  * @param campaignContext - Optional campaign context for consistency.
+ * @param signal - Optional AbortSignal for cancellation.
  * @returns The assistant's response text.
  */
 export const generateChatCompletion = async (
   history: { role: string; parts: { text: string }[] }[],
   systemInstruction: string,
   modelName: string,
-  campaignContext?: string
+  campaignContext?: string,
+  signal?: AbortSignal
 ): Promise<string> => {
   const provider = getActiveProvider();
   return provider.generateChatCompletion({
@@ -163,5 +164,6 @@ export const generateChatCompletion = async (
     systemInstruction,
     model: mapLegacyModelName(modelName),
     campaignContext,
+    ...(signal ? { signal } : {}),
   });
 };

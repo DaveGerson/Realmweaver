@@ -42,6 +42,8 @@ interface CliRequest {
   outputFormat: 'json' | 'text';
   systemPrompt?: string;
   maxTurns?: number;
+  /** Aborts the in-flight fetch (and, server-side, kills the CLI child). */
+  signal?: AbortSignal;
 }
 
 // ---------------------------------------------------------------------------
@@ -95,7 +97,7 @@ export class ClaudeCliProvider implements AIProvider {
   readonly name = 'claude-cli';
 
   async generateWithSchema<T = unknown>(options: GenerateWithSchemaOptions): Promise<T> {
-    const { prompt, schema, instructions, model, campaignContext, multimodalParts } = options;
+    const { prompt, schema, instructions, model, campaignContext, multimodalParts, signal } = options;
 
     // A PDF cannot be decoded by the CLI when pasted into a text prompt as
     // base64 — see finding #16. Fail fast before any network call, and point
@@ -141,15 +143,16 @@ export class ClaudeCliProvider implements AIProvider {
           model: TIER_TO_CLI_MODEL[model],
           outputFormat: 'json',
           systemPrompt,
+          signal,
         });
         return this.parseJsonResponse<T>(raw);
       },
-      { maxAttempts: getProviderConfig().maxRetries, delayMs: 1500, label: `${TIER_TO_CLI_MODEL[model]} json` }
+      { maxAttempts: getProviderConfig().maxRetries, delayMs: 1500, label: `${TIER_TO_CLI_MODEL[model]} json`, signal }
     );
   }
 
   async generateText(options: GenerateTextOptions): Promise<string> {
-    const { prompt, model, campaignContext } = options;
+    const { prompt, model, campaignContext, signal } = options;
 
     const contextBlock = buildContextBlock(campaignContext, false);
     const systemPrompt = contextBlock || undefined;
@@ -159,13 +162,14 @@ export class ClaudeCliProvider implements AIProvider {
       model: TIER_TO_CLI_MODEL[model],
       outputFormat: 'text',
       systemPrompt,
+      signal,
     });
 
     return raw.trim();
   }
 
   async generateChatCompletion(options: GenerateChatOptions): Promise<string> {
-    const { history, systemInstruction, model, campaignContext } = options;
+    const { history, systemInstruction, model, campaignContext, signal } = options;
 
     const rawContextBlock = buildContextBlock(campaignContext, false);
     const contextBlock = rawContextBlock ? `\n\n${rawContextBlock}` : '';
@@ -191,6 +195,7 @@ export class ClaudeCliProvider implements AIProvider {
       model: TIER_TO_CLI_MODEL[model],
       outputFormat: 'text',
       systemPrompt: `${systemInstruction}${contextBlock}`,
+      signal,
     });
 
     return raw.trim();
@@ -207,7 +212,7 @@ export class ClaudeCliProvider implements AIProvider {
   private async callApi(request: CliRequest): Promise<string> {
     return withRetry(
       () => this.rawCallApi(request),
-      { maxAttempts: getProviderConfig().maxRetries, delayMs: 1500, label: `${request.model} ${request.outputFormat}` }
+      { maxAttempts: getProviderConfig().maxRetries, delayMs: 1500, label: `${request.model} ${request.outputFormat}`, signal: request.signal }
     );
   }
 
@@ -226,6 +231,9 @@ export class ClaudeCliProvider implements AIProvider {
         systemPrompt: request.systemPrompt,
         maxTurns: 1,
       }),
+      // Aborting rejects the fetch with an AbortError; the proxy sees the
+      // client connection close and kills the spawned `claude` process.
+      signal: request.signal,
     });
 
     if (!response.ok) {

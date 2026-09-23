@@ -1,6 +1,6 @@
 # CLAUDE.md — `tests/`
 
-Vitest unit + component tests. **143 files, 990 tests, all green.** Playwright specs live in `e2e/` (see
+Vitest unit + component tests. **228 files, 2618 tests, all green.** Playwright specs live in `e2e/` (see
 `e2e/CLAUDE.md`) and are excluded from this run.
 
 ```bash
@@ -23,8 +23,9 @@ test: { globals: true, environment: 'node', exclude: ['e2e/**', 'node_modules/**
 Consequences worth knowing:
 
 - **`environment: 'node'` is the default.** A test that renders React must opt in per-file with a
-  `// @vitest-environment jsdom` pragma **on the first line** — before any comment block or import. All 70 files that
-  do this today live in `tests/ship/`.
+  `// @vitest-environment jsdom` pragma **on the first line** — before any comment block or import. 108 files do this
+  today: 73 in `tests/ship/` and 35 feature suites (the storyteller, unstructured-play, and Lazy DM waves) at the
+  `tests/` top level.
 - `globals: true`, so `describe` / `it` / `expect` are ambient — but every file still imports them from `vitest`
   explicitly. Keep doing that; it is what makes the files readable in isolation.
 - The `@/` alias and the vite `define` block (provider env vars) apply to tests too, so `services/ai/modelConfig.ts`
@@ -37,8 +38,10 @@ Consequences worth knowing:
 |------|----------|
 | `tests/*.test.ts` | Long-standing unit tests for one module each — `entityUtils`, `backlinkUtils`, `diceUtils`, `dmStyleUtils`, `contextBuilder`, `continuityChecker`, `importExportService`, `storageService`, `campaignService.*`, `keyboardShortcuts`, `popoverPosition`, `entityDetailExtractors`, `entityFieldSave`, `entityFormReconciliation`, `mentionInput`, `useRovingTabIndex`, `claudeCliProvider`, `retryProvider`, `aiServiceAdapters`, `evocationWizardSettle`, `smokeTestDevGuard`, `migration-verification`. |
 | `tests/archetype.*.test.ts` | Five end-to-end **store** journeys, one per GM persona: `forever-dm`, `lazy-dm`, `new-dm`, `tactical-dm`, `worldbuilder`. |
+| `tests/<feature>.<topic>.test.ts[x]` | Storyteller/ontology-wave feature families, one prefix per feature: `tonightsTable.*`, `lazyPrep.*`, `mysteryEdges.*` (integrity / continuity / backlinks), `secretsTracker.mysteryEdges`, `secretsGenerateTen.*`, `secretsHereNow.*`, `voiceCards.*`, `coldOpen.*`, `callbackMachine.*`, `dormantMaterial.*`, `storyDerivations`, `prepSheet.*`, `momentsReel.*`, `beatsCarryForward.*`. The unstructured-play wave (`docs/design/unstructured-play.md`) adds `unstructured.*` (the Stage & scene menu store contract, derivations, context/continuity, StagePanel, scene shelf, runner wiring, plot editor, quick start) and the Lazy DM / Monte Cook lanes: `gmIntrusion.*`, `dormantShelf.*`, `extras.*`, `quickTables.*`, `sceneMenu.*`, `lazyChecklist.*`, `strongStartStyles.*`, `tablePulse.*`, `locationAspects.*`, `canonCapture.*`. The `.tsx` ones carry the jsdom pragma. |
 | `tests/components/` | Tests of **pure helpers exported from component modules** (`removeCombatantFromEncounter`, `findUnlinkedEntities`, `getEffectiveSessionStatus` / `getPlotSessionStatus`). Node environment — these never render. |
-| `tests/services/linking/` | `autoLinker`, `matchingEngine`. |
+| `tests/services/` | AI-service contract suites: the party-knowledge wave's `contextBuilder.partyKnowledge` (+ shared `partyKnowledgeFixtures.ts`), `dmCoach.playerSafeRecap`, `dmCoach.coldOpen`, `dmCoach.callbackComplication`; the Lazy DM lanes' `dmCoach.gmIntrusion`, `dmCoach.extras`, `dmCoach.sceneMenu`, `dmCoach.strongStart`, `dmCoach.checkIn`, `realmWeaver.locationAspects` (prompt shape, schema normalisation, mock parity — no network). |
+| `tests/services/linking/` | `autoLinker`, `matchingEngine`, `matchingEngine.scoring` (confidence, ambiguity, index cache, consumers). |
 | `tests/helpers/` | `testStoreFactory.ts` — shared test scaffolding. |
 | `tests/ship/` | The ship-readiness TDD suite (below). |
 
@@ -119,7 +122,7 @@ the fastest way to see how the store's methods compose.
 
 ## Component tests
 
-`// @vitest-environment jsdom` + `@testing-library/react` (64 files import it; 3 use `renderHook`). Conventions:
+`// @vitest-environment jsdom` + `@testing-library/react` (101 files import it; 3 use `renderHook`). Conventions:
 
 - `cleanup()` in `afterEach` — there is no global setup file doing it for you.
 - Mock `services/campaignService` with `vi.mock` + `vi.hoisted` when the component only needs a snapshot to render;

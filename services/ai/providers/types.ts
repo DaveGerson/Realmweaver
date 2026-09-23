@@ -27,6 +27,12 @@ export interface GenerateWithSchemaOptions {
   campaignContext?: string;
   /** For PDF parsing -- binary data encoded as base64 inline parts. */
   multimodalParts?: MultimodalPart[];
+  /**
+   * Optional cancellation signal. When it aborts, the provider stops any
+   * in-flight network request, performs no further retries, and rejects
+   * with an `AbortError`.
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -36,6 +42,12 @@ export interface GenerateTextOptions {
   prompt: string;
   model: ModelTier;
   campaignContext?: string;
+  /**
+   * Optional cancellation signal. When it aborts, the provider stops any
+   * in-flight network request, performs no further retries, and rejects
+   * with an `AbortError`.
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -48,6 +60,12 @@ export interface GenerateChatOptions {
   systemInstruction: string;
   model: ModelTier;
   campaignContext?: string;
+  /**
+   * Optional cancellation signal. When it aborts, the provider stops any
+   * in-flight network request, performs no further retries, and rejects
+   * with an `AbortError`.
+   */
+  signal?: AbortSignal;
 }
 
 /**

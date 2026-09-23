@@ -1,5 +1,16 @@
 import { getMatchingEngine } from './engineRegistry';
-import type { EntityCandidate } from './matchingEngine';
+import type { EntityCandidate, EntityMatch } from './matchingEngine';
+
+/**
+ * A match is safe to auto-apply only when it clears the confidence bar AND
+ * names exactly one entity. Ambiguous names (two NPCs called "Marcus") are
+ * never resolved by array order — the engine already scores them below the
+ * default 0.9, and the explicit check keeps that true for any custom
+ * `minConfidence` or engine.
+ */
+function isConfidentUnambiguous(m: EntityMatch, minConfidence: number): boolean {
+  return m.confidence >= minConfidence && !m.ambiguous;
+}
 
 interface LinkableScene {
   id: string;
@@ -55,7 +66,7 @@ export function autoLinkScenes(
 
     // NPC matching — add any matched NPC not already in npcIds
     const npcMatches = engine.findMatches(text, npcCandidates).filter(
-      m => m.confidence >= minConfidence,
+      m => isConfidentUnambiguous(m, minConfidence),
     );
     for (const match of npcMatches) {
       if (!scene.npcIds.includes(match.entityId)) {
@@ -69,7 +80,7 @@ export function autoLinkScenes(
     if (!scene.locationId) {
       const locationMatches = engine
         .findMatches(text, locationCandidates)
-        .filter(m => m.confidence >= minConfidence);
+        .filter(m => isConfidentUnambiguous(m, minConfidence));
 
       if (locationMatches.length > 0) {
         // Pick the match with the longest entity name (most specific)
@@ -109,7 +120,7 @@ export function autoLinkNpcFactions(
     const text = `${npc.description ?? ''} ${npc.backstory ?? ''}`;
     const matches = engine
       .findMatches(text, factionCandidates)
-      .filter(m => m.confidence >= minConfidence);
+      .filter(m => isConfidentUnambiguous(m, minConfidence));
 
     // Deduplicate by entityId (engine may return the same entity multiple times)
     const uniqueIds = [...new Set(matches.map(m => m.entityId))];

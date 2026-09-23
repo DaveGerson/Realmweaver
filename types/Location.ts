@@ -42,4 +42,13 @@ export interface Location {
   controllingFactionId?: string; // The faction that controls or influences this area
   history: HistoryEntry[];
   mentionedEntityIds?: string[]; // IDs of entities referenced via @-mentions in text fields
+  /**
+   * Sly Flourish's "develop fantastic locations" step (Lazy DM step 5):
+   * 2-3 short, sensory one-liners lighter than the full `description` — a
+   * GM can read one aloud or paraphrase it without consulting a paragraph.
+   * Optional, non-id-bearing; absent on every save that predates this field
+   * and on any location the GM never bothered to add them to — read as
+   * `?? []` everywhere. An empty list is stored as `undefined`, never `[]`.
+   */
+  aspects?: string[];
 }

@@ -9,6 +9,8 @@ import { EntityCreationPanel } from '../common/EntityCreationPanel';
 import { createDefaultLocation } from '../../utils/entityUtils';
 import { useEntitySearch } from '../../hooks/useEntitySearch';
 import { useRovingTabIndex, type RovingProps } from '../../hooks/useRovingTabIndex';
+import { useIncrementalList } from '../../hooks/useIncrementalList';
+import { IncrementalListFooter } from '../common/IncrementalListFooter';
 
 const LOCATION_PROMPT_CHIPS = [
   'A haunted tavern',
@@ -66,7 +68,14 @@ interface LocationDashboardProps {
 
 export const LocationDashboard: React.FC<LocationDashboardProps> = ({ locations, factions = [], onLocationCreated, onSelectLocation, isMockMode, isOfficialSetting, campaignContext }) => {
   const { filteredEntities: filteredLocations, searchTerm, setSearchTerm } = useEntitySearch(locations, ['name', 'description', 'secrets']);
-  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: { base: 1, md: 2, xl: 3 } });
+  const incremental = useIncrementalList(filteredLocations, { resetKey: searchTerm });
+  const { getRovingProps } = useRovingTabIndex({
+    direction: 'both', columns: { base: 1, md: 2, xl: 3 },
+    // N4: above ~100 cards the grid renders a growing prefix; let arrow /
+    // End navigation reach past it (the window grows, then focus lands).
+    itemCount: filteredLocations.length,
+    onRequestIndex: incremental.ensureIndexVisible,
+  });
   const locationsById = React.useMemo(() => new Map(locations.map(l => [l.id, l])), [locations]);
 
   const handleLocationCreated = (data: any) => {
@@ -134,7 +143,7 @@ export const LocationDashboard: React.FC<LocationDashboardProps> = ({ locations,
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredLocations.map((location, index) => {
+          {incremental.visibleItems.map((location, index) => {
             const parent = location.parentLocationId ? locationsById.get(location.parentLocationId) : undefined;
             return (
               <LocationCard
@@ -161,6 +170,15 @@ export const LocationDashboard: React.FC<LocationDashboardProps> = ({ locations,
             </div>
           )}
         </div>
+        <IncrementalListFooter
+          hasMore={incremental.hasMore}
+          remaining={incremental.remaining}
+          visibleCount={incremental.visibleCount}
+          totalCount={incremental.totalCount}
+          showMore={incremental.showMore}
+          sentinelRef={incremental.sentinelRef}
+          noun="locations"
+        />
       </div>
     </div>
   );

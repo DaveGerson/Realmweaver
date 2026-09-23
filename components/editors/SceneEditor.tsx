@@ -11,6 +11,7 @@ import { MentionInput, resolveMentionCandidates, findMentionedIdsInText } from '
 import { generateNpc } from '../../services/aiService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
 import { RegenerateButton } from '../common/RegenerateButton';
+import { buildEntityContext } from '../../utils/entityUtils';
 import { EntityLink } from '../common/EntityLink';
 import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService';
@@ -234,7 +235,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
     onUpdate(scene.id, { [field]: newValue });
   };
 
-  const sceneEntityContext = `Scene Title: ${formData.title}\nScene Type: ${formData.type}\nRead-Aloud Text: ${formData.readAloudText || 'Not specified'}\nGM Notes: ${formData.gmNotes || 'Not specified'}`;
+  const sceneEntityContext = buildEntityContext('scene', formData);
 
   // Stable candidate arrays for the linking panels below. These are useMemo
   // deps (LinkSuggestionsPanel.tsx) for its matching-engine memo — building

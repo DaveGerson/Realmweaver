@@ -1,6 +1,8 @@
 
 import React, { useMemo } from 'react';
 import { useRovingTabIndex } from '../../hooks/useRovingTabIndex';
+import { useIncrementalList } from '../../hooks/useIncrementalList';
+import { IncrementalListFooter } from '../common/IncrementalListFooter';
 import { useEntitySearch } from '@/hooks/useEntitySearch';
 import type { Article, NPC, Location, Faction } from '../../types/index';
 import { ArticleGenerator } from '../generators/ArticleGenerator';
@@ -43,8 +45,6 @@ interface ArticleDashboardProps {
 }
 
 export const ArticleDashboard: React.FC<ArticleDashboardProps> = ({ articles, npcs = [], locations = [], factions = [], onArticleCreated, onSelectArticle, isMockMode, isOfficialSetting, campaignContext }) => {
-  const { getRovingProps } = useRovingTabIndex({ direction: 'both', columns: { base: 1, md: 2, xl: 3 } });
-
   // Normalize: article uses `title`, hook needs `name`
   const normalizedArticles = useMemo(
     () => articles.map(a => ({ ...a, name: a.title })),
@@ -61,6 +61,14 @@ export const ArticleDashboard: React.FC<ArticleDashboardProps> = ({ articles, np
     const ids = new Set(filteredNormalized.map(a => a.id));
     return articles.filter(a => ids.has(a.id));
   }, [filteredNormalized, articles]);
+  const incremental = useIncrementalList(filteredArticles, { resetKey: searchTerm });
+  const { getRovingProps } = useRovingTabIndex({
+    direction: 'both', columns: { base: 1, md: 2, xl: 3 },
+    // N4: above ~100 cards the grid renders a growing prefix; let arrow /
+    // End navigation reach past it (the window grows, then focus lands).
+    itemCount: filteredArticles.length,
+    onRequestIndex: incremental.ensureIndexVisible,
+  });
 
   const handleArticleCreated = (data: any) => {
     const { id, ...articleData } = data;
@@ -128,7 +136,7 @@ export const ArticleDashboard: React.FC<ArticleDashboardProps> = ({ articles, np
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredArticles.map((article, index) => {
+          {incremental.visibleItems.map((article, index) => {
             const contentSnippet = article.content ? article.content.slice(0, 100) + (article.content.length > 100 ? '…' : '') : '';
             const categoryColors: Record<string, string> = {
               lore: 'bg-cyan-900/40 text-cyan-300 border-cyan-500/30',
@@ -171,6 +179,15 @@ export const ArticleDashboard: React.FC<ArticleDashboardProps> = ({ articles, np
             </div>
           )}
         </div>
+        <IncrementalListFooter
+          hasMore={incremental.hasMore}
+          remaining={incremental.remaining}
+          visibleCount={incremental.visibleCount}
+          totalCount={incremental.totalCount}
+          showMore={incremental.showMore}
+          sentinelRef={incremental.sentinelRef}
+          noun="articles"
+        />
       </div>
     </div>
   );

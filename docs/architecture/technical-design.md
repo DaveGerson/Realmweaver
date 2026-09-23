@@ -269,6 +269,38 @@ internally:
 
 These steps run inside a single `updateState()` call so the state transition is atomic and triggers one debounced save.
 
+### 4.6 The Stage and the Scene Menu (unstructured play)
+
+Design record: `docs/design/unstructured-play.md`. A live session is not required to have a scene track.
+
+- **The Stage** — `SessionLog.stage?: SessionStage` (`{ locationId?, place?, npcIds, focus? }`) on the ACTIVE
+  session is the DM's live statement of where the party is, who is with them, and what is happening. It is
+  written only through dedicated store methods (`setStageLocation`, `addNpcToStage`, `removeNpcFromStage`,
+  `setStageFocus`, `updateStage`), each of which — except the silent `updateStage` — appends a
+  `scene-transition` running-log entry, so an improvised session produces the same timeline a scene-driven
+  one does. `locationId` and `npcIds` are id-bearing: they are in `_purgeEntityReferences`, in both id-remap
+  passes (`duplicateCampaign` preserves, `importTemplateData` drops unknown ids), and `npcIds` is backfilled
+  by `normaliseRequiredArrays`.
+- **The union rule.** Every reader derives `presentNpcs = sceneCast ∪ stage.npcIds` and
+  `presentLocation = stage location ?? scene location` — `SessionRunner` (cards, cast dynamics, Combat Tracker
+  auto-roster, the situation line handed to the zero-prompt tools) and `contextBuilder` ("On Stage Now" +
+  "NPCs in Scene") alike. `sceneCast` still follows finding #26 (`plannedNpcIds` / `plannedLocationIds` win
+  over the scene's own links when present).
+- **Lifecycle invariants.** `enterScene(id)` leaves the previous scene `in-progress` (a menu, not a track),
+  reopens a completed scene, and resets the Stage. `leaveScene({ complete })` (Done / Set Aside) seeds the
+  Stage from the scene's place and cast merged with the prior Stage cast; `advanceScene()` past the last
+  planned scene does the same instead of leaving the table nowhere. `removePlannedScene` reopens a started
+  scene as `planned` and clears `activeSceneId` if it was live. `plannedSceneIds` may name scenes from ANY
+  adventure; `goLive`, `advanceScene`, the runner and the store's Stage helpers all resolve through
+  `utils/storyDerivations.resolveSceneById`, never through `SessionLog.adventureId`.
+- **Idempotent `goLive`.** The prep wizard calls `goLive` and then hands the id to `App.handleGoLive`, which
+  calls it again; a second call for the session that is already live is a no-op (previously it logged
+  "Session started" twice). `createFreeformSession()` deliberately does not go live — one entry path.
+- **Plot pressure.** `Plot.clock?` / `Plot.ifIgnored?` are non-id-bearing; every reader normalises through
+  `utils/plotClock.normalizePlotClock`. `tickPlotClock` clamps and logs a `world-moved` entry; the
+  Continuity Checker's `clock-expired` rule is `info` severity by design — a clock is the DM's tool, never
+  a required field.
+
 ---
 
 ## 5. AI Service Architecture
@@ -443,6 +475,13 @@ const campaignContext = buildCampaignContext({
 Sections are added tier by tier and stop once the character budget
 (`maxTokenEstimate * 4`) is exhausted; list sections fill entry-by-entry rather than
 all-or-nothing, so a tight budget degrades to a partial roster instead of an empty one.
+
+A fourth variant, `'player-safe'`, is the player-facing build (no GM-authored private prose, no
+unrevealed secrets). When `activeSessionId` names a session with a non-empty Stage (§4.6), Tier 1
+adds an **On Stage Now** section — place and present cast in every variant, the DM's `focus` line
+GM-only — and the Stage's cast joins the "NPCs in Scene" list and the GM-ONLY secrets relevance set.
+Plot lines carry `[clock n/m]` / `— if ignored: …`, and the Player Characters roster carries each
+player's `playerFlags`.
 
 A separate, simpler `buildCampaignContext()` in `utils/entityUtils.ts` builds a flat string with
 entity names only — same name, different module. Do not confuse the two.
