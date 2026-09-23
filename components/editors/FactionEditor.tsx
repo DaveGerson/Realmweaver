@@ -10,6 +10,7 @@ import { reconcileEntityFormData } from '../../utils/formReconciliation';
 import { generateNpc } from '../../services/aiService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
 import { RegenerateButton } from '../common/RegenerateButton';
+import { buildEntityContext } from '../../utils/entityUtils';
 import { EntityLink } from '../common/EntityLink';
 import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService';
@@ -166,7 +167,7 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({ faction, allNpcs, 
     onUpdate(faction.id, { [field]: newValue });
   };
 
-  const factionEntityContext = `Faction Name: ${formData.name}\nDescription: ${formData.description || 'Not specified'}\nGoals: ${formData.goals || 'Not specified'}\nAlignment: ${formData.alignment || 'Not specified'}`;
+  const factionEntityContext = buildEntityContext('faction', formData);
 
   // --- Generate Member NPC ---
   const memberGenerationDefaultPrompt = `Generate a member NPC for the "${faction.name}" faction. ${faction.description ? `The faction is: ${faction.description}` : ''} This NPC should have a clear role and motivation within the faction.`.trim();

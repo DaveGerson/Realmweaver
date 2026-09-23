@@ -30,6 +30,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { ENTITY_TYPE_CONFIG } from '../../utils/entityUtils';
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -109,7 +110,16 @@ describe('wp-i2 — Tailwind build-time safelist covers runtime-composed entity-
     'yellow',
     'slate',
     'blue',
+    'fuchsia', // secret (X10)
   ];
+
+  // X10: the hand-list above must never fall behind ENTITY_TYPE_CONFIG itself.
+  it('covers every color ENTITY_TYPE_CONFIG uses', () => {
+    const configColors = new Set(Object.values(ENTITY_TYPE_CONFIG).map((c) => c.color));
+    for (const color of configColors) {
+      expect(entityColors, `${color} (ENTITY_TYPE_CONFIG) is not in the safelist cross-product`).toContain(color);
+    }
+  });
 
   it.each(entityColors)('emits the text-%s-400 / text-%s-300 accent pair', (color) => {
     expect(cssHasClass(builtCss, `text-${color}-400`)).toBe(true);

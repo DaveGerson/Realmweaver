@@ -6,6 +6,7 @@ import { Icons } from '../common/Icons';
 import { Button } from '../common/Button';
 import { PrepDocumentView } from './PrepDocumentView';
 import { RegenerateButton } from '../common/RegenerateButton';
+import { buildEntityContext } from '../../utils/entityUtils';
 import { generateScene } from '../../services/aiService';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
 import { LinkedText } from '../common/LinkedText';
@@ -101,7 +102,7 @@ export const AdventureEditor: React.FC<AdventureEditorProps> = ({ adventure, cam
     onUpdate(adventure.id, { [field]: newValue });
   };
 
-  const adventureEntityContext = `Adventure Title: ${formData.title}\nLevel: ${formData.level}\nTheme: ${formData.theme || 'Not specified'}\nHook: ${formData.hook || 'Not specified'}`;
+  const adventureEntityContext = buildEntityContext('adventure', formData);
 
   // --- Generate Next Scene ---
   const lastScene = adventure.scenes[adventure.scenes.length - 1];

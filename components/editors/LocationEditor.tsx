@@ -10,6 +10,7 @@ import { MentionInput, resolveMentionCandidates, findMentionedIdsInText } from '
 import { generatePoiFromLoot, generateNpc, generateLocationAspects } from '../../services/aiService';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { RegenerateButton } from '../common/RegenerateButton';
+import { buildEntityContext } from '../../utils/entityUtils';
 import { EntityLink } from '../common/EntityLink';
 import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService';
@@ -206,7 +207,7 @@ export const LocationEditor: React.FC<LocationEditorProps> = ({ location, allLoc
     onUpdate(location.id, { [field]: newValue });
   };
 
-  const locationEntityContext = `Location Name: ${formData.name}\nDescription: ${formData.description || 'Not specified'}\nSecrets: ${formData.secrets || 'Not specified'}`;
+  const locationEntityContext = buildEntityContext('location', formData);
 
   // --- Aspects (Lazy DM step 5 — "develop fantastic locations") ---
   // A short list of removable one-liners, lighter than the full description.

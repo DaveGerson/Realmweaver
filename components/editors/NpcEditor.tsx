@@ -9,6 +9,7 @@ import { AiTextarea } from '../common/Textarea';
 import { MentionInput, resolveMentionCandidates, findMentionedIdsInText } from '../common/MentionInput';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { RegenerateButton } from '../common/RegenerateButton';
+import { buildEntityContext } from '../../utils/entityUtils';
 import { EntityLink } from '../common/EntityLink';
 import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService';
@@ -163,7 +164,7 @@ export const NpcEditor: React.FC<NpcEditorProps> = ({ npc, factions, allNpcs = [
     onUpdate(npc.id, { [field]: newValue });
   };
 
-  const npcEntityContext = `NPC Name: ${formData.name}\nDescription: ${formData.description || 'Not specified'}\nTraits: ${formData.traits || 'Not specified'}\nBackstory: ${formData.backstory || 'Not specified'}\nMotivations: ${formData.motivations || 'Not specified'}`;
+  const npcEntityContext = buildEntityContext('npc', formData, { factions });
 
   // --- Relationship Handlers ---
   const handleAddRelationship = () => {

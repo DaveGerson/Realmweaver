@@ -1,5 +1,39 @@
 
-import type { NPC, Location, Faction, Item, Article, Adventure, Scene, SessionLog, Plot, Note, Campaign, PlayerCharacter } from '../types/index';
+import type { NPC, Location, Faction, Item, Article, Adventure, Scene, SessionLog, Plot, Note, Secret, Campaign, PlayerCharacter } from '../types/index';
+import { formatPlotClock } from './plotClock';
+
+/**
+ * Closed union of every key `ENTITY_TYPE_CONFIG` carries. The camelCase keys
+ * are the canonical entity types; `'session-log'` / `'player-character'` are
+ * kebab aliases (used by CommandPalette / QuickCard / sidebar pins) that map to
+ * the same config as their camelCase twins. Typing the record against this
+ * union makes a missing entry a compile error rather than a runtime
+ * `Cannot read properties of undefined`.
+ */
+export type EntityTypeKey =
+  | 'npc'
+  | 'location'
+  | 'faction'
+  | 'item'
+  | 'adventure'
+  | 'article'
+  | 'sessionLog'
+  | 'session-log'
+  | 'playerCharacter'
+  | 'player-character'
+  | 'plot'
+  | 'note'
+  | 'scene'
+  | 'secret';
+
+export interface EntityTypeConfigEntry {
+  /** Key into `components/common/Icons.tsx` (not a lucide export name). */
+  icon: string;
+  /** Bare Tailwind color name — must be covered by index.css's safelist. */
+  color: string;
+  /** Plural display label. */
+  label: string;
+}
 
 /**
  * Centralized entity type configuration.
@@ -8,8 +42,10 @@ import type { NPC, Location, Faction, Item, Article, Adventure, Scene, SessionLo
  *
  * `color` is a Tailwind color name (without variant) — consumers derive the
  * specific shade they need (e.g. `text-${color}-400`, `bg-${color}-900/60`).
+ * Every color used here must be covered by index.css's `@source inline(...)`
+ * safelist, since runtime-composed class names are invisible to the build scan.
  */
-export const ENTITY_TYPE_CONFIG: Record<string, { icon: string; color: string; label: string }> = {
+export const ENTITY_TYPE_CONFIG: Record<EntityTypeKey, EntityTypeConfigEntry> = {
   npc:             { icon: 'NPCs',            color: 'amber',   label: 'NPCs' },
   location:        { icon: 'Locations',       color: 'emerald', label: 'Locations' },
   faction:         { icon: 'Factions',        color: 'violet',  label: 'Factions' },
@@ -23,7 +59,22 @@ export const ENTITY_TYPE_CONFIG: Record<string, { icon: string; color: string; l
   plot:            { icon: 'Plot',            color: 'yellow',  label: 'Plots' },
   note:            { icon: 'FileText',        color: 'slate',   label: 'Notes' },
   scene:           { icon: 'Scenes',          color: 'blue',    label: 'Scenes' },
+  secret:          { icon: 'Lock',            color: 'fuchsia', label: 'Secrets' },
 };
+
+/** Type guard: is `key` one of `ENTITY_TYPE_CONFIG`'s keys? */
+export function isEntityTypeKey(key: string): key is EntityTypeKey {
+  return Object.prototype.hasOwnProperty.call(ENTITY_TYPE_CONFIG, key);
+}
+
+/**
+ * Looks up config for an open-ended type string (e.g. a linking-engine
+ * candidate type). Returns `undefined` for unknown keys so callers fall back
+ * explicitly instead of crashing on a missing entry.
+ */
+export function getEntityTypeConfig(key: string): EntityTypeConfigEntry | undefined {
+  return isEntityTypeKey(key) ? ENTITY_TYPE_CONFIG[key] : undefined;
+}
 
 /**
  * Builds a concise entity context string for per-field AI regeneration.
@@ -32,13 +83,22 @@ export const ENTITY_TYPE_CONFIG: Record<string, { icon: string; color: string; l
  * Each entity type includes its most relevant fields so the AI can
  * produce coherent output that fits the existing entity. Fields that
  * are empty/undefined are omitted to keep the context tight.
+ *
+ * Every editor's `RegenerateButton` goes through this function — do not
+ * hand-roll an inline template in an editor (roadmap X11). `lookups` only
+ * needs `factions` (used to resolve an NPC's faction name), so an editor
+ * that holds a `factions` array but no full `Campaign` can pass `{ factions }`.
  */
-export function buildEntityContext(entityType: string, entity: any, campaign?: Campaign): string {
+export function buildEntityContext(
+    entityType: string,
+    entity: any,
+    lookups?: Pick<Campaign, 'factions'>,
+): string {
     switch (entityType) {
         case 'npc': {
             const e = entity as NPC;
-            const faction = e.factionId && campaign
-                ? campaign.factions.find(f => f.id === e.factionId)
+            const faction = e.factionId && lookups?.factions
+                ? lookups.factions.find(f => f.id === e.factionId)
                 : undefined;
             return [
                 `Name: ${e.name}`,
@@ -46,6 +106,7 @@ export function buildEntityContext(entityType: string, entity: any, campaign?: C
                 e.traits ? `Traits: ${e.traits}` : '',
                 e.motivations ? `Motivations: ${e.motivations}` : '',
                 e.backstory ? `Backstory: ${e.backstory}` : '',
+                e.voiceNotes?.trim() ? `Voice: ${e.voiceNotes.trim()}` : '',
                 faction ? `Faction: ${faction.name}` : '',
             ].filter(Boolean).join('\n');
         }
@@ -65,6 +126,7 @@ export function buildEntityContext(entityType: string, entity: any, campaign?: C
                 e.goals ? `Goals: ${e.goals}` : '',
                 e.alignment ? `Alignment: ${e.alignment}` : '',
                 e.resources ? `Resources: ${e.resources}` : '',
+                e.influence ? `Influence: ${e.influence}` : '',
             ].filter(Boolean).join('\n');
         }
         case 'item': {
@@ -72,6 +134,7 @@ export function buildEntityContext(entityType: string, entity: any, campaign?: C
             return [
                 `Name: ${e.name}`,
                 e.rarity ? `Rarity: ${e.rarity}` : '',
+                e.itemType ? `Type: ${e.itemType}` : '',
                 e.description ? `Description: ${e.description}` : '',
                 e.properties ? `Properties: ${e.properties}` : '',
             ].filter(Boolean).join('\n');
@@ -100,6 +163,8 @@ export function buildEntityContext(entityType: string, entity: any, campaign?: C
                 `Title: ${e.title}`,
                 `Status: ${e.status}`,
                 e.description ? `Description: ${e.description}` : '',
+                formatPlotClock(e.clock) ? `Clock: ${formatPlotClock(e.clock)}` : '',
+                e.ifIgnored ? `If ignored: ${e.ifIgnored}` : '',
             ].filter(Boolean).join('\n');
         }
         case 'note': {
@@ -110,8 +175,27 @@ export function buildEntityContext(entityType: string, entity: any, campaign?: C
                 e.content ? `Content: ${e.content.substring(0, 300)}` : '',
             ].filter(Boolean).join('\n');
         }
+        case 'adventure': {
+            const e = entity as Adventure;
+            return [
+                `Title: ${e.title}`,
+                e.level !== undefined && e.level !== null ? `Level: ${e.level}` : '',
+                e.theme ? `Theme: ${e.theme}` : '',
+                e.hook ? `Hook: ${e.hook}` : '',
+            ].filter(Boolean).join('\n');
+        }
+        case 'secret': {
+            const e = entity as Secret;
+            return [
+                `Title: ${e.title}`,
+                `Category: ${e.category}`,
+                `Revealed: ${e.isRevealed ? 'yes' : 'no'}`,
+                e.content ? `Content: ${e.content.substring(0, 300)}` : '',
+            ].filter(Boolean).join('\n');
+        }
         default:
-            return entity.name ? `Name: ${entity.name}` : '';
+            if (entity?.name) return `Name: ${entity.name}`;
+            return entity?.title ? `Title: ${entity.title}` : '';
     }
 }
 
@@ -231,6 +315,38 @@ export const createDefaultPlot = (): Plot => ({
     description: '',
     status: 'active',
     relatedEntityIds: []
+});
+
+/**
+ * Default Note. Timestamps are stamped at call time; `campaignService.createNote`
+ * still re-stamps `createdAt` / `lastModified` when it persists, so these are
+ * placeholders for pre-save UI (e.g. a quick-add form).
+ */
+export const createDefaultNote = (): Note => {
+    const now = new Date().toISOString();
+    return {
+        id: '',
+        title: 'New Note',
+        content: '',
+        tags: [],
+        createdAt: now,
+        lastModified: now,
+    };
+};
+
+/**
+ * Default Secret. `campaignService.createSecret` owns the persisted
+ * `createdAt` stamp; the value here is a pre-save placeholder.
+ */
+export const createDefaultSecret = (): Secret => ({
+    id: '',
+    title: 'New Secret',
+    content: '',
+    category: 'secret',
+    isRevealed: false,
+    linkedEntityIds: [],
+    createdAt: new Date().toISOString(),
+    notes: '',
 });
 
 /**

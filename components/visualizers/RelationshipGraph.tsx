@@ -4,7 +4,7 @@ import * as d3 from 'd3';
 import type { Campaign } from '../../types/index';
 import { EntityType, GraphNode, GraphLink } from '../../types/index';
 import { twMerge } from 'tailwind-merge';
-import { ENTITY_TYPE_CONFIG } from '@/utils/entityUtils';
+import { ENTITY_TYPE_CONFIG, type EntityTypeKey } from '@/utils/entityUtils';
 import { Icons } from '@/components/common/Icons';
 
 interface RelationshipGraphProps {
@@ -33,7 +33,7 @@ const TAILWIND_COLOR_TO_HEX: Record<string, string> = {
 };
 
 // EntityType enum values (uppercase) mapped to ENTITY_TYPE_CONFIG keys (lowercase).
-const ENTITY_TYPE_TO_CONFIG_KEY: Record<string, string> = {
+const ENTITY_TYPE_TO_CONFIG_KEY: Record<string, EntityTypeKey> = {
   [EntityType.NPC]:       'npc',
   [EntityType.LOCATION]:  'location',
   [EntityType.FACTION]:   'faction',

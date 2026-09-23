@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import type { Campaign, Faction, NPC, RollableTable, RollableTableEntry } from '../../types/index';
 import { generateNarration, generateImprovisation, generateRollableTable, generateNpcRoleplay } from '../../services/aiService';
 import { Icons } from '../common/Icons';
@@ -14,6 +14,9 @@ import { logNpcQuote, selectRecentQuoteLines } from '../views/session/ActiveScen
 import { CheckInPanel } from './DmCoachCheckIn';
 
 type CoachTool = 'narrate' | 'improvise' | 'table' | 'roleplay' | 'checkin';
+
+const EMPTY_PROMPT_DRAFTS: Record<CoachTool, string> = { narrate: '', improvise: '', table: '', roleplay: '', checkin: '' };
+const EMPTY_MENTION_DRAFTS: Record<CoachTool, string[]> = { narrate: [], improvise: [], table: [], roleplay: [], checkin: [] };
 
 interface RoleplayMessage {
     id: string;
@@ -130,8 +133,23 @@ interface DmCoachProps {
 
 export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activeSceneNpcIds, onClose, onSendToNotes, onResultGenerated, isMockMode, onNavigate }) => {
     const [activeTool, setActiveTool] = useState<CoachTool>('narrate');
-    const [prompt, setPrompt] = useState('');
-    const [mentionedEntityIds, setMentionedEntityIds] = useState<string[]>([]);
+    // Roadmap X9: prompt drafts (and the @-mention ids parsed from them) are
+    // kept per tool, so switching Narrate → Table → Narrate restores what the
+    // DM was typing instead of wiping it.
+    const [promptDrafts, setPromptDrafts] = useState<Record<CoachTool, string>>(EMPTY_PROMPT_DRAFTS);
+    const [mentionDrafts, setMentionDrafts] = useState<Record<CoachTool, string[]>>(EMPTY_MENTION_DRAFTS);
+    const prompt = promptDrafts[activeTool];
+    const mentionedEntityIds = mentionDrafts[activeTool];
+    const setPrompt = useCallback((value: string) => {
+        setPromptDrafts(prev => (prev[activeTool] === value ? prev : { ...prev, [activeTool]: value }));
+    }, [activeTool]);
+    const setMentionedEntityIds = useCallback((ids: string[]) => {
+        setMentionDrafts(prev => {
+            const current = prev[activeTool];
+            if (current.length === ids.length && current.every((id, i) => id === ids[i])) return prev;
+            return { ...prev, [activeTool]: ids };
+        });
+    }, [activeTool]);
     const [result, setResult] = useState<string | RollableTable | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -274,8 +292,8 @@ export const DmCoach: React.FC<DmCoachProps> = ({ campaign, activeContext, activ
         // resolve/catch/finally handlers become no-ops (finding #77).
         generationIdRef.current++;
         setActiveTool(tool);
-        setPrompt('');
-        setMentionedEntityIds([]);
+        // Prompt + mention drafts are per-tool state (X9) — deliberately NOT
+        // cleared here, so the new tool shows its own preserved draft.
         setResult(null);
         setError(null);
         setIsLoading(false);

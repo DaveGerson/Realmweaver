@@ -10,6 +10,7 @@ import { Button } from '../common/Button';
 import { MentionInput, resolveMentionCandidates, findMentionedIdsInText } from '../common/MentionInput';
 import { generateScene } from '../../services/aiService';
 import { RegenerateButton } from '../common/RegenerateButton';
+import { buildEntityContext } from '../../utils/entityUtils';
 import { GenerateHerePanel } from '../common/GenerateHerePanel';
 import { EntityLink } from '../common/EntityLink';
 import { LinkedText } from '../common/LinkedText';
@@ -168,7 +169,7 @@ export const PlotEditor: React.FC<PlotEditorProps> = ({ plot, campaign, onUpdate
     commitClock({ segments: currentClock.segments, filled: Math.min(Math.max(filled, 0), currentClock.segments) });
   };
 
-  const plotEntityContext = `Title: ${formData.title}\nStatus: ${formData.status}${formData.description ? `\nDescription: ${formData.description}` : ''}`;
+  const plotEntityContext = buildEntityContext('plot', formData);
 
   // --- Generate Scene Advancing this Plot ---
   const targetAdventure = campaign.adventures[campaign.adventures.length - 1] ?? null;

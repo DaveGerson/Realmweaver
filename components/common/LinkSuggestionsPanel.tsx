@@ -4,7 +4,7 @@ import { Icons } from '@/components/common/Icons';
 import { getMatchingEngine } from '@/services/linking/engineRegistry';
 import { expandAmbiguousMatch } from '@/services/linking/matchingEngine';
 import type { EntityCandidate } from '@/services/linking/matchingEngine';
-import { ENTITY_TYPE_CONFIG } from '@/utils/entityUtils';
+import { getEntityTypeConfig } from '@/utils/entityUtils';
 import type { QuickCardEntityType } from './EntityQuickCard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ function getActionLabel(entityType: string): string {
 }
 
 function getEntityTypeColor(entityType: string): string {
-  const config = ENTITY_TYPE_CONFIG[entityType];
+  const config = getEntityTypeConfig(entityType);
   return config ? config.color : 'slate';
 }
 

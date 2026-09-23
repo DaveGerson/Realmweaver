@@ -13,7 +13,12 @@ import {
     createDefaultSession,
     createDefaultPlot,
     createDefaultPlayerCharacter,
+    createDefaultNote,
+    createDefaultSecret,
     normalizePlayerCharacter,
+    isEntityTypeKey,
+    getEntityTypeConfig,
+    type EntityTypeKey,
 } from '../utils/entityUtils';
 import type { Campaign } from '../types/Campaign';
 import type { PlayerCharacter } from '../types/PlayerCharacter';
@@ -91,7 +96,8 @@ describe('ENTITY_TYPE_CONFIG', () => {
         const coreTypes = [
             'npc', 'location', 'faction', 'item', 'adventure',
             'article', 'sessionLog', 'playerCharacter', 'plot', 'note',
-        ];
+            'scene', 'secret',
+        ] as const;
         for (const type of coreTypes) {
             expect(ENTITY_TYPE_CONFIG[type]).toBeDefined();
         }
@@ -123,6 +129,65 @@ describe('ENTITY_TYPE_CONFIG', () => {
         expect(ENTITY_TYPE_CONFIG.playerCharacter.color).toBe('teal');
         expect(ENTITY_TYPE_CONFIG.plot.color).toBe('yellow');
         expect(ENTITY_TYPE_CONFIG.note.color).toBe('slate');
+        expect(ENTITY_TYPE_CONFIG.scene.color).toBe('blue');
+        expect(ENTITY_TYPE_CONFIG.secret.color).toBe('fuchsia');
+    });
+
+    // X10: 'secret' was missing, so rendering a Secret through any config-driven
+    // surface crashed on `undefined.color`.
+    it('has a secret entry with a real Icons key and a non-indigo color', () => {
+        expect(ENTITY_TYPE_CONFIG.secret).toEqual({ icon: 'Lock', color: 'fuchsia', label: 'Secrets' });
+        for (const config of Object.values(ENTITY_TYPE_CONFIG)) {
+            expect(config.color, 'indigo is reserved for RealmChat').not.toBe('indigo');
+        }
+    });
+
+    it('gives each entry a distinct color except the kebab aliases', () => {
+        const canonical = Object.entries(ENTITY_TYPE_CONFIG).filter(([k]) => !k.includes('-'));
+        const colors = canonical.map(([, c]) => c.color);
+        expect(new Set(colors).size).toBe(colors.length);
+    });
+
+    it('isEntityTypeKey / getEntityTypeConfig narrow open-ended strings safely', () => {
+        const keys: EntityTypeKey[] = ['npc', 'secret', 'session-log', 'player-character'];
+        for (const k of keys) {
+            expect(isEntityTypeKey(k)).toBe(true);
+            expect(getEntityTypeConfig(k)).toBe(ENTITY_TYPE_CONFIG[k]);
+        }
+        expect(isEntityTypeKey('dragon')).toBe(false);
+        expect(isEntityTypeKey('toString')).toBe(false); // no prototype leakage
+        expect(getEntityTypeConfig('dragon')).toBeUndefined();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// createDefaultNote / createDefaultSecret (X10)
+// ---------------------------------------------------------------------------
+
+describe('createDefaultNote / createDefaultSecret', () => {
+    it('createDefaultNote returns a complete Note with an empty id', () => {
+        const note = createDefaultNote();
+        expect(note.id).toBe('');
+        expect(note.title).toBe('New Note');
+        expect(note.content).toBe('');
+        expect(note.tags).toEqual([]);
+        expect(Number.isNaN(Date.parse(note.createdAt))).toBe(false);
+        expect(note.lastModified).toBe(note.createdAt);
+    });
+
+    it('createDefaultSecret returns an unrevealed secret with an empty id', () => {
+        const secret = createDefaultSecret();
+        expect(secret.id).toBe('');
+        expect(secret.title).toBe('New Secret');
+        expect(secret.category).toBe('secret');
+        expect(secret.isRevealed).toBe(false);
+        expect(secret.linkedEntityIds).toEqual([]);
+        expect(Number.isNaN(Date.parse(secret.createdAt))).toBe(false);
+    });
+
+    it('returns fresh arrays on every call', () => {
+        expect(createDefaultNote().tags).not.toBe(createDefaultNote().tags);
+        expect(createDefaultSecret().linkedEntityIds).not.toBe(createDefaultSecret().linkedEntityIds);
     });
 });
 
@@ -237,6 +302,71 @@ describe('buildEntityContext', () => {
         const npc = { id: 'n1', name: 'Bob', description: '', traits: '', backstory: '', motivations: '', secrets: '', stats: '', exampleQuote: '', knowsPlayerHistory: [], relationships: [], history: [] };
         const ctx = buildEntityContext('npc', npc);
         expect(ctx).toBe('Name: Bob');
+    });
+
+    // X11 extensions — every editor's RegenerateButton now goes through here.
+    it('resolves NPC faction from a bare { factions } lookup (NpcEditor has no full campaign)', () => {
+        const npc = { id: 'n1', name: 'Guard', factionId: 'f1', description: '', traits: '', backstory: '', motivations: '' };
+        const ctx = buildEntityContext('npc', npc, { factions: [{ id: 'f1', name: 'City Watch', description: '', goals: '', memberIds: [] }] });
+        expect(ctx).toBe('Name: Guard\nFaction: City Watch');
+    });
+
+    it('omits the faction line when the factionId does not resolve', () => {
+        const npc = { id: 'n1', name: 'Guard', factionId: 'gone' };
+        expect(buildEntityContext('npc', npc, { factions: [] })).toBe('Name: Guard');
+    });
+
+    it('includes item type and faction influence', () => {
+        expect(buildEntityContext('item', { name: 'Blade', rarity: 'rare', itemType: 'weapon' }))
+            .toBe('Name: Blade\nRarity: rare\nType: weapon');
+        expect(buildEntityContext('faction', { name: 'Guild', influence: 'Citywide' }))
+            .toBe('Name: Guild\nInfluence: Citywide');
+    });
+
+    it('builds adventure context', () => {
+        const adv = { id: 'a1', title: 'The Sunken Crypt', level: 3, theme: 'Horror', hook: 'A drowned bell tolls', scenes: [] };
+        expect(buildEntityContext('adventure', adv))
+            .toBe('Title: The Sunken Crypt\nLevel: 3\nTheme: Horror\nHook: A drowned bell tolls');
+        expect(buildEntityContext('adventure', { title: 'Bare', level: 1, theme: '', hook: '' }))
+            .toBe('Title: Bare\nLevel: 1');
+    });
+
+    it('builds secret context', () => {
+        const secret = { ...createDefaultSecret(), title: 'The Duke is a lich', content: 'Phylactery in the chapel', category: 'revelation' as const };
+        expect(buildEntityContext('secret', secret))
+            .toBe('Title: The Duke is a lich\nCategory: revelation\nRevealed: no\nContent: Phylactery in the chapel');
+    });
+
+    it('never emits the old "Not specified" filler', () => {
+        const ctxs = [
+            buildEntityContext('npc', createDefaultNpc()),
+            buildEntityContext('location', createDefaultLocation()),
+            buildEntityContext('faction', createDefaultFaction()),
+            buildEntityContext('item', createDefaultItem()),
+            buildEntityContext('adventure', createDefaultAdventure()),
+            buildEntityContext('scene', createDefaultScene()),
+            buildEntityContext('article', createDefaultArticle()),
+            buildEntityContext('plot', createDefaultPlot()),
+            buildEntityContext('note', createDefaultNote()),
+        ];
+        for (const ctx of ctxs) {
+            expect(ctx).not.toMatch(/Not specified/i);
+            expect(ctx.length).toBeGreaterThan(0);
+        }
+    });
+
+    it('includes a plot\'s clock and if-ignored move, and an NPC\'s voice notes', () => {
+        const plot = { title: 'The Red Tithe', status: 'active', description: '', clock: { segments: 6, filled: 4 }, ifIgnored: 'The mill burns' };
+        expect(buildEntityContext('plot', plot))
+            .toBe('Title: The Red Tithe\nStatus: active\nClock: 4/6\nIf ignored: The mill burns');
+        expect(buildEntityContext('plot', { title: 'T', status: 'dormant', clock: { segments: 0, filled: 0 } }))
+            .toBe('Title: T\nStatus: dormant');
+        expect(buildEntityContext('npc', { name: 'Mags', voiceNotes: '  gravelly, never finishes a sentence ' }))
+            .toBe('Name: Mags\nVoice: gravelly, never finishes a sentence');
+    });
+
+    it('falls back to title for unknown title-keyed entities', () => {
+        expect(buildEntityContext('unknown', { title: 'Session 4' })).toBe('Title: Session 4');
     });
 });
 

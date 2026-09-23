@@ -30,8 +30,14 @@ hardcode an entity accent color anywhere else — several ship-hardening finding
 
 ```
 npc amber · location emerald · faction violet · item sky · adventure orange · article cyan
-sessionLog rose · playerCharacter teal · plot yellow · note slate · scene blue
+sessionLog rose · playerCharacter teal · plot yellow · note slate · scene blue · secret fuchsia
 ```
+
+- The record is typed `Record<EntityTypeKey, EntityTypeConfigEntry>` — `EntityTypeKey` is the closed union of its
+  keys (camelCase + the two kebab aliases), so a missing entry is a compile error. For an open-ended `string` type
+  (linking candidates, `SecretsTracker`'s picker) use `getEntityTypeConfig(key)` / `isEntityTypeKey(key)`, which
+  return `undefined` / `false` for unknown keys instead of indexing blind.
+- `secret` uses `icon: 'Lock'` (same as the sidebar's Secrets & Clues entry) and `fuchsia`.
 
 - `color` is a bare Tailwind color name; consumers compose the shade (`text-${color}-400`, `bg-${c}-900/50`).
 - `icon` is a **key into `components/common/Icons.tsx`**, not a lucide export name (`npc → 'NPCs'`,
@@ -55,9 +61,9 @@ runs a real `vite build` and greps the emitted CSS for the full cross-product.
 
 `createDefaultNpc`, `createDefaultLocation`, `createDefaultFaction`, `createDefaultItem`, `createDefaultArticle`,
 `createDefaultAdventure`, `createDefaultScene`, `createDefaultSession`, `createDefaultPlot`,
-`createDefaultPlayerCharacter`. There is deliberately **no** `createDefaultNote` / `createDefaultSecret` — both are
-minted wholesale by `campaignService.createNote` / `createSecret`, which own their `createdAt` / `lastModified`
-stamps.
+`createDefaultPlayerCharacter`, `createDefaultNote`, `createDefaultSecret`. The Note/Secret factories stamp
+`createdAt` (and `lastModified`) at call time only as pre-save placeholders — `campaignService.createNote` /
+`createSecret` still own the persisted stamps and overwrite them.
 
 - Every factory returns `id: ''`. The store mints the real `crypto.randomUUID()`; a factory must never mint one, or
   duplicating/importing an entity produces an id that was never registered in the remap table.
@@ -71,13 +77,17 @@ stamps.
 - `estimatePcHp(pc)` is a deliberate approximation (`10 + conMod × level`, floor 1, fallback 20) for the combat
   tracker — not a rules-accurate HP calculation.
 
-## `buildEntityContext(entityType, entity, campaign?)` (entityUtils.ts)
+## `buildEntityContext(entityType, entity, lookups?)` (entityUtils.ts)
 
-Builds the compact `entityContext` string for `RegenerateButton`'s per-field AI regeneration. Handles `npc`,
-`location`, `faction`, `item`, `scene`, `article`, `plot`, `note`; every other type falls through to
-`Name: ${entity.name}` (so `title`-keyed types get an empty string). Empty fields are dropped. `npc` is the only
-branch that reads `campaign` (to resolve the faction name). Add a case when a new entity type gains inline
-regeneration.
+Builds the compact `entityContext` string for `RegenerateButton`'s per-field AI regeneration, and it is the **only**
+builder — all nine editors with a `RegenerateButton` (NPC, location, faction, item, adventure, article, plot, note,
+scene) call it with their live `formData`; an inline template string in an editor is a regression (roadmap X11,
+pinned by `tests/editorEntityContext.test.tsx`). Handles `npc` (incl. `voiceNotes`), `location`, `faction`
+(incl. `influence`), `item` (incl. `itemType`), `adventure`, `scene`, `article`, `plot` (incl. clock via
+`formatPlotClock` and `ifIgnored`), `note`, `secret`; any other type falls through to `Name:` or `Title:`. Empty
+fields are dropped — there is no "Not specified" filler. `lookups` is `Pick<Campaign, 'factions'>`: `npc` is the only
+branch that reads it (faction-name resolution), so `NpcEditor` passes `{ factions }`. Add a case when a new entity
+type gains inline regeneration.
 
 ## `backlinkUtils.ts`
 

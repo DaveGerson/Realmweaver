@@ -8,7 +8,7 @@ import { campaignService } from '@/services/campaignService';
 import { generateSecretBatch, type SecretDraft } from '@/services/aiService';
 import { buildCampaignContext } from '@/services/contextBuilder';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
-import { ENTITY_TYPE_CONFIG } from '@/utils/entityUtils';
+import { getEntityTypeConfig } from '@/utils/entityUtils';
 
 // --- Types ---
 
@@ -118,7 +118,7 @@ interface EntityChipProps {
 }
 
 const EntityChip: React.FC<EntityChipProps> = ({ entity, onRemove }) => {
-  const config = ENTITY_TYPE_CONFIG[entity.type];
+  const config = getEntityTypeConfig(entity.type);
   const color = config?.color ?? 'slate';
 
   return (
@@ -236,7 +236,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
           <p className="text-xs text-slate-500 italic px-2 py-2">No results.</p>
         )}
         {orderedTypes.map(type => {
-          const config = ENTITY_TYPE_CONFIG[type];
+          const config = getEntityTypeConfig(type);
           const color = config?.color ?? 'slate';
           return (
             <div key={type} className="mb-1">

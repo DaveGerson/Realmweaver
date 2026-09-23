@@ -8,6 +8,7 @@ import { Button } from '../common/Button';
 import { MentionInput, resolveMentionCandidates, findMentionedIdsInText } from '../common/MentionInput';
 import { EntityHistoryManager } from '../common/EntityHistoryManager';
 import { RegenerateButton } from '../common/RegenerateButton';
+import { buildEntityContext } from '../../utils/entityUtils';
 import { EntityLink } from '../common/EntityLink';
 import { LinkedText } from '../common/LinkedText';
 import { campaignService } from '../../services/campaignService';
@@ -155,7 +156,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article, allArticl
     onUpdate(article.id, { [field]: newValue });
   };
 
-  const articleEntityContext = `Article Title: ${formData.title}\nCategory: ${formData.category}\nContent summary: ${(formData.content || '').substring(0, 200)}...`;
+  const articleEntityContext = buildEntityContext('article', formData);
 
   // The ancestor walk tracks visited ids: imported or batch-generated data can carry a
   // parent cycle (validation never checks referential cycles), and an unguarded walk

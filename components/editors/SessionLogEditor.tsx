@@ -273,7 +273,7 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
     // Start a new session via the service module.
     try {
       const session = await startAudioTranscription({
-        gcpApiKey: campaign.gcpApiKey!,
+        gcpApiKey: campaign.gcpApiKey ?? '',
         isMockMode,
         onTranscript: (text) => setLiveTranscript(prev => prev + text),
         onConnected: () => setIsLiveConnected(true),
@@ -546,8 +546,10 @@ export const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ log, campaig
         <div className="flex gap-2 items-center">
             {formData.status === 'active' && (
                 <div className="mr-4 flex items-center gap-2">
-                    {/* AI Scribe button — only shown when a GCP API key is configured */}
-                    {campaign.gcpApiKey ? (
+                    {/* AI Scribe button — shown when a GCP API key is configured, or in
+                        mock mode (the mock transcription needs no key, so gating it on the
+                        key made the mock branch unreachable from the UI — roadmap X3). */}
+                    {(campaign.gcpApiKey || isMockMode) ? (
                         <Button
                             onClick={handleToggleLive}
                             size="sm"
