@@ -2,6 +2,17 @@
 export type CombatantType = 'pc' | 'npc' | 'monster';
 
 /**
+ * A condition applied to a combatant (e.g. "Poisoned").
+ * `roundsRemaining` is optional — omitted means the condition lasts until removed.
+ * When set, it decrements each time the encounter's round advances and the
+ * condition is dropped when it reaches 0.
+ */
+export interface CombatCondition {
+  name: string;
+  roundsRemaining?: number;
+}
+
+/**
  * Represents a participant in a combat encounter.
  * Tracks dynamic state like current HP and Initiative.
  */
@@ -13,7 +24,13 @@ export interface Combatant {
   hp: number;
   maxHp: number;
   ac?: number;
-  notes?: string; // Status effects, conditions
+  /** Challenge rating as printed in a stat block ("1/4", "5"). Used by the difficulty readout. */
+  cr?: string;
+  /** Character level (PCs). Used to derive party XP thresholds. */
+  level?: number;
+  /** Structured conditions. Optional — encounters saved before this field existed have none. */
+  conditions?: CombatCondition[];
+  notes?: string; // Freeform notes
 }
 
 /**
