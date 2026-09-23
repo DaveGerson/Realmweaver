@@ -222,10 +222,19 @@ export async function createCampaign(
   // Submit
   await page.getByRole('button', { name: /weave campaign/i }).click();
 
-  // Wait for the editing state — aside heading confirms campaign loaded
-  await expect(
-    page.locator('aside').getByRole('heading', { name: title })
-  ).toBeVisible({ timeout: 8000 });
+  const sidebarHeading = page.locator('aside').getByRole('heading', { name: title });
+  const skipWizardBtn = page.locator('button[title="Skip wizard"]');
+
+  // Wait for the editing state. Either signal proves the campaign loaded: the
+  // sidebar heading, or the FirstCampaignWizard that auto-opens for an empty
+  // campaign. The wizard must be raced, not waited out: DialogShell marks the
+  // app behind an open dialog `inert` + `aria-hidden` (roadmap X4), and
+  // `getByRole` ignores aria-hidden content, so the sidebar heading is not
+  // role-visible until the wizard is dismissed.
+  await raceVisible([
+    { locator: sidebarHeading, timeout: 8000 },
+    { locator: skipWizardBtn, timeout: 8000 },
+  ]);
 
   // Dismiss the FirstCampaignWizard if it auto-opened for the empty campaign.
   // It renders as a fixed full-screen overlay with a close button titled "Skip wizard".
@@ -233,12 +242,13 @@ export async function createCampaign(
   // transitions to 'editing', so we must genuinely wait for it rather than
   // probe instantly — an instant check can lose that race and leave the
   // overlay covering every later action in the test.
-  const skipWizardBtn = page.locator('button[title="Skip wizard"]');
   if (await isVisibleWithin(skipWizardBtn, 2000)) {
     await skipWizardBtn.click();
     // Wait for the overlay to disappear
     await expect(skipWizardBtn).not.toBeVisible({ timeout: 3000 });
   }
+
+  await expect(sidebarHeading).toBeVisible({ timeout: 8000 });
 }
 
 // ---------------------------------------------------------------------------
@@ -249,11 +259,16 @@ export async function createCampaign(
  * On mobile, the sidebar is a hidden drawer. Open it by clicking the
  * hamburger button in the header (md:hidden class means desktop doesn't show it).
  */
-export async function openMobileSidebar(page: Page): Promise<void> {
+export async function openMobileSidebar(page: Page): Promise<boolean> {
   // The hamburger button sits before the logo in the header — it's md:hidden
   const hamburger = page.locator('header').getByRole('button').first();
   // Only click it if the sidebar is not currently visible in the viewport
   const sidebar = page.locator('aside');
+  // Let any in-flight slide transition settle first (CSS transitions are
+  // reported by Element.getAnimations()).
+  await expect
+    .poll(() => sidebar.evaluate(el => el.getAnimations().length), { timeout: 2000 })
+    .toBe(0);
   const sidebarBox = await sidebar.boundingBox();
   // On mobile, sidebar is translated -100% left so x is negative
   if (sidebarBox && sidebarBox.x < 0) {
@@ -264,7 +279,9 @@ export async function openMobileSidebar(page: Page): Promise<void> {
       const box = await sidebar.boundingBox();
       expect(box && box.x >= 0).toBe(true);
     }).toPass({ timeout: 2000 });
+    return true;
   }
+  return false;
 }
 
 /**
@@ -279,9 +296,20 @@ export async function openMobileSidebar(page: Page): Promise<void> {
  *   "NPCs", "Locations", "Factions", "Items"
  */
 export async function navigateToView(page: Page, label: string): Promise<void> {
-  await openMobileSidebar(page);
+  const openedDrawer = await openMobileSidebar(page);
   const btn = page.locator('aside').getByRole('button', { name: new RegExp(label, 'i') }).first();
   await btn.click();
+  if (openedDrawer) {
+    // Selecting a view closes the mobile drawer. Wait for it to finish sliding
+    // off-screen so the NEXT navigateToView sees a settled drawer: probing it
+    // mid-close (x still ≈ 0) read it as "open", skipped the hamburger, and
+    // then waited forever on a button that slid out of view.
+    const sidebar = page.locator('aside');
+    await expect(async () => {
+      const box = await sidebar.boundingBox();
+      expect(box === null || box.x < 0).toBe(true);
+    }).toPass({ timeout: 3000 });
+  }
 }
 
 /** Wait for the main content area to be rendered. */

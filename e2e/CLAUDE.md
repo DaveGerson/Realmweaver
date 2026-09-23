@@ -70,9 +70,9 @@ Every spec builds on these. Do not re-implement them inline.
 | Export | Contract |
 |--------|----------|
 | `gotoFresh(page)` | Clears every `realmweaver*` localStorage key, then sets `realmweaver-campaigns` to `'[]'` and reloads. Waits for the "Create a campaign" button. |
-| `createCampaign(page, opts?)` | Welcome / CrossCampaignDashboard / header-dropdown → template-select → "Start From Scratch" → form → submit. Waits for the sidebar heading, then dismisses `FirstCampaignWizard` if it auto-opened. Options: `{ title, dmStyle, settingType, setting }`. |
+| `createCampaign(page, opts?)` | Welcome / CrossCampaignDashboard / header-dropdown → template-select → "Start From Scratch" → form → submit. Races the sidebar heading against the auto-opened `FirstCampaignWizard`, dismisses the wizard, then asserts the sidebar heading. (While any dialog is open the app behind it is `inert` + `aria-hidden`, so `getByRole` cannot see the sidebar until the wizard closes.) Options: `{ title, dmStyle, settingType, setting }`. |
 | `enableMockMode(page)` | Ensures the header `[role="switch"]` reads `aria-checked="true"`. Returns silently if the toggle isn't mounted. |
-| `navigateToView(page, label)` | Opens the mobile drawer if the sidebar is off-screen, then clicks the sidebar button whose accessible name matches `label` (case-insensitive regex). |
+| `navigateToView(page, label)` | Opens the mobile drawer if the sidebar is off-screen, clicks the sidebar button whose accessible name matches `label` (case-insensitive regex), and — when it opened the drawer — waits for the drawer to finish sliding shut, so the next call never probes it mid-transition. |
 | `waitForDashboard(page)` | `expect(page.locator('main')).toBeVisible()`. |
 | `openCampaignSelector(page)` | Header dropdown → the `role="menuitem"` named exactly "All Campaigns". |
 | `waitForAutoSave(page, expectedTitle)` | Polls `localStorage['realmweaver-campaigns']` until it contains the title. The header "Saved" indicator is `hidden sm:flex`, so it is not a reliable signal. |
@@ -133,5 +133,6 @@ one to a spec.
 | `gotoFresh` writes `'[]'`, doesn't remove the key | A missing key seeds the demo campaign instead of the welcome screen. |
 | Don't assert on the header "Saved" text | It is `hidden sm:flex`; use `waitForAutoSave`. |
 | Each test creates its own campaign | Specs run in parallel with no shared state. |
+| Background content is aria-hidden while a dialog is open | `DialogShell` inerts everything behind it; role queries for background UI need `includeHidden: true` or must run after the dialog closes. |
 
 Rationale for the helper hardening is finding #33 in `docs/ship-readiness/remediation-plan.md`.

@@ -244,15 +244,22 @@ test.describe('Dialogs and Wizards', () => {
       await page.getByRole('radio', { name: /i keep it simple/i }).click();
       await page.getByRole('button', { name: /weave campaign/i }).click();
 
-      // Wait for campaign to load
+      // Wait for campaign to load. The sidebar renders, but while the wizard
+      // is open DialogShell marks the app behind it inert + aria-hidden
+      // (roadmap X4), so it is only reachable with includeHidden.
       await expect(
-        page.locator('aside').getByRole('heading', { name: 'Wizard Test Campaign' })
-      ).toBeVisible({ timeout: 8000 });
+        page.locator('aside').getByRole('heading', { name: 'Wizard Test Campaign', includeHidden: true })
+      ).toBeAttached({ timeout: 8000 });
 
       // The FirstCampaignWizard should auto-open as a fixed overlay
       // It has a "Skip wizard" close button
       const skipWizardBtn = page.locator('button[title="Skip wizard"]');
       await expect(skipWizardBtn).toBeVisible({ timeout: 5000 });
+
+      // Background content is hidden from assistive tech while the wizard is up.
+      await expect(
+        page.locator('aside').getByRole('heading', { name: 'Wizard Test Campaign' })
+      ).toHaveCount(0);
 
       // The wizard should show step progress (Step 1 of N)
       // or its initial content about getting started
@@ -262,9 +269,12 @@ test.describe('Dialogs and Wizards', () => {
 
       await page.screenshot({ path: 'e2e/screenshots/first-campaign-wizard.png' });
 
-      // Now dismiss it
+      // Now dismiss it — the background becomes reachable again.
       await skipWizardBtn.click();
       await expect(skipWizardBtn).not.toBeVisible({ timeout: 3000 });
+      await expect(
+        page.locator('aside').getByRole('heading', { name: 'Wizard Test Campaign' })
+      ).toBeVisible({ timeout: 3000 });
     });
   });
 
