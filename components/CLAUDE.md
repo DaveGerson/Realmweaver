@@ -40,9 +40,11 @@ Every React component in the app. Hooks live in `hooks/` (see `hooks/CLAUDE.md`)
 ### Generators
 
 Props are `onXCreated`, `isMockMode`, `campaignContext` (+ entity-specific lookups). They call `services/aiService.ts`
-directly — never `services/ai/*`. In-flight requests are guarded (`isMountedRef` set in an effect body so it survives
-StrictMode's mount → cleanup → remount, or a monotonic request id) so a stale response never writes into an unmounted
-or superseded panel.
+directly — never `services/ai/*`. The seven quick generators are thin configs over
+`generators/QuickGeneratorForm.tsx`; every in-flight request goes through `hooks/useAiRequest`, which passes an
+`AbortSignal` into the facade, aborts on unmount or re-run, and returns `'cancelled'` for a late result — so a stale
+response never writes into an unmounted or superseded panel, and the proxy kills the underlying `claude` process.
+Show a Cancel `<Button>` while `isLoading`.
 
 ### Editors
 
@@ -66,8 +68,14 @@ Props are the entity, its lookup arrays, `campaign`, `onUpdate(id, updates)`, `o
 
 Wraps every modal (`ConfirmDialog`, `CommandPalette`, `KeyboardShortcutsHelp`, `DmStylePanel`, all of `dialogs/`, the
 generator preview modals, `FirstCampaignWizard`, `SessionRunner`). Props: `isOpen`, `onClose`, `children`,
-`className`, `ariaLabel`. Renders `role="dialog" aria-modal="true"` with a `bg-black/60` backdrop, and returns `null`
-when closed.
+`className`, `ariaLabel`. Renders `role="dialog" aria-modal="true"` with a `bg-black/60` backdrop **portaled into
+`document.body`**, and returns `null` when closed.
+
+- **Background inert (roadmap X4):** `utils/modalStack.ts` keeps a module-level stack; while open, every top-level
+  sibling of the topmost dialog gets `inert` + `aria-hidden="true"`, restored exactly on close (out-of-order closes and
+  nesting handled — each nested dialog is its own `body` child). `data-modal-inert-exempt` opts an element out:
+  `ToastContainer` (z-[90]) and the `StatusBanners` conflict/backup banners (z-[85]) use it. Tests must query dialogs
+  via `screen` / `document`, not the render `container`.
 
 - **Escape contract:** `handleKeyDown` returns early if `e.defaultPrevented`. A child that already consumed the
   keystroke (`MentionInput` closing its suggestion dropdown calls `preventDefault()` + `stopPropagation()`) keeps the

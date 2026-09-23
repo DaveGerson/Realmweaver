@@ -1,6 +1,6 @@
 # CLAUDE.md — `hooks/`
 
-Seven hooks. Two of them (`useToast`, `useConfirmDialog`) also export the **provider** that owns their state; those
+Nine hooks. Two of them (`useToast`, `useConfirmDialog`) also export the **provider** that owns their state; those
 providers are mounted once in `index.tsx`, outside `<App/>`.
 
 | Hook | Shape |
@@ -12,6 +12,8 @@ providers are mounted once in `index.tsx`, outside `<App/>`.
 | `useRovingTabIndex` | `({ direction?, columns? }) => { getRovingProps(index) }` (+ exported `resolveColumns`) |
 | `useEntitySelection` | `({ activeCampaign, onSidebarClose }) => EntitySelectionState` — App-shell navigation state |
 | `useModalState` | `() => ModalState` — App-shell modal flags |
+| `useAiRequest` | `() => { run(fn: (signal) => Promise<T>): Promise<T \| 'cancelled'>, cancel, isLoading, error }` — owns an `AbortController`; aborts on unmount and on a new `run` |
+| `useIncrementalList` | `(items, { threshold = 100, initialCount = 60, pageSize = 60, resetKey })` → `{ visibleItems, hasMore, showMore, ensureIndexVisible, sentinelRef, … }` — renders everything at or below the threshold, else a prefix that grows on scroll / "Show more"; pair with `IncrementalListFooter`, and wire `ensureIndexVisible` to `useRovingTabIndex`'s `onRequestIndex` (plus `itemCount`) |
 
 ## useDebouncedFieldCommit
 
