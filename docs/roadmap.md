@@ -23,6 +23,14 @@
 > `CommandPalette.tsx` — but there is still no `'secret'` entry, the record is still typed
 > `Record<string, …>`, and `createDefaultSecret`/`createDefaultNote` still do not exist.
 
+> **Status update, 2026-09-23 — uplevel pass (branch `claude/codebase-refactor-improvements-jn4m0d`).**
+> The Lazy DM / unstructured-play toolkit (`claude/dnd-unstructured-campaigns-dwsjxk`) is folded in, and
+> eight parallel work packages closed **N4, X1, X2, X4, X6, X7, X9, X10, X11, L1, L3, L7, L8** plus the
+> encounter-difficulty half of **L5** (struck through in the master table below). N4 shipped as threshold-
+> gated incremental rendering (render 60, grow on scroll) rather than true windowing, because
+> `useRovingTabIndex` needs contiguous indices over variable-height grids. What remains open — and the
+> larger bets this pass surfaced — is laid out in `docs/architecture/uplevel-plan-2026-09.md`.
+
 ---
 
 ## 1. Method
@@ -514,28 +522,28 @@ Dependencies: none, but benefits from X1's cleaner CRUD surface to target.
 | ~~N1. CI Pipeline~~ **DONE** | 3 | 3 | 3 | 3 | 3 | 15 | S | P0 | none |
 | ~~N2. Tailwind Build Migration~~ **DONE** | 3 | 3 | 3 | 3 | 3 | 15 | M | P0 | none |
 | ~~N3. Session-Runner Data Durability~~ **DONE** | 2 | 5 | 4 | 5 | 2 | 18 | M | P0 | none |
-| N4. Dashboard & Palette Virtualization | 1 | 2 | 5 | 2 | 5 | 15 | M | P0 | none |
+| ~~N4. Dashboard & Palette Virtualization~~ **DONE** | 1 | 2 | 5 | 2 | 5 | 15 | M | P0 | none |
 | ~~N5. AI Buffer Truncation & Error Visibility~~ **DONE** | 2 | 4 | 3 | 2 | 4 | 15 | S | P0 | none |
 | ~~N6. Component Test Infra Bootstrap~~ **DONE** | 3 | 3 | 3 | 3 | 3 | 15 | M | P0 | none |
-| X1. Generic Entity CRUD Factory | 1 | 2 | 5 | 2 | 4 | 14 | L | P2 | N6 |
-| X2. ModelTier Unification | 2 | 3 | 2 | 2 | 3 | 12 | S | P1 | none |
+| ~~X1. Generic Entity CRUD Factory~~ **DONE** | 1 | 2 | 5 | 2 | 4 | 14 | L | P2 | N6 |
+| ~~X2. ModelTier Unification~~ **DONE** | 2 | 3 | 2 | 2 | 3 | 12 | S | P1 | none |
 | ~~X3. Audio Transcription Facade Compliance~~ **DONE** | 2 | 4 | 3 | 3 | 2 | 14 | M | P1 | none |
-| X4. DialogShell Portal + Inert | 3 | 3 | 3 | 3 | 3 | 15 | M | P1 | none |
+| ~~X4. DialogShell Portal + Inert~~ **DONE** | 3 | 3 | 3 | 3 | 3 | 15 | M | P1 | none |
 | X5. Streaming AI Responses | 4 | 5 | 3 | 2 | 4 | 18 | L | P2 | N5 |
-| X6. Combat Encounter Full-State Archiving | 1 | 1 | 3 | 5 | 1 | 11 | S | P1 | none |
-| X7. Structured Combat Essentials | 2 | 2 | 1 | 5 | 1 | 11 | M | P2 | none |
+| ~~X6. Combat Encounter Full-State Archiving~~ **DONE** | 1 | 1 | 3 | 5 | 1 | 11 | S | P1 | none |
+| ~~X7. Structured Combat Essentials~~ **DONE** | 2 | 2 | 1 | 5 | 1 | 11 | M | P2 | none |
 | ~~X8. Keyboard-Accessible Relationship Graph~~ **DONE** | 1 | 1 | 2 | 1 | 5 | 10 | M | P2 | none |
-| X9. DM Coach & Wizard Reliability Polish *(partly done)* | 5 | 4 | 1 | 1 | 1 | 12 | S | P1 | none |
-| X10. Entity-Type-Config Completeness | 1 | 1 | 3 | 1 | 3 | 9 | S | P1 | none |
-| X11. buildEntityContext Consolidation | 1 | 2 | 3 | 1 | 4 | 11 | M | P2 | none |
-| L1. Generator Consolidation & Cancellation | 3 | 4 | 2 | 1 | 2 | 12 | L | P3 | N6 |
+| ~~X9. DM Coach & Wizard Reliability Polish~~ **DONE** | 5 | 4 | 1 | 1 | 1 | 12 | S | P1 | none |
+| ~~X10. Entity-Type-Config Completeness~~ **DONE** | 1 | 1 | 3 | 1 | 3 | 9 | S | P1 | none |
+| ~~X11. buildEntityContext Consolidation~~ **DONE** | 1 | 2 | 3 | 1 | 4 | 11 | M | P2 | none |
+| ~~L1. Generator Consolidation & Cancellation~~ **DONE** | 3 | 4 | 2 | 1 | 2 | 12 | L | P3 | N6 |
 | L2. Component Render Test Expansion | 2 | 2 | 2 | 2 | 2 | 10 | L | P3 | N6 |
-| L3. Prep-to-Play Continuity Bridge | 2 | 5 | 4 | 1 | 1 | 13 | L | P3 | X11 (soft) |
+| ~~L3. Prep-to-Play Continuity Bridge~~ **DONE** | 2 | 5 | 4 | 1 | 1 | 13 | L | P3 | X11 (soft) |
 | L4. Cross-Campaign Entity Reuse | 1 | 1 | 5 | 1 | 3 | 11 | XL | P3 | X1 |
-| L5. Structured NPC Stat Blocks + Difficulty Calc | 3 | 1 | 1 | 5 | 1 | 11 | L | P3 | X7 |
+| L5. Structured NPC Stat Blocks + Difficulty Calc *(calculator done)* | 3 | 1 | 1 | 5 | 1 | 11 | L | P3 | X7 |
 | L6. Selection/Navigation State Consolidation | 2 | 2 | 2 | 2 | 2 | 10 | XL | P3 | N6, L2 |
-| L7. Linking Engine Unification *(partly done)* | 1 | 1 | 2 | 1 | 4 | 9 | M | P2 | none |
-| L8. New-DM Onboarding Revamp | 5 | 2 | 1 | 1 | 1 | 10 | L | P3 | X10 (soft) |
+| ~~L7. Linking Engine Unification~~ **DONE** | 1 | 1 | 2 | 1 | 4 | 9 | M | P2 | none |
+| ~~L8. New-DM Onboarding Revamp~~ **DONE** | 5 | 2 | 1 | 1 | 1 | 10 | L | P3 | X10 (soft) |
 | L9. Import/Export Foreign-Tool Adapters | 1 | 1 | 4 | 1 | 3 | 10 | XL | P3 | X1 (soft) |
 
 *Priority tiers: **P0** = ship first (reliability/platform gate, NOW section). **P1** = highest value-density

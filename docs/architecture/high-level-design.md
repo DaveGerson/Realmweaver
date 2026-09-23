@@ -69,7 +69,7 @@ RealmWeaver is an AI-native campaign management tool for tabletop RPG Game Maste
 
 2. **Three-layer AI facade** — Components call `aiService.ts` (never `ai/` modules directly). The facade routes to mock or real implementations based on `isMockMode`. Real implementations use `ai/core.ts`, which delegates to the active provider via `providers/registry.ts`.
 
-3. **Provider abstraction layer** — `providers/registry.ts` manages which AI backend is active. Default is `claude-cli` (Claude Code CLI via Vite proxy middleware). A stub `anthropic-api` provider is ready for future production deployment. Legacy Gemini model name strings are mapped to `ModelTier` values by `core.ts` for backward compatibility.
+3. **Provider abstraction layer** — `providers/registry.ts` manages which AI backend is active. Default is `claude-cli` (Claude Code CLI via Vite proxy middleware). A stub `anthropic-api` provider is ready for future production deployment. Legacy Gemini model names and RealmChat's old `'performance'`/`'medium'` tiers are mapped to the one `ModelTier` vocabulary by `modelConfig.toModelTier()`. Every call accepts an optional `AbortSignal`, threaded through `core.ts`, the provider's `fetch`, `withRetry` (aborts are never retried) and the mocks; the proxy kills the spawned `claude` process when the client disconnects. Components drive AI calls through `hooks/useAiRequest`, and the seven quick generators share `generators/QuickGeneratorForm.tsx`.
 
 4. **Tiered context builder** — `contextBuilder.ts` assembles AI context with token-budget awareness. Tier 1 (always): setting, style profile, active scene. Tier 2 (contextual): scene NPCs, location, plots. Tier 3 (on-demand): full entity overviews.
 
@@ -79,9 +79,9 @@ RealmWeaver is an AI-native campaign management tool for tabletop RPG Game Maste
 
 7. **Decomposed App shell** — `App.tsx` delegates view routing to `ViewRouter.tsx`, entity selection state to `useEntitySelection`, and modal lifecycle to `useModalState`. `SessionRunner` and `CampaignSidebar` are each decomposed into focused sub-components under `views/session/` and `layout/sidebar/` respectively.
 
-8. **Accessible dialog system** — All modals compose `DialogShell` for consistent focus trap, Escape-to-close, body scroll lock, and ARIA roles. Confirmations go through `useConfirmDialog` (context-provider); ephemeral feedback through `useToast` (context-provider). Direct use of `window.confirm` / `window.alert` is prohibited. Phase 7 additions: `DmStylePanel` uses `role="radiogroup"` semantics; `BacklinksPanel` exposes collapsed link count to screen readers.
+8. **Accessible dialog system** — All modals compose `DialogShell` for consistent focus trap, Escape-to-close, body scroll lock, and ARIA roles. `DialogShell` portals into `document.body`, and `utils/modalStack.ts` marks everything behind the topmost dialog `inert` + `aria-hidden` (toasts and status banners opt out via `data-modal-inert-exempt`). Confirmations go through `useConfirmDialog` (context-provider); ephemeral feedback through `useToast` (context-provider). Direct use of `window.confirm` / `window.alert` is prohibited. Phase 7 additions: `DmStylePanel` uses `role="radiogroup"` semantics; `BacklinksPanel` exposes collapsed link count to screen readers.
 
-9. **ENTITY_TYPE_CONFIG** — Canonical map in `utils/entityUtils.ts` from entity type key to `{ icon, color, label }`. All components that render entity type metadata (dashboards, quick cards, command palette, sidebar) derive from this config. Colors: npc=amber, location=emerald, faction=violet, item=sky, adventure=orange, article=cyan, sessionLog=rose, playerCharacter=teal, plot=yellow, note=slate, **scene=blue**. Adding a color here also requires extending the `@source inline(...)` safelist in `index.css`, since these classes are composed at runtime and invisible to Tailwind's scanner. There is still no `secret` entry.
+9. **ENTITY_TYPE_CONFIG** — Canonical map in `utils/entityUtils.ts` from entity type key to `{ icon, color, label }`. All components that render entity type metadata (dashboards, quick cards, command palette, sidebar) derive from this config. Colors: npc=amber, location=emerald, faction=violet, item=sky, adventure=orange, article=cyan, sessionLog=rose, playerCharacter=teal, plot=yellow, note=slate, **scene=blue**. Adding a color here also requires extending the `@source inline(...)` safelist in `index.css`, since these classes are composed at runtime and invisible to Tailwind's scanner. **secret=fuchsia**. The record is typed against the closed `EntityTypeKey` union, so a missing entry is a compile error; `getEntityTypeConfig` / `isEntityTypeKey` handle arbitrary strings. Editors build `RegenerateButton` context through the single `buildEntityContext`.
 
 10. **Shared Button component** — `components/common/Button.tsx` provides a unified button abstraction with 5 variants (`primary`, `secondary`, `ghost`, `danger`, `icon`) and 3 sizes (`sm`, `md`, `lg`). `twMerge` handles className composition and override. 219+ instances across the codebase use it. Cards, tabs, and chip elements with semantic roles may stay as raw `<button>` elements.
 
@@ -96,6 +96,14 @@ RealmWeaver is an AI-native campaign management tool for tabletop RPG Game Maste
 15. **Build-time Tailwind + provider env flow** — Tailwind is compiled by `@tailwindcss/vite` from `index.css` (no CDN script, no runtime JIT); classes composed at runtime from `ENTITY_TYPE_CONFIG` colors are kept alive by `@source inline(...)` safelists in that file. Provider knobs (`REALMWEAVER_AI_PROVIDER`, `_DEFAULT_TIER`, `_MAX_RETRIES`, `_TIMEOUT_MS`, `_API_BASE_URL`) travel from `.env.local` through `vite.config.ts`'s `define` as literal `process.env.<KEY>` tokens, and `services/ai/modelConfig.ts` reads them back through guarded live getters so Node-side callers (tests, middleware) still see runtime mutations.
 
 16. **Localhost-only AI proxy** — `vite-plugin-ai-proxy.ts` registers `/api/ai/generate` and `/api/ai/health` on both the dev server (`configureServer`) and the preview server (`configurePreviewServer`). Requests must arrive from a loopback TCP peer (unforgeable), with `Origin` and `Host` both resolving to localhost; bodies are capped at 4 MB, CLI invocation at 120 s and 1 MB of stdout. A per-session token is injected into the page and validated when present, but is not yet required.
+
+17. **Generic entity CRUD factory** — `campaignService.ts` builds create/update/delete for the 11 flat collections from a private `makeEntityCrud(key, spec)`: specs declare per-type rules (`build`, `onCreate`, `canUpdate`, `prepareUpdate`, `onUpdate`, `onDelete`), the factory enforces purge-on-delete, no-op on unknown ids, and veto-leaves-state-unchanged. `makeHierarchy()` supplies the Location/Article parent trees and their cycle guards. Scenes stay bespoke (nested under adventures).
+
+18. **Bounded rendering for large campaigns** — `hooks/useIncrementalList.ts` engages above 100 items, renders 60 and grows on scroll or "Show more"; `useRovingTabIndex` can request unrendered indices so keyboard navigation still reaches every card. Nine dashboards use it; `CommandPalette` caps entity results at 50.
+
+19. **One entity-name matcher** — `services/linking` is the only name-in-prose matcher (`LinkedText`, suggestions, auto-linking, `storyDerivations`). It scores confidence, honours aliases, and returns names shared by several entities as a single `ambiguous` match with `candidates`, which `autoLinker` never auto-applies.
+
+20. **Continuity & combat utilities** — `utils/continuityThreads.ts` ranks last session's loose ends, unresolved plots, in-progress scenes/adventures and loaded-gun secrets for the prep wizard's opt-in carry-forward and the runner's `LooseEndsPanel`. `utils/encounterDifficulty.ts` rates a fight from party levels and monster CRs for `CombatTracker`, whose combatants now carry `ac` / `cr` / `level` / timed `conditions`; `campaignService.endCombat()` archives mid-session fights to the session's `encounterLog`.
 
 ---
 
@@ -154,8 +162,10 @@ SessionLog.plannedSceneIds[]     -> Scene      (any adventure — resolved campa
 
 ### Cascade Deletion
 
-Every `deleteX()` does two things: type-specific relationship unwinding, plus a shared
-`_purgeEntityReferences(campaign, id)` sweep so no dangling reference survives anywhere.
+Every `deleteX()` does two things: type-specific relationship unwinding (the spec's `onDelete`), plus a shared
+`_purgeEntityReferences(campaign, id)` sweep so no dangling reference survives anywhere. For the 11 flat
+collections both run through `makeEntityCrud`, so the sweep cannot be forgotten; `deleteScene` and
+`deleteAdventure`'s per-scene sweep call it by hand.
 
 | Deleted entity | Type-specific cascade |
 |----------------|----------------------|
