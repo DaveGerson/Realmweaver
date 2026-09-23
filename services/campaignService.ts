@@ -1,5 +1,5 @@
 
-import { produce } from 'immer';
+import { produce, current } from 'immer';
 import type {
     Campaign,
     Adventure,
@@ -502,70 +502,6 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         }
     };
 
-    const _isLocationParentingAllowed = (draftCampaign: Campaign, childId: string, newParentId: string): boolean => {
-        // Visited guard: a PRE-EXISTING parent cycle (importable — the import
-        // validator checks ids, not referential integrity) must not turn this
-        // walk into an infinite loop. Such a cycle cannot include childId (that
-        // returns false first), so attaching under it creates no NEW cycle.
-        const visited = new Set<string>();
-        let currentId: string | undefined = newParentId;
-        while (currentId) {
-            if (currentId === childId) return false; // Cycle detected
-            if (visited.has(currentId)) return true;
-            visited.add(currentId);
-            const current = draftCampaign.locations.find(l => l.id === currentId);
-            if (!current) return true;
-            currentId = current.parentLocationId;
-        }
-        return true;
-    };
-
-    const _synchronizeLocationHierarchy = (draftCampaign: Campaign, locationId: string, oldParentId?: string, newParentId?: string) => {
-        if (oldParentId === newParentId) return;
-
-        if (oldParentId) {
-            const oldParent = draftCampaign.locations.find(l => l.id === oldParentId);
-            if (oldParent) oldParent.subLocationIds = oldParent.subLocationIds.filter(id => id !== locationId);
-        }
-        if (newParentId) {
-            const newParent = draftCampaign.locations.find(l => l.id === newParentId);
-            if (newParent && !newParent.subLocationIds.includes(locationId)) newParent.subLocationIds.push(locationId);
-        }
-    };
-    
-    const _isArticleParentingAllowed = (draftCampaign: Campaign, childId: string, newParentId: string): boolean => {
-        // Visited guard mirrors _isLocationParentingAllowed — see the comment there.
-        const visited = new Set<string>();
-        let currentId: string | undefined = newParentId;
-        while (currentId) {
-            if (currentId === childId) return false; // Cycle detected
-            if (visited.has(currentId)) return true;
-            visited.add(currentId);
-            const current = draftCampaign.articles.find(a => a.id === currentId);
-            if (!current) return true;
-            currentId = current.parentArticleId;
-        }
-        return true;
-    };
-
-    const _synchronizeArticleHierarchy = (draftCampaign: Campaign, articleId: string, oldParentId?: string, newParentId?: string) => {
-        if (oldParentId === newParentId) return;
-
-        if (oldParentId) {
-            const oldParent = draftCampaign.articles.find(a => a.id === oldParentId);
-            if (oldParent) {
-                oldParent.subArticleIds = (oldParent.subArticleIds || []).filter(id => id !== articleId);
-            }
-        }
-        if (newParentId) {
-            const newParent = draftCampaign.articles.find(a => a.id === newParentId);
-            if (newParent) {
-                if (!newParent.subArticleIds) newParent.subArticleIds = [];
-                if (!newParent.subArticleIds.includes(articleId)) newParent.subArticleIds.push(articleId);
-            }
-        }
-    };
-
     /**
      * Sweeps every known cross-entity reference array/field for a deleted
      * entity's id and strips it out. Safe to call unconditionally for any
@@ -584,13 +520,12 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
      * structuredNotes[].taggedEntityIds + plannedNpcIds + plannedLocationIds,
      * and Campaign.pinnedEntities (finding #10).
      *
-     * Called from every entity delete method — including
-     * deleteScene/deleteSessionLog/deletePlayerCharacter/deleteNote/
-     * deleteSecret, not just NPC/Location/Faction/Plot/Article (verifier
-     * follow-up on #10: those five were wired to the individual-array splice
-     * but never called this sweep, so e.g. a deleted scene's id survived in
-     * every mentionedEntityIds array and a deleted note/secret/session-log/PC
-     * id survived in pinnedEntities forever).
+     * Called by `makeEntityCrud`'s `remove` for EVERY factory-built entity
+     * type (so a new type cannot forget it), plus the bespoke `deleteScene`
+     * and `deleteAdventure`'s per-scene sweep (verifier follow-up on #10:
+     * several delete paths once skipped this sweep, so e.g. a deleted scene's
+     * id survived in every mentionedEntityIds array and a deleted
+     * note/secret/session-log/PC id survived in pinnedEntities forever).
      */
     const _purgeEntityReferences = (draftCampaign: Campaign, entityId: string) => {
         // History rows keep their summary but drop the dangling pointer —
@@ -720,6 +655,334 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             draftCampaign.pinnedEntities = draftCampaign.pinnedEntities.filter(p => p.id !== entityId);
         }
     };
+
+    // --- Generic Entity CRUD Factory (X1) ---
+    //
+    // Every top-level entity collection gets its create/update/delete triplet
+    // from `makeEntityCrud`, so the integrity rules below are enforced in ONE
+    // place instead of being hand-copied per entity type:
+    //   - create: fresh UUID, `build` normalisation, collection lazily
+    //     created for optional arrays, returns the new id (even with no
+    //     active campaign — callers use it for selection).
+    //   - update: unknown id / no active campaign is a no-op; `canUpdate` can
+    //     veto the whole update (state unchanged); `onUpdate` sees the
+    //     pre-update snapshot for bidirectional syncing.
+    //   - delete: unknown id is a no-op; otherwise `onDelete` (type-specific
+    //     unlinking) → `_purgeEntityReferences` (ALWAYS — a new entity type
+    //     cannot forget it) → removal from the collection.
+    // Scenes are nested under adventures and keep bespoke methods below.
+
+    /** Top-level Campaign arrays managed by `makeEntityCrud`. */
+    type EntityCollectionKey =
+        | 'npcs' | 'locations' | 'factions' | 'items' | 'articles' | 'adventures'
+        | 'sessionLogs' | 'playerCharacters' | 'plots' | 'notes' | 'secrets';
+    type EntityOf<K extends EntityCollectionKey> = NonNullable<Campaign[K]>[number];
+
+    interface EntityCrudSpec<T extends { id: string }, TInput> {
+        /** Pure normalisation of the caller's data (runs outside the draft). */
+        build?: (data: TInput) => Omit<T, 'id'>;
+        /** Runs inside the draft just before insertion; may mutate `entity`. */
+        onCreate?: (campaign: Campaign, entity: T) => void;
+        /** Return false to reject the update entirely (state left unchanged). */
+        canUpdate?: (campaign: Campaign, id: string, updates: Partial<T>) => boolean;
+        /** Transforms the patch before it is applied (e.g. stamping lastModified). */
+        prepareUpdate?: (updates: Partial<T>) => Partial<T>;
+        /** Runs after the patch is applied; `previous` is the pre-update shallow snapshot. */
+        onUpdate?: (campaign: Campaign, entity: T, previous: T) => void;
+        /** Type-specific unlinking, run before the reference purge and removal. */
+        onDelete?: (campaign: Campaign, entity: T) => void;
+    }
+
+    function makeEntityCrud<K extends EntityCollectionKey, TInput = Omit<EntityOf<K>, 'id'>>(
+        key: K,
+        spec: EntityCrudSpec<EntityOf<K>, TInput> = {},
+    ) {
+        type T = EntityOf<K>;
+        const list = (c: Campaign) => c[key] as T[] | undefined;
+        const findIn = (c: Campaign, id: string) => list(c)?.find(e => e.id === id);
+
+        return {
+            create(data: TInput): string {
+                const built = spec.build ? spec.build(data) : (data as unknown as Omit<T, 'id'>);
+                const entity = { ...built, id: crypto.randomUUID() } as T;
+                updateState(draft => {
+                    const campaign = getActiveCampaignFromState(draft);
+                    if (!campaign) return;
+                    spec.onCreate?.(campaign, entity);
+                    const collection = list(campaign);
+                    if (collection) collection.push(entity);
+                    else (campaign as Record<K, T[]>)[key] = [entity];
+                });
+                return entity.id;
+            },
+            update(id: string, updates: Partial<T>): void {
+                updateState(draft => {
+                    const campaign = getActiveCampaignFromState(draft);
+                    if (!campaign) return;
+                    const entity = findIn(campaign, id);
+                    if (!entity) return;
+                    if (spec.canUpdate && !spec.canUpdate(campaign, id, updates)) return;
+                    const previous = { ...entity };
+                    Object.assign(entity, spec.prepareUpdate ? spec.prepareUpdate(updates) : updates);
+                    spec.onUpdate?.(campaign, entity, previous);
+                });
+            },
+            remove(id: string): void {
+                updateState(draft => {
+                    const campaign = getActiveCampaignFromState(draft);
+                    if (!campaign) return;
+                    const entity = findIn(campaign, id);
+                    if (!entity) return;
+                    spec.onDelete?.(campaign, entity);
+                    _purgeEntityReferences(campaign, id);
+                    const collection = list(campaign)!;
+                    collection.splice(collection.findIndex(e => e.id === id), 1);
+                });
+            },
+        };
+    }
+    /**
+     * Parent/child tree integrity shared by the Location and Article
+     * hierarchies (the two were hand-duplicated before X1). The accessors keep
+     * this independent of the concrete `parentXId` / `subXIds` field names.
+     *
+     * - `isParentingAllowed` walks the proposed parent's ancestor chain and
+     *   rejects a move that would make the child its own ancestor. A visited
+     *   guard stops a PRE-EXISTING cycle (importable — the import validator
+     *   checks ids, not referential integrity) from turning the walk into an
+     *   infinite loop; such a cycle cannot include childId (that returns false
+     *   first), so attaching under it creates no NEW cycle.
+     * - `synchronize` keeps the parent's child-id list in lockstep with the
+     *   child's parent pointer.
+     * - `hooks` plugs both into `makeEntityCrud`: a rejected re-parent aborts
+     *   the whole update (state unchanged), a delete detaches from the parent
+     *   and orphans (un-parents) every child.
+     */
+    const makeHierarchy = <T extends { id: string }>(opts: {
+        label: string;
+        list: (c: Campaign) => T[];
+        getParentId: (e: Partial<T>) => string | undefined;
+        setParentId: (e: T, id: string | undefined) => void;
+        getChildIds: (e: T) => string[] | undefined;
+        setChildIds: (e: T, ids: string[]) => void;
+    }) => {
+        const { label, list, getParentId, setParentId, getChildIds, setChildIds } = opts;
+        const find = (c: Campaign, id: string) => list(c).find(e => e.id === id);
+
+        const isParentingAllowed = (draftCampaign: Campaign, childId: string, newParentId: string): boolean => {
+            const visited = new Set<string>();
+            let currentId: string | undefined = newParentId;
+            while (currentId) {
+                if (currentId === childId) return false; // Cycle detected
+                if (visited.has(currentId)) return true;
+                visited.add(currentId);
+                const current = find(draftCampaign, currentId);
+                if (!current) return true;
+                currentId = getParentId(current);
+            }
+            return true;
+        };
+
+        const synchronize = (draftCampaign: Campaign, childId: string, oldParentId?: string, newParentId?: string) => {
+            if (oldParentId === newParentId) return;
+            const oldParent = oldParentId ? find(draftCampaign, oldParentId) : undefined;
+            if (oldParent) setChildIds(oldParent, (getChildIds(oldParent) || []).filter(id => id !== childId));
+            const newParent = newParentId ? find(draftCampaign, newParentId) : undefined;
+            if (newParent) {
+                const children = getChildIds(newParent) || [];
+                if (!children.includes(childId)) setChildIds(newParent, [...children, childId]);
+            }
+        };
+
+        const hooks: Pick<EntityCrudSpec<T, never>, 'onCreate' | 'canUpdate' | 'onUpdate' | 'onDelete'> = {
+            onCreate: (campaign, entity) => {
+                const parentId = getParentId(entity);
+                if (parentId) synchronize(campaign, entity.id, undefined, parentId);
+            },
+            canUpdate: (campaign, id, updates) => {
+                const newParentId = getParentId(updates);
+                if (newParentId && !isParentingAllowed(campaign, id, newParentId)) {
+                    console.error(`Invalid parenting update for ${label} ${id}: would create a circular dependency.`);
+                    return false;
+                }
+                return true;
+            },
+            onUpdate: (campaign, entity, previous) =>
+                synchronize(campaign, entity.id, getParentId(previous), getParentId(entity)),
+            onDelete: (campaign, entity) => {
+                synchronize(campaign, entity.id, getParentId(entity), undefined);
+                (getChildIds(entity) || []).forEach(childId => {
+                    const child = find(campaign, childId);
+                    if (child) setParentId(child, undefined);
+                });
+            },
+        };
+
+        return { isParentingAllowed, synchronize, hooks };
+    };
+
+    const locationTree = makeHierarchy<Location>({
+        label: 'Location',
+        list: c => c.locations,
+        getParentId: l => l.parentLocationId,
+        setParentId: (l, id) => { l.parentLocationId = id; },
+        getChildIds: l => l.subLocationIds,
+        setChildIds: (l, ids) => { l.subLocationIds = ids; },
+    });
+    const articleTree = makeHierarchy<Article>({
+        label: 'Article',
+        list: c => c.articles,
+        getParentId: a => a.parentArticleId,
+        setParentId: (a, id) => { a.parentArticleId = id; },
+        getChildIds: a => a.subArticleIds,
+        setChildIds: (a, ids) => { a.subArticleIds = ids; },
+    });
+    const _isLocationParentingAllowed = locationTree.isParentingAllowed;
+
+    // --- Per-entity CRUD specs (only the rules that differ per type) ---
+
+    const npcCrud = makeEntityCrud('npcs', {
+        build: data => ({ ...data, relationships: data.relationships || [], history: data.history || [] }),
+        onCreate: (campaign, npc) => {
+            // Drop a factionId that doesn't resolve to an existing faction in
+            // this campaign (e.g. a chat-generator preview's synthetic
+            // 'preview' id) rather than persisting a dangling reference.
+            if (npc.factionId && !campaign.factions.some(f => f.id === npc.factionId)) {
+                npc.factionId = undefined;
+            }
+            if (npc.factionId) _synchronizeNpcFactionLink(campaign, npc.id, undefined, npc.factionId);
+        },
+        onUpdate: (campaign, npc, previous) =>
+            _synchronizeNpcFactionLink(campaign, npc.id, previous.factionId, npc.factionId),
+        onDelete: (campaign, npc) => {
+            _synchronizeNpcFactionLink(campaign, npc.id, npc.factionId, undefined);
+            campaign.adventures.forEach(adv => adv.scenes.forEach(scene => {
+                scene.npcIds = scene.npcIds.filter(npcId => npcId !== npc.id);
+            }));
+        },
+    });
+
+    const locationCrud = makeEntityCrud('locations', {
+        ...locationTree.hooks,
+        build: data => ({ ...data, history: data.history || [], subLocationIds: data.subLocationIds || [] }),
+        onDelete: (campaign, location) => {
+            locationTree.hooks.onDelete!(campaign, location);
+            campaign.adventures.forEach(adv => adv.scenes.forEach(scene => {
+                if (scene.locationId === location.id) scene.locationId = undefined;
+            }));
+        },
+    });
+
+    const factionCrud = makeEntityCrud('factions', {
+        build: data => ({ ...data, memberIds: data.memberIds || [] }),
+        onDelete: (campaign, faction) => {
+            faction.memberIds.forEach(npcId => {
+                const npc = campaign.npcs.find(n => n.id === npcId);
+                if (npc) npc.factionId = undefined;
+            });
+            campaign.locations.forEach(loc => {
+                if (loc.controllingFactionId === faction.id) loc.controllingFactionId = undefined;
+            });
+        },
+    });
+
+    const itemCrud = makeEntityCrud('items');
+
+    const articleCrud = makeEntityCrud('articles', articleTree.hooks);
+
+    const adventureCrud = makeEntityCrud<'adventures', AdventureForBatchAdd>('adventures', {
+        build: adventureData => ({
+            title: adventureData.title,
+            hook: adventureData.hook,
+            theme: adventureData.theme,
+            level: adventureData.level,
+            // The real provider's sceneSchema (and the RealmChat draft-adventure
+            // path, which has no postProcess step at all) omit
+            // npcIds/status/skillChecks (finding #7 and its verifier follow-up).
+            // Build from createDefaultScene() and spread the AI data over it so
+            // every Scene field is normalised in one move, including any future
+            // field this type gains.
+            scenes: (adventureData.scenes || []).map(sceneData => ({
+                ...createDefaultScene(),
+                ...sceneData,
+                id: crypto.randomUUID(),
+                npcIds: sceneData.npcIds ?? [],
+                status: sceneData.status ?? 'planned',
+                skillChecks: sceneData.skillChecks ?? [],
+            })),
+        }),
+        onDelete: (campaign, adventure) => {
+            if (campaign.activeSceneId && adventure.scenes.some(s => s.id === campaign.activeSceneId)) {
+                campaign.activeSceneId = undefined;
+            }
+            // Clear adventureId on session logs referencing this adventure, and
+            // strip its (now deleted) scenes from planned lists — the reference
+            // sweep does not cover those fields.
+            const deletedSceneIds = new Set(adventure.scenes.map(s => s.id));
+            (campaign.sessionLogs || []).forEach(log => {
+                if (log.adventureId === adventure.id) log.adventureId = undefined;
+                if (log.plannedSceneIds?.some(sid => deletedSceneIds.has(sid))) {
+                    log.plannedSceneIds = log.plannedSceneIds.filter(sid => !deletedSceneIds.has(sid));
+                }
+            });
+            // deleteScene runs the sweep per scene, so deleting the whole
+            // adventure must too, or the scene ids survive in
+            // pinnedEntities/mentionedEntityIds/etc. forever (ghost pins).
+            adventure.scenes.forEach(s => _purgeEntityReferences(campaign, s.id));
+        },
+    });
+
+    const sessionLogCrud = makeEntityCrud('sessionLogs', {
+        build: data => ({ ...data, structuredNotes: data.structuredNotes || [], relatedPlotIds: data.relatedPlotIds || [] }),
+        onDelete: (campaign, log) => {
+            // Clear the live-session pointers if the deleted log was the active one
+            if (campaign.activeSessionId === log.id) {
+                campaign.activeSessionId = undefined;
+                campaign.activeSceneId = undefined;
+            }
+        },
+    });
+
+    const playerCharacterCrud = makeEntityCrud('playerCharacters', {
+        // Normalize against a fully-populated default: AI-parsed PDF sheets (and
+        // hand-authored Quick Add drafts) may omit fields that
+        // CharacterStatistics/CharacterSocial declare as required — e.g. a blank
+        // Features & Traits page omits `specialActions` entirely. This MUST be a
+        // deep merge: a shallow spread of `characterStatistics` would wipe the
+        // default actions/specialActions whenever the parse includes a partial
+        // characterStatistics object.
+        build: newPcData => {
+            const defaults = createDefaultPlayerCharacter();
+            return {
+                ...defaults,
+                ...newPcData,
+                characterSocial: { ...defaults.characterSocial, ...newPcData.characterSocial },
+                characterStatistics: {
+                    ...defaults.characterStatistics,
+                    ...newPcData.characterStatistics,
+                    classes: { ...defaults.characterStatistics.classes, ...newPcData.characterStatistics?.classes },
+                    attributes: { ...defaults.characterStatistics.attributes, ...newPcData.characterStatistics?.attributes },
+                    skills: { ...defaults.characterStatistics.skills, ...newPcData.characterStatistics?.skills },
+                    actions: newPcData.characterStatistics?.actions ?? defaults.characterStatistics.actions,
+                    specialActions: newPcData.characterStatistics?.specialActions ?? defaults.characterStatistics.specialActions,
+                },
+            };
+        },
+    });
+
+    const plotCrud = makeEntityCrud('plots');
+
+    const noteCrud = makeEntityCrud<'notes', Omit<Note, 'id' | 'createdAt' | 'lastModified'>>('notes', {
+        build: data => {
+            const now = new Date().toISOString();
+            return { ...data, createdAt: now, lastModified: now };
+        },
+        prepareUpdate: updates => ({ ...updates, lastModified: new Date().toISOString() }),
+    });
+
+    const secretCrud = makeEntityCrud<'secrets', Omit<Secret, 'id' | 'createdAt'>>('secrets', {
+        build: data => ({ ...data, createdAt: new Date().toISOString() }),
+    });
 
 
     const service = {
@@ -1783,340 +2046,58 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
         },
 
         // --- Entity Actions (Creators return the new ID for selection) ---
-        createNpc(newNpcData: Omit<NPC, 'id'>) {
-            const newNpc: NPC = { ...newNpcData, id: crypto.randomUUID() };
-            // Ensure new fields are present if not passed
-            if (!newNpc.relationships) newNpc.relationships = [];
-            if (!newNpc.history) newNpc.history = [];
+        // Built by makeEntityCrud (X1) — see the specs above for per-type rules.
+        createNpc: npcCrud.create,
+        updateNpc: npcCrud.update,
+        deleteNpc: npcCrud.remove,
 
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (campaign) {
-                    // Drop a factionId that doesn't resolve to an existing faction
-                    // in this campaign (e.g. a chat-generator preview's synthetic
-                    // 'preview' id) rather than persisting a dangling reference.
-                    if (newNpc.factionId && !campaign.factions.some(f => f.id === newNpc.factionId)) {
-                        newNpc.factionId = undefined;
-                    }
-                    campaign.npcs.push(newNpc);
-                    // Also handle initial faction assignment
-                    if (newNpc.factionId) {
-                        _synchronizeNpcFactionLink(campaign, newNpc.id, undefined, newNpc.factionId);
-                    }
-                }
-            });
-            return newNpc.id;
-        },
-        updateNpc(id: string, updatedData: Partial<NPC>) {
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (!campaign) return;
-                const npc = campaign.npcs.find(n => n.id === id);
-                if (!npc) return;
-                
-                const oldFactionId = npc.factionId;
-                Object.assign(npc, updatedData);
-                const newFactionId = npc.factionId;
+        createLocation: locationCrud.create,
+        updateLocation: locationCrud.update,
+        deleteLocation: locationCrud.remove,
 
-                _synchronizeNpcFactionLink(campaign, id, oldFactionId, newFactionId);
-            });
-        },
-        deleteNpc(id: string) {
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (!campaign) return;
-                const npcIndex = campaign.npcs.findIndex(n => n.id === id);
-                if (npcIndex === -1) return;
-                
-                const npcToDelete = campaign.npcs[npcIndex];
-                
-                // Unlink from faction
-                _synchronizeNpcFactionLink(campaign, id, npcToDelete.factionId, undefined);
+        createFaction: factionCrud.create,
+        updateFaction: factionCrud.update,
+        deleteFaction: factionCrud.remove,
 
-                // Cleanup all cross-entity references (articles, plots, other NPCs' relationships, etc.)
-                _purgeEntityReferences(campaign, id);
+        createItem: itemCrud.create,
+        updateItem: itemCrud.update,
+        deleteItem: itemCrud.remove,
 
-                // Remove from NPC list
-                campaign.npcs.splice(npcIndex, 1);
-                
-                // Remove from all scenes
-                campaign.adventures.forEach(adv => adv.scenes.forEach(scene => {
-                    scene.npcIds = scene.npcIds.filter(npcId => npcId !== id);
-                }));
-            });
+        createArticle: articleCrud.create,
+        updateArticle: articleCrud.update,
+        deleteArticle: articleCrud.remove,
+
+        createFullAdventure: adventureCrud.create,
+        updateAdventure: adventureCrud.update,
+        deleteAdventure: adventureCrud.remove,
+
+        createSessionLog: sessionLogCrud.create,
+        updateSessionLog: sessionLogCrud.update,
+        deleteSessionLog: sessionLogCrud.remove,
+
+        createPlayerCharacter: playerCharacterCrud.create,
+        updatePlayerCharacter: playerCharacterCrud.update,
+        deletePlayerCharacter: playerCharacterCrud.remove,
+        async createPlayerCharacterFromPdf(pdfBase64: string, isMockMode: boolean) {
+            const activeCampaign = this.getActiveCampaign();
+            const campaignContext = activeCampaign ? `Campaign Title: ${activeCampaign.title}\nSetting: ${activeCampaign.setting}` : undefined;
+            const pcData = await parseCharacterSheetPdf(pdfBase64, isMockMode, campaignContext);
+            return this.createPlayerCharacter(pcData);
         },
 
-        createLocation(newLocationData: Omit<Location, 'id'>) {
-            const newLocation: Location = { ...newLocationData, id: crypto.randomUUID() };
-            // Ensure history is initialized
-            if (!newLocation.history) newLocation.history = [];
-            if (!newLocation.subLocationIds) newLocation.subLocationIds = [];
+        createPlot: plotCrud.create,
+        updatePlot: plotCrud.update,
+        deletePlot: plotCrud.remove,
 
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if(campaign) {
-                    campaign.locations.push(newLocation);
-                    if (newLocation.parentLocationId) {
-                        _synchronizeLocationHierarchy(campaign, newLocation.id, undefined, newLocation.parentLocationId);
-                    }
-                }
-            });
-            return newLocation.id;
-        },
-        updateLocation(id: string, updatedData: Partial<Location>) {
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (!campaign) return;
-                const location = campaign.locations.find(l => l.id === id);
-                if (!location) return;
+        createNote: noteCrud.create,
+        updateNote: noteCrud.update,
+        deleteNote: noteCrud.remove,
 
-                const oldParentId = location.parentLocationId;
-                
-                // Validate before applying changes
-                if ('parentLocationId' in updatedData && updatedData.parentLocationId && !_isLocationParentingAllowed(campaign, id, updatedData.parentLocationId)) {
-                    console.error(`Invalid parenting update for Location ${id}: would create a circular dependency.`);
-                    return; // Abort update if parenting is invalid
-                }
-                
-                Object.assign(location, updatedData);
-                const newParentId = location.parentLocationId;
-        
-                _synchronizeLocationHierarchy(campaign, id, oldParentId, newParentId);
-            });
-        },
-        deleteLocation(id: string) {
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (!campaign) return;
-                const locIndex = campaign.locations.findIndex(l => l.id === id);
-                if (locIndex === -1) return;
+        createSecret: secretCrud.create,
+        updateSecret: secretCrud.update,
+        deleteSecret: secretCrud.remove,
 
-                const locToDelete = campaign.locations[locIndex];
-        
-                // Unlink from parent
-                _synchronizeLocationHierarchy(campaign, id, locToDelete.parentLocationId, undefined);
-                
-                // Un-parent all children
-                locToDelete.subLocationIds.forEach(childId => {
-                    const child = campaign.locations.find(c => c.id === childId);
-                    if (child) child.parentLocationId = undefined;
-                });
-                
-                // Cleanup all cross-entity references (articles, plots, NPC relationships, etc.)
-                _purgeEntityReferences(campaign, id);
-
-                // Remove the location
-                campaign.locations.splice(locIndex, 1);
-                
-                // Clean up references
-                campaign.adventures.forEach(adv => adv.scenes.forEach(scene => {
-                    if (scene.locationId === id) scene.locationId = undefined;
-                }));
-            });
-        },
-        
-        createFaction(newFactionData: Omit<Faction, 'id'>) {
-            const newFaction: Faction = { ...newFactionData, id: crypto.randomUUID() };
-            if (!newFaction.memberIds) newFaction.memberIds = [];
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if(campaign) campaign.factions.push(newFaction)
-            });
-            return newFaction.id;
-        },
-        updateFaction(id: string, updatedData: Partial<Faction>) {
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (!campaign) return;
-                const faction = campaign.factions.find(f => f.id === id);
-                if (faction) Object.assign(faction, updatedData);
-            });
-        },
-        deleteFaction(id: string) {
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (!campaign) return;
-                const factionToDelete = campaign.factions.find(f => f.id === id);
-                if (!factionToDelete) return;
-
-                // Unlink all member NPCs
-                factionToDelete.memberIds.forEach(npcId => {
-                    const npc = campaign.npcs.find(n => n.id === npcId);
-                    if (npc) npc.factionId = undefined;
-                });
-                
-                // Cleanup Location control references
-                campaign.locations.forEach(loc => {
-                    if (loc.controllingFactionId === id) loc.controllingFactionId = undefined;
-                });
-
-                // Cleanup all cross-entity references (articles, plots, NPC relationships, etc.)
-                _purgeEntityReferences(campaign, id);
-
-                // Remove faction
-                campaign.factions = campaign.factions.filter(f => f.id !== id);
-            });
-        },
-        
-        createItem(newItemData: Omit<Item, 'id'>) {
-            const newItem: Item = { ...newItemData, id: crypto.randomUUID() };
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (campaign) campaign.items.push(newItem);
-            });
-            return newItem.id;
-        },
-        updateItem(id: string, updatedData: Partial<Item>) {
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (!campaign) return;
-                const item = campaign.items.find(i => i.id === id);
-                if (item) Object.assign(item, updatedData);
-            });
-        },
-        deleteItem(id: string) {
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (!campaign) return;
-                _purgeEntityReferences(campaign, id);
-                campaign.items = campaign.items.filter(i => i.id !== id);
-            });
-        },
-
-        createArticle(newArticleData: Omit<Article, 'id'>) {
-            const newArticle: Article = { ...newArticleData, id: crypto.randomUUID() };
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (campaign) {
-                    campaign.articles.push(newArticle);
-                    if(newArticle.parentArticleId) {
-                        _synchronizeArticleHierarchy(campaign, newArticle.id, undefined, newArticle.parentArticleId);
-                    }
-                }
-            });
-            return newArticle.id;
-        },
-        updateArticle(id: string, updatedData: Partial<Article>) {
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (!campaign) return;
-                const article = campaign.articles.find(a => a.id === id);
-                if (!article) return;
-                
-                const oldParentId = article.parentArticleId;
-                
-                if ('parentArticleId' in updatedData && updatedData.parentArticleId && !_isArticleParentingAllowed(campaign, id, updatedData.parentArticleId)) {
-                     console.error(`Invalid parenting update for Article ${id}: would create a circular dependency.`);
-                    return;
-                }
-
-                Object.assign(article, updatedData);
-                const newParentId = article.parentArticleId;
-        
-                _synchronizeArticleHierarchy(campaign, id, oldParentId, newParentId);
-            });
-        },
-        deleteArticle(id: string) {
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (!campaign) return;
-                const articleIndex = campaign.articles.findIndex(a => a.id === id);
-                if (articleIndex === -1) return;
-
-                const articleToDelete = campaign.articles[articleIndex];
-                
-                // Unlink from parent
-                _synchronizeArticleHierarchy(campaign, id, articleToDelete.parentArticleId, undefined);
-        
-                // Un-parent all children
-                (articleToDelete.subArticleIds || []).forEach(childId => {
-                    const child = campaign.articles.find(c => c.id === childId);
-                    if (child) child.parentArticleId = undefined;
-                });
-
-                // Cleanup all cross-entity references (e.g. @-mentions of this article)
-                _purgeEntityReferences(campaign, id);
-
-                // Remove the article
-                campaign.articles.splice(articleIndex, 1);
-            });
-        },
-        
-        createFullAdventure(adventureData: AdventureForBatchAdd) {
-            const newAdventure: Adventure = {
-                id: crypto.randomUUID(),
-                title: adventureData.title,
-                hook: adventureData.hook,
-                theme: adventureData.theme,
-                level: adventureData.level,
-                // The real provider's sceneSchema (and the RealmChat
-                // draft-adventure path, which has no postProcess step at all)
-                // omit npcIds/status/skillChecks (finding #7 and its verifier
-                // follow-up — the earlier fix only defaulted npcIds/status,
-                // leaving skillChecks undefined for ActiveScenePanel/SceneEditor
-                // to crash on). Build from createDefaultScene() and spread the
-                // AI data over it so every Scene field is normalised in one
-                // move, including any future field this type gains.
-                scenes: (adventureData.scenes || []).map(sceneData => ({
-                    ...createDefaultScene(),
-                    ...sceneData,
-                    id: crypto.randomUUID(),
-                    npcIds: sceneData.npcIds ?? [],
-                    status: sceneData.status ?? 'planned',
-                    skillChecks: sceneData.skillChecks ?? [],
-                }))
-            };
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (campaign) campaign.adventures.push(newAdventure);
-            });
-            return newAdventure.id;
-        },
-        updateAdventure(id: string, updatedData: Partial<Adventure>) {
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (!campaign) return;
-                const adventure = campaign.adventures.find(a => a.id === id);
-                if (adventure) Object.assign(adventure, updatedData);
-            });
-        },
-        deleteAdventure(id: string) {
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (!campaign) return;
-                const adventure = campaign.adventures.find(a => a.id === id);
-                if (!adventure) return;
-
-                // Clear activeSceneId if it belongs to this adventure
-                if (campaign.activeSceneId && adventure.scenes.some(s => s.id === campaign.activeSceneId)) {
-                    campaign.activeSceneId = undefined;
-                }
-
-                // Clear adventureId on any session logs referencing this adventure,
-                // and strip the adventure's (now deleted) scenes from planned lists
-                const deletedSceneIds = new Set(adventure.scenes.map(s => s.id));
-                if (campaign.sessionLogs) {
-                    campaign.sessionLogs.forEach(log => {
-                        if (log.adventureId === id) log.adventureId = undefined;
-                        if (log.plannedSceneIds?.some(sid => deletedSceneIds.has(sid))) {
-                            log.plannedSceneIds = log.plannedSceneIds.filter(sid => !deletedSceneIds.has(sid));
-                        }
-                    });
-                }
-
-                // Cleanup all cross-entity references (e.g. @-mentions of this adventure)
-                // AND of every scene it contains — deleteScene runs the sweep per
-                // scene, so deleting the whole adventure must too, or the scene ids
-                // survive in pinnedEntities/mentionedEntityIds/etc. forever
-                // (invisible, unremovable ghost pins). The hand-rolled
-                // activeSceneId/plannedSceneIds cleanups above stay: the sweep
-                // does not cover those fields.
-                adventure.scenes.forEach(s => _purgeEntityReferences(campaign, s.id));
-                _purgeEntityReferences(campaign, id);
-
-                campaign.adventures = campaign.adventures.filter(a => a.id !== id);
-            });
-        },
+        // --- Scenes (nested under adventures — bespoke, not factory-built) ---
         createScene(adventureId: string, newSceneData: Omit<Scene, 'id'>) {
             const newScene: Scene = { ...newSceneData, id: crypto.randomUUID() };
             updateState(draft => {
@@ -2179,204 +2160,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 }
             });
         },
-        
-        createSessionLog(newLogData: Omit<SessionLog, 'id'>) {
-            const newLog: SessionLog = { ...newLogData, id: crypto.randomUUID() };
-            // Ensure compatibility
-            if (!newLog.structuredNotes) newLog.structuredNotes = [];
-            if (!newLog.relatedPlotIds) newLog.relatedPlotIds = [];
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (campaign) {
-                    campaign.sessionLogs = [...(campaign.sessionLogs || []), newLog];
-                }
-            });
-            return newLog.id;
-        },
-        updateSessionLog(id: string, updatedData: Partial<SessionLog>) {
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (!campaign || !campaign.sessionLogs) return;
-                const log = campaign.sessionLogs.find(l => l.id === id);
-                if (log) Object.assign(log, updatedData);
-            });
-        },
-        deleteSessionLog(id: string) {
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (!campaign) return;
 
-                // Clear the live-session pointers if the deleted log was the active one
-                if (campaign.activeSessionId === id) {
-                    campaign.activeSessionId = undefined;
-                    campaign.activeSceneId = undefined;
-                }
-
-                // Cleanup all cross-entity references — most notably
-                // Secret.revealedInSessionId, which otherwise keeps pointing at
-                // a session log that no longer exists (verifier follow-up on #10).
-                _purgeEntityReferences(campaign, id);
-
-                campaign.sessionLogs = (campaign.sessionLogs || []).filter(l => l.id !== id);
-            });
-        },
-
-        createPlayerCharacter(newPcData: Omit<PlayerCharacter, 'id'>) {
-            // Normalize against a fully-populated default: AI-parsed PDF sheets
-            // (and hand-authored Quick Add drafts) may omit fields that
-            // CharacterStatistics/CharacterSocial declare as required — e.g. a
-            // blank Features & Traits page omits `specialActions` entirely.
-            // This MUST be a deep merge: a shallow spread of
-            // `characterStatistics` would wipe the default actions/specialActions
-            // whenever the parse includes a partial characterStatistics object.
-            const defaults = createDefaultPlayerCharacter();
-            const normalized: Omit<PlayerCharacter, 'id'> = {
-                ...defaults,
-                ...newPcData,
-                characterSocial: { ...defaults.characterSocial, ...newPcData.characterSocial },
-                characterStatistics: {
-                    ...defaults.characterStatistics,
-                    ...newPcData.characterStatistics,
-                    classes: { ...defaults.characterStatistics.classes, ...newPcData.characterStatistics?.classes },
-                    attributes: { ...defaults.characterStatistics.attributes, ...newPcData.characterStatistics?.attributes },
-                    skills: { ...defaults.characterStatistics.skills, ...newPcData.characterStatistics?.skills },
-                    actions: newPcData.characterStatistics?.actions ?? defaults.characterStatistics.actions,
-                    specialActions: newPcData.characterStatistics?.specialActions ?? defaults.characterStatistics.specialActions,
-                },
-            };
-            const newPc: PlayerCharacter = { ...normalized, id: crypto.randomUUID() };
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (campaign) {
-                    campaign.playerCharacters = [...(campaign.playerCharacters || []), newPc];
-                }
-            });
-            return newPc.id;
-        },
-        async createPlayerCharacterFromPdf(pdfBase64: string, isMockMode: boolean) {
-            const activeCampaign = this.getActiveCampaign();
-            const campaignContext = activeCampaign ? `Campaign Title: ${activeCampaign.title}\nSetting: ${activeCampaign.setting}` : undefined;
-            const pcData = await parseCharacterSheetPdf(pdfBase64, isMockMode, campaignContext);
-            return this.createPlayerCharacter(pcData);
-        },
-        updatePlayerCharacter(id: string, updatedData: Partial<PlayerCharacter>) {
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (!campaign || !campaign.playerCharacters) return;
-                const pc = campaign.playerCharacters.find(p => p.id === id);
-                if (pc) Object.assign(pc, updatedData);
-            });
-        },
-        deletePlayerCharacter(id: string) {
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (!campaign) return;
-                // Cleanup all cross-entity references (pinnedEntities, etc.)
-                // before removing it (verifier follow-up on #10).
-                _purgeEntityReferences(campaign, id);
-                campaign.playerCharacters = (campaign.playerCharacters || []).filter(p => p.id !== id);
-            });
-        },
-
-        createPlot(newPlotData: Omit<Plot, 'id'>) {
-            const newPlot: Plot = { ...newPlotData, id: crypto.randomUUID() };
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (campaign) {
-                    campaign.plots = [...(campaign.plots || []), newPlot];
-                }
-            });
-            return newPlot.id;
-        },
-        updatePlot(id: string, updatedData: Partial<Plot>) {
-             updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (!campaign || !campaign.plots) return;
-                const plot = campaign.plots.find(n => n.id === id);
-                if (plot) {
-                    Object.assign(plot, updatedData);
-                }
-            });
-        },
-        deletePlot(id: string) {
-             updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (!campaign) return;
-                _purgeEntityReferences(campaign, id);
-                campaign.plots = (campaign.plots || []).filter(n => n.id !== id);
-            });
-        },
-
-        createNote(newNoteData: Omit<Note, 'id' | 'createdAt' | 'lastModified'>) {
-            const newNote: Note = {
-                ...newNoteData,
-                id: crypto.randomUUID(),
-                createdAt: new Date().toISOString(),
-                lastModified: new Date().toISOString()
-            };
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (campaign) {
-                    campaign.notes = [...(campaign.notes || []), newNote];
-                }
-            });
-            return newNote.id;
-        },
-        updateNote(id: string, updatedData: Partial<Note>) {
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (!campaign || !campaign.notes) return;
-                const note = campaign.notes.find(n => n.id === id);
-                if (note) {
-                    Object.assign(note, { ...updatedData, lastModified: new Date().toISOString() });
-                }
-            });
-        },
-        deleteNote(id: string) {
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (!campaign) return;
-                // Cleanup all cross-entity references (pinnedEntities, etc.)
-                // before removing it (verifier follow-up on #10).
-                _purgeEntityReferences(campaign, id);
-                campaign.notes = (campaign.notes || []).filter(n => n.id !== id);
-            });
-        },
-
-        // --- Secret CRUD ---
-        createSecret(newSecretData: Omit<Secret, 'id' | 'createdAt'>): string {
-            const newSecret: Secret = {
-                ...newSecretData,
-                id: crypto.randomUUID(),
-                createdAt: new Date().toISOString(),
-            };
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (campaign) {
-                    if (!campaign.secrets) campaign.secrets = [];
-                    campaign.secrets.push(newSecret);
-                }
-            });
-            return newSecret.id;
-        },
-        updateSecret(id: string, updates: Partial<Secret>) {
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (!campaign || !campaign.secrets) return;
-                const secret = campaign.secrets.find(s => s.id === id);
-                if (secret) Object.assign(secret, updates);
-            });
-        },
-        deleteSecret(id: string) {
-            updateState(draft => {
-                const campaign = getActiveCampaignFromState(draft);
-                if (!campaign) return;
-                // Cleanup all cross-entity references (pinnedEntities, etc.)
-                // before removing it (verifier follow-up on #10).
-                _purgeEntityReferences(campaign, id);
-                campaign.secrets = (campaign.secrets || []).filter(s => s.id !== id);
-            });
-        },
         revealSecret(id: string, sessionId?: string) {
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
@@ -2396,6 +2180,43 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                     campaign.activeEncounter = updatedEncounter;
                 }
             });
+        },
+
+        /**
+         * Ends the current fight WITHOUT ending the session (X6). Archives the
+         * outgoing encounter — full combatant/HP/round detail — onto the
+         * session's `encounterLog` (mirroring `endSession()`), then resets
+         * `activeEncounter` to a fresh, empty encounter with a new id.
+         *
+         * - `campaignId` defaults to the active campaign; `sessionId` to that
+         *   campaign's `activeSessionId`.
+         * - An encounter with no combatants is not archived (nothing was fought).
+         * - With no resolvable session the encounter is still reset, but not archived.
+         * - No-op when the campaign has no `activeEncounter` at all.
+         *
+         * Returns true when an encounter was archived.
+         */
+        endCombat(campaignId?: string, sessionId?: string): boolean {
+            let archived = false;
+            updateState(draft => {
+                const campaign = campaignId
+                    ? draft.campaigns.find(c => c.id === campaignId)
+                    : getActiveCampaignFromState(draft);
+                if (!campaign?.activeEncounter) return;
+
+                const encounter = campaign.activeEncounter;
+                const targetSessionId = sessionId ?? campaign.activeSessionId;
+                const session = targetSessionId
+                    ? campaign.sessionLogs?.find(s => s.id === targetSessionId)
+                    : undefined;
+                if (session && encounter.combatants.length > 0) {
+                    if (!session.encounterLog) session.encounterLog = [];
+                    session.encounterLog.push({ ...current(encounter), sessionId: session.id });
+                    archived = true;
+                }
+                campaign.activeEncounter = { id: crypto.randomUUID(), round: 1, turnIndex: 0, combatants: [] };
+            });
+            return archived;
         },
 
         // --- Session Runner Methods ---

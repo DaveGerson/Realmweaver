@@ -413,9 +413,12 @@ export const SessionRunner: React.FC<SessionRunnerProps> = ({
             'combat',
             `Combat ended. ${combatantCount} combatant${combatantCount !== 1 ? 's' : ''}, ${rounds} round${rounds !== 1 ? 's' : ''}.`
         );
-        campaignService.updateEncounter({ ...encounter, combatants: [], round: 1, turnIndex: 0 });
+        // Archive the full fight (combatants/HP/rounds) onto this session's
+        // encounterLog before resetting, so ending one fight mid-session no
+        // longer discards it (X6).
+        campaignService.endCombat(campaign.id, sessionLog.id);
         setShowCombatPanel(false);
-    }, [campaign.activeEncounter]);
+    }, [campaign.activeEncounter, campaign.id, sessionLog.id]);
 
     const cyclePlotStatus = useCallback((plotId: string) => {
         const current = plotSessionStatus[plotId] || 'unchanged';
