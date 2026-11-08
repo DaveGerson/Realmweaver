@@ -89,6 +89,15 @@ entities, flagged GM-ONLY; revealed secrets as established party knowledge) and 
 Zero schema change. Source: ADRAS `KnowledgeState`; DDAO `visibility`/`knownBy`
 (distilled).
 
+*Amended 2026-11-07:* the reveal-state sections stay and now reach every variant. The
+"revealed-only" rule, the `'player-safe'` variant and the split recap calls were removed.
+The variant did keep unrevealed secrets, GM notes and plot threads away from the player
+recap, but Realmweaver is the GM's private workspace and that recap's main input is the
+GM's own session notes, so the cost of a second variant and a second model call bought
+little. Spoiler control is now one instruction: the unrevealed-secrets header, the recap
+prompt and the cold-open prompt each tell the model to keep undiscovered material out of
+anything players hear or read, and the GM reviews the player recap before sharing it.
+
 **E4 — Plot escalation track (Fronts / threat clocks).** Realmweaver has no
 "the world moves without the PCs" structure: `Plot.status` is flat, `plotProgressions`
 records the past, and `generateWorldEvents` is memoryless (each run forgets it ever ran,

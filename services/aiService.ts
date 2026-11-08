@@ -11,9 +11,6 @@ import * as aiRealmWeaver from './ai/realmWeaver';
 import type { SecretDraft } from './ai/realmWeaver';
 export type { SecretDraft } from './ai/realmWeaver';
 import * as aiDmCoach from './ai/dmCoach';
-// Re-exported so callers can build the E3 player-safe recap context without
-// reaching past this facade (CLAUDE.md) — see `generateSessionRecap` below.
-export type { PlayerSafeRecapContext } from './ai/dmCoach';
 // P2 (Callback Machine): callers assemble the request shape, so the facade
 // re-exports it rather than making them reach into `services/ai/*`.
 export type { CallbackComplicationRequest } from './ai/dmCoach';
@@ -361,17 +358,12 @@ export const generateSessionRecap = (
     sessionNotes: string,
     plotSummaries: string,
     campaignContext?: string,
-    isMockMode: boolean = false,
-    // E3: when supplied, dmCoach derives the player-facing half's context via
-    // buildCampaignContext({ variant: 'player-safe', ... }) internally — see
-    // tests/services/dmCoach.playerSafeRecap.test.ts. Ignored in mock mode
-    // (the mock response is canned and never touches campaign context).
-    playerSafe?: aiDmCoach.PlayerSafeRecapContext
+    isMockMode: boolean = false
 ): Promise<{ recap: string; looseEnds: string[]; playerFacingRecap: string }> => {
     if (isMockMode) {
         return mockService.generateSessionRecap(sessionNotes, plotSummaries, campaignContext);
     }
-    return aiDmCoach.generateSessionRecap(sessionNotes, plotSummaries, campaignContext, playerSafe);
+    return aiDmCoach.generateSessionRecap(sessionNotes, plotSummaries, campaignContext);
 };
 
 export const generateStarterNpcs = (

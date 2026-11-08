@@ -1,6 +1,6 @@
 # CLAUDE.md — `tests/`
 
-Vitest unit + component tests. **228 files, 2618 tests, all green.** Playwright specs live in `e2e/` (see
+Vitest unit + component tests. **230 files, 2591 tests, all green.** Playwright specs live in `e2e/` (see
 `e2e/CLAUDE.md`) and are excluded from this run.
 
 ```bash
@@ -40,7 +40,7 @@ Consequences worth knowing:
 | `tests/archetype.*.test.ts` | Five end-to-end **store** journeys, one per GM persona: `forever-dm`, `lazy-dm`, `new-dm`, `tactical-dm`, `worldbuilder`. |
 | `tests/<feature>.<topic>.test.ts[x]` | Storyteller/ontology-wave feature families, one prefix per feature: `tonightsTable.*`, `lazyPrep.*`, `mysteryEdges.*` (integrity / continuity / backlinks), `secretsTracker.mysteryEdges`, `secretsGenerateTen.*`, `secretsHereNow.*`, `voiceCards.*`, `coldOpen.*`, `callbackMachine.*`, `dormantMaterial.*`, `storyDerivations`, `prepSheet.*`, `momentsReel.*`, `beatsCarryForward.*`. The unstructured-play wave (`docs/design/unstructured-play.md`) adds `unstructured.*` (the Stage & scene menu store contract, derivations, context/continuity, StagePanel, scene shelf, runner wiring, plot editor, quick start) and the Lazy DM / Monte Cook lanes: `gmIntrusion.*`, `dormantShelf.*`, `extras.*`, `quickTables.*`, `sceneMenu.*`, `lazyChecklist.*`, `strongStartStyles.*`, `tablePulse.*`, `locationAspects.*`, `canonCapture.*`. The `.tsx` ones carry the jsdom pragma. |
 | `tests/components/` | Tests of **pure helpers exported from component modules** (`removeCombatantFromEncounter`, `findUnlinkedEntities`, `getEffectiveSessionStatus` / `getPlotSessionStatus`). Node environment — these never render. |
-| `tests/services/` | AI-service contract suites: the party-knowledge wave's `contextBuilder.partyKnowledge` (+ shared `partyKnowledgeFixtures.ts`), `dmCoach.playerSafeRecap`, `dmCoach.coldOpen`, `dmCoach.callbackComplication`; the Lazy DM lanes' `dmCoach.gmIntrusion`, `dmCoach.extras`, `dmCoach.sceneMenu`, `dmCoach.strongStart`, `dmCoach.checkIn`, `realmWeaver.locationAspects` (prompt shape, schema normalisation, mock parity — no network). |
+| `tests/services/` | AI-service contract suites: the party-knowledge wave's `contextBuilder.partyKnowledge` (+ shared `partyKnowledgeFixtures.ts`), `dmCoach.sessionRecap`, `dmCoach.coldOpen`, `dmCoach.callbackComplication`; the Lazy DM lanes' `dmCoach.gmIntrusion`, `dmCoach.extras`, `dmCoach.sceneMenu`, `dmCoach.strongStart`, `dmCoach.checkIn`, `realmWeaver.locationAspects` (prompt shape, schema normalisation, mock parity — no network). |
 | `tests/services/linking/` | `autoLinker`, `matchingEngine`, `matchingEngine.scoring` (confidence, ambiguity, index cache, consumers). |
 | `tests/helpers/` | `testStoreFactory.ts` — shared test scaffolding. |
 | `tests/ship/` | The ship-readiness TDD suite (below). |

@@ -1,6 +1,6 @@
 # CLAUDE.md - AI Assistant Guide for Realmweaver
 
-> **Last Updated:** 2026-09-23
+> **Last Updated:** 2026-11-05
 
 ---
 
@@ -385,7 +385,7 @@ error. Look up an arbitrary string with `getEntityTypeConfig` / `isEntityTypeKey
 ```typescript
 import { buildCampaignContext } from '@/services/contextBuilder';
 const ctx = buildCampaignContext({
-  variant: 'generation',        // 'generation' | 'coach' | 'chat' | 'player-safe'
+  variant: 'generation',        // 'generation' | 'coach' | 'chat'
   campaign,
   maxTokenEstimate: 4000,       // default 4000 (≈16 000 chars)
   // optional: activeSceneId, activeSessionId, focusEntityId, focusEntityType, focusSelection
@@ -393,9 +393,11 @@ const ctx = buildCampaignContext({
 ```
 
 Pass `activeSessionId` whenever a session is live: the builder reads the session's Stage from it ("On
-Stage Now" — place, present cast, and, GM-only, what is happening), so the AI knows who is in the room
+Stage Now" — place, present cast, and what is happening), so the AI knows who is in the room
 even when no prepped scene is active. Plot lines carry `[clock n/m]` and `— if ignored: …`; the
-Player Characters roster carries each player's `playerFlags`.
+Player Characters roster carries each player's `playerFlags`. Every variant carries reveal state:
+unrevealed secrets linked to what is in scope, and revealed secrets as party knowledge (in-scope ones
+first, capped at a quarter of the budget).
 
 ---
 
@@ -410,6 +412,8 @@ Player Characters roster carries each player's `playerFlags`.
 | AI facade only | Import from `aiService.ts`, never `ai/` modules directly — audio transcription included |
 | Mock mode required | Every AI function needs a mock in `mockService.ts` |
 | Always pass campaignContext | AI content needs world context for consistency |
+| Spoiler control is the prompt plus the GM's review | Realmweaver is the GM's private workspace: the GM reads all AI output and reviews anything before sharing it. `Secret` reveal state (`isRevealed`, clue → revelation edges) tracks what the party has discovered. The context builder chooses what is relevant and what fits the budget, not what is safe to show. A prompt whose output players will hear or read carries one sentence telling the model to keep undiscovered material out — the unrevealed-secrets header, the session recap and the cold open do. Anything beyond that sentence (extra variants, field filters, split calls, never-leak tests) needs an explicit request from the user. This rule covers campaign content only — data durability, credential and proxy safeguards stay |
+| Check a value's shape where it enters | Saved campaigns and file imports pass through `migrateCampaignsData`, templates through `importTemplateData`, and generated entities through their module's normaliser. Readers past those points use a plain `?? []` for optional fields and add no `Array.isArray` or `typeof` re-checks. A new loose field, or a new path that writes model output into the store, gets its one check at that entry |
 | No direct state mutation | Use campaignService methods (Immer internally) |
 | `useSyncExternalStore` | React subscription pattern for campaignService |
 | Never write to the store in a setState updater | Functional updaters run during render and StrictMode double-invokes them — derive in the updater, commit outside it |

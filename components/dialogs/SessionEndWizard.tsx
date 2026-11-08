@@ -6,6 +6,7 @@ import { Button } from '../common/Button';
 import { twMerge } from 'tailwind-merge';
 import { campaignService } from '../../services/campaignService';
 import { generateSessionRecap } from '../../services/aiService';
+import { buildCampaignContext } from '../../services/contextBuilder';
 import { DialogShell } from '../common/DialogShell';
 import { useToast } from '@/hooks/useToast';
 
@@ -115,22 +116,17 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
         setIsGenerating(true);
         setGenerateError(null);
         try {
-            const campaignContext = `Campaign: ${campaign.title}\nSetting: ${campaign.setting}`;
-            // E3: the player-facing half of the recap is generated against a
-            // separately-derived player-safe context (never the GM
-            // `campaignContext` above) so unrevealed secrets, GM notes and
-            // hidden NPC motivations can't leak into the text the DM shares
-            // with the party. See tests/services/dmCoach.playerSafeRecap.test.ts.
+            const campaignContext = buildCampaignContext({
+                variant: 'generation',
+                campaign,
+                activeSceneId: campaign.activeSceneId,
+                activeSessionId: campaign.activeSessionId,
+            });
             const result = await generateSessionRecap(
                 sessionNotesText || sessionLog.runningNotes || 'No notes recorded.',
                 plotSummariesText,
                 campaignContext,
                 isMockMode,
-                {
-                    campaign,
-                    activeSceneId: campaign.activeSceneId,
-                    activeSessionId: campaign.activeSessionId,
-                },
             );
             setRecap(result.recap);
             setAiLooseEnds(result.looseEnds);
@@ -147,7 +143,7 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
         } finally {
             setIsGenerating(false);
         }
-    }, [sessionNotesText, plotSummariesText, campaign.title, campaign.setting, isMockMode, sessionLog.runningNotes, sessionLog.looseEnds]);
+    }, [sessionNotesText, plotSummariesText, campaign, isMockMode, sessionLog.runningNotes, sessionLog.looseEnds]);
 
     // M24: Only auto-trigger recap if there are enough notes to produce a quality result.
     // With sparse notes the AI tends to hallucinate; let the DM decide instead.
@@ -446,7 +442,7 @@ export const SessionEndWizard: React.FC<SessionEndWizardProps> = ({
                         <div className="space-y-4">
                             <div>
                                 <h3 className="text-sm font-bold text-white mb-1">Player-Facing Recap</h3>
-                                <p className="text-xs text-slate-400">A spoiler-free version to share with your players. Edit or copy as needed.</p>
+                                <p className="text-xs text-slate-400">A shorter version to share with your players. Read it over, then edit or copy it.</p>
                             </div>
 
                             {/* One textarea serves both the empty and filled states — only

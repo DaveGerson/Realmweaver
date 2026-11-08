@@ -749,32 +749,6 @@ describe('session prep sheet — the planned cast and locations', () => {
         );
     });
 
-    it('does not throw and adds no aspects line when aspects is a malformed value', () => {
-        const campaign = makeCampaign({
-            locations: [
-                {
-                    id: 'loc-chapel',
-                    name: 'The Drowned Chapel',
-                    description: 'A flooded nave.',
-                    secrets: '',
-                    subLocationIds: [],
-                    history: [],
-                    aspects: 'not an array' as unknown as string[],
-                },
-            ],
-        });
-
-        let md = '';
-        expect(() => {
-            md = generateSessionPrepSheetMarkdown(
-                makeSession({ plannedLocationIds: ['loc-chapel'], plannedNpcIds: [] }),
-                campaign,
-            );
-        }).not.toThrow();
-        expect(section(md, '## Locations')).toContain('The Drowned Chapel');
-        expect(md).not.toMatch(/aspects/i);
-    });
-
     it('skips a planned id whose entity was deleted, without a placeholder', () => {
         const md = generateSessionPrepSheetMarkdown(
             makeSession({

@@ -476,11 +476,11 @@ Sections are added tier by tier and stop once the character budget
 (`maxTokenEstimate * 4`) is exhausted; list sections fill entry-by-entry rather than
 all-or-nothing, so a tight budget degrades to a partial roster instead of an empty one.
 
-A fourth variant, `'player-safe'`, is the player-facing build (no GM-authored private prose, no
-unrevealed secrets). When `activeSessionId` names a session with a non-empty Stage (§4.6), Tier 1
-adds an **On Stage Now** section — place and present cast in every variant, the DM's `focus` line
-GM-only — and the Stage's cast joins the "NPCs in Scene" list and the GM-ONLY secrets relevance set.
-Plot lines carry `[clock n/m]` / `— if ignored: …`, and the Player Characters roster carries each
+Every variant carries reveal state: unrevealed secrets linked to what is in scope, and every
+revealed secret as established party knowledge. When `activeSessionId` names a session with a
+non-empty Stage (§4.6), Tier 1 adds an **On Stage Now** section — place, present cast and the DM's
+`focus` line — and the Stage's cast joins the "NPCs in Scene" list and the unrevealed secrets
+relevance set. Plot lines carry `[clock n/m]` / `— if ignored: …`, and the Player Characters roster carries each
 player's `playerFlags`.
 
 A separate, simpler `buildCampaignContext()` in `utils/entityUtils.ts` builds a flat string with

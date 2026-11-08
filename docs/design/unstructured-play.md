@@ -70,7 +70,7 @@ interface SessionStage {
   the Combat Tracker's auto-roster, Quick NPC's auto-link (a Quick NPC made
   with no scene walks straight onto the Stage), Complicate This / GM Intrusion's
   situation line, and `contextBuilder`'s "NPCs in Scene" + a new **On Stage
-  Now** section (place + present are player-visible; `focus` is GM-only).
+  Now** section (place, present cast and `focus`).
 - **Lifecycle.** Entering a prepped scene clears the Stage (the scene now says
   where the party is). Leaving a scene — "Done" or "Set Aside" — seeds the
   Stage from that scene's place and cast (honouring the prep roster rule from

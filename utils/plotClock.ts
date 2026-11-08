@@ -15,8 +15,8 @@ export const PLOT_CLOCK_SIZES: readonly number[] = [4, 6, 8];
 /**
  * Returns a well-formed copy of a clock — integer `segments >= 1`, `filled`
  * clamped to `[0, segments]` — or null when there is no usable clock at all
- * (missing, or a non-positive / non-numeric segment count from a hand-edited
- * save). Never mutates its argument.
+ * (missing, or a non-positive / non-numeric segment count). Never mutates its
+ * argument.
  */
 export function normalizePlotClock(clock: PlotClock | null | undefined): PlotClock | null {
   if (!clock) return null;

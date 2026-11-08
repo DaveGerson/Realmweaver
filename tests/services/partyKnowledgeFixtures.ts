@@ -1,13 +1,10 @@
 /**
  * tests/services/partyKnowledgeFixtures.ts
  *
- * Shared fixtures for the E3 "party-knowledge AI wiring" lane. NOT a suite —
- * the filename deliberately has no `.test.` segment so Vitest does not collect
- * it (see tests/CLAUDE.md, `wp-i1-ai-proxy.harness.ts` follows the same rule).
- *
- * The CANARY_* tokens below are the never-leak instrumentation: each one is
- * planted in exactly one GM-authored prose field, so a player-facing context
- * that contains any of them names the field that leaked.
+ * Shared fixtures for the reveal-state sections of the campaign context. NOT a
+ * suite — the filename deliberately has no `.test.` segment so Vitest does not
+ * collect it (see tests/CLAUDE.md, `wp-i1-ai-proxy.harness.ts` follows the same
+ * rule).
  */
 
 import type { Campaign } from '../../types/Campaign';
@@ -20,38 +17,28 @@ import type { Secret } from '../../types/Secret';
 import type { Plot } from '../../types/Plot';
 
 // ---------------------------------------------------------------------------
-// Never-leak canaries — one per GM-only prose field
+// Exact section strings the builder emits
 // ---------------------------------------------------------------------------
 
-export const CANARY = {
-  npcSecrets: 'CANARYNPCSECRETS',
-  npcTraits: 'CANARYNPCTRAITS',
-  npcMotivations: 'CANARYNPCMOTIVATIONS',
-  npcBackstory: 'CANARYNPCBACKSTORY',
-  locationSecrets: 'CANARYLOCATIONSECRETS',
-  sceneGmNotes: 'CANARYSCENEGMNOTES',
-  sessionPrepNotes: 'CANARYSESSIONPREPNOTES',
-  sessionRunningNotes: 'CANARYSESSIONRUNNINGNOTES',
-  unrevealedTitle: 'CANARYUNREVEALEDTITLE',
-  unrevealedContent: 'CANARYUNREVEALEDCONTENT',
-  secretNotes: 'CANARYSECRETNOTES',
-  plotTitle: 'CANARYPLOTTITLE',
-  plotDescription: 'CANARYPLOTDESCRIPTION',
-} as const;
-
-/** Every canary token, for the "not a single one of them leaked" assertions. */
-export const ALL_CANARIES: string[] = Object.values(CANARY);
-
-// ---------------------------------------------------------------------------
-// Exact section strings the builder must emit (the executable contract)
-// ---------------------------------------------------------------------------
-
-export const GM_ONLY_HEADER = 'GM-ONLY — UNREVEALED SECRETS (never reveal to players):';
+export const UNREVEALED_HEADER =
+  'Unrevealed Secrets (the party has not discovered these yet; keep them out of anything players will hear or read):';
 export const PARTY_KNOWLEDGE_HEADER = 'Established Party Knowledge (revealed secrets):';
 
 /** `  - [category] Title: content` — the one entry format both sections use. */
 export const secretLine = (s: Pick<Secret, 'category' | 'title' | 'content'>): string =>
   s.content ? `  - [${s.category}] ${s.title}: ${s.content}` : `  - [${s.category}] ${s.title}`;
+
+/** The DM's bookkeeping on a secret — not campaign content, so never sent to the model. */
+export const SECRET_NOTES = 'Bookkeeping: move this to session six.';
+
+/** The GM's own prose on the loaded campaign, which the model sees in every variant. */
+export const GM_PROSE = {
+  npcTraits: 'Never raises his voice.',
+  npcMotivations: 'Wants the Duke deposed.',
+  sceneGmNotes: 'Vayne offers a bargain he cannot keep.',
+  sessionPrepNotes: 'Open on the ash falling indoors.',
+  plotTitle: 'The Quiet Debt',
+} as const;
 
 // ---------------------------------------------------------------------------
 // Entity factories
@@ -169,9 +156,8 @@ export function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
 }
 
 // ---------------------------------------------------------------------------
-// The canonical "loaded" campaign: every GM-only field carries its canary,
-// and there is one revealed secret + two unrevealed secrets (one linked to the
-// active scene, one linked to an off-scene entity).
+// The canonical "loaded" campaign: one revealed secret + two unrevealed secrets
+// (one linked to the active scene, one linked to an off-scene entity).
 // ---------------------------------------------------------------------------
 
 export const SCENE_ID = 'scene-1';
@@ -188,17 +174,17 @@ export const REVEALED_SECRET: Secret = makeSecret({
   isRevealed: true,
   revealedInSessionId: SESSION_ID,
   linkedEntityIds: [SCENE_LOCATION_ID],
-  notes: CANARY.secretNotes,
+  notes: SECRET_NOTES,
 });
 
 export const SCENE_UNREVEALED_SECRET: Secret = makeSecret({
   id: 'sec-unrevealed-scene',
-  title: CANARY.unrevealedTitle,
-  content: CANARY.unrevealedContent,
+  title: 'The Chancellor Forged The Writ',
+  content: 'His own seal is on the forgery.',
   category: 'clue',
   isRevealed: false,
   linkedEntityIds: [SCENE_NPC_ID],
-  notes: CANARY.secretNotes,
+  notes: SECRET_NOTES,
 });
 
 export const OFFSCENE_UNREVEALED_SECRET: Secret = makeSecret({
@@ -210,17 +196,14 @@ export const OFFSCENE_UNREVEALED_SECRET: Secret = makeSecret({
   linkedEntityIds: [OFFSCENE_NPC_ID],
 });
 
-/**
- * A campaign with an active scene, an active session, secrets in all three
- * relevance states, and a canary in every GM-only prose field.
- */
+/** A campaign with an active scene, an active session and secrets in all three relevance states. */
 export function makeLoadedCampaign(overrides: Partial<Campaign> = {}): Campaign {
   const scene = makeScene({
     id: SCENE_ID,
     title: 'Audience in the Ash Court',
     npcIds: [SCENE_NPC_ID],
     locationId: SCENE_LOCATION_ID,
-    gmNotes: CANARY.sceneGmNotes,
+    gmNotes: GM_PROSE.sceneGmNotes,
     readAloudText: 'Ash drifts through the shattered dome.',
   });
 
@@ -230,19 +213,16 @@ export function makeLoadedCampaign(overrides: Partial<Campaign> = {}): Campaign 
         id: SCENE_NPC_ID,
         name: 'Chancellor Vayne',
         description: 'A stooped official in grey.',
-        secrets: CANARY.npcSecrets,
-        traits: CANARY.npcTraits,
-        motivations: CANARY.npcMotivations,
-        backstory: CANARY.npcBackstory,
+        traits: GM_PROSE.npcTraits,
+        motivations: GM_PROSE.npcMotivations,
       }),
-      makeNpc({ id: OFFSCENE_NPC_ID, name: 'Duke Harrow', secrets: CANARY.npcSecrets }),
+      makeNpc({ id: OFFSCENE_NPC_ID, name: 'Duke Harrow' }),
     ],
     locations: [
       makeLocation({
         id: SCENE_LOCATION_ID,
         name: 'The Ash Court',
         description: 'A ruined hall of pale stone.',
-        secrets: CANARY.locationSecrets,
       }),
     ],
     adventures: [makeAdventure({ id: 'adv-1', title: 'Embers', scenes: [scene] })],
@@ -250,18 +230,10 @@ export function makeLoadedCampaign(overrides: Partial<Campaign> = {}): Campaign 
       makeSessionLog({
         id: SESSION_ID,
         title: 'Session 4 — The Ash Court',
-        prepNotes: CANARY.sessionPrepNotes,
-        runningNotes: CANARY.sessionRunningNotes,
+        prepNotes: GM_PROSE.sessionPrepNotes,
       }),
     ],
-    plots: [
-      makePlot({
-        id: 'plot-1',
-        title: CANARY.plotTitle,
-        description: CANARY.plotDescription,
-        status: 'active',
-      }),
-    ],
+    plots: [makePlot({ id: 'plot-1', title: GM_PROSE.plotTitle, status: 'active' })],
     secrets: [REVEALED_SECRET, SCENE_UNREVEALED_SECRET, OFFSCENE_UNREVEALED_SECRET],
     activeSceneId: SCENE_ID,
     activeSessionId: SESSION_ID,
