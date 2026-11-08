@@ -58,9 +58,10 @@ start missing · 2 secrets unrevealed · 1 clock about to fill"). `continuityThr
 inputs; this is mostly wiring, not new data.
 
 **B3. Player-facing companion view — M.**
-The Lazy DM merge added a `'player-safe'` context variant (no GM prose, no unrevealed secrets). That is the
-hard part of a player handout / recap surface. Ship a read-only "Table view" (revealed secrets as a clue
-board, recap of last session, the party's known NPCs) that a GM can put on a second screen or export.
+Ship a read-only "Table view" (revealed secrets as a clue board, `SessionLog.playerRecap` from last session,
+the party's known NPCs) that a GM can put on a second screen or export. Open question before starting: this
+crosses the "not a player-facing tool" boundary in `docs/design/dm-archetypes.md`, and nothing tracks which
+NPCs the party knows yet.
 
 ### Wave 2 — structure the game rules
 

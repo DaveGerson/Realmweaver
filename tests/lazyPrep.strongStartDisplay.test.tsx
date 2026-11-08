@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 /**
  * SPEC — components/views/session/SceneListPanel.tsx (Wave 1, lane R1)
- *          + the never-leak rule for the strong start.
  *
  * Source: docs/design/lazy-dm-lens.md §2 step 2 — "nothing re-surfaces it
  * prominently once the session goes live". A strong start written at prep time
@@ -38,11 +37,8 @@
  * 5. IT IS A DISPLAY. Rendering it calls no campaignService method. The beats
  *    list below it keeps working exactly as before.
  *
- * 6. NEVER-LEAK. The strong start is GM prose living in `prepNotes`, and
- *    `buildCampaignContext`'s 'player-safe' variant already excludes prep notes
- *    wholesale. Storing it there must keep that true: the player-safe context
- *    contains neither the strong start nor its delimiters, while the GM-facing
- *    'generation' variant still carries it.
+ * 6. THE AI SEES IT. The strong start lives in `prepNotes`, which the campaign
+ *    context already carries.
  *
  * 7. Slate/amber only — indigo belongs to RealmChat.
  */
@@ -265,28 +261,16 @@ describe('SceneListPanel — the strong start block is inert chrome', () => {
     });
 });
 
-// ── 6. Never-leak ─────────────────────────────────────────────────────────────
+// ── 6. The AI sees it ─────────────────────────────────────────────────────────
 
-describe('the strong start never reaches a player-facing context', () => {
+describe('the strong start in the campaign context', () => {
     const liveCampaign = {
         ...(campaign as unknown as Record<string, unknown>),
         activeSessionId: 'sess-1',
         sessionLogs: [makeSession(composeStrongStartPrepNotes(STRONG_START, OTHER_NOTES))],
     } as unknown as Campaign;
 
-    it('is absent from the player-safe context, delimiters included', () => {
-        const ctx = buildCampaignContext({
-            variant: 'player-safe',
-            campaign: liveCampaign,
-            activeSessionId: 'sess-1',
-        });
-
-        expect(ctx).not.toContain(STRONG_START);
-        expect(ctx).not.toContain(STRONG_START_OPEN);
-        expect(ctx).not.toContain(STRONG_START_CLOSE);
-    });
-
-    it('is still available to the GM-facing generation context', () => {
+    it('is available to the generation context', () => {
         const ctx = buildCampaignContext({
             variant: 'generation',
             campaign: liveCampaign,

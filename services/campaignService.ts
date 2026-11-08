@@ -36,6 +36,33 @@ import { resolveSceneById } from '../utils/storyDerivations';
 type AppStatus = 'loading' | 'welcome' | 'selecting' | 'creating' | 'editing';
 export type SaveStatus = 'idle' | 'saved' | 'saving' | 'error' | 'quota-warning';
 
+/** A required string list: a non-array becomes `[]` and non-string entries are filtered out. */
+function cleanStringList(raw: unknown): string[] {
+    return Array.isArray(raw) ? raw.filter((item): item is string => typeof item === 'string') : [];
+}
+
+/** An optional string list stays optional: a non-array is dropped and non-string entries are filtered out. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function withCleanStringList(entity: any, field: string): any {
+    const raw = entity?.[field];
+    if (raw === undefined) return entity;
+    if (Array.isArray(raw)) return { ...entity, [field]: cleanStringList(raw) };
+    const { [field]: _dropped, ...rest } = entity;
+    return rest;
+}
+
+/** Beats stay optional: a non-array is dropped, and only beat objects with a text title are kept. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function withCleanBeats(log: any): any {
+    if (log.beats === undefined) return log;
+    if (!Array.isArray(log.beats)) {
+        const { beats: _dropped, ...rest } = log;
+        return rest;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return { ...log, beats: log.beats.filter((b: any) => b && typeof b === 'object' && typeof b.title === 'string') };
+}
+
 /**
  * Migrates a raw, possibly-old-shape array of campaign objects (freshly
  * `JSON.parse`d from localStorage or a backup slot) into the current
@@ -68,11 +95,11 @@ function migrateCampaignsData(campaignsData: any[]): Campaign[] {
             const log = {
                 ...l,
                 structuredNotes: l.structuredNotes || [],
-                relatedPlotIds: l.relatedPlotIds || [],
+                relatedPlotIds: cleanStringList(l.relatedPlotIds),
                 // Backfilled in lockstep with importExportService.normaliseRequiredArrays
                 // (finding #35) — goLive()/advanceScene() dereference plannedSceneIds
                 // unconditionally once an adventureId is set.
-                plannedSceneIds: l.plannedSceneIds || [],
+                plannedSceneIds: cleanStringList(l.plannedSceneIds),
                 encounterLog: l.encounterLog || [],
             };
             // The Stage is optional, but when present it must be a plain object
@@ -85,14 +112,15 @@ function migrateCampaignsData(campaignsData: any[]): Campaign[] {
                     delete log.stage;
                 }
             }
-            return log;
+            // The prep sheet (built on every Session Log editor render) reads these as-is.
+            return withCleanBeats(withCleanStringList(withCleanStringList(log, 'plannedNpcIds'), 'plannedLocationIds'));
         }),
-        playerCharacters: c.playerCharacters || [],
+        playerCharacters: (c.playerCharacters || []).map((pc: any) => withCleanStringList(pc, 'playerFlags')),
         // Backfilled in lockstep with importExportService.normaliseRequiredArrays —
         // ItemDashboard/createItem/duplicateCampaign dereference `items` unconditionally.
         items: c.items || [],
         npcs: (c.npcs || []).map((n: any) => ({ ...n, relationships: n.relationships || [], history: n.history || [] })),
-        locations: (c.locations || []).map((l: any) => ({ ...l, history: l.history || [] })),
+        locations: (c.locations || []).map((l: any) => withCleanStringList({ ...l, history: l.history || [] }, 'aspects')),
         // Ensure required array fields exist on factions/adventures too — older or
         // hand-edited/imported saves can be missing these, and CRUD code
         // (_synchronizeNpcFactionLink, deleteFaction, deleteLocation, etc.)
@@ -441,13 +469,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
 
     /** Returns the session's Stage, creating an empty one on first use. */
     const _ensureStage = (session: SessionLog): SessionStage => {
-        // A Stage that is not a plain object (a hand-edited save's `"stage":
-        // "none"`, say) is replaced, not patched — assigning `.npcIds` onto a
-        // primitive throws inside the producer and the click silently dies.
-        if (!session.stage || typeof session.stage !== 'object' || Array.isArray(session.stage)) {
-            session.stage = { npcIds: [] };
-        }
-        if (!Array.isArray(session.stage.npcIds)) session.stage.npcIds = [];
+        if (!session.stage) session.stage = { npcIds: [] };
         return session.stage;
     };
 
@@ -2616,7 +2638,6 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                 if (!session) return;
                 const stage = _ensureStage(session);
                 Object.assign(stage, updates);
-                if (!Array.isArray(stage.npcIds)) stage.npcIds = [];
             });
         },
 
@@ -2667,7 +2688,7 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
             updateState(draft => {
                 const campaign = getActiveCampaignFromState(draft);
                 const session = _getActiveSession(draft);
-                if (!campaign || !session?.stage || !Array.isArray(session.stage.npcIds)) return;
+                if (!campaign || !session?.stage) return;
                 if (!session.stage.npcIds.includes(npcId)) return;
                 session.stage.npcIds = session.stage.npcIds.filter(id => id !== npcId);
                 const name = campaign.npcs.find(n => n.id === npcId)?.name;

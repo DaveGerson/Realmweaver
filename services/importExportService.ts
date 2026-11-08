@@ -222,8 +222,7 @@ const normaliseRequiredArrays = (data: Record<string, unknown>): void => {
       ensureArrayField(log, 'encounterLog');
       // The Stage is optional, but when present it must be a plain object with
       // a cast array (in lockstep with campaignService.migrateCampaignsData).
-      // A primitive or array Stage is meaningless — drop it rather than let
-      // `_ensureStage` try to hang `.npcIds` off a string later.
+      // A primitive or array Stage is meaningless, so it is dropped.
       if ('stage' in log) {
         const stage = log['stage'];
         if (isPlainObject(stage)) {
@@ -871,7 +870,7 @@ const dedupeOrdered = (ids: Array<string | undefined>): string[] => {
  * Only an absent/empty curated list falls back to the scene-derived roster.
  */
 const resolveRosterIds = (curated: string[] | undefined, fallback: string[]): string[] =>
-  Array.isArray(curated) && curated.length > 0 ? curated : fallback;
+  curated?.length ? curated : fallback;
 
 /** Finds a Scene by id across every adventure (mirrors `storyDerivations.findSceneById`). */
 const findSceneAcrossAdventures = (
@@ -949,8 +948,7 @@ export const generateSessionPrepSheetMarkdown = (
   }
 
   // ---- Beats ---------------------------------------------------------------
-  const rawBeats = Array.isArray(log.beats) ? log.beats : [];
-  const beats = rawBeats.filter(b => b && typeof b.title === 'string' && b.title.trim());
+  const beats = (log.beats ?? []).filter(b => b.title?.trim());
   if (beats.length > 0) {
     const lines = beats.map(b => {
       const box = b.isCompleted ? '[x]' : '[ ]';
@@ -962,7 +960,7 @@ export const generateSessionPrepSheetMarkdown = (
   }
 
   // ---- Scenes ----------------------------------------------------------
-  const plannedSceneIds = Array.isArray(log.plannedSceneIds) ? log.plannedSceneIds : [];
+  const plannedSceneIds = log.plannedSceneIds ?? [];
   const resolvedScenes = plannedSceneIds
     .map(id => findSceneAcrossAdventures(camp.adventures, id))
     .filter((s): s is Scene => Boolean(s));
@@ -1031,12 +1029,8 @@ export const generateSessionPrepSheetMarkdown = (
       let line = `- **${loc.name}**${desc ? ` — ${desc}` : ''}`;
       // Lazy DM step 5 ("develop fantastic locations") — an aspects line only
       // when the location actually has some; never a placeholder for one that
-      // doesn't (mirrors the NPC "Voice:" line immediately above). Guarded
-      // with Array.isArray, not just `?? []` — a malformed non-array value
-      // (a hand-edited import, an old save) must degrade, not throw.
-      const aspects = Array.isArray(loc.aspects)
-        ? loc.aspects.filter((a): a is string => typeof a === 'string' && a.trim().length > 0)
-        : [];
+      // doesn't (mirrors the NPC "Voice:" line immediately above).
+      const aspects = (loc.aspects ?? []).filter(a => a.trim());
       if (aspects.length > 0) {
         line += `\n  Aspects: ${aspects.map(a => a.trim()).join('; ')}`;
       }
@@ -1046,7 +1040,7 @@ export const generateSessionPrepSheetMarkdown = (
   }
 
   // ---- Plot Threads (related AND still active) -----------------------------
-  const relatedPlotIds = Array.isArray(log.relatedPlotIds) ? log.relatedPlotIds : [];
+  const relatedPlotIds = log.relatedPlotIds ?? [];
   const campPlots = camp.plots ?? [];
   const activePlots = relatedPlotIds
     .map(id => campPlots.find(p => p.id === id))

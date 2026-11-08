@@ -7,14 +7,10 @@
  * there is. And a plot's pressure — its clock and its move when ignored — is
  * exactly what an improvising GM wants the model to have in hand.
  *
- *  - 'coach' / 'generation' contexts carry an "On Stage Now" section (place,
- *    present cast, what's happening), the Stage's cast joins the
- *    "NPCs in Scene" list, and the Stage's ids count as scene-relevant for
- *    the GM-ONLY secrets section.
- *  - 'player-safe' keeps the place and the names but never the DM's
- *    "Happening" line, which can carry GM truth.
- *  - Active plot lines carry `[clock n/m]` and `— if ignored: …`, never in
- *    the player-safe variant (which has no plot section at all).
+ *  - Contexts carry an "On Stage Now" section (place, present cast, what's
+ *    happening), the Stage's cast joins the "NPCs in Scene" list, and the
+ *    Stage's ids count as scene-relevant for the unrevealed secrets section.
+ *  - Active plot lines carry `[clock n/m]` and `— if ignored: …`.
  *  - The continuity checker emits an `info` `clock-expired` issue for an
  *    active plot whose clock is full, and nothing for a partial or absent clock.
  */
@@ -94,20 +90,11 @@ describe('contextBuilder — On Stage Now', () => {
     expect(ctx).toMatch(/NPCs in Scene:\n  - Serah Vane/);
   });
 
-  it('the Stage cast counts as scene-relevant for the GM-ONLY secrets section', () => {
+  it('the Stage cast counts as scene-relevant for the unrevealed secrets section', () => {
     const ctx = buildCampaignContext({ variant: 'coach', campaign: stagedCampaign, activeSessionId: 'live' });
-    expect(ctx).toContain('GM-ONLY — UNREVEALED SECRETS');
+    expect(ctx).toContain('Unrevealed Secrets');
     expect(ctx).toContain("Serah is the harbourmaster's daughter");
     expect(ctx).not.toContain('The chapel bell is bronze');
-  });
-
-  it('player-safe keeps the place and the names but never the DM\'s Happening line', () => {
-    const ctx = buildCampaignContext({ variant: 'player-safe', campaign: stagedCampaign, activeSessionId: 'live' });
-    expect(ctx).toContain('Place: The Gull and Gallows');
-    expect(ctx).toContain('Present: Serah Vane');
-    expect(ctx).not.toContain('Happening:');
-    expect(ctx).not.toContain('tide cult is listening');
-    expect(ctx).not.toContain('GM-ONLY');
   });
 
   it('a freeform place with no linked location is reported as typed', () => {
@@ -165,20 +152,6 @@ describe('contextBuilder — player appetites (Table Pulse)', () => {
     const ctx = buildCampaignContext({ variant: 'generation', campaign });
     expect(ctx).toContain('Player Characters: Torvald (player wants more of: tactical combat; romance plots), Mira');
   });
-
-  it('tolerates a non-array playerFlags from a hand-edited save — never throws, ignores the junk', () => {
-    // Context building runs before essentially every AI call; a bad optional
-    // field on one PC must not take every AI feature down with it.
-    const campaign = makeCampaign({
-      playerCharacters: [
-        { id: 'pc-1', playerName: 'Dana', playerFlags: 'wants more combat', characterSocial: { characterName: 'Torvald' } },
-        { id: 'pc-2', playerName: 'Lee', playerFlags: ['mystery', 42, null], characterSocial: { characterName: 'Mira' } },
-      ] as unknown as Campaign['playerCharacters'],
-    });
-    let ctx = '';
-    expect(() => { ctx = buildCampaignContext({ variant: 'generation', campaign }); }).not.toThrow();
-    expect(ctx).toContain('Player Characters: Torvald, Mira (player wants more of: mystery)');
-  });
 });
 
 describe('contextBuilder — plot pressure', () => {
@@ -189,17 +162,11 @@ describe('contextBuilder — plot pressure', () => {
     ],
   });
 
-  it('GM variants carry the clock reading and the if-ignored move', () => {
+  it('plot lines carry the clock reading and the if-ignored move', () => {
     const ctx = buildCampaignContext({ variant: 'generation', campaign: pressured });
     expect(ctx).toContain('The Tide Cult [active] [clock 6/6 — run out]: They want the bell. — if ignored: The chapel floods for good and the bell is lost.');
     expect(ctx).toContain('  - Quiet Debt [active]');
     expect(ctx).not.toContain('Quiet Debt [active] [clock');
-  });
-
-  it('player-safe carries neither (no plot section at all)', () => {
-    const ctx = buildCampaignContext({ variant: 'player-safe', campaign: pressured });
-    expect(ctx).not.toContain('if ignored');
-    expect(ctx).not.toContain('Active Plot Threads');
   });
 });
 

@@ -17,18 +17,11 @@
  *   'generation'  — Emphasises world consistency: all entity names, setting, relationships
  *   'coach'       — Emphasises current session: active scene, combat, recent events first
  *   'chat'        — Balanced: entity names + current context in equal measure
- *   'player-safe' — Player-facing output only: no GM-authored private prose (NPC/Location
- *                   `secrets`, NPC `traits`/`motivations`/`backstory`, scene `gmNotes`,
- *                   session prep/running notes, plot plans) and no unrevealed `Secret`;
- *                   revealed secrets appear as established party knowledge. See
- *                   tests/services/contextBuilder.partyKnowledge.test.ts.
  *
- * E3 party knowledge (zero schema change, derived from the existing `Secret` shape):
- *   'generation' / 'coach' additionally gain a Tier-2 "GM-ONLY — UNREVEALED SECRETS" section
- *   listing every unrevealed secret linked to the current scene-relevance set (active scene +
- *   its NPCs/location, the focus entity, the editor selection). 'generation' / 'coach' /
- *   'player-safe' all gain an "Established Party Knowledge (revealed secrets)" section listing
- *   every revealed secret campaign-wide, scene-relevant ones first. 'chat' gains neither.
+ * Reveal state (derived from the `Secret` shape, the same in every variant): one Tier-2
+ * section lists the unrevealed secrets linked to what is in scope right now (active scene +
+ * its NPCs/location, the Stage, the focus entity, the editor selection); another lists every
+ * revealed secret campaign-wide as established party knowledge, scene-relevant ones first.
  */
 
 import type { Campaign } from '../types/Campaign';
@@ -39,19 +32,18 @@ import type { Secret } from '../types/Secret';
 import { normalizePlotClock } from '../utils/plotClock';
 
 // ---------------------------------------------------------------------------
-// E3 — party-knowledge section headers (exact strings; see
-// tests/services/contextBuilder.partyKnowledge.test.ts and
-// tests/services/partyKnowledgeFixtures.ts for the executable contract).
+// Reveal-state section headers
 // ---------------------------------------------------------------------------
 
-const GM_ONLY_SECRETS_HEADER = 'GM-ONLY — UNREVEALED SECRETS (never reveal to players):';
+const UNREVEALED_SECRETS_HEADER =
+  'Unrevealed Secrets (the party has not discovered these yet; keep them out of anything players will hear or read):';
 const PARTY_KNOWLEDGE_HEADER = 'Established Party Knowledge (revealed secrets):';
 
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
-export type ContextVariant = 'generation' | 'coach' | 'chat' | 'player-safe';
+export type ContextVariant = 'generation' | 'coach' | 'chat';
 
 export interface ContextOptions {
   variant: ContextVariant;
@@ -278,15 +270,11 @@ export function buildCampaignContext(options: ContextOptions): string {
     return parts.slice(0, n).join('. ').trim();
   };
 
-  /** True for the player-facing variant that must never carry GM-authored prose. */
-  const isPlayerSafe = variant === 'player-safe';
-
   /**
    * Render one secret as `  - [<category>] <title>: <content>` (content
    * truncated to 160 chars; the `: <content>` half dropped when content is
-   * empty). Used by both the GM-ONLY and established-party-knowledge
-   * sections. `Secret.notes` is DM bookkeeping and is deliberately never
-   * read here.
+   * empty). Used by both reveal-state sections. `Secret.notes` is DM
+   * bookkeeping, not campaign content, so it is not read here.
    */
   const secretEntry = (s: Secret): string => {
     const content = trunc(s.content, 160);
@@ -328,11 +316,9 @@ export function buildCampaignContext(options: ContextOptions): string {
         const lines: string[] = [
           `Focus NPC — ${npc.name}`,
           npc.description ? `  Description: ${trunc(npc.description, 200)}` : '',
-          // player-safe: traits/motivations/backstory are GM-authored prose
-          // (hidden agendas, secret backstory beats) — never player-facing.
-          !isPlayerSafe && npc.traits ? `  Traits: ${trunc(npc.traits, 150)}` : '',
-          !isPlayerSafe && npc.motivations ? `  Motivations: ${trunc(npc.motivations, 150)}` : '',
-          !isPlayerSafe && npc.backstory ? `  Backstory: ${trunc(npc.backstory, 200)}` : '',
+          npc.traits ? `  Traits: ${trunc(npc.traits, 150)}` : '',
+          npc.motivations ? `  Motivations: ${trunc(npc.motivations, 150)}` : '',
+          npc.backstory ? `  Backstory: ${trunc(npc.backstory, 200)}` : '',
           npc.factionId
             ? `  Faction: ${campaign.factions.find(f => f.id === npc.factionId)?.name ?? npc.factionId}`
             : '',
@@ -345,8 +331,7 @@ export function buildCampaignContext(options: ContextOptions): string {
         return [
           `Focus Location — ${loc.name}`,
           loc.description ? `  Description: ${trunc(loc.description, 300)}` : '',
-          // player-safe: Location.secrets is GM-authored private prose, never player-facing.
-          !isPlayerSafe && loc.secrets ? `  Secrets: ${trunc(loc.secrets, 150)}` : '',
+          loc.secrets ? `  Secrets: ${trunc(loc.secrets, 150)}` : '',
         ].filter(Boolean).join('\n');
       }
       case 'faction': {
@@ -397,11 +382,10 @@ export function buildCampaignContext(options: ContextOptions): string {
   const activeSession = findActiveSession();
   if (activeSession && hasBudget()) {
     const recapLines: string[] = [`Active Session: ${activeSession.title}`];
-    // player-safe: prep/running notes are GM bookkeeping, never player-facing.
-    if (!isPlayerSafe && activeSession.prepNotes) {
+    if (activeSession.prepNotes) {
       recapLines.push(`  Prep Notes: ${trunc(activeSession.prepNotes, 300)}`);
     }
-    if (!isPlayerSafe && activeSession.runningNotes) {
+    if (activeSession.runningNotes) {
       recapLines.push(`  Running Notes: ${trunc(activeSession.runningNotes, 200)}`);
     }
     tryAdd(recapLines.join('\n'));
@@ -416,8 +400,7 @@ export function buildCampaignContext(options: ContextOptions): string {
     if (activeScene.readAloudText) {
       sceneLines.push(`  Read-Aloud: ${firstSentences(activeScene.readAloudText, 1)}`);
     }
-    // player-safe: GM Notes is GM-only prose (scene goals, hidden setup) — never player-facing.
-    if (!isPlayerSafe && activeScene.gmNotes) {
+    if (activeScene.gmNotes) {
       sceneLines.push(`  GM Notes: ${firstSentences(activeScene.gmNotes, 1)}`);
     }
     tryAdd(sceneLines.join('\n'));
@@ -426,8 +409,7 @@ export function buildCampaignContext(options: ContextOptions): string {
   // --- On stage now (unstructured play: the session's live Stage) ---
   // The Stage is the DM's live statement of where the party is and who is
   // with them, independent of any prepped scene — a freeform session has
-  // nothing else. Its place and cast are player-visible facts; `focus` is
-  // the DM's own running line and can carry GM truth, so it stays GM-only.
+  // nothing else.
   const stage = activeSession?.stage;
   const stageLocation = stage?.locationId
     ? campaign.locations.find(l => l.id === stage.locationId)
@@ -440,7 +422,7 @@ export function buildCampaignContext(options: ContextOptions): string {
     const stageLines: string[] = ['On Stage Now:'];
     if (stagePlace) stageLines.push(`  Place: ${stagePlace}`);
     if (stageNpcs.length > 0) stageLines.push(`  Present: ${stageNpcs.map(n => n.name).join(', ')}`);
-    if (!isPlayerSafe && stage.focus?.trim()) stageLines.push(`  Happening: ${trunc(stage.focus.trim(), 200)}`);
+    if (stage.focus?.trim()) stageLines.push(`  Happening: ${trunc(stage.focus.trim(), 200)}`);
     if (stageLines.length > 1) tryAdd(stageLines.join('\n'));
   }
 
@@ -474,10 +456,8 @@ export function buildCampaignContext(options: ContextOptions): string {
       const sceneNpcIds = new Set(sceneNpcs.map(n => n.id));
       const npcLines = sceneNpcs.map(n => {
         const parts: string[] = [n.name];
-        // player-safe: traits/motivations are GM-authored prose (hidden
-        // agendas among them) — never player-facing. Name only.
-        if (!isPlayerSafe && n.traits) parts.push(trunc(n.traits, 80));
-        if (!isPlayerSafe && n.motivations) parts.push(trunc(n.motivations, 80));
+        if (n.traits) parts.push(trunc(n.traits, 80));
+        if (n.motivations) parts.push(trunc(n.motivations, 80));
         const faction = n.factionId ? campaign.factions.find(f => f.id === n.factionId) : undefined;
         if (faction) parts.push(`[${faction.name}]`);
         return `  - ${parts.join(' | ')}`;
@@ -513,8 +493,7 @@ export function buildCampaignContext(options: ContextOptions): string {
   }
 
   // --- Active plot threads (max 5) ---
-  // player-safe: plot titles/descriptions are GM plan text, omit the whole section.
-  if (!isPlayerSafe && campaign.plots && campaign.plots.length > 0 && hasBudget()) {
+  if (campaign.plots && campaign.plots.length > 0 && hasBudget()) {
     const activePlots = campaign.plots
       .filter(p => p.status === 'active')
       .slice(0, 5);
@@ -537,11 +516,7 @@ export function buildCampaignContext(options: ContextOptions): string {
     if (focusText) tryAdd(focusText);
   }
 
-  // --- E3: party-knowledge secrets (Tier 2 — before the Tier-3 rosters) ---
-  // Zero schema change: derived entirely from the existing `Secret` shape
-  // (`isRevealed`, `linkedEntityIds`, `category`, `title`, `content`) and
-  // `campaign.secrets ?? []`. See
-  // tests/services/contextBuilder.partyKnowledge.test.ts for the contract.
+  // --- Reveal state (Tier 2 — before the Tier-3 rosters) ---
   const allSecrets = campaign.secrets ?? [];
 
   if (allSecrets.length > 0) {
@@ -567,30 +542,24 @@ export function buildCampaignContext(options: ContextOptions): string {
 
     const isSceneRelevant = (s: Secret) => (s.linkedEntityIds ?? []).some(id => relevantIds.has(id));
 
-    // GM-ONLY — unrevealed secrets linked to something in scope right now.
-    // Never built for 'chat' or 'player-safe' — this is GM truth the players
-    // must not see.
-    if ((variant === 'generation' || variant === 'coach') && hasBudget()) {
-      // Truthiness, not `=== false` — an old/hand-edited save can have
-      // `isRevealed: undefined` (no field-level migration backfills it; see
-      // `deriveLoadedGuns`/`SecretsTracker`, which both treat that the same
-      // way via `!s.isRevealed`). A strict-false check would silently drop
-      // such a secret from BOTH GM sections instead of treating it as
-      // unrevealed GM truth.
+    // Unrevealed secrets linked to something in scope right now.
+    if (hasBudget()) {
       const unrevealedInScope = allSecrets.filter(s => !s.isRevealed && isSceneRelevant(s));
       if (unrevealedInScope.length > 0) {
-        tryAddList(GM_ONLY_SECRETS_HEADER, unrevealedInScope.map(secretEntry));
+        tryAddList(UNREVEALED_SECRETS_HEADER, unrevealedInScope.map(secretEntry));
       }
     }
 
     // Established party knowledge — every revealed secret campaign-wide,
-    // scene-relevant ones first. Present in every variant except 'chat'.
-    if (variant !== 'chat' && hasBudget()) {
+    // scene-relevant ones first. It grows all campaign long and Realm Chat
+    // rebuilds it on every message, so it gets a quarter of the budget and an
+    // "…and N more" marker rather than crowding out the Tier-3 rosters.
+    if (hasBudget()) {
       const revealed = allSecrets.filter(s => !!s.isRevealed);
       if (revealed.length > 0) {
         const inScene = revealed.filter(isSceneRelevant);
         const elsewhere = revealed.filter(s => !isSceneRelevant(s));
-        tryAddList(PARTY_KNOWLEDGE_HEADER, [...inScene, ...elsewhere].map(secretEntry));
+        tryAddList(PARTY_KNOWLEDGE_HEADER, [...inScene, ...elsewhere].map(secretEntry), Math.floor(maxChars / 4));
       }
     }
   }
@@ -683,12 +652,7 @@ export function buildCampaignContext(options: ContextOptions): string {
     if (hasPlayerCharacters && hasBudget()) {
       const pcNames = campaign.playerCharacters!.map(pc => {
         const name = pc.characterSocial?.characterName ?? '?';
-        // Tolerate a hand-edited save / template where this is not an array —
-        // context building runs before every AI call and must never throw.
-        const wants = (Array.isArray(pc.playerFlags) ? pc.playerFlags : [])
-          .filter((f): f is string => typeof f === 'string')
-          .map(f => f.trim())
-          .filter(Boolean);
+        const wants = (pc.playerFlags ?? []).map(f => f.trim()).filter(Boolean);
         return wants.length > 0 ? `${name} (player wants more of: ${trunc(wants.join('; '), 120)})` : name;
       });
       tryAddJoined('Player Characters:', pcNames, nextTier3Quota());
@@ -734,8 +698,7 @@ export function buildCampaignContext(options: ContextOptions): string {
       const focusScene = focusAdv?.scenes.find(s => s.id === focusSceneId);
       if (focusScene && focusAdv && focusScene.id !== activeSceneId) {
         selectionContext += `USER IS VIEWING SCENE: "${focusScene.title}" (Adventure: ${focusAdv.title})\n`;
-        // player-safe: scene gmNotes is GM-only, in this block too.
-        if (!isPlayerSafe && focusScene.gmNotes) selectionContext += `Notes: ${trunc(focusScene.gmNotes, 200)}\n`;
+        if (focusScene.gmNotes) selectionContext += `Notes: ${trunc(focusScene.gmNotes, 200)}\n`;
       }
     } else if (focusLocId) {
       const focusLoc = campaign.locations.find(l => l.id === focusLocId);
@@ -747,9 +710,7 @@ export function buildCampaignContext(options: ContextOptions): string {
       const focusNpc = campaign.npcs.find(n => n.id === focusNpcId);
       if (focusNpc) {
         selectionContext += `USER IS VIEWING NPC: "${focusNpc.name}"\n`;
-        // player-safe: traits is GM-authored prose, in this block too (same
-        // leak class as the focus-NPC and NPCs-in-scene blocks above).
-        if (!isPlayerSafe && focusNpc.traits) selectionContext += `Traits: ${trunc(focusNpc.traits, 150)}\n`;
+        if (focusNpc.traits) selectionContext += `Traits: ${trunc(focusNpc.traits, 150)}\n`;
       }
     }
 

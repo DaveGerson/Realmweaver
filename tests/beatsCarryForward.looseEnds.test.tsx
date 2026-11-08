@@ -37,9 +37,8 @@
  *    after a click. A DM who presses it has the merged text persisted through
  *    the existing `updateSessionLog` call at Save & End.
  *
- * 5. **Never leaks to the players.** Beat titles are the GM's prep. They go to
- *    `looseEnds` and to nothing else — never into `recap`, and above all never
- *    into `playerRecap`, the one field written to be handed to the table.
+ * 5. **Only the loose ends change.** Beat titles go to `looseEnds` and nothing
+ *    else; `recap` and `playerRecap` stay as they were.
  */
 
 import React from 'react';
@@ -331,7 +330,7 @@ describe('SessionEndWizard — carry-forward is purely additive', () => {
   });
 });
 
-describe('SessionEndWizard — unfinished beats never reach the players', () => {
+describe('SessionEndWizard — carrying beats only changes the loose ends', () => {
   it('writes the beat titles to looseEnds and to nothing else', () => {
     renderWizard(makeLog({ recap: 'The party lost the ledger.', playerRecap: 'You lost the ledger.' }));
     gotoLooseEnds();

@@ -450,7 +450,7 @@ When you click **End Session** in the Session Runner, the **Session End Wizard**
 1. **AI Recap** — the wizard reads the notes you captured in the Running Log and writes a summary, also detecting unresolved loose ends. It runs automatically on open once you have five or more logged notes; with fewer, it tells you how many notes it found and waits for you to click **Generate AI Recap** (sparse notes produce unreliable recaps). The generated text is fully editable, and **Regenerate** re-runs it. If generation fails, the error is shown inline with a **Try Again** button.
 2. **Plot Status** — for each plot linked to the session, click it to cycle Advanced → Stalled → Unchanged
 3. **Loose Ends** — review the AI-suggested loose ends and add your own; these carry forward into the next session. If the session has beats you never checked off, one click folds them in here too, so an unplayed idea survives to next week instead of vanishing
-4. **Player Recap** — the AI generates a player-facing version of the recap (spoiler-free) you can copy and share with your group
+4. **Player Recap** — the AI generates a shorter version of the recap for your players. Read it over, then copy and share it with your group
 5. **Save and End** — saves everything and closes the runner
 
 Everything the wizard collects — the GM recap, loose ends, per-plot progressions, and the player-facing recap — is written to the session log when you finish. Reopening the wizard on a session that already has a saved recap loads those values back in rather than starting blank, so a second pass edits your existing text instead of overwriting it with an empty field.

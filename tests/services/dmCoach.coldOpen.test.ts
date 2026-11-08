@@ -49,9 +49,7 @@
  *    no unfilled `{{…}}` placeholder survives.
  *
  * 7. **Context comes from the caller, verbatim.** The function forwards the
- *    `campaignContext` it was handed and never builds one itself — in
- *    particular never the player-safe variant. The output is GM-facing
- *    performance material; it is not a player recap.
+ *    `campaignContext` it was handed.
  *
  * 8. **It is freeform text, not a schema call.** One `generateText` call per
  *    invocation at the standard tier, dropping to lite only when asked. The
@@ -73,15 +71,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Campaign, SessionLog, SessionLogEntry } from '../../types/index';
 
-const h = vi.hoisted(() => ({ buildCampaignContext: vi.fn(() => 'BUILT-CONTEXT') }));
-
 vi.mock('../../services/ai/core', () => ({
   generateWithSchema: vi.fn(async () => ({})),
   generateText: vi.fn(async () => '  Previously, on Ashfall.  '),
   generateChatCompletion: vi.fn(async () => 'ok'),
 }));
-
-vi.mock('../../services/contextBuilder', () => ({ buildCampaignContext: h.buildCampaignContext }));
 
 import * as core from '../../services/ai/core';
 import * as dmCoach from '../../services/ai/dmCoach';
@@ -201,7 +195,6 @@ beforeEach(() => {
   vi.mocked(core.generateText).mockClear();
   vi.mocked(core.generateText).mockResolvedValue('  Previously, on Ashfall.  ');
   vi.mocked(core.generateWithSchema).mockClear();
-  h.buildCampaignContext.mockClear();
 });
 
 afterEach(() => {
@@ -283,6 +276,16 @@ describe('what the model is given to work from', () => {
     const prompt = sentPrompt();
     expect(prompt).toContain(RECAP);
     expect(prompt).toContain(LOOSE_ENDS);
+  });
+
+  // Loose ends come from the recap step and may name a secret, while the cold
+  // open is read aloud to the table.
+  it('labels the loose ends as the DM\'s private notes and keeps the undiscovered out of the text', async () => {
+    await dmCoach.generateColdOpen({ campaign: full });
+    const prompt = sentPrompt();
+    const looseEndsLabel = prompt.slice(0, prompt.indexOf(LOOSE_ENDS)).split('\n\n').pop() ?? '';
+    expect(looseEndsLabel).toMatch(/private/i);
+    expect(looseEndsLabel).toMatch(/not (yet )?discovered/i);
   });
 
   it('leaves an older session\'s recap out — last session is the one being recalled', async () => {
@@ -410,7 +413,7 @@ describe('campaign text reaches the model exactly as the DM wrote it', () => {
 
 // --- 7. context ------------------------------------------------------------
 
-describe('context comes from the caller and stays GM-facing', () => {
+describe('context comes from the caller', () => {
   it('forwards the caller context untouched', async () => {
     await dmCoach.generateColdOpen({ campaign: full, campaignContext: 'GEN-CONTEXT' });
     expect(sentContext()).toBe('GEN-CONTEXT');
@@ -419,11 +422,6 @@ describe('context comes from the caller and stays GM-facing', () => {
   it('passes no context at all rather than inventing one', async () => {
     await dmCoach.generateColdOpen({ campaign: full });
     expect(sentContext()).toBeUndefined();
-  });
-
-  it('never builds a context itself — least of all the player-safe one', async () => {
-    await dmCoach.generateColdOpen({ campaign: full, campaignContext: 'GEN-CONTEXT' });
-    expect(h.buildCampaignContext).not.toHaveBeenCalled();
   });
 });
 

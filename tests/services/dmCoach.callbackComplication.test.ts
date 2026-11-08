@@ -43,10 +43,7 @@
  *    heading is left behind.
  *
  * 5. **Context comes from the caller, verbatim.** The function forwards the
- *    `campaignContext` string it was given to the model adapter untouched. It
- *    never builds context itself, and in particular never touches the
- *    player-safe variant — this output is GM-private and belongs in the
- *    running log, never in anything the players read.
+ *    `campaignContext` string it was given to the model adapter untouched.
  *
  * 6. **It is freeform text, not a schema call.** One `generateText` call per
  *    invocation, at the standard tier, dropping to the lite tier only when
@@ -66,15 +63,11 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-const h = vi.hoisted(() => ({ buildCampaignContext: vi.fn(() => 'BUILT-CONTEXT') }));
-
 vi.mock('../../services/ai/core', () => ({
   generateWithSchema: vi.fn(async () => ({})),
   generateText: vi.fn(async () => '  A complication.  '),
   generateChatCompletion: vi.fn(async () => 'ok'),
 }));
-
-vi.mock('../../services/contextBuilder', () => ({ buildCampaignContext: h.buildCampaignContext }));
 
 import * as core from '../../services/ai/core';
 import * as dmCoach from '../../services/ai/dmCoach';
@@ -99,7 +92,6 @@ beforeEach(() => {
   vi.mocked(core.generateText).mockClear();
   vi.mocked(core.generateText).mockResolvedValue('  A complication.  ');
   vi.mocked(core.generateWithSchema).mockClear();
-  h.buildCampaignContext.mockClear();
 });
 
 afterEach(() => {
@@ -183,7 +175,7 @@ describe('what is happening right now', () => {
 
 // --- 5. context ------------------------------------------------------------
 
-describe('context comes from the caller and stays GM-private', () => {
+describe('context comes from the caller', () => {
   it('forwards the caller campaign context untouched', async () => {
     await dmCoach.generateCallbackComplication({ material: MATERIAL, campaignContext: 'COACH-CONTEXT' });
     expect(sentContext()).toBe('COACH-CONTEXT');
@@ -192,11 +184,6 @@ describe('context comes from the caller and stays GM-private', () => {
   it('passes no context at all rather than inventing one', async () => {
     await dmCoach.generateCallbackComplication({ material: MATERIAL });
     expect(sentContext()).toBeUndefined();
-  });
-
-  it('never builds a context itself — least of all the player-safe one', async () => {
-    await dmCoach.generateCallbackComplication({ material: MATERIAL, campaignContext: 'COACH-CONTEXT' });
-    expect(h.buildCampaignContext).not.toHaveBeenCalled();
   });
 });
 

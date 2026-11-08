@@ -134,7 +134,7 @@ lints), E4 (escalation), E7 (safety lines), E9 (status widening) are schema and 
 costs a lazy DM nothing to leave unused, consistent with E5's own principle that GM craft is lint,
 never a requirement. E12 (`Scene.expectedDurationMinutes?`, a prep-time total in the wizard) is a
 small win only for a DM who is already using formal Scenes — it does nothing for a beats-only
-prep. E3 (player-safe AI context) and E10 (context derivations) quietly improve the AI a lazy DM
+prep. E3 (reveal state in AI context) and E10 (context derivations) quietly improve the AI a lazy DM
 already leans on hardest without asking for any new input — the best-shaped kind of change for
 this persona. None of E1–E12 threaten the method.
 

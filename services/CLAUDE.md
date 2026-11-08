@@ -65,12 +65,14 @@ Tests use `{ persist: false }` (init then just sets `appStatus: 'welcome'`).
 - Integrity: `stage.locationId` / `stage.npcIds` are in `_purgeEntityReferences`, `duplicateCampaign`'s remap and
   `importTemplateData`'s remap (unknown ids dropped); `importExportService.normaliseRequiredArrays` and
   `migrateCampaignsData` (lockstep) guarantee `stage.npcIds` on an object Stage and DROP a Stage that is not a plain
-  object, and `_ensureStage` replaces rather than patches one that slipped through. `goLive` clears `activeSceneId`
+  object, so the Stage methods trust the shape. `goLive` clears `activeSceneId`
   when the new session has no scene to open on, so a scene-less session never inherits the previous live session's
   scene. `Plot.clock` / `Plot.ifIgnored` are non-id-bearing; `importTemplateData` validates them the way it validates
   `Secret.isVital` / `cluesNeeded`, and validates `PlayerCharacter.playerFlags` the way it validates
-  `Location.aspects` (strings only, absent when empty) — every reader of `playerFlags` (`contextBuilder`,
-  `dmCoach.generateCheckInQuestions`, `normalizePlayerCharacter`) also tolerates a non-array.
+  `Location.aspects` (strings only, absent when empty). `migrateCampaignsData` settles the same two lists for saves and
+  file imports (`withCleanStringList`), along with each session's `beats` (`withCleanBeats`: objects with a text
+  title), `plannedNpcIds` / `plannedLocationIds`, and `relatedPlotIds` / `plannedSceneIds` (`cleanStringList`), so
+  readers — the prep sheet the Session Log editor builds on every render among them — use a plain `?? []`.
 
 ### Cascade deletion
 
@@ -137,15 +139,14 @@ UI. `importCampaignFromJson` is the throw-on-error wrapper. `exportCampaignAsJso
 
 `buildCampaignContext({ variant, campaign, activeSceneId, activeSessionId, maxTokenEstimate, focusEntityId,
 focusEntityType, focusSelection })` — an **options object**, not positional args. `maxTokenEstimate` defaults to
-4000, converted at 1 token ≈ 4 chars. `variant` is `'generation' | 'coach' | 'chat' | 'player-safe'` — the last
-one (ontology element **E3**) is the player-facing build: it emits no GM-authored private prose (`NPC.secrets`,
-`Location.secrets`, `Scene.gmNotes`, session prep/running notes, the plot-threads section) and no unrevealed
-`Secret`, while `'generation'` / `'coach'` gain a Tier-2 GM-ONLY section of unrevealed secrets linked to the active
-scene's entities. Revealed secrets appear as established party knowledge in all three; `'chat'` gains neither
-section. Tier 1 (identity, setting, `styleProfile`, active session/scene, and — when the active session has a
-non-empty Stage — an **On Stage Now** section: place and present cast in every variant, the DM's `focus` line
-GM-only) always tries first; Tier 2 adds scene participants (the scene's cast ∪ the Stage's cast, deduplicated; the
-Stage's ids also count as scene-relevant for the GM-ONLY secrets section), the active location (skipped when the
+4000, converted at 1 token ≈ 4 chars. `variant` is `'generation' | 'coach' | 'chat'`. Every variant gains two Tier-2
+reveal-state sections (ontology element **E3**): unrevealed secrets linked to the active scene's entities, under a
+header telling the model to keep them out of anything players hear or read, and revealed secrets as established party
+knowledge, scene-relevant first and capped at a quarter of the budget (Realm Chat rebuilds it every message, and an
+uncapped list grows all campaign long until the Tier-3 rosters vanish). Tier 1 (identity, setting, `styleProfile`, active session/scene, and —
+when the active session has a non-empty Stage — an **On Stage Now** section: place, present cast and the DM's `focus`
+line) always tries first; Tier 2 adds scene participants (the scene's cast ∪ the Stage's cast, deduplicated; the
+Stage's ids also count as scene-relevant for the unrevealed secrets section), the active location (skipped when the
 Stage already named a place), plots (each line carries `[clock n/m]` and `— if ignored: …` when set), focus entity,
 and — `coach` only — the active encounter; Tier 3 fills the remainder with roster overviews (skipped for `coach`). Lists fill **entry-by-entry**
 (`tryAddList` / `tryAddJoined`, with an "…and N more" marker), and each Tier-3 section takes a fair share via
