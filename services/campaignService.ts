@@ -1944,7 +1944,9 @@ export function createCampaignStore(config: { persist?: boolean } = {}) {
                         looseEnds: l.looseEnds || '',
                     };
                     if (!campaign.sessionLogs) campaign.sessionLogs = [];
-                    campaign.sessionLogs.push(log);
+                    // Templates are a separate ingestion path from saved campaigns.
+                    // Normalize their beats before readers trust the stored shape.
+                    campaign.sessionLogs.push(withCleanBeats(log));
                 });
 
                 // --- Player Characters ---

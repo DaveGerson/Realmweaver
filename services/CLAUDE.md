@@ -73,6 +73,7 @@ Tests use `{ persist: false }` (init then just sets `appStatus: 'welcome'`).
   file imports (`withCleanStringList`), along with each session's `beats` (`withCleanBeats`: objects with a text
   title), `plannedNpcIds` / `plannedLocationIds`, and `relatedPlotIds` / `plannedSceneIds` (`cleanStringList`), so
   readers — the prep sheet the Session Log editor builds on every render among them — use a plain `?? []`.
+  `importTemplateData` applies the same `withCleanBeats` check to template session logs before storing them.
 
 ### Cascade deletion
 
@@ -142,8 +143,8 @@ focusEntityType, focusSelection })` — an **options object**, not positional ar
 4000, converted at 1 token ≈ 4 chars. `variant` is `'generation' | 'coach' | 'chat'`. Every variant gains two Tier-2
 reveal-state sections (ontology element **E3**): unrevealed secrets linked to the active scene's entities, under a
 header telling the model to keep them out of anything players hear or read, and revealed secrets as established party
-knowledge, scene-relevant first and capped at a quarter of the budget (Realm Chat rebuilds it every message, and an
-uncapped list grows all campaign long until the Tier-3 rosters vanish). Tier 1 (identity, setting, `styleProfile`, active session/scene, and —
+knowledge, scene-relevant first. Each section is capped at a quarter of the budget (Realm Chat rebuilds it every
+message, and an uncapped list can crowd out the other section and the Tier-3 rosters). Tier 1 (identity, setting, `styleProfile`, active session/scene, and —
 when the active session has a non-empty Stage — an **On Stage Now** section: place, present cast and the DM's `focus`
 line) always tries first; Tier 2 adds scene participants (the scene's cast ∪ the Stage's cast, deduplicated; the
 Stage's ids also count as scene-relevant for the unrevealed secrets section), the active location (skipped when the
