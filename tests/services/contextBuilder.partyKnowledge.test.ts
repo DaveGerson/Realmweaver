@@ -303,6 +303,26 @@ describe.each(VARIANTS)('%s — the GM\'s prose', variant => {
 // ===========================================================================
 
 describe('the secrets sections respect the token budget', () => {
+  it('chat keeps party knowledge and world rosters with many in-scope unrevealed secrets', () => {
+    const secrets = Array.from({ length: 120 }, (_, i) => makeSecret({
+      id: `unrevealed-${i}`,
+      title: `Hidden history ${i}`,
+      content: 'A hidden piece of the history of the watch and its struggle with the guilds. '.repeat(3),
+      isRevealed: false,
+      linkedEntityIds: [SCENE_NPC_ID],
+    }));
+    const campaign = makeLoadedCampaign({ secrets: [...secrets, REVEALED_SECRET] });
+    const out = buildCampaignContext({ variant: 'chat', campaign, activeSceneId: SCENE_ID });
+
+    expect(out).toContain(UNREVEALED_HEADER);
+    expect(out).toMatch(/…and \d+ more/);
+    expect(out).toContain(secretLine(REVEALED_SECRET));
+    expect(out).toContain('\nNPCs:');
+    expect(out).toContain('Duke Harrow');
+    expect(out).toContain('\nLocations:');
+    expect(estimateTokens(out)).toBeLessThanOrEqual(4000);
+  });
+
   it.each(VARIANTS)('%s stays within budget with 60 secrets in scope', variant => {
     const secrets = Array.from({ length: 60 }, (_, i) =>
       makeSecret({

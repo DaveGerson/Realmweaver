@@ -9,7 +9,7 @@
  * this check would take the whole editor down.
  */
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
-import { setupTestEnvironment, type CreateCampaignStoreFn } from './helpers/testStoreFactory';
+import { setupTestEnvironment, makeTestStore, type CreateCampaignStoreFn } from './helpers/testStoreFactory';
 import { buildCampaignContext } from '../services/contextBuilder';
 import { generateSessionPrepSheetMarkdown } from '../services/importExportService';
 import type { Campaign } from '../types/index';
@@ -111,6 +111,27 @@ function expectCleanLists(campaign: Campaign) {
 }
 
 describe('optional string lists are settled when data enters the store', () => {
+    it('normalizes template beats before the Session Log prep sheet reads them', () => {
+        const { service, campaign } = makeTestStore(createCampaignStore);
+        liveStores.push(service);
+        service.importTemplateData({
+            sessionLogs: [
+                {
+                    ...sessionBase('mixed-template'),
+                    beats: [null, 'loose', { title: 7 }, { id: 'valid', title: 'Open on the bridge', isCompleted: false }],
+                },
+                { ...sessionBase('bare-template'), beats: 'not a list' },
+            ],
+        });
+
+        const [mixed, bare] = campaign().sessionLogs;
+        expect(() => generateSessionPrepSheetMarkdown(mixed, campaign())).not.toThrow();
+        expect(generateSessionPrepSheetMarkdown(mixed, campaign())).toContain('Open on the bridge');
+        expect(mixed.beats).toEqual([{ id: 'valid', title: 'Open on the bridge', isCompleted: false }]);
+        expect(() => generateSessionPrepSheetMarkdown(bare, campaign())).not.toThrow();
+        expect(bare).not.toHaveProperty('beats');
+    });
+
     it('on startup, from a saved campaign', async () => {
         localStorage.setItem('realmweaver-campaigns', JSON.stringify([campaignWithBadLists]));
         localStorage.setItem('realmweaver-active-campaign-id', 'camp-lists');

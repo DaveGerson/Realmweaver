@@ -542,11 +542,12 @@ export function buildCampaignContext(options: ContextOptions): string {
 
     const isSceneRelevant = (s: Secret) => (s.linkedEntityIds ?? []).some(id => relevantIds.has(id));
 
-    // Unrevealed secrets linked to something in scope right now.
+    // Each reveal-state section gets a share of the context budget. A large
+    // in-scope unrevealed list must leave room for party knowledge and rosters.
     if (hasBudget()) {
       const unrevealedInScope = allSecrets.filter(s => !s.isRevealed && isSceneRelevant(s));
       if (unrevealedInScope.length > 0) {
-        tryAddList(UNREVEALED_SECRETS_HEADER, unrevealedInScope.map(secretEntry));
+        tryAddList(UNREVEALED_SECRETS_HEADER, unrevealedInScope.map(secretEntry), Math.floor(maxChars / 4));
       }
     }
 

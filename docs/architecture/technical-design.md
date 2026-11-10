@@ -477,7 +477,9 @@ Sections are added tier by tier and stop once the character budget
 all-or-nothing, so a tight budget degrades to a partial roster instead of an empty one.
 
 Every variant carries reveal state: unrevealed secrets linked to what is in scope, and every
-revealed secret as established party knowledge. When `activeSessionId` names a session with a
+revealed secret as established party knowledge. Each section takes at most a quarter of the
+context budget, with an omission count, leaving room for the other section and world rosters.
+When `activeSessionId` names a session with a
 non-empty Stage (§4.6), Tier 1 adds an **On Stage Now** section — place, present cast and the DM's
 `focus` line — and the Stage's cast joins the "NPCs in Scene" list and the unrevealed secrets
 relevance set. Plot lines carry `[clock n/m]` / `— if ignored: …`, and the Player Characters roster carries each
